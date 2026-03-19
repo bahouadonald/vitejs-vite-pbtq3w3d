@@ -11,8 +11,7 @@ import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 const ADMIN_EMAIL = 'admin@securedrop.com';
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
-const BASE_URL = 'https://vitejsvitepbtq3w3d-kdjb--5173--8669d46c.local-credentialless.webcontainer.io';
-
+const BASE_URL = 'https://vitejs-vite-pbtq3w3d-sza3.vercel.app';
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login'|'dashboard'>('login');
