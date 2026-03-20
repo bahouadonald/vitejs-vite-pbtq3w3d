@@ -16,6 +16,18 @@ const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://vitejs-vite-pbtq3w3d-sza3.vercel.app';
 
+// ─────────────────────────────────────────────
+// DETECT SAFARI
+// ─────────────────────────────────────────────
+const isSafari = () => {
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua) && !/FxiOS/.test(ua);
+};
+
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+};
+
 const S = {
   bg: { minHeight: '100vh', background: '#07080f', color: '#e8eaf2', fontFamily: 'sans-serif' } as React.CSSProperties,
   card: { background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 16, padding: 24, marginBottom: 16 } as React.CSSProperties,
@@ -56,11 +68,12 @@ const cleanName = (name: string) =>
 // ─────────────────────────────────────────────
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
-  const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
+  const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'safari' | 'done'>('loading');
   const [qrData, setQrData] = useState<any>(null);
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [copied, setCopied] = useState('');
+  const [safariLinks, setSafariLinks] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -84,28 +97,44 @@ function FanPage() {
     setTimeout(() => setCopied(''), 2000);
   };
 
+  const markAsDownloaded = async () => {
+    if (!qrData) return;
+    const newUsed = (qrData.usedScans || 0) + 1;
+    await updateDoc(doc(db, 'qrcodes', qrData.id), {
+      usedScans: newUsed,
+      downloads: (qrData.downloads || 0) + 1,
+      status: newUsed >= qrData.totalScans ? 'locked' : 'active',
+    });
+  };
+
   const startDownload = async () => {
     if (!qrData) return;
+    const files = qrData.files || [];
+
+    // Mark as downloaded immediately
+    await markAsDownloaded();
+
+    // SAFARI / iOS → show direct links
+    if (isSafari() || isIOS()) {
+      const links = files.map((f: any) => ({
+        name: f.name,
+        url: f.url.replace('/upload/', '/upload/fl_attachment/'),
+      }));
+      setSafariLinks(links);
+      setStep('safari');
+      return;
+    }
+
+    // CHROME / ANDROID → ZIP download
     setStep('zipping');
 
     try {
-      const files = qrData.files || [];
-
-      // Update scan count in Firebase
-      const newUsed = (qrData.usedScans || 0) + 1;
-      await updateDoc(doc(db, 'qrcodes', qrData.id), {
-        usedScans: newUsed,
-        downloads: (qrData.downloads || 0) + 1,
-        status: newUsed >= qrData.totalScans ? 'locked' : 'active',
-      });
-
       if (files.length === 0) {
         setDlStatus('Aucun fichier disponible');
         setStep('done');
         return;
       }
 
-      // Single file — download directly
       if (files.length === 1) {
         setDlStatus('Telechargement en cours...');
         setDlProgress(50);
@@ -122,7 +151,6 @@ function FanPage() {
         return;
       }
 
-      // Multiple files — create ZIP
       const zip = new JSZip();
       const folder = zip.folder(qrData.label || 'SecureDrop') as JSZip;
 
@@ -130,15 +158,13 @@ function FanPage() {
         const file = files[i];
         setDlStatus('Preparation ' + (i + 1) + '/' + files.length + ' — ' + file.name);
         setDlProgress(Math.round((i / files.length) * 70));
-
         try {
-          // Use fl_attachment to force proper download from Cloudinary
           const dlUrl = file.url.replace('/upload/', '/upload/fl_attachment/');
           const response = await fetch(dlUrl);
           const blob = await response.blob();
           folder.file(file.name, blob);
         } catch (e) {
-          console.error('Error fetching file:', file.name, e);
+          console.error('Error fetching:', file.name, e);
         }
       }
 
@@ -147,13 +173,11 @@ function FanPage() {
 
       const zipBlob = await zip.generateAsync(
         { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
-        (metadata) => {
-          setDlProgress(80 + Math.round(metadata.percent * 0.2));
-        }
+        (meta) => { setDlProgress(80 + Math.round(meta.percent * 0.2)); }
       );
 
-      setDlStatus('Telechargement du ZIP...');
       setDlProgress(100);
+      setDlStatus('Telechargement du ZIP...');
 
       const zipName = (qrData.label || 'SecureDrop').replace(/[^a-zA-Z0-9_-]/g, '_') + '.zip';
       const url = URL.createObjectURL(zipBlob);
@@ -166,9 +190,7 @@ function FanPage() {
       URL.revokeObjectURL(url);
 
       setStep('done');
-
     } catch (e: any) {
-      console.error('Download error:', e);
       setDlStatus('Erreur: ' + (e.message || 'Telechargement echoue'));
       setStep('done');
     }
@@ -228,16 +250,61 @@ function FanPage() {
               </div>
             )}
 
+            {/* Device info */}
             <div style={{ background: '#0a1a0a', border: '1px solid #1a3a1a', borderRadius: 8, padding: 12, marginBottom: 16, textAlign: 'center' }}>
               <p style={{ color: '#4af09a', fontSize: 12, marginBottom: 4 }}>
-                {(qrData.files?.length || 0) > 1 ? 'Tous les fichiers seront compresses en 1 ZIP' : 'Telechargement unique'}
+                {(isSafari() || isIOS())
+                  ? '📱 iPhone/Safari detecte — telechargement fichier par fichier'
+                  : (qrData.files?.length || 0) > 1 ? '📦 Tous les fichiers en 1 ZIP' : '⬇ Telechargement direct'}
               </p>
               <p style={{ color: '#5a6080', fontSize: 11 }}>Ce lien expire apres 1 telechargement</p>
             </div>
 
             <button style={{ ...S.btn, width: '100%', padding: 16, fontSize: 16 }} onClick={startDownload}>
-              {(qrData.files?.length || 0) > 1 ? 'Telecharger le ZIP' : 'Telecharger'}
+              {(isSafari() || isIOS()) ? 'Acceder aux fichiers' : (qrData.files?.length || 0) > 1 ? 'Telecharger le ZIP' : 'Telecharger'}
             </button>
+          </div>
+        )}
+
+        {/* SAFARI MODE — show direct links */}
+        {step === 'safari' && (
+          <div style={{ ...S.card, border: '1px solid #1a3a1a' }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <p style={{ fontSize: 36, marginBottom: 8 }}>📱</p>
+              <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Vos fichiers sont prets !</h2>
+              <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7 }}>
+                Sur iPhone, appuyez sur chaque fichier puis <strong style={{ color: '#f9fafb' }}>"Telecharger le fichier"</strong> pour l enregistrer.
+              </p>
+            </div>
+
+            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 12, letterSpacing: 1 }}>APPUYEZ POUR TELECHARGER</p>
+              {safariLinks.map((f, i) => (
+                <a
+                  key={i}
+                  href={f.url}
+                  download={f.name}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: '#0e1018', border: '1px solid #1c1f2e',
+                    borderRadius: 10, padding: '12px 16px', marginBottom: 10,
+                    textDecoration: 'none', color: '#e8eaf2'
+                  }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</p>
+                    <p style={{ fontSize: 11, color: '#5a6080' }}>Appuyer pour telecharger</p>
+                  </div>
+                  <span style={{ color: '#c8f04a', fontSize: 18, flexShrink: 0 }}>⬇</span>
+                </a>
+              ))}
+            </div>
+
+            <div style={{ background: '#1a1000', border: '1px solid #3a2a00', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 12, color: '#f0b84a' }}>
+              Conseil : Appuyez longuement sur chaque lien → "Telecharger le fichier"
+            </div>
           </div>
         )}
 
@@ -310,10 +377,10 @@ function FanPage() {
               {dlStatus.startsWith('Erreur') ? 'Erreur de telechargement' : 'Telechargement termine !'}
             </h2>
             <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
-              {dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier ZIP est dans vos telechargements. Ce lien est maintenant expire.'}
+              {dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier est dans vos telechargements. Ce lien est maintenant expire.'}
             </p>
             <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, fontSize: 11, color: '#5a6080' }}>
-              {dlStatus.startsWith('Erreur') ? 'Contactez l artiste' : 'LIEN REVOQUE — ACCES DESACTIVE'}
+              LIEN REVOQUE — ACCES DESACTIVE
             </div>
           </div>
         )}
@@ -430,7 +497,7 @@ function AdminPage() {
 
   const deleteQR = async (id: string) => {
     await deleteDoc(doc(db, 'qrcodes', id));
-    setConfirmDelete(null); setMsg('QR Code supprime !');
+    setConfirmDelete(null); setMsg('QR supprime !');
   };
 
   const deleteAllLocked = async () => {
@@ -441,17 +508,24 @@ function AdminPage() {
 
   const saveEdit = async () => {
     if (!editModal) return;
+    const newTotal = parseInt(editScans) || editModal.totalScans;
+    const newPrice2 = parseInt(editPrice) || editModal.price;
+    const isNowActive = editModal.usedScans < newTotal;
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
-      price: parseInt(editPrice) || editModal.price,
-      totalScans: parseInt(editScans) || editModal.totalScans,
+      price: newPrice2,
+      totalScans: newTotal,
+      status: isNowActive ? 'active' : 'locked',
     });
-    setEditModal(null); setMsg('QR Code mis a jour !');
+    setEditModal(null); setMsg('QR mis a jour !');
   };
 
   const verifyPayment = async (p: any) => {
     await updateDoc(doc(db, 'payments', p.id), { status: 'verified' });
     const qr = qrcodes.find(q => q.id === p.qrDocId);
-    if (qr) await updateDoc(doc(db, 'qrcodes', p.qrDocId), { status: 'active', totalScans: (qr.totalScans || 0) + 10 });
+    if (qr) await updateDoc(doc(db, 'qrcodes', p.qrDocId), {
+      status: 'active',
+      totalScans: (qr.totalScans || 0) + 10
+    });
     setMsg('Paiement valide, QR reactive !');
   };
 
@@ -528,12 +602,23 @@ function AdminPage() {
       {editModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420 }}>
-            <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Modifier</h3>
-            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 20 }}>{editModal.qrId} — {editModal.label}</p>
+            <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Modifier / Reactiver</h3>
+            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 8 }}>{editModal.qrId}</p>
+            <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 20 }}>
+              Scans utilises : {editModal.usedScans}/{editModal.totalScans}
+              {editModal.usedScans >= editModal.totalScans && (
+                <span style={{ color: '#f0b84a', marginLeft: 8 }}>— Pour reactiver, augmentez le nombre de scans</span>
+              )}
+            </p>
             <label style={S.lbl}>Nouveau prix (FCFA)</label>
             <input style={S.inp} type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} placeholder={'Actuel: ' + editModal.price} />
-            <label style={S.lbl}>Nouveau nombre de scans total</label>
+            <label style={S.lbl}>Nombre de scans total</label>
             <input style={S.inp} type="number" value={editScans} onChange={e => setEditScans(e.target.value)} placeholder={'Actuel: ' + editModal.totalScans} />
+            {parseInt(editScans) > editModal.usedScans && (
+              <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4af09a' }}>
+                ✓ Ce QR code sera reactive automatiquement
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => setEditModal(null)}>Annuler</button>
               <button style={{ ...S.btn, flex: 2 }} onClick={saveEdit}>Sauvegarder</button>
@@ -599,18 +684,16 @@ function AdminPage() {
             <div style={S.card}>
               <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, fontFamily: 'serif' }}>Nouveau QR Code</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div><label style={S.lbl}>Nom du contenu *</label><input style={S.inp} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Album Vol.1 2026" /></div>
+                <div><label style={S.lbl}>Nom du contenu *</label><input style={S.inp} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Album Vol.1" /></div>
                 <div><label style={S.lbl}>Artiste *</label><input style={S.inp} value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="DJ Lamine" /></div>
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
-
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {[['album', 'Album'], ['single', 'Single'], ['video', 'Video'], ['mix', 'Mix']].map(([t, l]) => (
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#c8f04a' : '#252840'), background: newType === t ? '#1a2a0a' : 'transparent', color: newType === t ? '#c8f04a' : '#5a6080', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
-
               <label style={S.lbl}>Fichiers audio/video</label>
               <div style={{ border: '2px dashed #252840', borderRadius: 12, padding: 20, marginBottom: 16, textAlign: 'center', background: '#0a0b12' }}>
                 <input type="file" accept="audio/*,video/*" multiple onChange={e => setSelectedFiles(e.target.files)} style={{ display: 'none' }} id="fileInput" />
@@ -628,7 +711,6 @@ function AdminPage() {
                   </div>
                 ) : <p style={{ color: '#5a6080', fontSize: 13 }}>Aucun fichier selectionne</p>}
               </div>
-
               {loading && uploadProgress > 0 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8890b0', marginBottom: 6 }}>
@@ -639,7 +721,6 @@ function AdminPage() {
                   </div>
                 </div>
               )}
-
               <button style={{ ...S.btn, width: '100%', padding: 14, fontSize: 15 }} onClick={createQR} disabled={loading}>
                 {loading ? (uploadMsg || 'Creation...') : 'Generer QR Code'}
               </button>
@@ -649,43 +730,52 @@ function AdminPage() {
 
             {filteredQRs.length === 0 ? (
               <div style={{ ...S.card, textAlign: 'center', color: '#5a6080', padding: 40 }}>
-                {searchTerm ? 'Aucun resultat' : 'Aucun QR code — cree le premier ci-dessus'}
+                {searchTerm ? 'Aucun resultat' : 'Aucun QR code'}
               </div>
-            ) : filteredQRs.map(q => (
-              <div key={q.id} style={{ ...S.card, borderColor: q.status === 'locked' ? '#3a2a00' : '#1c1f2e' }}>
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  <div style={{ background: 'white', padding: 10, borderRadius: 12, flexShrink: 0, cursor: 'pointer' }} onClick={() => setQrModal(q)}>
-                    <QRCodeSVG value={q.url} size={80} bgColor="#ffffff" fgColor="#07080f" />
-                    <p style={{ color: '#07080f', fontSize: 9, textAlign: 'center', marginTop: 4, fontWeight: 700 }}>{q.qrId}</p>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, fontSize: 15 }}>{q.label}</span>
-                      <span style={badgeStyle(q.status)}>{q.status === 'active' ? 'Actif' : 'Bloque'}</span>
-                      <span style={{ fontFamily: 'monospace', color: '#c8f04a', fontSize: 12, fontWeight: 700, letterSpacing: 2 }}>{q.qrId}</span>
+            ) : filteredQRs.map(q => {
+              const isLocked = q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1);
+              return (
+                <div key={q.id} style={{ ...S.card, borderColor: isLocked ? '#3a2a00' : '#1c1f2e' }}>
+                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ background: 'white', padding: 10, borderRadius: 12, flexShrink: 0, cursor: 'pointer' }} onClick={() => setQrModal(q)}>
+                      <QRCodeSVG value={q.url} size={80} bgColor="#ffffff" fgColor="#07080f" />
+                      <p style={{ color: '#07080f', fontSize: 9, textAlign: 'center', marginTop: 4, fontWeight: 700 }}>{q.qrId}</p>
                     </div>
-                    <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 4 }}>{q.artist} · {q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
-                    <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 8 }}>{q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL</p>
-                    <div style={{ height: 4, background: '#1c1f2e', borderRadius: 99, marginBottom: 8 }}>
-                      <div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: (q.usedScans || 0) >= (q.totalScans || 1) ? '#f04a6a' : '#c8f04a', borderRadius: 99 }} />
-                    </div>
-                    {q.files && q.files.length > 0 && (
-                      <div style={{ background: '#0a0b12', borderRadius: 6, padding: '6px 10px' }}>
-                        {q.files.map((f: any, i: number) => <p key={i} style={{ color: '#5a6080', fontSize: 11, marginBottom: 1 }}>{i + 1}. {f.name}</p>)}
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: 15 }}>{q.label}</span>
+                        <span style={badgeStyle(isLocked ? 'locked' : 'active')}>{isLocked ? 'Bloque' : 'Actif'}</span>
+                        <span style={{ fontFamily: 'monospace', color: '#c8f04a', fontSize: 12, fontWeight: 700, letterSpacing: 2 }}>{q.qrId}</span>
                       </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-                    <button style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }} onClick={() => setQrModal(q)}>QR PNG</button>
-                    <button style={{ ...S.btn2, fontSize: 12 }} onClick={() => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); }}>✏️ Modifier</button>
-                    <button style={q.status === 'active' ? { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 12 } : { ...S.btn2, color: '#4af09a', borderColor: '#4af09a', fontSize: 12 }} onClick={() => toggleQR(q.id, q.status)}>
-                      {q.status === 'active' ? '🔒 Bloquer' : '🔓 Activer'}
-                    </button>
-                    <button style={{ ...S.btnRed, fontSize: 12 }} onClick={() => setConfirmDelete(q.id)}>🗑️ Supprimer</button>
+                      <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 4 }}>{q.artist} · {q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
+                      <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 8 }}>{q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL</p>
+                      <div style={{ height: 4, background: '#1c1f2e', borderRadius: 99, marginBottom: 8 }}>
+                        <div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#c8f04a', borderRadius: 99 }} />
+                      </div>
+                      {q.files && q.files.length > 0 && (
+                        <div style={{ background: '#0a0b12', borderRadius: 6, padding: '6px 10px' }}>
+                          {q.files.map((f: any, i: number) => <p key={i} style={{ color: '#5a6080', fontSize: 11, marginBottom: 1 }}>{i + 1}. {f.name}</p>)}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                      <button style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }} onClick={() => setQrModal(q)}>QR PNG</button>
+                      <button style={{ ...S.btn2, fontSize: 12 }} onClick={() => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); }}>
+                        {isLocked ? '🔓 Reactiver' : '✏️ Modifier'}
+                      </button>
+                      <button
+                        style={isLocked
+                          ? { ...S.btn2, color: '#4af09a', borderColor: '#4af09a', fontSize: 12 }
+                          : { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 12 }}
+                        onClick={() => toggleQR(q.id, q.status)}>
+                        {isLocked ? '🔓 Activer' : '🔒 Bloquer'}
+                      </button>
+                      <button style={{ ...S.btnRed, fontSize: 12 }} onClick={() => setConfirmDelete(q.id)}>🗑️ Supprimer</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </>
         )}
 
