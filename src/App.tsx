@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import JSZip from 'jszip';
 import { db, auth } from './firebase';
@@ -16,17 +16,12 @@ const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://securedrop-ci.vercel.app';
 
-// ─────────────────────────────────────────────
-// DETECT SAFARI
-// ─────────────────────────────────────────────
 const isSafari = () => {
   const ua = navigator.userAgent;
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua) && !/FxiOS/.test(ua);
 };
-
-const isIOS = () => {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-};
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isChromeiOS = () => /CriOS/.test(navigator.userAgent);
 
 const S = {
   bg: { minHeight: '100vh', background: '#07080f', color: '#e8eaf2', fontFamily: 'sans-serif' } as React.CSSProperties,
@@ -63,17 +58,212 @@ const formatSize = (bytes: number) => {
 const cleanName = (name: string) =>
   name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
 
+const formatTime = (t: number) => {
+  if (!t || isNaN(t)) return '0:00';
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+};
+
+// ─────────────────────────────────────────────
+// AUDIO PLAYER
+// ─────────────────────────────────────────────
+function AudioPlayer({ files }: { files: any[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const current = files[currentIndex];
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.load();
+      if (isPlaying) audioRef.current.play().catch(() => setIsPlaying(false));
+    }
+  }, [currentIndex]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setIsPlaying(false));
+      setIsPlaying(true);
+    }
+  };
+
+  const onTimeUpdate = () => {
+    if (!audioRef.current) return;
+    setCurrentTime(audioRef.current.currentTime);
+    setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100 || 0);
+  };
+
+  const onLoadedMetadata = () => {
+    if (audioRef.current) setDuration(audioRef.current.duration);
+  };
+
+  const onEnded = () => {
+    if (currentIndex < files.length - 1) {
+      setCurrentIndex(i => i + 1);
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+    }
+  };
+
+  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audioRef.current.currentTime = pct * audioRef.current.duration;
+  };
+
+  const prev = () => { if (currentIndex > 0) { setCurrentIndex(i => i - 1); setIsPlaying(true); } };
+  const next = () => { if (currentIndex < files.length - 1) { setCurrentIndex(i => i + 1); setIsPlaying(true); } };
+
+  if (!files || files.length === 0) return null;
+
+  return (
+    <div style={{ background: '#0a0b12', borderRadius: 14, padding: 20, marginBottom: 20 }}>
+      <audio ref={audioRef} src={current?.url} onTimeUpdate={onTimeUpdate} onLoadedMetadata={onLoadedMetadata} onEnded={onEnded} preload="metadata" />
+
+      {/* NOW PLAYING */}
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 99, background: 'linear-gradient(135deg, #c8f04a, #4af09a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 10px' }}>
+          🎵
+        </div>
+        <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2, color: '#e8eaf2' }}>
+          {current?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentIndex + 1)}
+        </p>
+        <p style={{ color: '#5a6080', fontSize: 12 }}>{currentIndex + 1} / {files.length}</p>
+      </div>
+
+      {/* PROGRESS */}
+      <div onClick={seek} style={{ height: 6, background: '#1c1f2e', borderRadius: 99, marginBottom: 8, cursor: 'pointer' }}>
+        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #c8f04a, #4af09a)', borderRadius: 99, transition: 'width .1s' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#5a6080', marginBottom: 16 }}>
+        <span>{formatTime(currentTime)}</span>
+        <span>{formatTime(duration)}</span>
+      </div>
+
+      {/* CONTROLS */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
+        <button onClick={prev} disabled={currentIndex === 0} style={{ background: 'none', border: 'none', color: currentIndex === 0 ? '#2a2a3a' : '#8890b0', fontSize: 22, cursor: currentIndex === 0 ? 'default' : 'pointer' }}>⏮</button>
+        <button onClick={togglePlay} style={{ width: 56, height: 56, borderRadius: 99, border: 'none', background: '#c8f04a', color: '#07080f', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isPlaying ? '⏸' : '▶'}
+        </button>
+        <button onClick={next} disabled={currentIndex === files.length - 1} style={{ background: 'none', border: 'none', color: currentIndex === files.length - 1 ? '#2a2a3a' : '#8890b0', fontSize: 22, cursor: currentIndex === files.length - 1 ? 'default' : 'pointer' }}>⏭</button>
+      </div>
+
+      {/* PLAYLIST */}
+      {files.length > 1 && (
+        <div style={{ marginTop: 16, borderTop: '1px solid #1c1f2e', paddingTop: 14 }}>
+          {files.map((f, i) => (
+            <div key={i} onClick={() => { setCurrentIndex(i); setIsPlaying(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: i === currentIndex ? '#1a2a0a' : 'transparent', marginBottom: 4 }}>
+              <span style={{ color: i === currentIndex ? '#c8f04a' : '#5a6080', fontSize: 13, fontWeight: 700, minWidth: 20 }}>
+                {i === currentIndex && isPlaying ? '▶' : (i + 1)}
+              </span>
+              <span style={{ fontSize: 13, color: i === currentIndex ? '#c8f04a' : '#8890b0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// IPHONE DOWNLOAD COMPONENT
+// ─────────────────────────────────────────────
+function IPhoneDownload({ files, label, currentUrl }: { files: any[], label: string, currentUrl: string }) {
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  // Try to open current page in Chrome iOS
+  const openInChrome = () => {
+    const chromeUrl = currentUrl.replace('https://', 'googlechrome://');
+    window.location.href = chromeUrl;
+    // Fallback after 2s if Chrome not installed
+    setTimeout(() => {
+      window.open('https://apps.apple.com/app/google-chrome/id535886823', '_blank');
+    }, 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* OPEN IN CHROME — Primary action */}
+      <button onClick={openInChrome} style={{ ...S.btn, width: '100%', padding: 16, fontSize: 16, marginBottom: 12, background: '#4285f4', borderRadius: 12 }}>
+        🌐 Ouvrir dans Chrome pour telecharger
+      </button>
+
+      {/* ALTERNATIVE — Manual instructions */}
+      <button onClick={() => setShowInstructions(!showInstructions)} style={{ ...S.btn2, width: '100%', padding: 12, fontSize: 13, textAlign: 'center' }}>
+        {showInstructions ? 'Masquer les instructions' : 'Telecharger manuellement sur Safari →'}
+      </button>
+
+      {showInstructions && (
+        <div style={{ background: '#0a0b12', borderRadius: 12, padding: 18, marginTop: 12 }}>
+          <p style={{ color: '#f0b84a', fontWeight: 700, fontSize: 13, marginBottom: 14 }}>
+            Instructions pour Safari iPhone :
+          </p>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>1</div>
+            <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.6 }}>Appuyez <strong style={{ color: '#f9fafb' }}>longuement</strong> sur le lien du fichier ci-dessous</p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>2</div>
+            <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.6 }}>Selectionnez <strong style={{ color: '#f9fafb' }}>"Telecharger le fichier lie"</strong></p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>3</div>
+            <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.6 }}>Le fichier sera dans vos <strong style={{ color: '#f9fafb' }}>Fichiers → Telechargements</strong></p>
+          </div>
+
+          {/* File links */}
+          <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 14 }}>
+            <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 10, letterSpacing: 1 }}>APPUYEZ LONGUEMENT SUR CHAQUE FICHIER</p>
+            {files.map((f, i) => (
+              <a key={i} href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 10, padding: '12px 16px', marginBottom: 10, textDecoration: 'none', color: '#e8eaf2' }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {f.name?.replace(/\.[^/.]+$/, '') || 'Fichier ' + (i + 1)}
+                  </p>
+                  <p style={{ fontSize: 11, color: '#5a6080' }}>Appuyer longuement → Telecharger</p>
+                </div>
+                <span style={{ color: '#c8f04a', fontSize: 18, flexShrink: 0 }}>⬇</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // FAN PAGE
 // ─────────────────────────────────────────────
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
-  const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'safari' | 'done'>('loading');
+  const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
   const [qrData, setQrData] = useState<any>(null);
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [copied, setCopied] = useState('');
-  const [safariLinks, setSafariLinks] = useState<any[]>([]);
+  const [downloaded, setDownloaded] = useState(false);
+  const currentUrl = window.location.href;
 
   useEffect(() => {
     const load = async () => {
@@ -98,7 +288,8 @@ function FanPage() {
   };
 
   const markAsDownloaded = async () => {
-    if (!qrData) return;
+    if (!qrData || downloaded) return;
+    setDownloaded(true);
     const newUsed = (qrData.usedScans || 0) + 1;
     await updateDoc(doc(db, 'qrcodes', qrData.id), {
       usedScans: newUsed,
@@ -108,203 +299,121 @@ function FanPage() {
   };
 
   const startDownload = async () => {
-    if (!qrData) return;
-    const files = qrData.files || [];
-
-    // Mark as downloaded immediately
+    if (!qrData || downloaded) return;
     await markAsDownloaded();
-
-    // SAFARI / iOS → show direct links
-    if (isSafari() || isIOS()) {
-      const links = files.map((f: any) => ({
-        name: f.name,
-        url: f.url.replace('/upload/', '/upload/fl_attachment/'),
-      }));
-      setSafariLinks(links);
-      setStep('safari');
-      return;
-    }
-
-    // CHROME / ANDROID → ZIP download
+    const files = qrData.files || [];
     setStep('zipping');
-
     try {
-      if (files.length === 0) {
-        setDlStatus('Aucun fichier disponible');
-        setStep('done');
-        return;
-      }
-
+      if (files.length === 0) { setDlStatus('Aucun fichier'); setStep('done'); return; }
       if (files.length === 1) {
-        setDlStatus('Telechargement en cours...');
         setDlProgress(50);
-        const file = files[0];
-        const dlUrl = file.url.replace('/upload/', '/upload/fl_attachment/');
+        const dlUrl = files[0].url.replace('/upload/', '/upload/fl_attachment/');
         const a = document.createElement('a');
-        a.href = dlUrl;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setDlProgress(100);
-        setStep('done');
-        return;
+        a.href = dlUrl; a.download = files[0].name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setDlProgress(100); setStep('done'); return;
       }
-
       const zip = new JSZip();
       const folder = zip.folder(qrData.label || 'SecureDrop') as JSZip;
-
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setDlStatus('Preparation ' + (i + 1) + '/' + files.length + ' — ' + file.name);
+        setDlStatus('Preparation ' + (i + 1) + '/' + files.length + ' — ' + files[i].name);
         setDlProgress(Math.round((i / files.length) * 70));
         try {
-          const dlUrl = file.url.replace('/upload/', '/upload/fl_attachment/');
+          const dlUrl = files[i].url.replace('/upload/', '/upload/fl_attachment/');
           const response = await fetch(dlUrl);
           const blob = await response.blob();
-          folder.file(file.name, blob);
-        } catch (e) {
-          console.error('Error fetching:', file.name, e);
-        }
+          folder.file(files[i].name, blob);
+        } catch (e) { console.error(e); }
       }
-
-      setDlStatus('Compression en cours...');
+      setDlStatus('Compression...');
       setDlProgress(80);
-
       const zipBlob = await zip.generateAsync(
         { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
         (meta) => { setDlProgress(80 + Math.round(meta.percent * 0.2)); }
       );
-
       setDlProgress(100);
-      setDlStatus('Telechargement du ZIP...');
-
       const zipName = (qrData.label || 'SecureDrop').replace(/[^a-zA-Z0-9_-]/g, '_') + '.zip';
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = zipName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = zipName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
       setStep('done');
     } catch (e: any) {
-      setDlStatus('Erreur: ' + (e.message || 'Telechargement echoue'));
+      setDlStatus('Erreur: ' + (e.message || 'Echec'));
       setStep('done');
     }
   };
 
-  return (
-    <div style={{ ...S.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+  const onSafari = isSafari() && isIOS() && !isChromeiOS();
 
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 10px' }}>◈</div>
-        <p style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800 }}>SecureDrop</p>
-        <p style={{ color: '#5a6080', fontSize: 11 }}>Distribution securisee</p>
+  return (
+    <div style={{ ...S.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, minHeight: '100vh' }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 11, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 8px' }}>◈</div>
+        <p style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800 }}>SecureDrop</p>
       </div>
 
-      <div style={{ width: '100%', maxWidth: 420 }}>
+      <div style={{ width: '100%', maxWidth: 440 }}>
 
         {/* LOADING */}
         {step === 'loading' && (
           <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
             <div style={{ width: 44, height: 44, border: '3px solid #c8f04a', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 16px', animation: 'spin .8s linear infinite' }} />
-            <p style={{ color: '#8890b0' }}>Verification en cours...</p>
+            <p style={{ color: '#8890b0' }}>Chargement...</p>
           </div>
         )}
 
         {/* READY */}
         {step === 'ready' && qrData && (
-          <div style={{ ...S.card, border: '1px solid #1a3a1a' }}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 99, background: '#0d2e1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 12px' }}>✓</div>
-              <p style={{ color: '#4af09a', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 6 }}>ACCES AUTORISE</p>
-              <h2 style={{ fontFamily: 'serif', fontSize: 22, marginBottom: 4 }}>{qrData.label}</h2>
-              <p style={{ color: '#8890b0', fontSize: 13 }}>par {qrData.artist}</p>
+          <div style={{ animation: 'fadeUp .4s ease' }}>
+
+            {/* HEADER + DOWNLOAD */}
+            <div style={{ ...S.card, border: '1px solid #1a3a1a' }}>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <p style={{ color: '#4af09a', fontSize: 10, fontWeight: 800, letterSpacing: 2, marginBottom: 8 }}>CONTENU EXCLUSIF</p>
+                <h1 style={{ fontFamily: 'serif', fontSize: 24, fontWeight: 800, marginBottom: 6, lineHeight: 1.2 }}>{qrData.label}</h1>
+                <p style={{ color: '#8890b0', fontSize: 14 }}>par <strong style={{ color: '#e8eaf2' }}>{qrData.artist}</strong></p>
+              </div>
+
+              {/* DOWNLOAD — Priority */}
+              {!downloaded ? (
+                onSafari ? (
+                  /* iPhone Safari — special handling */
+                  <IPhoneDownload
+                    files={qrData.files || []}
+                    label={qrData.label}
+                    currentUrl={currentUrl}
+                  />
+                ) : (
+                  <button onClick={startDownload} style={{ ...S.btn, width: '100%', padding: 18, fontSize: 17, borderRadius: 12, marginBottom: 8 }}>
+                    ⬇ {(qrData.files?.length || 0) > 1 ? 'Telecharger l album complet' : 'Telecharger'}
+                  </button>
+                )
+              ) : (
+                <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 12, padding: 14, textAlign: 'center', marginBottom: 8 }}>
+                  <p style={{ color: '#4af09a', fontWeight: 700, fontSize: 14 }}>✓ Telechargement effectue</p>
+                  <p style={{ color: '#5a6080', fontSize: 12, marginTop: 4 }}>Vous pouvez continuer a ecouter</p>
+                </div>
+              )}
+
+              {/* Safari notice */}
+              {onSafari && !downloaded && (
+                <p style={{ color: '#5a6080', fontSize: 11, textAlign: 'center', marginTop: 8 }}>
+                  💡 Chrome est recommande pour un telechargement automatique
+                </p>
+              )}
             </div>
 
-            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', justifyContent: 'space-around' }}>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ color: '#c8f04a', fontWeight: 800, fontSize: 20 }}>{(qrData.totalScans || 0) - (qrData.usedScans || 0)}</p>
-                <p style={{ color: '#5a6080', fontSize: 10 }}>scans restants</p>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontWeight: 800, fontSize: 20 }}>{qrData.fileCount || 0}</p>
-                <p style={{ color: '#5a6080', fontSize: 10 }}>fichier(s)</p>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontWeight: 800, fontSize: 20 }}>{(qrData.price || 0).toLocaleString()}</p>
-                <p style={{ color: '#5a6080', fontSize: 10 }}>FCFA</p>
-              </div>
-            </div>
-
+            {/* AUDIO PLAYER */}
             {qrData.files && qrData.files.length > 0 && (
-              <div style={{ background: '#0a0b12', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 8 }}>Contenu inclus :</p>
-                {qrData.files.map((f: any, i: number) => (
-                  <p key={i} style={{ color: '#8890b0', fontSize: 12, marginBottom: 2 }}>{i + 1}. {f.name}</p>
-                ))}
+              <div style={S.card}>
+                <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 14, letterSpacing: 1 }}>LECTEUR AUDIO — STREAMING GRATUIT</p>
+                <AudioPlayer files={qrData.files} />
               </div>
             )}
-
-            {/* Device info */}
-            <div style={{ background: '#0a1a0a', border: '1px solid #1a3a1a', borderRadius: 8, padding: 12, marginBottom: 16, textAlign: 'center' }}>
-              <p style={{ color: '#4af09a', fontSize: 12, marginBottom: 4 }}>
-                {(isSafari() || isIOS())
-                  ? '📱 iPhone/Safari detecte — telechargement fichier par fichier'
-                  : (qrData.files?.length || 0) > 1 ? '📦 Tous les fichiers en 1 ZIP' : '⬇ Telechargement direct'}
-              </p>
-              <p style={{ color: '#5a6080', fontSize: 11 }}>Ce lien expire apres 1 telechargement</p>
-            </div>
-
-            <button style={{ ...S.btn, width: '100%', padding: 16, fontSize: 16 }} onClick={startDownload}>
-              {(isSafari() || isIOS()) ? 'Acceder aux fichiers' : (qrData.files?.length || 0) > 1 ? 'Telecharger le ZIP' : 'Telecharger'}
-            </button>
-          </div>
-        )}
-
-        {/* SAFARI MODE — show direct links */}
-        {step === 'safari' && (
-          <div style={{ ...S.card, border: '1px solid #1a3a1a' }}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <p style={{ fontSize: 36, marginBottom: 8 }}>📱</p>
-              <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Vos fichiers sont prets !</h2>
-              <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7 }}>
-                Sur iPhone, appuyez sur chaque fichier puis <strong style={{ color: '#f9fafb' }}>"Telecharger le fichier"</strong> pour l enregistrer.
-              </p>
-            </div>
-
-            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-              <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 12, letterSpacing: 1 }}>APPUYEZ POUR TELECHARGER</p>
-              {safariLinks.map((f, i) => (
-                <a
-                  key={i}
-                  href={f.url}
-                  download={f.name}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    background: '#0e1018', border: '1px solid #1c1f2e',
-                    borderRadius: 10, padding: '12px 16px', marginBottom: 10,
-                    textDecoration: 'none', color: '#e8eaf2'
-                  }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</p>
-                    <p style={{ fontSize: 11, color: '#5a6080' }}>Appuyer pour telecharger</p>
-                  </div>
-                  <span style={{ color: '#c8f04a', fontSize: 18, flexShrink: 0 }}>⬇</span>
-                </a>
-              ))}
-            </div>
-
-            <div style={{ background: '#1a1000', border: '1px solid #3a2a00', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 12, color: '#f0b84a' }}>
-              Conseil : Appuyez longuement sur chaque lien → "Telecharger le fichier"
-            </div>
           </div>
         )}
 
@@ -315,7 +424,7 @@ function FanPage() {
             <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Preparation en cours...</p>
             <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 20 }}>{dlStatus}</p>
             <div style={{ height: 8, background: '#1c1f2e', borderRadius: 99, marginBottom: 12 }}>
-              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #c8f04a, #4af09a)', borderRadius: 99, transition: 'width .3s ease' }} />
+              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #c8f04a, #4af09a)', borderRadius: 99, transition: 'width .3s' }} />
             </div>
             <p style={{ color: '#c8f04a', fontWeight: 800, fontSize: 28 }}>{dlProgress}%</p>
             <p style={{ color: '#5a6080', fontSize: 11, marginTop: 12 }}>Ne fermez pas cette page</p>
@@ -324,37 +433,39 @@ function FanPage() {
 
         {/* LOCKED */}
         {step === 'locked' && (
-          <div style={{ ...S.card, border: '1px solid #3a1a1a' }}>
+          <div style={{ ...S.card, border: '1px solid #3a1a1a', animation: 'fadeUp .4s ease' }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <div style={{ width: 56, height: 56, borderRadius: 99, background: '#2e0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 12px' }}>🔒</div>
-              <p style={{ color: '#f04a6a', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 6 }}>ACCES BLOQUE</p>
-              <h2 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>{qrData?.label || 'Contenu protege'}</h2>
+              <p style={{ color: '#f04a6a', fontSize: 10, fontWeight: 800, letterSpacing: 2, marginBottom: 8 }}>ACCES BLOQUE</p>
+              <h2 style={{ fontFamily: 'serif', fontSize: 22, marginBottom: 4 }}>{qrData?.label || 'Contenu protege'}</h2>
               <p style={{ color: '#8890b0', fontSize: 13 }}>par {qrData?.artist || '—'}</p>
             </div>
 
-            <div style={{ background: '#1a1000', border: '1px solid #3a2a00', borderRadius: 12, padding: 20, marginBottom: 16, textAlign: 'center' }}>
-              <p style={{ color: '#f0b84a', fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Ce QR code a ete utilise</p>
+            <div style={{ background: '#1a1000', border: '1px solid #3a2a00', borderRadius: 12, padding: 18, marginBottom: 16, textAlign: 'center' }}>
+              <p style={{ color: '#f0b84a', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                Nombre de telechargements atteint
+              </p>
               <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.8 }}>
-                Pour obtenir un nouvel acces, contactez directement l artiste <strong style={{ color: '#f9fafb' }}>{qrData?.artist}</strong> et mentionnez la reference ci-dessous.
+                Contactez l artiste <strong style={{ color: '#f9fafb' }}>{qrData?.artist}</strong> avec la reference ci-dessous.
               </p>
             </div>
 
             <div style={{ background: '#0a0b12', borderRadius: 12, padding: 18, marginBottom: 16, textAlign: 'center' }}>
-              <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 10, letterSpacing: 1 }}>VOTRE REFERENCE</p>
-              <p style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 28, color: '#c8f04a', letterSpacing: 4, marginBottom: 12 }}>
+              <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 10, letterSpacing: 2 }}>VOTRE REFERENCE</p>
+              <p style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 32, color: '#c8f04a', letterSpacing: 6, marginBottom: 14 }}>
                 {qrData?.qrId || qrId}
               </p>
-              <button onClick={() => copy(qrData?.qrId || qrId || '', 'qrid')} style={{ ...S.btn, padding: '10px 28px', fontSize: 13 }}>
-                {copied === 'qrid' ? '✓ Reference copiee !' : 'Copier la reference'}
+              <button onClick={() => copy(qrData?.qrId || qrId || '', 'qrid')} style={{ ...S.btn, padding: '10px 28px' }}>
+                {copied === 'qrid' ? '✓ Copie !' : 'Copier la reference'}
               </button>
             </div>
 
-            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-              <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 12, letterSpacing: 1 }}>COMMENT FAIRE</p>
+            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16 }}>
+              <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 2 }}>ETAPES</p>
               {[
                 ['1', 'Copiez la reference ' + (qrData?.qrId || qrId)],
-                ['2', 'Contactez l artiste ' + (qrData?.artist || '') + ' et envoyez-lui cette reference avec votre paiement'],
-                ['3', 'Apres activation, rescannez ce QR code pour telecharger'],
+                ['2', 'Contactez l artiste ' + (qrData?.artist || '') + ' et envoyez la reference avec votre paiement'],
+                ['3', 'Apres activation, rescannez ce QR code'],
               ].map(([n, t]) => (
                 <div key={n} style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>{n}</div>
@@ -362,22 +473,18 @@ function FanPage() {
                 </div>
               ))}
             </div>
-
-            <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, textAlign: 'center', fontSize: 11, color: '#5a6080' }}>
-              Prix : <strong style={{ color: '#f9fafb' }}>{(qrData?.price || 0).toLocaleString()} FCFA</strong>
-            </div>
           </div>
         )}
 
         {/* DONE */}
         {step === 'done' && (
-          <div style={{ ...S.card, textAlign: 'center', padding: 36 }}>
+          <div style={{ ...S.card, textAlign: 'center', padding: 36, animation: 'fadeUp .4s ease' }}>
             <p style={{ fontSize: 52, marginBottom: 16 }}>{dlStatus.startsWith('Erreur') ? '❌' : '✅'}</p>
             <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
-              {dlStatus.startsWith('Erreur') ? 'Erreur de telechargement' : 'Telechargement termine !'}
+              {dlStatus.startsWith('Erreur') ? 'Erreur' : 'Telechargement termine !'}
             </h2>
             <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
-              {dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier est dans vos telechargements. Ce lien est maintenant expire.'}
+              {dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier est dans vos telechargements.'}
             </p>
             <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, fontSize: 11, color: '#5a6080' }}>
               LIEN REVOQUE — ACCES DESACTIVE
@@ -501,7 +608,7 @@ function AdminPage() {
   };
 
   const deleteAllLocked = async () => {
-    const locked = qrcodes.filter(q => q.status === 'locked');
+    const locked = qrcodes.filter(q => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1));
     for (const q of locked) await deleteDoc(doc(db, 'qrcodes', q.id));
     setMsg(locked.length + ' QR code(s) supprimes !');
   };
@@ -510,10 +617,9 @@ function AdminPage() {
     if (!editModal) return;
     const newTotal = parseInt(editScans) || editModal.totalScans;
     const newPrice2 = parseInt(editPrice) || editModal.price;
-    const isNowActive = editModal.usedScans < newTotal;
+    const isNowActive = (editModal.usedScans || 0) < newTotal;
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
-      price: newPrice2,
-      totalScans: newTotal,
+      price: newPrice2, totalScans: newTotal,
       status: isNowActive ? 'active' : 'locked',
     });
     setEditModal(null); setMsg('QR mis a jour !');
@@ -523,8 +629,7 @@ function AdminPage() {
     await updateDoc(doc(db, 'payments', p.id), { status: 'verified' });
     const qr = qrcodes.find(q => q.id === p.qrDocId);
     if (qr) await updateDoc(doc(db, 'qrcodes', p.qrDocId), {
-      status: 'active',
-      totalScans: (qr.totalScans || 0) + 10
+      status: 'active', totalScans: (qr.totalScans || 0) + 10
     });
     setMsg('Paiement valide, QR reactive !');
   };
@@ -571,7 +676,7 @@ function AdminPage() {
   );
 
   const pendingPay = payments.filter(p => p.status === 'pending');
-  const lockedQRs = qrcodes.filter(q => q.status === 'locked');
+  const lockedQRs = qrcodes.filter(q => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1));
 
   return (
     <div style={S.bg}>
@@ -603,20 +708,20 @@ function AdminPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420 }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Modifier / Reactiver</h3>
-            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 8 }}>{editModal.qrId}</p>
-            <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 20 }}>
-              Scans utilises : {editModal.usedScans}/{editModal.totalScans}
-              {editModal.usedScans >= editModal.totalScans && (
-                <span style={{ color: '#f0b84a', marginLeft: 8 }}>— Pour reactiver, augmentez le nombre de scans</span>
+            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 8 }}>{editModal.qrId} — {editModal.label}</p>
+            <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 16 }}>
+              Scans : {editModal.usedScans || 0}/{editModal.totalScans}
+              {(editModal.usedScans || 0) >= editModal.totalScans && (
+                <span style={{ color: '#f0b84a', marginLeft: 8 }}>— Augmentez pour reactiver</span>
               )}
             </p>
             <label style={S.lbl}>Nouveau prix (FCFA)</label>
             <input style={S.inp} type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} placeholder={'Actuel: ' + editModal.price} />
             <label style={S.lbl}>Nombre de scans total</label>
             <input style={S.inp} type="number" value={editScans} onChange={e => setEditScans(e.target.value)} placeholder={'Actuel: ' + editModal.totalScans} />
-            {parseInt(editScans) > editModal.usedScans && (
+            {parseInt(editScans) > (editModal.usedScans || 0) && (
               <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4af09a' }}>
-                ✓ Ce QR code sera reactive automatiquement
+                ✓ Ce QR sera reactive automatiquement
               </div>
             )}
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -763,11 +868,7 @@ function AdminPage() {
                       <button style={{ ...S.btn2, fontSize: 12 }} onClick={() => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); }}>
                         {isLocked ? '🔓 Reactiver' : '✏️ Modifier'}
                       </button>
-                      <button
-                        style={isLocked
-                          ? { ...S.btn2, color: '#4af09a', borderColor: '#4af09a', fontSize: 12 }
-                          : { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 12 }}
-                        onClick={() => toggleQR(q.id, q.status)}>
+                      <button style={isLocked ? { ...S.btn2, color: '#4af09a', borderColor: '#4af09a', fontSize: 12 } : { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 12 }} onClick={() => toggleQR(q.id, q.status)}>
                         {isLocked ? '🔓 Activer' : '🔒 Bloquer'}
                       </button>
                       <button style={{ ...S.btnRed, fontSize: 12 }} onClick={() => setConfirmDelete(q.id)}>🗑️ Supprimer</button>
