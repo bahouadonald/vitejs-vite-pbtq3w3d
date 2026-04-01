@@ -658,13 +658,26 @@ function FanPage() {
               <button onClick={() => copy(qrData?.qrId || qrId || '', 'qrid')} style={{ ...S.btn, padding: '10px 28px' }}>{copied === 'qrid' ? '✓ Copie !' : 'Copier la reference'}</button>
             </div>
             <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16, marginBottom: 14 }}>
-              {[['1', 'Copiez la reference ' + (qrData?.qrId || qrId)], ['2', 'Contactez l artiste ' + (qrData?.artist || '') + ' et envoyez la reference avec votre paiement'], ['3', 'Apres activation, rescannez ce QR code']].map(([n, t]) => (
+              {[['1', 'Copiez la reference ' + (qrData?.qrId || qrId)], ['2', 'Contactez l artiste ' + (qrData?.artist || '') + ' sur WhatsApp avec la reference et votre paiement'], ['3', 'Apres activation, rescannez ce QR code']].map(([n, t]) => (
                 <div key={n} style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>{n}</div>
                   <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.6 }}>{t}</p>
                 </div>
               ))}
             </div>
+
+            {/* WHATSAPP BUTTON */}
+            {qrData?.whatsapp ? (
+              <a
+                href={'https://wa.me/' + qrData.whatsapp.replace(/[\s+\-()]/g, '') + '?text=' + encodeURIComponent('Bonjour, je souhaite debloquer l\'acces a "' + (qrData?.label || '') + '". Ma reference est : ' + (qrData?.qrId || qrId))}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '15px 20px', borderRadius: 12, background: '#25D366', color: '#fff', fontWeight: 700, fontSize: 16, textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Contacter {qrData?.artist} sur WhatsApp
+              </a>
+            ) : null}
+
             <button onClick={() => navigate('/playlist')} style={{ ...S.btn2, width: '100%', textAlign: 'center' as const }}>🎵 Ma playlist</button>
           </div>
         )}
@@ -711,11 +724,13 @@ function AdminPage() {
   const [newType, setNewType] = useState('album');
   const [newPrice, setNewPrice] = useState('');
   const [newScans, setNewScans] = useState('');
+  const [newWhatsapp, setNewWhatsapp] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [qrModal, setQrModal] = useState<any>(null);
   const [editModal, setEditModal] = useState<any>(null);
   const [editScans, setEditScans] = useState('');
   const [editPrice, setEditPrice] = useState('');
+  const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editFiles, setEditFiles] = useState<any[]>([]);
   const [addFiles, setAddFiles] = useState<FileList | null>(null);
   const [editUploading, setEditUploading] = useState(false);
@@ -751,14 +766,14 @@ function AdminPage() {
       const uploaded: any[] = [];
       for (let i = 0; i < files.length; i++) uploaded.push(await uploadFile(files[i], qrId, i, files.length, (s, p) => { setUploadMsg(s); setUploadProgress(p); }));
       setUploadProgress(100);
-      await addDoc(collection(db, 'qrcodes'), { qrId, label: newLabel, artist: newArtist, type: newType, price: parseInt(newPrice), totalScans: parseInt(newScans), usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length, status: 'active', createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId });
-      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans(''); setSelectedFiles(null); setUploadProgress(0); setUploadMsg('');
+      await addDoc(collection(db, 'qrcodes'), { qrId, label: newLabel, artist: newArtist, type: newType, price: parseInt(newPrice), totalScans: parseInt(newScans), usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length, status: 'active', whatsapp: newWhatsapp, createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId });
+      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans(''); setNewWhatsapp(''); setSelectedFiles(null); setUploadProgress(0); setUploadMsg('');
       setMsg('QR ' + qrId + ' cree avec ' + uploaded.length + ' fichier(s) !');
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
 
-  const openEdit = (q: any) => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg(''); };
+  const openEdit = (q: any) => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); setEditWhatsapp(q.whatsapp || ''); setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg(''); };
 
   const uploadEditFiles = async () => {
     if (!addFiles || !editModal) return;
@@ -773,7 +788,7 @@ function AdminPage() {
   const saveEdit = async () => {
     if (!editModal) return;
     const newTotal = parseInt(editScans) || editModal.totalScans;
-    await updateDoc(doc(db, 'qrcodes', editModal.id), { price: parseInt(editPrice) || editModal.price, totalScans: newTotal, files: editFiles, fileCount: editFiles.length, status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked' });
+    await updateDoc(doc(db, 'qrcodes', editModal.id), { price: parseInt(editPrice) || editModal.price, totalScans: newTotal, files: editFiles, fileCount: editFiles.length, whatsapp: editWhatsapp, status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked' });
     setEditModal(null); setMsg('QR mis a jour !');
   };
 
@@ -825,6 +840,8 @@ function AdminPage() {
               <div><label style={S.lbl}>Prix (FCFA)</label><input style={S.inp} type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} /></div>
               <div><label style={S.lbl}>Nb scans total</label><input style={S.inp} type="number" value={editScans} onChange={e => setEditScans(e.target.value)} /></div>
             </div>
+            <label style={S.lbl}>💬 WhatsApp de l artiste</label>
+            <input style={{ ...S.inp, marginBottom: 14 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
             {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4af09a' }}>✓ QR sera reactive</div>}
             <label style={{ ...S.lbl, marginBottom: 10 }}>Fichiers ({editFiles.length})</label>
             <div style={{ background: '#0a0b12', borderRadius: 10, padding: 12, marginBottom: 14 }}>
@@ -928,6 +945,8 @@ function AdminPage() {
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
+              <label style={S.lbl}>💬 WhatsApp de l artiste (avec indicatif)</label>
+              <input style={{ ...S.inp, marginBottom: 16 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {[['album','Album'],['single','Single'],['video','Video'],['mix','Mix']].map(([t,l]) => (
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#c8f04a' : '#252840'), background: newType === t ? '#1a2a0a' : 'transparent', color: newType === t ? '#c8f04a' : '#5a6080', cursor: 'pointer', fontSize: 12 }}>{l}</button>
