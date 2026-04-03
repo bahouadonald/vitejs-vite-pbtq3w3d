@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import JSZip from 'jszip';
 import { Html5Qrcode } from 'html5-qrcode';
+import { jsPDF } from 'jspdf';
 import { db, auth } from './firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc,
@@ -726,6 +727,13 @@ function AdminPage() {
   const [newScans, setNewScans] = useState('');
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  // Bulk QR generation
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkQr, setBulkQr] = useState<any>(null);
+  const [bulkCount, setBulkCount] = useState('100');
+  const [bulkScans, setBulkScans] = useState('1');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
   const [qrModal, setQrModal] = useState<any>(null);
   const [editModal, setEditModal] = useState<any>(null);
   const [editScans, setEditScans] = useState('');
@@ -738,7 +746,7 @@ function AdminPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => { onAuthStateChanged(auth, (u) => { if (u) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
+  useEffect(() => { onAuthStateChanged(auth, (u) => { if (u && u.email === ADMIN_EMAIL) { setUser(u); setView('dashboard'); } else if (!u) { setUser(null); setView('login'); } }); }, []);
   useEffect(() => {
     if (!user) return;
     const u1 = onSnapshot(query(collection(db, 'qrcodes'), orderBy('createdAt', 'desc')), s => setQrcodes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -792,6 +800,78 @@ function AdminPage() {
     setEditModal(null); setMsg('QR mis a jour !');
   };
 
+  const generateBulkQRs = async () => {
+    if (!bulkQr || !bulkCount || !bulkScans) return;
+    const count = parseInt(bulkCount);
+    const scans = parseInt(bulkScans);
+    if (count < 1 || count > 5000) { setMsg('Entre 1 et 5000 QR codes'); return; }
+    setBulkLoading(true); setBulkProgress(0);
+
+    // Step 1 — Generate all QR IDs and save to Firestore
+    const qrIds: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const qrId = Math.random().toString(36).slice(2, 10).toUpperCase();
+      qrIds.push(qrId);
+    }
+
+    // Save in batches of 20
+    const batchSize = 20;
+    for (let i = 0; i < qrIds.length; i += batchSize) {
+      const batch = qrIds.slice(i, i + batchSize).map(qrId =>
+        addDoc(collection(db, 'qrcodes'), {
+          qrId, label: bulkQr.label, artist: bulkQr.artist, type: bulkQr.type,
+          price: bulkQr.price, totalScans: scans, usedScans: 0, downloads: 0,
+          files: bulkQr.files || [], fileCount: bulkQr.fileCount || 0,
+          status: 'active', whatsapp: bulkQr.whatsapp || '',
+          createdAt: new Date().toISOString(),
+          url: BASE_URL + '/fan/' + qrId,
+          bulk: true, bulkParent: bulkQr.qrId,
+        })
+      );
+      await Promise.all(batch);
+      setBulkProgress(Math.round(((i + batchSize) / count) * 50));
+    }
+
+    // Step 2 — Generate QR images using canvas + qrcode library
+    setBulkProgress(55);
+    const QRCode = (await import('qrcode')).default;
+
+    // A4 dimensions in px at 96dpi → use mm for jsPDF
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210; const pageH = 297;
+    const cols = 6; const rows = 5; const perPage = cols * rows;
+    const qrSize = 27;
+    const marginX = (pageW - cols * qrSize) / (cols + 1);
+    const marginY = (pageH - rows * qrSize) / (rows + 1);
+
+    for (let i = 0; i < qrIds.length; i++) {
+      if (i > 0 && i % perPage === 0) pdf.addPage();
+      const pos = i % perPage;
+      const col = pos % cols;
+      const row = Math.floor(pos / cols);
+      const x = marginX + col * (qrSize + marginX);
+      const y = marginY + row * (qrSize + marginY);
+      const url = BASE_URL + '/fan/' + qrIds[i];
+
+      try {
+        const dataUrl = await QRCode.toDataURL(url, {
+          width: 200, margin: 1,
+          color: { dark: '#000000', light: '#ffffff' },
+          errorCorrectionLevel: 'H',
+        });
+        pdf.addImage(dataUrl, 'PNG', x, y, qrSize, qrSize);
+      } catch (e) { console.error('QR gen error:', e); }
+
+      if (i % 5 === 0) setBulkProgress(55 + Math.round((i / qrIds.length) * 40));
+    }
+
+    setBulkProgress(100);
+    const filename = bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes.pdf';
+    pdf.save(filename);
+    setBulkLoading(false); setShowBulk(false); setBulkQr(null);
+    setMsg('✅ ' + count + ' QR codes generes ! PDF telecharge.');
+  };
+
   const verifyPayment = async (p: any) => {
     await updateDoc(doc(db, 'payments', p.id), { status: 'verified' });
     const qr = qrcodes.find(q => q.id === p.qrDocId);
@@ -829,6 +909,57 @@ function AdminPage() {
   return (
     <div style={S.bg}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
+      {/* BULK QR MODAL */}
+      {showBulk && bulkQr && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
+            <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Generation en masse</h3>
+            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 6 }}>{bulkQr.label}</p>
+            <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
+
+            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 14, marginBottom: 20 }}>
+              <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
+              <p style={{ color: '#5a6080', fontSize: 11 }}>30 QR codes par page A4 → PDF imprimable</p>
+            </div>
+
+            <label style={S.lbl}>Nombre de QR codes a generer</label>
+            <input style={S.inp} type="number" value={bulkCount} onChange={e => setBulkCount(e.target.value)} placeholder="100" min="1" max="5000" />
+
+            <label style={S.lbl}>Nombre de scans par QR code</label>
+            <input style={S.inp} type="number" value={bulkScans} onChange={e => setBulkScans(e.target.value)} placeholder="1" min="1" />
+
+            <div style={{ background: '#1a2a0a', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 20 }}>
+              <p style={{ color: '#4af09a', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                📄 {Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4
+              </p>
+              <p style={{ color: '#8890b0', fontSize: 12 }}>
+                {bulkCount} QR codes × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements possibles
+              </p>
+            </div>
+
+            {bulkLoading && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8890b0', marginBottom: 6 }}>
+                  <span>{bulkProgress < 65 ? 'Creation des QR codes...' : 'Generation du PDF...'}</span>
+                  <span style={{ color: '#c8f04a', fontWeight: 700 }}>{bulkProgress}%</span>
+                </div>
+                <div style={{ height: 8, background: '#1c1f2e', borderRadius: 99 }}>
+                  <div style={{ height: '100%', width: bulkProgress + '%', background: 'linear-gradient(90deg, #c8f04a, #4af09a)', borderRadius: 99, transition: 'width .3s' }} />
+                </div>
+                <p style={{ color: '#5a6080', fontSize: 11, marginTop: 8, textAlign: 'center' }}>Ne fermez pas cette page...</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); }} disabled={bulkLoading}>Annuler</button>
+              <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading}>
+                {bulkLoading ? 'Generation...' : '🖨️ Generer ' + bulkCount + ' QR codes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT MODAL */}
       {editModal && (
@@ -999,6 +1130,7 @@ function AdminPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
                       <button style={{ ...S.btn, padding: '7px 12px', fontSize: 11 }} onClick={() => setQrModal(q)}>QR PNG</button>
+                      <button style={{ background: '#1a1a2e', border: '1px solid #4a4af0', color: '#a0a0ff', borderRadius: 8, padding: '7px 12px', fontSize: 11, cursor: 'pointer', fontWeight: 700 }} onClick={() => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setShowBulk(true); }}>🖨️ En masse</button>
                       <button style={{ ...S.btn2, fontSize: 11 }} onClick={() => openEdit(q)}>{isLocked ? '🔓 Reactiver' : '✏️ Modifier'}</button>
                       <button style={isLocked ? { ...S.btn2, color: '#4af09a', borderColor: '#4af09a', fontSize: 11 } : { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 11 }} onClick={() => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}>
                         {isLocked ? '🔓 Activer' : '🔒 Bloquer'}
