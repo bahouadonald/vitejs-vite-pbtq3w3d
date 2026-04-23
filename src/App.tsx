@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import JSZip from 'jszip';
 import { Html5Qrcode } from 'html5-qrcode';
 import { jsPDF } from 'jspdf';
 import { db, auth } from './firebase';
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc,
-  onSnapshot, query, orderBy, where, getDocs, arrayUnion
+  collection, addDoc, doc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, where, getDocs
 } from 'firebase/firestore';
-import {
-  signInWithEmailAndPassword, signOut, onAuthStateChanged,
-  createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup
-} from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 const ADMIN_EMAIL = 'admin@securedrop.com';
@@ -29,7 +26,6 @@ const S = {
   btn: { padding: '10px 20px', borderRadius: 10, border: 'none', background: '#c8f04a', color: '#07080f', fontWeight: 700, cursor: 'pointer', fontSize: 14 } as React.CSSProperties,
   btn2: { padding: '8px 16px', borderRadius: 8, border: '1px solid #1c1f2e', background: 'transparent', color: '#8890b0', cursor: 'pointer', fontSize: 13 } as React.CSSProperties,
   btnRed: { padding: '8px 14px', borderRadius: 8, border: '1px solid #f04a6a', background: '#2e0d14', color: '#f04a6a', cursor: 'pointer', fontSize: 12, fontWeight: 700 } as React.CSSProperties,
-  btnGoogle: { padding: '12px 20px', borderRadius: 10, border: '1px solid #374151', background: '#fff', color: '#111', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%' } as React.CSSProperties,
   inp: { width: '100%', background: '#0a0b12', border: '1px solid #252840', borderRadius: 10, padding: '11px 14px', color: '#e8eaf2', fontSize: 14, outline: 'none', marginBottom: 12, boxSizing: 'border-box' } as React.CSSProperties,
   lbl: { display: 'block', color: '#8890b0', fontSize: 12, marginBottom: 6 } as React.CSSProperties,
 };
@@ -40,108 +36,55 @@ const formatSize = (bytes: number) => { if (!bytes) return ''; if (bytes < 1024 
 const cleanName = (name: string) => name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
 const formatTime = (t: number) => { if (!t || isNaN(t)) return '0:00'; const m = Math.floor(t / 60); const s = Math.floor(t % 60); return m + ':' + (s < 10 ? '0' : '') + s; };
 
-const GoogleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 48 48">
-    <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.2-2.7-.4-4z"/>
-    <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-    <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.6 26.9 36.5 24 36.5c-5.2 0-9.7-3.3-11.3-8L6 33.8C9.5 39.8 16.3 44 24 44z"/>
-    <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.7 35.8 44 30.3 44 24c0-1.3-.2-2.7-.4-4z"/>
-  </svg>
-);
-
 // ─────────────────────────────────────────────
-// QR SCANNER COMPONENT
+// STREAMING BUTTONS COMPONENT
 // ─────────────────────────────────────────────
-function QRScanner({ onScan, onClose }: { onScan: (qrId: string) => void, onClose: () => void }) {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [error, setError] = useState('');
-  const [scanning, setScanning] = useState(false);
-
-  useEffect(() => {
-    const scanner = new Html5Qrcode('qr-reader');
-    scannerRef.current = scanner;
-
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      (decodedText) => {
-        // Extract qrId from URL or use directly
-        let qrId = decodedText;
-        if (decodedText.includes('/fan/')) {
-          qrId = decodedText.split('/fan/').pop() || decodedText;
-        }
-        scanner.stop().then(() => onScan(qrId.trim().toUpperCase()));
-      },
-      () => {}
-    ).then(() => setScanning(true)).catch((e: any) => {
-      setError('Impossible d acces a la camera: ' + e.message);
-    });
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-      }
-    };
-  }, []);
-
+function StreamingButtons({ sydica, boomplay, spotify }: { sydica?: string, boomplay?: string, spotify?: string }) {
+  if (!sydica && !boomplay && !spotify) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(7,8,15,.95)', zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 17 }}>Scanner un QR code</p>
-            <p style={{ color: '#8890b0', fontSize: 13 }}>Pointez vers le QR code de la pochette</p>
-          </div>
-          <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 99, border: '1px solid #1c1f2e', background: 'transparent', color: '#8890b0', cursor: 'pointer', fontSize: 20 }}>✕</button>
-        </div>
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ color: '#5a6080', fontSize: 10, letterSpacing: 1, marginBottom: 10, textAlign: 'center' }}>ECOUTER EN STREAMING</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {error ? (
-          <div style={{ background: '#2e0d14', border: '1px solid #f04a6a', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-            <p style={{ color: '#f04a6a', fontSize: 14, marginBottom: 16 }}>{error}</p>
-            <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 16 }}>Ou entrez la reference manuellement :</p>
-            <input
-              id="manual-qr"
-              style={{ ...S.inp, marginBottom: 12, textAlign: 'center', letterSpacing: 3, fontFamily: 'monospace', fontSize: 16, textTransform: 'uppercase' }}
-              placeholder="Ex: TFHM63TN"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = (document.getElementById('manual-qr') as HTMLInputElement)?.value;
-                  if (val) onScan(val.trim().toUpperCase());
-                }
-              }}
-            />
-            <button onClick={() => {
-              const val = (document.getElementById('manual-qr') as HTMLInputElement)?.value;
-              if (val) onScan(val.trim().toUpperCase());
-            }} style={{ ...S.btn, width: '100%' }}>Acceder →</button>
-          </div>
-        ) : (
-          <div>
-            <div id="qr-reader" style={{ borderRadius: 16, overflow: 'hidden', border: '2px solid #c8f04a' }} />
-            {!scanning && (
-              <div style={{ textAlign: 'center', marginTop: 16 }}>
-                <div style={{ width: 32, height: 32, border: '3px solid #c8f04a', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 8px', animation: 'spin .8s linear infinite' }} />
-                <p style={{ color: '#8890b0', fontSize: 13 }}>Initialisation camera...</p>
-              </div>
-            )}
-            <div style={{ marginTop: 16, background: '#0e1018', borderRadius: 12, padding: 16 }}>
-              <p style={{ color: '#8890b0', fontSize: 12, marginBottom: 10 }}>Ou entrez la reference manuellement :</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  id="manual-qr2"
-                  style={{ ...S.inp, marginBottom: 0, flex: 1, textTransform: 'uppercase', letterSpacing: 2, fontFamily: 'monospace' }}
-                  placeholder="TFHM63TN"
-                />
-                <button onClick={() => {
-                  const val = (document.getElementById('manual-qr2') as HTMLInputElement)?.value;
-                  if (val) onScan(val.trim().toUpperCase());
-                }} style={{ ...S.btn, padding: '10px 16px' }}>→</button>
-              </div>
+        {/* SYDICA */}
+        {sydica && (
+          <a href={sydica} target="_blank" rel="noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderRadius: 12, background: '#1a0a2e', border: '1.5px solid #7c3aed', color: '#a78bfa', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+            <span style={{ fontSize: 22 }}>🎵</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Ecouter sur Sydica</p>
+              <p style={{ color: '#7c3aed', fontSize: 11 }}>Plateforme de streaming</p>
             </div>
-          </div>
+            <span style={{ fontSize: 18 }}>→</span>
+          </a>
+        )}
+
+        {/* BOOMPLAY */}
+        {boomplay && (
+          <a href={boomplay} target="_blank" rel="noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderRadius: 12, background: '#1a0a0a', border: '1.5px solid #ef4444', color: '#fca5a5', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+            <span style={{ fontSize: 22 }}>🎧</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Ecouter sur Boomplay</p>
+              <p style={{ color: '#ef4444', fontSize: 11 }}>Streaming Afrique</p>
+            </div>
+            <span style={{ fontSize: 18 }}>→</span>
+          </a>
+        )}
+
+        {/* SPOTIFY */}
+        {spotify && (
+          <a href={spotify} target="_blank" rel="noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderRadius: 12, background: '#0a1a0a', border: '1.5px solid #1db954', color: '#4af09a', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#1db954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Ecouter sur Spotify</p>
+              <p style={{ color: '#1db954', fontSize: 11 }}>Streaming mondial</p>
+            </div>
+            <span style={{ fontSize: 18 }}>→</span>
+          </a>
         )}
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -200,274 +143,20 @@ function AudioPlayer({ files }: { files: any[] }) {
 }
 
 // ─────────────────────────────────────────────
-// FAN AUTH MODAL
-// ─────────────────────────────────────────────
-function FanAuthModal({ qrData, onClose, onSuccess }: { qrData: any, onClose: () => void, onSuccess: () => void }) {
-  const [mode, setMode] = useState<'choice' | 'email'>('choice');
-  const [isLogin, setIsLogin] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const albumEntry = {
-    qrId: qrData.qrId, label: qrData.label, artist: qrData.artist,
-    type: qrData.type, files: qrData.files || [], fileCount: qrData.fileCount || 0,
-    addedAt: new Date().toISOString(), url: qrData.url,
-  };
-
-  const save = async (uid: string) => {
-    const ref = doc(db, 'fans', uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const existing = snap.data().playlist || [];
-      if (!existing.find((a: any) => a.qrId === qrData.qrId)) {
-        await updateDoc(ref, { playlist: arrayUnion(albumEntry) });
-      }
-    } else {
-      await setDoc(ref, { playlist: [albumEntry], createdAt: new Date().toISOString() });
-    }
-    onSuccess();
-  };
-
-  const handleGoogle = async () => {
-    setLoading(true);
-    try { const r = await signInWithPopup(auth, new GoogleAuthProvider()); await save(r.user.uid); }
-    catch (e: any) { setMsg('Erreur: ' + e.message); }
-    setLoading(false);
-  };
-
-  const handleEmail = async () => {
-    if (!email || !password) { setMsg('Remplis tous les champs'); return; }
-    setLoading(true);
-    try {
-      let uid = '';
-      if (isLogin) { uid = (await signInWithEmailAndPassword(auth, email, password)).user.uid; }
-      else { uid = (await createUserWithEmailAndPassword(auth, email, password)).user.uid; }
-      await save(uid);
-    } catch (e: any) { setMsg(e.message); }
-    setLoading(false);
-  };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(7,8,15,.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 420 }}>
-        {mode === 'choice' && (
-          <>
-            <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <p style={{ fontSize: 32, marginBottom: 8 }}>🎵</p>
-              <h3 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Sauvegarde dans ta playlist !</h3>
-              <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7 }}><strong style={{ color: '#c8f04a' }}>{qrData.label}</strong> sera ajoute a ta playlist. Ecoute-le quand tu veux !</p>
-            </div>
-            <button onClick={handleGoogle} style={{ ...S.btnGoogle, marginBottom: 12 }} disabled={loading}><GoogleIcon />Continuer avec Google</button>
-            <button onClick={() => setMode('email')} style={{ ...S.btn, width: '100%', marginBottom: 12 }}>Continuer avec Email</button>
-            <button onClick={onClose} style={{ ...S.btn2, width: '100%', textAlign: 'center' as const }}>Non merci</button>
-          </>
-        )}
-        {mode === 'email' && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <button onClick={() => setMode('choice')} style={{ background: 'none', border: 'none', color: '#8890b0', cursor: 'pointer', fontSize: 20 }}>←</button>
-              <h3 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800 }}>{isLogin ? 'Se connecter' : 'Creer un compte'}</h3>
-            </div>
-            <label style={S.lbl}>Email</label>
-            <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="ton@email.com" />
-            <label style={S.lbl}>Mot de passe</label>
-            <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-            {msg && <p style={{ color: '#f04a6a', fontSize: 12, marginBottom: 12 }}>{msg}</p>}
-            <button onClick={handleEmail} style={{ ...S.btn, width: '100%', marginBottom: 12 }} disabled={loading}>{loading ? 'Chargement...' : isLogin ? 'Se connecter' : 'Creer mon compte'}</button>
-            <p style={{ textAlign: 'center', color: '#5a6080', fontSize: 12, cursor: 'pointer' }} onClick={() => { setIsLogin(!isLogin); setMsg(''); }}>{isLogin ? 'Pas encore de compte ?' : 'Deja un compte ?'}</p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// PLAYLIST PAGE
-// ─────────────────────────────────────────────
-function PlaylistPage() {
-  const [fanUser, setFanUser] = useState<any>(null);
-  const [playlist, setPlaylist] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeAlbum, setActiveAlbum] = useState<any>(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [msg, setMsg] = useState('');
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Listen to auth state — session persists automatically
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u && u.email !== ADMIN_EMAIL) {
-        setFanUser(u);
-        const snap = await getDoc(doc(db, 'fans', u.uid));
-        if (snap.exists()) setPlaylist(snap.data().playlist || []);
-      } else if (!u) {
-        setFanUser(null);
-        setPlaylist([]);
-      }
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleGoogle = async () => {
-    try {
-      const r = await signInWithPopup(auth, new GoogleAuthProvider());
-      const snap = await getDoc(doc(db, 'fans', r.user.uid));
-      if (snap.exists()) setPlaylist(snap.data().playlist || []);
-    } catch (e: any) { setMsg('Erreur: ' + e.message); }
-  };
-
-  const handleEmail = async () => {
-    if (!email || !password) { setMsg('Remplis tous les champs'); return; }
-    try {
-      let uid = '';
-      if (authMode === 'login') { uid = (await signInWithEmailAndPassword(auth, email, password)).user.uid; }
-      else { uid = (await createUserWithEmailAndPassword(auth, email, password)).user.uid; }
-      const snap = await getDoc(doc(db, 'fans', uid));
-      if (snap.exists()) setPlaylist(snap.data().playlist || []);
-    } catch (e: any) { setMsg(e.message); }
-  };
-
-  const handleScan = (qrId: string) => {
-    setShowScanner(false);
-    navigate('/fan/' + qrId);
-  };
-
-  if (loading) return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ width: 44, height: 44, border: '3px solid #c8f04a', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
-    </div>
-  );
-
-  if (!fanUser) return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 10px' }}>◈</div>
-          <p style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800 }}>SecureDrop</p>
-          <p style={{ color: '#5a6080', fontSize: 12, marginTop: 4 }}>Ma Playlist</p>
-        </div>
-        <div style={S.card}>
-          <h3 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>Acces a ma playlist</h3>
-          <p style={{ color: '#8890b0', fontSize: 13, textAlign: 'center', marginBottom: 20 }}>Connecte-toi pour acceder a tes albums</p>
-          <button onClick={handleGoogle} style={{ ...S.btnGoogle, marginBottom: 14 }}><GoogleIcon />Continuer avec Google</button>
-          <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 14 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setAuthMode('login')} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid ' + (authMode === 'login' ? '#c8f04a' : '#1c1f2e'), background: authMode === 'login' ? '#1a2a0a' : 'transparent', color: authMode === 'login' ? '#c8f04a' : '#5a6080', cursor: 'pointer', fontSize: 12 }}>Se connecter</button>
-              <button onClick={() => setAuthMode('register')} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid ' + (authMode === 'register' ? '#c8f04a' : '#1c1f2e'), background: authMode === 'register' ? '#1a2a0a' : 'transparent', color: authMode === 'register' ? '#c8f04a' : '#5a6080', cursor: 'pointer', fontSize: 12 }}>Creer un compte</button>
-            </div>
-            <label style={S.lbl}>Email</label>
-            <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="ton@email.com" onKeyDown={e => e.key === 'Enter' && handleEmail()} />
-            <label style={S.lbl}>Mot de passe</label>
-            <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleEmail()} />
-            {msg && <p style={{ color: '#f04a6a', fontSize: 12, marginBottom: 10 }}>{msg}</p>}
-            <button onClick={handleEmail} style={{ ...S.btn, width: '100%' }}>{authMode === 'login' ? 'Se connecter' : 'Creer mon compte'}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={S.bg}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
-
-      {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
-
-      {/* HEADER */}
-      <div style={{ background: '#0e1018', borderBottom: '1px solid #1c1f2e', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>◈</div>
-          <div><p style={{ fontWeight: 800, fontSize: 14 }}>SecureDrop</p><p style={{ color: '#5a6080', fontSize: 10 }}>MA PLAYLIST</p></div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <p style={{ color: '#8890b0', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fanUser.displayName || fanUser.email?.split('@')[0]}</p>
-          <button style={S.btn2} onClick={() => signOut(auth)}>Deconnexion</button>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: 20 }}>
-
-        {/* ACTIVE PLAYER */}
-        {activeAlbum && (
-          <div style={{ ...S.card, border: '1px solid #1a3a1a', animation: 'fadeUp .3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div><p style={{ fontWeight: 800, fontSize: 15 }}>{activeAlbum.label}</p><p style={{ color: '#8890b0', fontSize: 12 }}>par {activeAlbum.artist}</p></div>
-              <button onClick={() => setActiveAlbum(null)} style={{ background: 'none', border: 'none', color: '#5a6080', cursor: 'pointer', fontSize: 20 }}>✕</button>
-            </div>
-            <AudioPlayer files={activeAlbum.files || []} />
-          </div>
-        )}
-
-        {/* SCAN BUTTON */}
-        <div style={{ ...S.card, background: 'linear-gradient(135deg, #1a2a0a, #0d2e1a)', border: '1px solid #2a4a1a', textAlign: 'center', padding: 24 }}>
-          <p style={{ fontSize: 28, marginBottom: 8 }}>📱</p>
-          <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Ajouter un album</p>
-          <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 16 }}>Scanne le QR code d une nouvelle pochette</p>
-          <button onClick={() => setShowScanner(true)} style={{ ...S.btn, padding: '14px 32px', fontSize: 15 }}>
-            Scanner un nouvel album
-          </button>
-        </div>
-
-        {/* PLAYLIST */}
-        <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 14, fontFamily: 'serif' }}>Mes Albums ({playlist.length})</p>
-
-        {playlist.length === 0 ? (
-          <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
-            <p style={{ fontSize: 40, marginBottom: 12 }}>🎵</p>
-            <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Ta playlist est vide</p>
-            <p style={{ color: '#8890b0', fontSize: 13 }}>Scanne une pochette pour commencer !</p>
-          </div>
-        ) : playlist.map((album, i) => (
-          <div key={i} style={{ ...S.card, borderColor: activeAlbum?.qrId === album.qrId ? '#1a3a1a' : '#1c1f2e', animation: 'fadeUp .3s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'linear-gradient(135deg, #c8f04a22, #4af09a22)', border: '1px solid #1a3a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-                {album.type === 'video' ? '🎬' : '🎵'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.label}</p>
-                <p style={{ color: '#8890b0', fontSize: 12, marginBottom: 2 }}>{album.artist}</p>
-                <p style={{ color: '#5a6080', fontSize: 11 }}>{album.fileCount || 0} piste(s)</p>
-              </div>
-              <button onClick={() => setActiveAlbum(activeAlbum?.qrId === album.qrId ? null : album)}
-                style={{ width: 44, height: 44, borderRadius: 99, border: 'none', background: activeAlbum?.qrId === album.qrId ? '#1a2a0a' : '#c8f04a', color: activeAlbum?.qrId === album.qrId ? '#4af09a' : '#07080f', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {activeAlbum?.qrId === album.qrId ? '⏸' : '▶'}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
 // FAN PAGE
 // ─────────────────────────────────────────────
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
-  const navigate = useNavigate();
   const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
   const [qrData, setQrData] = useState<any>(null);
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [copied, setCopied] = useState('');
   const [downloaded, setDownloaded] = useState(false);
-  const [showFanAuth, setShowFanAuth] = useState(false);
-  const [savedToPlaylist, setSavedToPlaylist] = useState(false);
-  const [fanUser, setFanUser] = useState<any>(null);
   const currentUrl = window.location.href;
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
 
   useEffect(() => {
-    onAuthStateChanged(auth, (u) => { if (u && u.email !== ADMIN_EMAIL) setFanUser(u); });
     const load = async () => {
       const q = query(collection(db, 'qrcodes'), where('qrId', '==', qrId));
       const snap = await getDocs(q);
@@ -486,7 +175,10 @@ function FanPage() {
     if (!qrData || downloaded) return;
     setDownloaded(true);
     const newUsed = (qrData.usedScans || 0) + 1;
-    await updateDoc(doc(db, 'qrcodes', qrData.id), { usedScans: newUsed, downloads: (qrData.downloads || 0) + 1, status: newUsed >= qrData.totalScans ? 'locked' : 'active' });
+    await updateDoc(doc(db, 'qrcodes', qrData.id), {
+      usedScans: newUsed, downloads: (qrData.downloads || 0) + 1,
+      status: newUsed >= qrData.totalScans ? 'locked' : 'active',
+    });
   };
 
   const startDownload = async () => {
@@ -518,24 +210,9 @@ function FanPage() {
     } catch (e: any) { setDlStatus('Erreur: ' + e.message); setStep('done'); }
   };
 
-  // Auto-save to playlist if fan already logged in
-  const saveIfLoggedIn = async () => {
-    if (!fanUser || !qrData || savedToPlaylist) return;
-    const albumEntry = { qrId: qrData.qrId, label: qrData.label, artist: qrData.artist, type: qrData.type, files: qrData.files || [], fileCount: qrData.fileCount || 0, addedAt: new Date().toISOString(), url: qrData.url };
-    const ref = doc(db, 'fans', fanUser.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) { const ex = snap.data().playlist || []; if (!ex.find((a: any) => a.qrId === qrData.qrId)) await updateDoc(ref, { playlist: arrayUnion(albumEntry) }); }
-    else await setDoc(ref, { playlist: [albumEntry], createdAt: new Date().toISOString() });
-    setSavedToPlaylist(true);
-  };
-
   return (
     <div style={{ ...S.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, minHeight: '100vh' }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
-
-      {showFanAuth && qrData && (
-        <FanAuthModal qrData={qrData} onClose={() => setShowFanAuth(false)} onSuccess={() => { setShowFanAuth(false); setSavedToPlaylist(true); }} />
-      )}
 
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div style={{ width: 42, height: 42, borderRadius: 10, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, margin: '0 auto 8px' }}>◈</div>
@@ -544,6 +221,7 @@ function FanPage() {
 
       <div style={{ width: '100%', maxWidth: 440 }}>
 
+        {/* LOADING */}
         {step === 'loading' && (
           <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
             <div style={{ width: 44, height: 44, border: '3px solid #c8f04a', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 16px', animation: 'spin .8s linear infinite' }} />
@@ -551,6 +229,7 @@ function FanPage() {
           </div>
         )}
 
+        {/* READY */}
         {step === 'ready' && qrData && (
           <div style={{ animation: 'fadeUp .4s ease' }}>
             <div style={{ ...S.card, border: '1px solid #1a3a1a' }}>
@@ -560,42 +239,33 @@ function FanPage() {
                 <p style={{ color: '#8890b0', fontSize: 14 }}>par <strong style={{ color: '#e8eaf2' }}>{qrData.artist}</strong></p>
               </div>
 
+              {/* DOWNLOAD BUTTON */}
               {!downloaded ? (
                 onSafari ? (
-                  <div>
+                  <div style={{ marginBottom: 12 }}>
                     <button onClick={() => { const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = currentUrl.replace('https://', 'googlechromes://'); document.body.appendChild(iframe); setTimeout(() => { document.body.removeChild(iframe); window.location.href = 'https://apps.apple.com/app/google-chrome/id535886823'; }, 2500); }}
                       style={{ ...S.btn, width: '100%', padding: 16, fontSize: 16, background: '#4285f4', borderRadius: 12, marginBottom: 8 }}>
-                      🌐 Ouvrir dans Chrome
+                      🌐 Ouvrir dans Chrome pour telecharger
                     </button>
-                    <p style={{ color: '#5a6080', fontSize: 11, textAlign: 'center', marginBottom: 8 }}>ou appuyez longuement sur les fichiers ci-dessous</p>
+                    <p style={{ color: '#5a6080', fontSize: 11, textAlign: 'center' }}>ou appuyez longuement sur les fichiers ci-dessous</p>
                   </div>
                 ) : (
-                  <button onClick={startDownload} style={{ ...S.btn, width: '100%', padding: 18, fontSize: 17, borderRadius: 12, marginBottom: 8 }}>
+                  <button onClick={startDownload} style={{ ...S.btn, width: '100%', padding: 18, fontSize: 17, borderRadius: 12, marginBottom: 12 }}>
                     ⬇ {(qrData.files?.length || 0) > 1 ? 'Telecharger l album complet' : 'Telecharger'}
                   </button>
                 )
               ) : (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 10, padding: 12, textAlign: 'center', marginBottom: 10 }}>
-                    <p style={{ color: '#4af09a', fontWeight: 700, fontSize: 13 }}>✓ Telechargement effectue</p>
-                  </div>
-                  {!savedToPlaylist ? (
-                    fanUser ? (
-                      <button onClick={saveIfLoggedIn} style={{ ...S.btn, width: '100%', padding: 13, fontSize: 14, borderRadius: 10 }}>
-                        🎵 Ajouter a ma playlist
-                      </button>
-                    ) : (
-                      <button onClick={() => setShowFanAuth(true)} style={{ ...S.btn, width: '100%', padding: 13, fontSize: 14, borderRadius: 10 }}>
-                        🎵 Sauvegarder dans ma playlist
-                      </button>
-                    )
-                  ) : (
-                    <button onClick={() => navigate('/playlist')} style={{ ...S.btn, width: '100%', padding: 13, fontSize: 14, borderRadius: 10, background: '#4af09a' }}>
-                      ✓ Voir ma playlist →
-                    </button>
-                  )}
+                <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 10, padding: 12, textAlign: 'center', marginBottom: 12 }}>
+                  <p style={{ color: '#4af09a', fontWeight: 700, fontSize: 13 }}>✓ Telechargement effectue</p>
                 </div>
               )}
+
+              {/* STREAMING BUTTONS */}
+              <StreamingButtons
+                sydica={qrData.sydica}
+                boomplay={qrData.boomplay}
+                spotify={qrData.spotify}
+              />
             </div>
 
             {/* AUDIO PLAYER */}
@@ -603,9 +273,8 @@ function FanPage() {
               <div style={S.card}>
                 <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>LECTEUR — STREAMING GRATUIT</p>
                 <AudioPlayer files={qrData.files} />
-                {/* Safari links */}
                 {onSafari && !downloaded && (
-                  <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 12, marginTop: 4 }}>
+                  <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 12 }}>
                     <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
                     {qrData.files.map((f: any, i: number) => (
                       <a key={i} href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
@@ -620,14 +289,10 @@ function FanPage() {
                 )}
               </div>
             )}
-
-            {/* Link to playlist */}
-            <button onClick={() => navigate('/playlist')} style={{ ...S.btn2, width: '100%', textAlign: 'center' as const, padding: 12 }}>
-              🎵 Ma playlist
-            </button>
           </div>
         )}
 
+        {/* ZIPPING */}
         {step === 'zipping' && (
           <div style={{ ...S.card, textAlign: 'center', padding: 36 }}>
             <div style={{ width: 48, height: 48, border: '3px solid #c8f04a', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 16px', animation: 'spin .8s linear infinite' }} />
@@ -641,6 +306,7 @@ function FanPage() {
           </div>
         )}
 
+        {/* LOCKED */}
         {step === 'locked' && (
           <div style={{ ...S.card, border: '1px solid #3a1a1a', animation: 'fadeUp .4s ease' }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -649,17 +315,32 @@ function FanPage() {
               <h2 style={{ fontFamily: 'serif', fontSize: 22, marginBottom: 4 }}>{qrData?.label || 'Contenu protege'}</h2>
               <p style={{ color: '#8890b0', fontSize: 13 }}>par {qrData?.artist || '—'}</p>
             </div>
+
+            {/* STREAMING STILL AVAILABLE WHEN LOCKED */}
+            {(qrData?.sydica || qrData?.boomplay || qrData?.spotify) && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ color: '#8890b0', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
+                  Le telechargement est bloque mais vous pouvez toujours ecouter en streaming :
+                </p>
+                <StreamingButtons sydica={qrData?.sydica} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
+              </div>
+            )}
+
             <div style={{ background: '#1a1000', border: '1px solid #3a2a00', borderRadius: 12, padding: 18, marginBottom: 16, textAlign: 'center' }}>
               <p style={{ color: '#f0b84a', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Nombre de telechargements atteint</p>
               <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.8 }}>Contactez l artiste <strong style={{ color: '#f9fafb' }}>{qrData?.artist}</strong> avec la reference ci-dessous.</p>
             </div>
+
             <div style={{ background: '#0a0b12', borderRadius: 12, padding: 18, marginBottom: 16, textAlign: 'center' }}>
               <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 10, letterSpacing: 2 }}>VOTRE REFERENCE</p>
               <p style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 32, color: '#c8f04a', letterSpacing: 6, marginBottom: 14 }}>{qrData?.qrId || qrId}</p>
-              <button onClick={() => copy(qrData?.qrId || qrId || '', 'qrid')} style={{ ...S.btn, padding: '10px 28px' }}>{copied === 'qrid' ? '✓ Copie !' : 'Copier la reference'}</button>
+              <button onClick={() => copy(qrData?.qrId || qrId || '', 'qrid')} style={{ ...S.btn, padding: '10px 28px' }}>
+                {copied === 'qrid' ? '✓ Copie !' : 'Copier la reference'}
+              </button>
             </div>
+
             <div style={{ background: '#0a0b12', borderRadius: 10, padding: 16, marginBottom: 14 }}>
-              {[['1', 'Copiez la reference ' + (qrData?.qrId || qrId)], ['2', 'Contactez l artiste ' + (qrData?.artist || '') + ' sur WhatsApp avec la reference et votre paiement'], ['3', 'Apres activation, rescannez ce QR code']].map(([n, t]) => (
+              {[['1', 'Copiez la reference ' + (qrData?.qrId || qrId)], ['2', 'Contactez l artiste sur WhatsApp avec la reference et votre paiement'], ['3', 'Apres activation, rescannez ce QR code']].map(([n, t]) => (
                 <div key={n} style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 99, background: '#c8f04a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#07080f', flexShrink: 0 }}>{n}</div>
                   <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.6 }}>{t}</p>
@@ -667,37 +348,30 @@ function FanPage() {
               ))}
             </div>
 
-            {/* WHATSAPP BUTTON */}
-            {qrData?.whatsapp ? (
-              <a
-                href={'https://wa.me/' + qrData.whatsapp.replace(/[\s+\-()]/g, '') + '?text=' + encodeURIComponent('Bonjour, je souhaite debloquer l\'acces a "' + (qrData?.label || '') + '". Ma reference est : ' + (qrData?.qrId || qrId))}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '15px 20px', borderRadius: 12, background: '#25D366', color: '#fff', fontWeight: 700, fontSize: 16, textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box' }}>
+            {qrData?.whatsapp && (
+              <a href={'https://wa.me/' + qrData.whatsapp.replace(/[\s+\-()]/g, '') + '?text=' + encodeURIComponent('Bonjour, je souhaite debloquer l\'acces a "' + (qrData?.label || '') + '". Ma reference est : ' + (qrData?.qrId || qrId))}
+                target="_blank" rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '15px 20px', borderRadius: 12, background: '#25D366', color: '#fff', fontWeight: 700, fontSize: 16, textDecoration: 'none', boxSizing: 'border-box' }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 Contacter {qrData?.artist} sur WhatsApp
               </a>
-            ) : null}
-
-            <button onClick={() => navigate('/playlist')} style={{ ...S.btn2, width: '100%', textAlign: 'center' as const }}>🎵 Ma playlist</button>
+            )}
           </div>
         )}
 
+        {/* DONE */}
         {step === 'done' && (
           <div style={{ ...S.card, textAlign: 'center', padding: 36, animation: 'fadeUp .4s ease' }}>
             <p style={{ fontSize: 52, marginBottom: 16 }}>{dlStatus.startsWith('Erreur') ? '❌' : '✅'}</p>
             <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>{dlStatus.startsWith('Erreur') ? 'Erreur' : 'Telechargement termine !'}</h2>
             <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>{dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier est dans vos telechargements.'}</p>
-            {!savedToPlaylist ? (
-              fanUser ? (
-                <button onClick={saveIfLoggedIn} style={{ ...S.btn, width: '100%', padding: 14, marginBottom: 10 }}>🎵 Ajouter a ma playlist</button>
-              ) : (
-                <button onClick={() => setShowFanAuth(true)} style={{ ...S.btn, width: '100%', padding: 14, marginBottom: 10 }}>🎵 Sauvegarder dans ma playlist</button>
-              )
-            ) : (
-              <button onClick={() => navigate('/playlist')} style={{ ...S.btn, width: '100%', padding: 14, marginBottom: 10, background: '#4af09a' }}>✓ Voir ma playlist →</button>
+            {(qrData?.sydica || qrData?.boomplay || qrData?.spotify) && (
+              <div style={{ marginTop: 8 }}>
+                <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 12 }}>Continuez a ecouter en streaming :</p>
+                <StreamingButtons sydica={qrData?.sydica} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
+              </div>
             )}
-            <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, fontSize: 11, color: '#5a6080' }}>LIEN REVOQUE — ACCES DESACTIVE</div>
+            <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, fontSize: 11, color: '#5a6080', marginTop: 8 }}>LIEN REVOQUE — ACCES DESACTIVE</div>
           </div>
         )}
       </div>
@@ -726,25 +400,30 @@ function AdminPage() {
   const [newPrice, setNewPrice] = useState('');
   const [newScans, setNewScans] = useState('');
   const [newWhatsapp, setNewWhatsapp] = useState('');
+  const [newSydica, setNewSydica] = useState('');
+  const [newBoomplay, setNewBoomplay] = useState('');
+  const [newSpotify, setNewSpotify] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  // Bulk QR generation
-  const [showBulk, setShowBulk] = useState(false);
-  const [bulkQr, setBulkQr] = useState<any>(null);
-  const [bulkCount, setBulkCount] = useState('100');
-  const [bulkScans, setBulkScans] = useState('1');
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
   const [qrModal, setQrModal] = useState<any>(null);
   const [editModal, setEditModal] = useState<any>(null);
   const [editScans, setEditScans] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [editSydica, setEditSydica] = useState('');
+  const [editBoomplay, setEditBoomplay] = useState('');
+  const [editSpotify, setEditSpotify] = useState('');
   const [editFiles, setEditFiles] = useState<any[]>([]);
   const [addFiles, setAddFiles] = useState<FileList | null>(null);
   const [editUploading, setEditUploading] = useState(false);
   const [editUploadMsg, setEditUploadMsg] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkQr, setBulkQr] = useState<any>(null);
+  const [bulkCount, setBulkCount] = useState('100');
+  const [bulkScans, setBulkScans] = useState('1');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
 
   useEffect(() => { onAuthStateChanged(auth, (u) => { if (u) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
   useEffect(() => {
@@ -758,7 +437,8 @@ function AdminPage() {
   const logout = async () => { await signOut(auth); };
 
   const uploadFile = async (file: File, qrId: string, i: number, total: number, setProgress: (s: string, p: number) => void) => {
-    const fd = new FormData(); fd.append('file', file); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); fd.append('resource_type', 'auto'); fd.append('public_id', 'securedrop/' + qrId + '/' + cleanName(file.name));
+    const fd = new FormData(); fd.append('file', file); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); fd.append('resource_type', 'auto');
+    fd.append('public_id', 'securedrop/' + qrId + '/' + Date.now() + '_' + cleanName(file.name));
     setProgress('Upload ' + (i + 1) + '/' + total + ' — ' + file.name, Math.round((i / total) * 100));
     const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method: 'POST', body: fd });
     if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Failed'); }
@@ -766,7 +446,7 @@ function AdminPage() {
   };
 
   const createQR = async () => {
-    if (!newLabel || !newArtist || !newPrice || !newScans) { setMsg('Remplis tous les champs'); return; }
+    if (!newLabel || !newArtist || !newPrice || !newScans) { setMsg('Remplis tous les champs obligatoires'); return; }
     setLoading(true); setMsg('');
     try {
       const qrId = Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -774,100 +454,94 @@ function AdminPage() {
       const uploaded: any[] = [];
       for (let i = 0; i < files.length; i++) uploaded.push(await uploadFile(files[i], qrId, i, files.length, (s, p) => { setUploadMsg(s); setUploadProgress(p); }));
       setUploadProgress(100);
-      await addDoc(collection(db, 'qrcodes'), { qrId, label: newLabel, artist: newArtist, type: newType, price: parseInt(newPrice), totalScans: parseInt(newScans), usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length, status: 'active', whatsapp: newWhatsapp, createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId });
-      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans(''); setNewWhatsapp(''); setSelectedFiles(null); setUploadProgress(0); setUploadMsg('');
+      await addDoc(collection(db, 'qrcodes'), {
+        qrId, label: newLabel, artist: newArtist, type: newType,
+        price: parseInt(newPrice), totalScans: parseInt(newScans),
+        usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length,
+        status: 'active', whatsapp: newWhatsapp, sydica: newSydica,
+        boomplay: newBoomplay, spotify: newSpotify,
+        createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
+      });
+      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
+      setNewWhatsapp(''); setNewSydica(''); setNewBoomplay(''); setNewSpotify('');
+      setSelectedFiles(null); setUploadProgress(0); setUploadMsg('');
       setMsg('QR ' + qrId + ' cree avec ' + uploaded.length + ' fichier(s) !');
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
 
-  const openEdit = (q: any) => { setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans)); setEditWhatsapp(q.whatsapp || ''); setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg(''); };
+  const openEdit = (q: any) => {
+    setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans));
+    setEditWhatsapp(q.whatsapp || ''); setEditSydica(q.sydica || '');
+    setEditBoomplay(q.boomplay || ''); setEditSpotify(q.spotify || '');
+    setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg('');
+  };
 
   const uploadEditFiles = async () => {
     if (!addFiles || !editModal) return;
     setEditUploading(true); const uploaded: any[] = [];
     for (let i = 0; i < addFiles.length; i++) {
-      setEditUploadMsg('Upload ' + (i + 1) + '/' + addFiles.length);
       try { uploaded.push(await uploadFile(addFiles[i], editModal.qrId, i, addFiles.length, (s) => setEditUploadMsg(s))); } catch (e) { console.error(e); }
     }
-    setEditFiles(f => [...f, ...uploaded]); setAddFiles(null); setEditUploadMsg(uploaded.length + ' fichier(s) ajoute(s) !'); setEditUploading(false);
+    setEditFiles(f => [...f, ...uploaded]); setAddFiles(null);
+    setEditUploadMsg(uploaded.length + ' fichier(s) ajoute(s) !'); setEditUploading(false);
   };
 
   const saveEdit = async () => {
     if (!editModal) return;
     const newTotal = parseInt(editScans) || editModal.totalScans;
-    await updateDoc(doc(db, 'qrcodes', editModal.id), { price: parseInt(editPrice) || editModal.price, totalScans: newTotal, files: editFiles, fileCount: editFiles.length, whatsapp: editWhatsapp, status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked' });
+    await updateDoc(doc(db, 'qrcodes', editModal.id), {
+      price: parseInt(editPrice) || editModal.price, totalScans: newTotal,
+      files: editFiles, fileCount: editFiles.length,
+      whatsapp: editWhatsapp, sydica: editSydica,
+      boomplay: editBoomplay, spotify: editSpotify,
+      status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
+    });
     setEditModal(null); setMsg('QR mis a jour !');
   };
 
   const generateBulkQRs = async () => {
     if (!bulkQr || !bulkCount || !bulkScans) return;
-    const count = parseInt(bulkCount);
-    const scans = parseInt(bulkScans);
+    const count = parseInt(bulkCount); const scans = parseInt(bulkScans);
     if (count < 1 || count > 5000) { setMsg('Entre 1 et 5000 QR codes'); return; }
     setBulkLoading(true); setBulkProgress(0);
-
-    // Step 1 — Generate all QR IDs and save to Firestore
     const qrIds: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const qrId = Math.random().toString(36).slice(2, 10).toUpperCase();
-      qrIds.push(qrId);
-    }
-
-    // Save in batches of 20
+    for (let i = 0; i < count; i++) qrIds.push(Math.random().toString(36).slice(2, 10).toUpperCase());
     const batchSize = 20;
     for (let i = 0; i < qrIds.length; i += batchSize) {
-      const batch = qrIds.slice(i, i + batchSize).map(qrId =>
+      await Promise.all(qrIds.slice(i, i + batchSize).map(qrId =>
         addDoc(collection(db, 'qrcodes'), {
           qrId, label: bulkQr.label, artist: bulkQr.artist, type: bulkQr.type,
           price: bulkQr.price, totalScans: scans, usedScans: 0, downloads: 0,
           files: bulkQr.files || [], fileCount: bulkQr.fileCount || 0,
           status: 'active', whatsapp: bulkQr.whatsapp || '',
-          createdAt: new Date().toISOString(),
-          url: BASE_URL + '/fan/' + qrId,
+          sydica: bulkQr.sydica || '', boomplay: bulkQr.boomplay || '', spotify: bulkQr.spotify || '',
+          createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
           bulk: true, bulkParent: bulkQr.qrId,
         })
-      );
-      await Promise.all(batch);
+      ));
       setBulkProgress(Math.round(((i + batchSize) / count) * 50));
     }
-
-    // Step 2 — Generate QR images using canvas + qrcode library
     setBulkProgress(55);
     const QRCode = (await import('qrcode')).default;
-
-    // A4 dimensions in px at 96dpi → use mm for jsPDF
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = 210; const pageH = 297;
     const cols = 6; const rows = 5; const perPage = cols * rows;
     const qrSize = 27;
-    const marginX = (pageW - cols * qrSize) / (cols + 1);
-    const marginY = (pageH - rows * qrSize) / (rows + 1);
-
+    const marginX = (210 - cols * qrSize) / (cols + 1);
+    const marginY = (297 - rows * qrSize) / (rows + 1);
     for (let i = 0; i < qrIds.length; i++) {
       if (i > 0 && i % perPage === 0) pdf.addPage();
       const pos = i % perPage;
-      const col = pos % cols;
-      const row = Math.floor(pos / cols);
-      const x = marginX + col * (qrSize + marginX);
-      const y = marginY + row * (qrSize + marginY);
-      const url = BASE_URL + '/fan/' + qrIds[i];
-
+      const x = marginX + (pos % cols) * (qrSize + marginX);
+      const y = marginY + Math.floor(pos / cols) * (qrSize + marginY);
       try {
-        const dataUrl = await QRCode.toDataURL(url, {
-          width: 200, margin: 1,
-          color: { dark: '#000000', light: '#ffffff' },
-          errorCorrectionLevel: 'H',
-        });
+        const dataUrl = await QRCode.toDataURL(BASE_URL + '/fan/' + qrIds[i], { width: 200, margin: 1, errorCorrectionLevel: 'H' });
         pdf.addImage(dataUrl, 'PNG', x, y, qrSize, qrSize);
-      } catch (e) { console.error('QR gen error:', e); }
-
+      } catch (e) { console.error(e); }
       if (i % 5 === 0) setBulkProgress(55 + Math.round((i / qrIds.length) * 40));
     }
-
     setBulkProgress(100);
-    const filename = bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes.pdf';
-    pdf.save(filename);
+    pdf.save(bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes.pdf');
     setBulkLoading(false); setShowBulk(false); setBulkQr(null);
     setMsg('✅ ' + count + ' QR codes generes ! PDF telecharge.');
   };
@@ -879,9 +553,16 @@ function AdminPage() {
     setMsg('Paiement valide !');
   };
 
-  const downloadQR = (q: any) => { const c = document.getElementById('qr-dl-' + q.id) as HTMLCanvasElement; if (!c) return; const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = q.label + '-' + q.qrId + '.png'; a.click(); };
+  const downloadQR = (q: any) => {
+    const c = document.getElementById('qr-dl-' + q.id) as HTMLCanvasElement;
+    if (!c) return; const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = q.label + '-' + q.qrId + '.png'; a.click();
+  };
 
-  const filteredQRs = qrcodes.filter(q => q.label?.toLowerCase().includes(searchTerm.toLowerCase()) || q.artist?.toLowerCase().includes(searchTerm.toLowerCase()) || q.qrId?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredQRs = qrcodes.filter(q =>
+    q.label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    q.artist?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    q.qrId?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (view === 'login') return (
     <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -910,38 +591,29 @@ function AdminPage() {
     <div style={S.bg}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* BULK QR MODAL */}
+      {/* BULK MODAL */}
       {showBulk && bulkQr && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Generation en masse</h3>
-            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 6 }}>{bulkQr.label}</p>
+            <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4 }}>{bulkQr.label}</p>
             <p style={{ color: '#8890b0', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
-
-            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 14, marginBottom: 20 }}>
+            <div style={{ background: '#0a0b12', borderRadius: 10, padding: 14, marginBottom: 16 }}>
               <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
               <p style={{ color: '#5a6080', fontSize: 11 }}>30 QR codes par page A4 → PDF imprimable</p>
             </div>
-
-            <label style={S.lbl}>Nombre de QR codes a generer</label>
+            <label style={S.lbl}>Nombre de QR codes</label>
             <input style={S.inp} type="number" value={bulkCount} onChange={e => setBulkCount(e.target.value)} placeholder="100" min="1" max="5000" />
-
-            <label style={S.lbl}>Nombre de scans par QR code</label>
+            <label style={S.lbl}>Scans par QR code</label>
             <input style={S.inp} type="number" value={bulkScans} onChange={e => setBulkScans(e.target.value)} placeholder="1" min="1" />
-
-            <div style={{ background: '#1a2a0a', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 20 }}>
-              <p style={{ color: '#4af09a', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                📄 {Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4
-              </p>
-              <p style={{ color: '#8890b0', fontSize: 12 }}>
-                {bulkCount} QR codes × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements possibles
-              </p>
+            <div style={{ background: '#1a2a0a', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <p style={{ color: '#4af09a', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>📄 {Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4</p>
+              <p style={{ color: '#8890b0', fontSize: 12 }}>{bulkCount} QR × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements</p>
             </div>
-
             {bulkLoading && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8890b0', marginBottom: 6 }}>
-                  <span>{bulkProgress < 65 ? 'Creation des QR codes...' : 'Generation du PDF...'}</span>
+                  <span>{bulkProgress < 55 ? 'Creation des QR codes...' : 'Generation du PDF...'}</span>
                   <span style={{ color: '#c8f04a', fontWeight: 700 }}>{bulkProgress}%</span>
                 </div>
                 <div style={{ height: 8, background: '#1c1f2e', borderRadius: 99 }}>
@@ -950,7 +622,6 @@ function AdminPage() {
                 <p style={{ color: '#5a6080', fontSize: 11, marginTop: 8, textAlign: 'center' }}>Ne fermez pas cette page...</p>
               </div>
             )}
-
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); }} disabled={bulkLoading}>Annuler</button>
               <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading}>
@@ -967,13 +638,21 @@ function AdminPage() {
           <div style={{ background: '#0e1018', border: '1px solid #1c1f2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Modifier</h3>
             <p style={{ color: '#c8f04a', fontFamily: 'monospace', fontWeight: 700, marginBottom: 20 }}>{editModal.qrId} — {editModal.label}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div><label style={S.lbl}>Prix (FCFA)</label><input style={S.inp} type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} /></div>
               <div><label style={S.lbl}>Nb scans total</label><input style={S.inp} type="number" value={editScans} onChange={e => setEditScans(e.target.value)} /></div>
             </div>
+            {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && (
+              <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4af09a' }}>✓ QR sera reactive</div>
+            )}
             <label style={S.lbl}>💬 WhatsApp de l artiste</label>
-            <input style={{ ...S.inp, marginBottom: 14 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
-            {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && <div style={{ background: '#0d2e1a', border: '1px solid #4af09a', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4af09a' }}>✓ QR sera reactive</div>}
+            <input style={{ ...S.inp, marginBottom: 12 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
+            <label style={S.lbl}>🎵 Lien Sydica</label>
+            <input style={{ ...S.inp, marginBottom: 12 }} value={editSydica} onChange={e => setEditSydica(e.target.value)} placeholder="https://sydica.com/artiste" />
+            <label style={S.lbl}>🎧 Lien Boomplay</label>
+            <input style={{ ...S.inp, marginBottom: 12 }} value={editBoomplay} onChange={e => setEditBoomplay(e.target.value)} placeholder="https://boomplay.com/artiste" />
+            <label style={S.lbl}>💚 Lien Spotify</label>
+            <input style={{ ...S.inp, marginBottom: 14 }} value={editSpotify} onChange={e => setEditSpotify(e.target.value)} placeholder="https://open.spotify.com/artist/..." />
             <label style={{ ...S.lbl, marginBottom: 10 }}>Fichiers ({editFiles.length})</label>
             <div style={{ background: '#0a0b12', borderRadius: 10, padding: 12, marginBottom: 14 }}>
               {editFiles.length === 0 ? <p style={{ color: '#5a6080', fontSize: 13, textAlign: 'center' }}>Aucun fichier</p> :
@@ -1053,6 +732,7 @@ function AdminPage() {
         </div>
       </div>
 
+      {/* TABS */}
       <div style={{ borderBottom: '1px solid #1c1f2e', padding: '0 24px', display: 'flex', background: '#0e1018' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
@@ -1063,11 +743,14 @@ function AdminPage() {
 
         {tab === 'qrcodes' && (
           <>
-            {lockedQRs.length > 0 && <div style={{ background: '#1a1500', border: '1px solid #3a3000', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-              <p style={{ color: '#f0b84a', fontSize: 13 }}>🔒 {lockedQRs.length} QR bloque(s)</p>
-              <button style={S.btnRed} onClick={async () => { for (const q of lockedQRs) await deleteDoc(doc(db, 'qrcodes', q.id)); setMsg(lockedQRs.length + ' supprimes !'); }}>🗑️ Supprimer les bloques</button>
-            </div>}
+            {lockedQRs.length > 0 && (
+              <div style={{ background: '#1a1500', border: '1px solid #3a3000', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <p style={{ color: '#f0b84a', fontSize: 13 }}>🔒 {lockedQRs.length} QR bloque(s)</p>
+                <button style={S.btnRed} onClick={async () => { for (const q of lockedQRs) await deleteDoc(doc(db, 'qrcodes', q.id)); setMsg(lockedQRs.length + ' supprimes !'); }}>🗑️ Supprimer les bloques</button>
+              </div>
+            )}
 
+            {/* CREATE FORM */}
             <div style={S.card}>
               <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, fontFamily: 'serif' }}>Nouveau QR Code</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1076,14 +759,22 @@ function AdminPage() {
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
-              <label style={S.lbl}>💬 WhatsApp de l artiste (avec indicatif)</label>
-              <input style={{ ...S.inp, marginBottom: 16 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 {[['album','Album'],['single','Single'],['video','Video'],['mix','Mix']].map(([t,l]) => (
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#c8f04a' : '#252840'), background: newType === t ? '#1a2a0a' : 'transparent', color: newType === t ? '#c8f04a' : '#5a6080', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
-              <label style={S.lbl}>Fichiers</label>
+
+              <label style={S.lbl}>💬 WhatsApp de l artiste</label>
+              <input style={{ ...S.inp, marginBottom: 12 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
+              <label style={S.lbl}>🎵 Lien Sydica</label>
+              <input style={{ ...S.inp, marginBottom: 12 }} value={newSydica} onChange={e => setNewSydica(e.target.value)} placeholder="https://sydica.com/artiste" />
+              <label style={S.lbl}>🎧 Lien Boomplay</label>
+              <input style={{ ...S.inp, marginBottom: 12 }} value={newBoomplay} onChange={e => setNewBoomplay(e.target.value)} placeholder="https://boomplay.com/artiste" />
+              <label style={S.lbl}>💚 Lien Spotify</label>
+              <input style={{ ...S.inp, marginBottom: 14 }} value={newSpotify} onChange={e => setNewSpotify(e.target.value)} placeholder="https://open.spotify.com/artist/..." />
+
+              <label style={S.lbl}>Fichiers audio/video</label>
               <div style={{ border: '2px dashed #252840', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#0a0b12' }}>
                 <input type="file" accept="audio/*,video/*" multiple onChange={e => setSelectedFiles(e.target.files)} style={{ display: 'none' }} id="fileInput" />
                 <input type="file" accept="audio/*,video/*" onChange={e => setSelectedFiles(e.target.files)} style={{ display: 'none' }} id="folderInput" {...{ webkitdirectory: '', directory: '' } as any} />
@@ -1124,9 +815,14 @@ function AdminPage() {
                         <span style={{ fontFamily: 'monospace', color: '#c8f04a', fontSize: 11, fontWeight: 700 }}>{q.qrId}</span>
                       </div>
                       <p style={{ color: '#8890b0', fontSize: 12, marginBottom: 4 }}>{q.artist} · {q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
-                      <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 8 }}>{q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL</p>
-                      <div style={{ height: 3, background: '#1c1f2e', borderRadius: 99, marginBottom: 8 }}><div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#c8f04a', borderRadius: 99 }} /></div>
-                      {q.files && q.files.length > 0 && <div style={{ background: '#0a0b12', borderRadius: 6, padding: '5px 8px' }}>{q.files.map((f: any, i: number) => <p key={i} style={{ color: '#5a6080', fontSize: 10, marginBottom: 1 }}>{i + 1}. {f.name}</p>)}</div>}
+                      <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 6 }}>{q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL</p>
+                      <div style={{ height: 3, background: '#1c1f2e', borderRadius: 99, marginBottom: 6 }}><div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#c8f04a', borderRadius: 99 }} /></div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {q.sydica && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#1a0a2e', color: '#a78bfa' }}>🎵 Sydica</span>}
+                        {q.boomplay && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#1a0a0a', color: '#fca5a5' }}>🎧 Boomplay</span>}
+                        {q.spotify && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a1a0a', color: '#4af09a' }}>💚 Spotify</span>}
+                        {q.whatsapp && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a2e0a', color: '#86efac' }}>💬 WA</span>}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
                       <button style={{ ...S.btn, padding: '7px 12px', fontSize: 11 }} onClick={() => setQrModal(q)}>QR PNG</button>
@@ -1151,7 +847,11 @@ function AdminPage() {
               payments.map(p => (
                 <div key={p.id} style={S.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                    <div><p style={{ fontWeight: 700, marginBottom: 4 }}>{p.note}</p><p style={{ color: '#5a6080', fontSize: 12 }}>{p.method} · {p.phone} · {p.date}</p>{p.qrId && <p style={{ color: '#c8f04a', fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>Ref: {p.qrId}</p>}</div>
+                    <div>
+                      <p style={{ fontWeight: 700, marginBottom: 4 }}>{p.note}</p>
+                      <p style={{ color: '#5a6080', fontSize: 12 }}>{p.method} · {p.phone} · {p.date}</p>
+                      {p.qrId && <p style={{ color: '#c8f04a', fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>Ref: {p.qrId}</p>}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ color: '#c8f04a', fontWeight: 800, fontSize: 18 }}>{(p.amount || 0).toLocaleString()} FCFA</span>
                       <span style={badgeStyle(p.status)}>{p.status}</span>
@@ -1173,7 +873,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/fan/:qrId" element={<FanPage />} />
-        <Route path="/playlist" element={<PlaylistPage />} />
         <Route path="/*" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
