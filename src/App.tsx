@@ -39,21 +39,21 @@ const formatTime = (t: number) => { if (!t || isNaN(t)) return '0:00'; const m =
 // ─────────────────────────────────────────────
 // STREAMING BUTTONS COMPONENT
 // ─────────────────────────────────────────────
-function StreamingButtons({ sydica, boomplay, spotify }: { sydica?: string, boomplay?: string, spotify?: string }) {
-  if (!sydica && !boomplay && !spotify) return null;
+function StreamingButtons({ appleMusic, boomplay, spotify }: { appleMusic?: string, boomplay?: string, spotify?: string }) {
+  if (!appleMusic && !boomplay && !spotify) return null;
   return (
     <div style={{ marginBottom: 16 }}>
       <p style={{ color: '#5a6080', fontSize: 10, letterSpacing: 1, marginBottom: 10, textAlign: 'center' }}>ECOUTER EN STREAMING</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* SYDICA */}
-        {sydica && (
-          <a href={sydica} target="_blank" rel="noreferrer"
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderRadius: 12, background: '#1a0a2e', border: '1.5px solid #7c3aed', color: '#a78bfa', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
-            <span style={{ fontSize: 22 }}>🎵</span>
+        {/* APPLE MUSIC */}
+        {appleMusic && (
+          <a href={appleMusic} target="_blank" rel="noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderRadius: 12, background: '#1a0a0a', border: '1.5px solid #fc3c44', color: '#ff6b6b', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#fc3c44"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026C4.786.07 4.043.15 3.34.428 2.004.958 1.04 1.88.475 3.208c-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.772.165 1.528.507 2.235.458.936 1.15 1.65 2.063 2.137.5.268 1.035.428 1.59.513.595.09 1.194.12 1.795.13.094.002.19.006.284.006h11.24c.235 0 .47-.005.704-.013.508-.015 1.01-.06 1.504-.163.998-.204 1.846-.688 2.525-1.41.49-.522.84-1.132 1.04-1.815.16-.55.24-1.11.28-1.674.014-.19.018-.383.026-.574V6.123zm-7.54 5.43c-.04.042-.08.083-.117.127l-4.98 5.82a.44.44 0 01-.696-.05l-2.49-3.735a.44.44 0 01.087-.615l.766-.544a.44.44 0 01.597.086l1.657 2.463 4.148-4.832a.44.44 0 01.62-.045l.7.612a.44.44 0 01.047.62l-.34.093zm1.86-5.7c-.35 0-.636-.287-.636-.638V3.567c0-.352.285-.638.636-.638h5.29c.352 0 .637.286.637.638v1.648c0 .35-.285.638-.637.638h-5.29z"/></svg>
             <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Ecouter sur Sydica</p>
-              <p style={{ color: '#7c3aed', fontSize: 11 }}>Plateforme de streaming</p>
+              <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Ecouter sur Apple Music</p>
+              <p style={{ color: '#fc3c44', fontSize: 11 }}>Streaming Apple</p>
             </div>
             <span style={{ fontSize: 18 }}>→</span>
           </a>
@@ -262,7 +262,7 @@ function FanPage() {
 
               {/* STREAMING BUTTONS */}
               <StreamingButtons
-                sydica={qrData.sydica}
+                appleMusic={qrData.appleMusic}
                 boomplay={qrData.boomplay}
                 spotify={qrData.spotify}
               />
@@ -317,12 +317,12 @@ function FanPage() {
             </div>
 
             {/* STREAMING STILL AVAILABLE WHEN LOCKED */}
-            {(qrData?.sydica || qrData?.boomplay || qrData?.spotify) && (
+            {(qrData?.appleMusic || qrData?.boomplay || qrData?.spotify) && (
               <div style={{ marginBottom: 16 }}>
                 <p style={{ color: '#8890b0', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
                   Le telechargement est bloque mais vous pouvez toujours ecouter en streaming :
                 </p>
-                <StreamingButtons sydica={qrData?.sydica} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
+                <StreamingButtons appleMusic={qrData?.appleMusic} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
               </div>
             )}
 
@@ -365,10 +365,10 @@ function FanPage() {
             <p style={{ fontSize: 52, marginBottom: 16 }}>{dlStatus.startsWith('Erreur') ? '❌' : '✅'}</p>
             <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, marginBottom: 8 }}>{dlStatus.startsWith('Erreur') ? 'Erreur' : 'Telechargement termine !'}</h2>
             <p style={{ color: '#8890b0', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>{dlStatus.startsWith('Erreur') ? dlStatus : 'Votre fichier est dans vos telechargements.'}</p>
-            {(qrData?.sydica || qrData?.boomplay || qrData?.spotify) && (
+            {(qrData?.appleMusic || qrData?.boomplay || qrData?.spotify) && (
               <div style={{ marginTop: 8 }}>
                 <p style={{ color: '#5a6080', fontSize: 12, marginBottom: 12 }}>Continuez a ecouter en streaming :</p>
-                <StreamingButtons sydica={qrData?.sydica} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
+                <StreamingButtons appleMusic={qrData?.appleMusic} boomplay={qrData?.boomplay} spotify={qrData?.spotify} />
               </div>
             )}
             <div style={{ background: '#0a0b12', borderRadius: 8, padding: 10, fontSize: 11, color: '#5a6080', marginTop: 8 }}>LIEN REVOQUE — ACCES DESACTIVE</div>
@@ -400,7 +400,7 @@ function AdminPage() {
   const [newPrice, setNewPrice] = useState('');
   const [newScans, setNewScans] = useState('');
   const [newWhatsapp, setNewWhatsapp] = useState('');
-  const [newSydica, setNewSydica] = useState('');
+  const [newAppleMusic, setNewAppleMusic] = useState('');
   const [newBoomplay, setNewBoomplay] = useState('');
   const [newSpotify, setNewSpotify] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -409,7 +409,7 @@ function AdminPage() {
   const [editScans, setEditScans] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
-  const [editSydica, setEditSydica] = useState('');
+  const [editAppleMusic, setEditAppleMusic] = useState('');
   const [editBoomplay, setEditBoomplay] = useState('');
   const [editSpotify, setEditSpotify] = useState('');
   const [editFiles, setEditFiles] = useState<any[]>([]);
@@ -458,12 +458,12 @@ function AdminPage() {
         qrId, label: newLabel, artist: newArtist, type: newType,
         price: parseInt(newPrice), totalScans: parseInt(newScans),
         usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length,
-        status: 'active', whatsapp: newWhatsapp, sydica: newSydica,
+        status: 'active', whatsapp: newWhatsapp, appleMusic: newAppleMusic,
         boomplay: newBoomplay, spotify: newSpotify,
         createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
       });
       setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
-      setNewWhatsapp(''); setNewSydica(''); setNewBoomplay(''); setNewSpotify('');
+      setNewWhatsapp(''); setNewAppleMusic(''); setNewBoomplay(''); setNewSpotify('');
       setSelectedFiles(null); setUploadProgress(0); setUploadMsg('');
       setMsg('QR ' + qrId + ' cree avec ' + uploaded.length + ' fichier(s) !');
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
@@ -472,7 +472,7 @@ function AdminPage() {
 
   const openEdit = (q: any) => {
     setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans));
-    setEditWhatsapp(q.whatsapp || ''); setEditSydica(q.sydica || '');
+    setEditWhatsapp(q.whatsapp || ''); setEditAppleMusic(q.appleMusic || '');
     setEditBoomplay(q.boomplay || ''); setEditSpotify(q.spotify || '');
     setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg('');
   };
@@ -493,7 +493,7 @@ function AdminPage() {
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
       price: parseInt(editPrice) || editModal.price, totalScans: newTotal,
       files: editFiles, fileCount: editFiles.length,
-      whatsapp: editWhatsapp, sydica: editSydica,
+      whatsapp: editWhatsapp, appleMusic: editAppleMusic,
       boomplay: editBoomplay, spotify: editSpotify,
       status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
     });
@@ -515,7 +515,7 @@ function AdminPage() {
           price: bulkQr.price, totalScans: scans, usedScans: 0, downloads: 0,
           files: bulkQr.files || [], fileCount: bulkQr.fileCount || 0,
           status: 'active', whatsapp: bulkQr.whatsapp || '',
-          sydica: bulkQr.sydica || '', boomplay: bulkQr.boomplay || '', spotify: bulkQr.spotify || '',
+          appleMusic: bulkQr.appleMusic || '', boomplay: bulkQr.boomplay || '', spotify: bulkQr.spotify || '',
           createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
           bulk: true, bulkParent: bulkQr.qrId,
         })
@@ -647,8 +647,8 @@ function AdminPage() {
             )}
             <label style={S.lbl}>💬 WhatsApp de l artiste</label>
             <input style={{ ...S.inp, marginBottom: 12 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
-            <label style={S.lbl}>🎵 Lien Sydica</label>
-            <input style={{ ...S.inp, marginBottom: 12 }} value={editSydica} onChange={e => setEditSydica(e.target.value)} placeholder="https://sydica.com/artiste" />
+            <label style={S.lbl}>🍎 Lien Apple Music</label>
+            <input style={{ ...S.inp, marginBottom: 12 }} value={editAppleMusic} onChange={e => setEditAppleMusic(e.target.value)} placeholder="https://music.apple.com/..." />
             <label style={S.lbl}>🎧 Lien Boomplay</label>
             <input style={{ ...S.inp, marginBottom: 12 }} value={editBoomplay} onChange={e => setEditBoomplay(e.target.value)} placeholder="https://boomplay.com/artiste" />
             <label style={S.lbl}>💚 Lien Spotify</label>
@@ -767,8 +767,8 @@ function AdminPage() {
 
               <label style={S.lbl}>💬 WhatsApp de l artiste</label>
               <input style={{ ...S.inp, marginBottom: 12 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
-              <label style={S.lbl}>🎵 Lien Sydica</label>
-              <input style={{ ...S.inp, marginBottom: 12 }} value={newSydica} onChange={e => setNewSydica(e.target.value)} placeholder="https://sydica.com/artiste" />
+              <label style={S.lbl}>🍎 Lien Apple Music</label>
+              <input style={{ ...S.inp, marginBottom: 12 }} value={newAppleMusic} onChange={e => setNewAppleMusic(e.target.value)} placeholder="https://music.apple.com/..." />
               <label style={S.lbl}>🎧 Lien Boomplay</label>
               <input style={{ ...S.inp, marginBottom: 12 }} value={newBoomplay} onChange={e => setNewBoomplay(e.target.value)} placeholder="https://boomplay.com/artiste" />
               <label style={S.lbl}>💚 Lien Spotify</label>
@@ -818,7 +818,7 @@ function AdminPage() {
                       <p style={{ color: '#5a6080', fontSize: 11, marginBottom: 6 }}>{q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL</p>
                       <div style={{ height: 3, background: '#1c1f2e', borderRadius: 99, marginBottom: 6 }}><div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#c8f04a', borderRadius: 99 }} /></div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {q.sydica && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#1a0a2e', color: '#a78bfa' }}>🎵 Sydica</span>}
+                        {q.appleMusic && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#1a0a0a', color: '#ff6b6b' }}>🍎 Apple Music</span>}
                         {q.boomplay && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#1a0a0a', color: '#fca5a5' }}>🎧 Boomplay</span>}
                         {q.spotify && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a1a0a', color: '#4af09a' }}>💚 Spotify</span>}
                         {q.whatsapp && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a2e0a', color: '#86efac' }}>💬 WA</span>}
