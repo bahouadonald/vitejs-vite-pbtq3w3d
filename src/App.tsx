@@ -197,6 +197,46 @@ function VideoPlayer({ files }: { files: any[] }) {
   );
 }
 
+// ─────────────────────────────────────────────
+// MEDIA PLAYERS — Audio + Video séparés
+// ─────────────────────────────────────────────
+function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded }:
+  { files: any[], onStream: (t: string, d: number) => void, onSafari: boolean, downloaded: boolean, onMarkDownloaded: () => void }) {
+  const isVideo = (f: any) => /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(f.name || '');
+  const audioFiles = files.filter(f => !isVideo(f));
+  const videoFiles = files.filter(f => isVideo(f));
+  return (
+    <>
+      {audioFiles.length > 0 && (
+        <div style={S.card}>
+          <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎵 LECTEUR AUDIO — STREAMING GRATUIT</p>
+          <AudioPlayer files={audioFiles} onStream={onStream} />
+          {onSafari && !downloaded && (
+            <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 12 }}>
+              <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
+              {audioFiles.map((f: any, i: number) => (
+                <a key={i} href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
+                  onClick={i === 0 ? onMarkDownloaded : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0a0b12', border: '1px solid #1c1f2e', borderRadius: 10, padding: '10px 14px', marginBottom: 8, textDecoration: 'none', color: '#e8eaf2' }}>
+                  <span>🎵</span>
+                  <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '')}</span>
+                  <span style={{ color: '#c8f04a' }}>⬇</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {videoFiles.length > 0 && (
+        <div style={S.card}>
+          <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
+          <VideoPlayer files={videoFiles} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
   const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
@@ -329,7 +369,7 @@ function FanPage() {
     }
   };
 
-return (
+  return (
     <div style={{ ...S.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, minHeight: '100vh' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -392,41 +432,7 @@ return (
             </div>
 
             {/* AUDIO PLAYER */}
-            {(() => {
-              const isVideo = (f: any) => /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(f.name || '');
-              const audioFiles = (qrData.files || []).filter((f: any) => !isVideo(f));
-              const videoFiles = (qrData.files || []).filter((f: any) => isVideo(f));
-              return (
-                <>
-                  {audioFiles.length > 0 && (
-                    <div style={S.card}>
-                      <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎵 LECTEUR AUDIO — STREAMING GRATUIT</p>
-                      <AudioPlayer files={audioFiles} onStream={recordStream} />
-                      {onSafari && !downloaded && (
-                        <div style={{ borderTop: '1px solid #1c1f2e', paddingTop: 12 }}>
-                          <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
-                          {audioFiles.map((f: any, i: number) => (
-                            <a key={i} href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                              onClick={i === 0 ? () => markAsDownloaded() : undefined}
-                              style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0a0b12', border: '1px solid #1c1f2e', borderRadius: 10, padding: '10px 14px', marginBottom: 8, textDecoration: 'none', color: '#e8eaf2' }}>
-                              <span>🎵</span>
-                              <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '')}</span>
-                              <span style={{ color: '#c8f04a' }}>⬇</span>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {videoFiles.length > 0 && (
-                    <div style={S.card}>
-                      <p style={{ color: '#5a6080', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
-                      <VideoPlayer files={videoFiles} />
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+            <MediaPlayers files={qrData.files || []} onStream={recordStream} onSafari={onSafari} downloaded={downloaded} onMarkDownloaded={markAsDownloaded} />
           </div>
         )}
 
@@ -523,8 +529,6 @@ return (
     </div>
   );
 }
-
-
 // ─────────────────────────────────────────────
 // ADMIN PAGE
 // ─────────────────────────────────────────────
@@ -608,7 +612,6 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
     </div>
   );
 }
-
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -799,6 +802,27 @@ function AdminPage() {
       </div>
     </div>
   );
+  
+const pendingPay = payments.filter(p => p.status === 'pending');
+  const lockedQRs = qrcodes.filter(q => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1));
+
+  // Grouper QR codes par artiste
+  const groupedQRs = (() => {
+    const groups: Record<string, any[]> = {};
+    filteredQRs.forEach((q: any) => {
+      const artist = q.artist || 'Sans artiste';
+      if (!groups[artist]) groups[artist] = [];
+      groups[artist].push(q);
+    });
+    return Object.entries(groups).map(([artist, qs]) => {
+      const lockedCount = qs.filter((q: any) => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1)).length;
+      return { artist, qs, activeCount: qs.length - lockedCount, lockedCount };
+    });
+  })();
+
+  return (
+    <div style={S.bg}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* BULK MODAL */}
       {showBulk && bulkQr && (
@@ -1009,29 +1033,16 @@ function AdminPage() {
               <div style={{ ...S.card, textAlign: 'center', color: '#5a6080', padding: 40 }}>
                 {searchTerm ? 'Aucun resultat' : 'Aucun QR code — cree le premier ci-dessus'}
               </div>
-            ) : (() => {
-              // Grouper par artiste
-              const groups: Record<string, any[]> = {};
-              filteredQRs.forEach(q => {
-                const artist = q.artist || 'Sans artiste';
-                if (!groups[artist]) groups[artist] = [];
-                groups[artist].push(q);
-              });
-              return Object.entries(groups).map(([artist, qs]) => {
-                const totalQrs = qs.length;
-                const lockedCount = qs.filter(q => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1)).length;
-                const activeCount = totalQrs - lockedCount;
-                return (
-                  <ArtistFolder key={artist} artist={artist} qrcodes={qs} activeCount={activeCount} lockedCount={lockedCount}
-                    onEdit={openEdit} onQrModal={setQrModal} onBulk={(q: any) => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setShowBulk(true); }}
-                    onToggle={(q: any) => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}
-                    onDelete={(id: string) => setConfirmDelete(id)} />
-                );
-              });
-            })()}
+) : groupedQRs.map(({ artist, qs, activeCount, lockedCount }) => (
+              <ArtistFolder key={artist} artist={artist} qrcodes={qs} activeCount={activeCount} lockedCount={lockedCount}
+                onEdit={openEdit} onQrModal={setQrModal} onBulk={(q: any) => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setShowBulk(true); }}
+                onToggle={(q: any) => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}
+                onDelete={(id: string) => setConfirmDelete(id)} />
+            ))
           </>
         )}
-{tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
+
+        {tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
 
         {tab === 'payments' && (
           <>
@@ -1061,6 +1072,7 @@ function AdminPage() {
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────
 // POCHETTES TAB
@@ -1310,6 +1322,7 @@ function ArtistPage() {
     </div>
   );
 }
+
 // ─────────────────────────────────────────────
 // POCHETTE GENERATOR (dans AdminPage — onglet Pochettes)
 // ─────────────────────────────────────────────
@@ -1538,7 +1551,6 @@ function UserAuthPage() {
     </div>
   );
 }
-
 // ─────────────────────────────────────────────
 // MA ZIKOTHÈQUE PAGE
 // ─────────────────────────────────────────────
