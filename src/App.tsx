@@ -148,7 +148,6 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
     </div>
   );
 }
-
 // ─────────────────────────────────────────────
 // FAN PAGE
 // ─────────────────────────────────────────────
@@ -170,6 +169,7 @@ function VideoPlayer({ files }: { files: any[] }) {
         key={cur?.url}
         src={cur?.url}
         controls
+        controlsList="nodownload"
         style={{ width: '100%', maxHeight: 280, background: '#000', display: 'block' }}
         onEnded={() => { if (idx < files.length - 1) setIdx(i => i + 1); }}
       />
@@ -262,8 +262,7 @@ function FanPage() {
     });
     // ── Sauvegarde dans Ma Zikothèque si utilisateur connecté ──
     try {
-      const { getAuth } = await import('firebase/auth');
-      const currentUser = getAuth().currentUser;
+      const currentUser = auth.currentUser;
       if (currentUser) {
         await addDoc(collection(db, 'zikotheque'), {
           uid: currentUser.uid,
@@ -330,7 +329,7 @@ function FanPage() {
     }
   };
 
-  return (
+return (
     <div style={{ ...S.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, minHeight: '100vh' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -524,6 +523,7 @@ function FanPage() {
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────
 // ADMIN PAGE
@@ -799,12 +799,6 @@ function AdminPage() {
       </div>
     </div>
   );
- const pendingPay = payments.filter(p => p.status === 'pending');
-  const lockedQRs = qrcodes.filter(q => q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1));
-
-  return (
-    <div style={S.bg}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* BULK MODAL */}
       {showBulk && bulkQr && (
@@ -913,6 +907,7 @@ function AdminPage() {
           </div>
         </div>
       )}
+
       {/* CONFIRM DELETE */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -1036,8 +1031,7 @@ function AdminPage() {
             })()}
           </>
         )}
-
-        {tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
+{tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
 
         {tab === 'payments' && (
           <>
@@ -1067,6 +1061,7 @@ function AdminPage() {
     </div>
   );
 }
+
 // ─────────────────────────────────────────────
 // POCHETTES TAB
 // ─────────────────────────────────────────────
@@ -1204,7 +1199,6 @@ function ArtistPage() {
       const snap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
       if (snap.empty) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
       // Créer le compte Firebase Auth
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
       await createUserWithEmailAndPassword(auth, email, password);
       // Enregistrer dans collection artists
       await addDoc(collection(db, 'artists'), { name: artistName, email, createdAt: new Date().toISOString() });
@@ -1316,163 +1310,6 @@ function ArtistPage() {
     </div>
   );
 }
-// ─────────────────────────────────────────────
-// ARTIST PAGE
-// ─────────────────────────────────────────────
-function ArtistPage() {
-  const [view, setView] = useState<'login' | 'register' | 'dashboard'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [artistName, setArtistName] = useState('');
-  const [user, setUser] = useState<any>(null);
-  const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-
-  useEffect(() => {
-    onAuthStateChanged(auth, (u) => {
-      if (u) { setUser(u); setView('dashboard'); loadStats(u.email || ''); }
-      else { setUser(null); setView('login'); }
-    });
-  }, []);
-
-  const loadStats = async (email: string) => {
-    // Trouver l'artiste lié à cet email
-    const snap = await getDocs(query(collection(db, 'artists'), where('email', '==', email)));
-    if (snap.empty) return;
-    const artistData = snap.docs[0].data();
-    const artistName = artistData.name;
-    // QR codes de cet artiste
-    const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
-    const qrList = qrSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    const totalVisits = qrList.reduce((s: number, q: any) => s + (q.visits || 0), 0);
-    const totalStreams = qrList.reduce((s: number, q: any) => s + (q.streams || 0), 0);
-    const totalValidStreams = qrList.reduce((s: number, q: any) => s + (q.validStreams || 0), 0);
-    const totalDl = qrList.reduce((s: number, q: any) => s + (q.downloads || 0), 0);
-    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, artistName });
-  };
-
-  const register = async () => {
-    if (!artistName || !email || !password) { setMsg('Remplis tous les champs'); return; }
-    setLoading(true); setMsg('');
-    try {
-      // Vérifier que l'artiste est dans la base
-      const snap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
-      if (snap.empty) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
-      // Créer le compte Firebase Auth
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Enregistrer dans collection artists
-      await addDoc(collection(db, 'artists'), { name: artistName, email, createdAt: new Date().toISOString() });
-      setMsg('Compte cree !');
-    } catch (e: any) { setMsg('Erreur: ' + (e.message || 'Impossible de creer le compte')); }
-    setLoading(false);
-  };
-
-  const login = async () => {
-    setLoading(true); setMsg('');
-    try { await signInWithEmailAndPassword(auth, email, password); }
-    catch { setMsg('Email ou mot de passe incorrect'); }
-    setLoading(false);
-  };
-
-  const logout = async () => { await signOut(auth); };
-
-  if (view === 'dashboard' && user) return (
-    <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#0e1018', borderBottom: '1px solid #1c1f2e', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
-        <Logo size="sm" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: '#8890b0', fontSize: 13 }}>{stats.artistName || user.email}</span>
-          <button style={S.btn2} onClick={logout}>Déconnexion</button>
-        </div>
-      </div>
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
-        <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Mon tableau de bord</h2>
-
-        {/* STATS CARDS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-          {[
-            { label: 'Visites totales', value: stats.visits, icon: '👁️', color: '#4285f4' },
-            { label: 'Téléchargements', value: stats.downloads, icon: '⬇️', color: '#c8f04a' },
-            { label: 'Streams totaux', value: stats.streams, icon: '🎵', color: '#f0b84a' },
-            { label: 'Streams +30s', value: stats.validStreams, icon: '✅', color: '#4af09a' },
-          ].map((s, i) => (
-            <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
-              <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
-              <p style={{ fontSize: 26, fontWeight: 900, color: s.color, marginBottom: 4 }}>{s.value}</p>
-              <p style={{ color: '#5a6080', fontSize: 11 }}>{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* QR CODES */}
-        <h3 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
-        {stats.qrcodes.map((q: any) => (
-          <div key={q.id} style={S.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <p style={{ fontWeight: 700, marginBottom: 4 }}>{q.label}</p>
-                <p style={{ color: '#5a6080', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL · {q.streams || 0} streams</p>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#4af09a' }}>✅ {q.validStreams || 0} validés</span>
-                <span style={badgeStyle(q.status)}>{q.status}</span>
-              </div>
-            </div>
-            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'Visites', val: q.visits || 0, color: '#4285f4' },
-                { label: 'Streams', val: q.streams || 0, color: '#f0b84a' },
-                { label: 'DL', val: q.downloads || 0, color: '#c8f04a' },
-              ].map((s, i) => (
-                <div key={i} style={{ background: '#0a0b12', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
-                  <p style={{ color: s.color, fontWeight: 800, fontSize: 18 }}>{s.val}</p>
-                  <p style={{ color: '#5a6080', fontSize: 10 }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div style={{ width: '100%', maxWidth: 380, padding: '0 16px' }}>
-        <div style={{ marginBottom: 32, textAlign: 'center' }}><Logo size="lg" /></div>
-        <div style={S.card}>
-          <h2 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>
-            {view === 'register' ? 'Créer mon compte artiste' : 'Espace artiste'}
-          </h2>
-          <p style={{ color: '#5a6080', fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
-            {view === 'register' ? 'Réservé aux artistes Doniel Zik' : 'Connectez-vous à votre tableau de bord'}
-          </p>
-          {view === 'register' && (
-            <>
-              <label style={S.lbl}>Nom d'artiste (tel qu'enregistré chez nous)</label>
-              <input style={S.inp} value={artistName} onChange={e => setArtistName(e.target.value)} placeholder="Ex: Élite Doniel" />
-            </>
-          )}
-          <label style={S.lbl}>Email</label>
-          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
-          <label style={S.lbl}>Mot de passe</label>
-          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-          {msg && <p style={{ color: msg.includes('Erreur') || msg.includes('incorrect') || msg.includes('non reconnu') ? '#f04a6a' : '#4af09a', fontSize: 12, marginBottom: 10 }}>{msg}</p>}
-          <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={view === 'register' ? register : login} disabled={loading}>
-            {loading ? 'Chargement...' : view === 'register' ? 'Créer mon compte' : 'Se connecter'}
-          </button>
-          <button style={{ ...S.btn2, width: '100%', marginTop: 10, textAlign: 'center' }}
-            onClick={() => { setView(view === 'login' ? 'register' : 'login'); setMsg(''); }}>
-            {view === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────
 // POCHETTE GENERATOR (dans AdminPage — onglet Pochettes)
 // ─────────────────────────────────────────────
@@ -1543,7 +1380,7 @@ function UserAuthPage() {
   const [confirmResult, setConfirmResult] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any | null>(null);
   const recaptchaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1565,10 +1402,9 @@ function UserAuthPage() {
     if (!phone) { setMsg('Entrez votre numéro'); return; }
     setLoading(true); setMsg('');
     try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaRef.current!, { size: 'invisible' });
-      }
-      const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
+      const recaptchaContainer = recaptchaRef.current!;
+      const verifier = new RecaptchaVerifier(auth, recaptchaContainer, { size: 'invisible' });
+      const result = await signInWithPhoneNumber(auth, phone, verifier);
       setConfirmResult(result);
       setStep('verify');
       setMsg('Code SMS envoyé !');
@@ -1604,7 +1440,7 @@ function UserAuthPage() {
   };
 
   // ── Dashboard si connecté ──
-  if (user) return <ZikothequePage user={user} />;
+  if (user != null) return <ZikothequePage user={user} />;
 
   return (
     <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
