@@ -1338,7 +1338,7 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
   const QR_X = Math.round(SIZE * 0.03); // bas gauche
   const QR_Y = SIZE - QR_SIZE - Math.round(SIZE * 0.03);
 
-  const zip = (await import('jszip')).default ? new ((await import('jszip')).default)() : new JSZip();
+  const zip = new JSZip();  
   const folder = zip.folder('pochettes') as any;
 
   for (let i = 0; i < qrcodes.length; i++) {
