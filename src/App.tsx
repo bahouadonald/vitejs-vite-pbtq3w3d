@@ -1162,7 +1162,7 @@ function PochettesTab({ qrcodes }: { qrcodes: any[] }) {
           {generating ? '⏳ Génération...' : '🖨️ Générer et télécharger les pochettes'}
         </button>
         <p style={{ color: '#5a6080', fontSize: 11, marginTop: 10, textAlign: 'center' }}>
-          ZIP téléchargé · QR code 15% · Position bas gauche · Texte "Scannez et Téléchargez"
+          ZIP téléchargé · QR code 22% · Position bas gauche · Texte "Scannez et Téléchargez"
         </p>
       </div>
     </>
@@ -1334,7 +1334,7 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
     const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = templateUrl;
   });
   const SIZE = 1000; // canvas carré 1000x1000px
-  const QR_SIZE = Math.round(SIZE * 0.15); // 15% de la largeur
+  const QR_SIZE = Math.round(SIZE * 0.22); // 22% de la largeur
   const QR_X = Math.round(SIZE * 0.03); // bas gauche
   const QR_Y = SIZE - QR_SIZE - Math.round(SIZE * 0.03);
 
@@ -1364,9 +1364,9 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
     // Texte "Scannez et Téléchargez"
     ctx.fillStyle = '#000000';
     ctx.font = `bold ${Math.round(SIZE * 0.022)}px Arial`;
-    ctx.fillText('Scannez et', QR_X + QR_SIZE + 8, QR_Y + QR_SIZE * 0.4);
+    ctx.fillText('Scannez et', QR_X + Math.round(QR_SIZE * 0.05), QR_Y + QR_SIZE + Math.round(SIZE * 0.025));
     ctx.fillStyle = '#1e6fff';
-    ctx.fillText('Téléchargez', QR_X + QR_SIZE + 8, QR_Y + QR_SIZE * 0.65);
+    ctx.fillText('Téléchargez', QR_X + Math.round(QR_SIZE * 0.05), QR_Y + QR_SIZE + Math.round(SIZE * 0.048));
     // Exporter en PNG
     const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png', 0.95));
     folder.file((q.label || 'pochette').replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + q.qrId + '.png', blob);
