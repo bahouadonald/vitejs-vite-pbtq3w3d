@@ -1039,6 +1039,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 onToggle={(q: any) => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}
                 onDelete={(id: string) => setConfirmDelete(id)} />
             ))
+            }
           </>
         )}
 
