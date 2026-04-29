@@ -948,11 +948,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* HEADER */}
       <div style={{ background: '#0e1018', borderBottom: '1px solid #1c1f2e', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg, #c8f04a, #4af09a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎵</div>
-          <div>
-            <p style={{ fontWeight: 800, fontSize: 15 }}>{APP_NAME}</p>
-            <p style={{ color: '#5a6080', fontSize: 10 }}>ADMIN</p>
-          </div>
+           <Logo size="sm" />
+           <p style={{ color: '#5a6080', fontSize: 10, fontWeight: 700 }}>ADMIN</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {pendingPay.length > 0 && <span style={{ ...badgeStyle('pending'), padding: '6px 12px', fontSize: 12 }}>{pendingPay.length} en attente</span>}
@@ -1195,10 +1192,12 @@ function ArtistPage() {
     // QR codes de cet artiste
     const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
     const qrList = qrSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    // Pour les anciens QR codes sans champ downloads, utiliser usedScans comme fallback
+    const getDl = (q: any) => q.downloads !== undefined ? q.downloads : (q.usedScans || 0);
     const totalVisits = qrList.reduce((s: number, q: any) => s + (q.visits || 0), 0);
     const totalStreams = qrList.reduce((s: number, q: any) => s + (q.streams || 0), 0);
     const totalValidStreams = qrList.reduce((s: number, q: any) => s + (q.validStreams || 0), 0);
-    const totalDl = qrList.reduce((s: number, q: any) => s + (q.downloads || 0), 0);
+    const totalDl = qrList.reduce((s: number, q: any) => s + getDl(q), 0);
     setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, artistName });
   };
 
@@ -1266,7 +1265,7 @@ function ArtistPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <p style={{ fontWeight: 700, marginBottom: 4 }}>{q.label}</p>
-                <p style={{ color: '#5a6080', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL · {q.streams || 0} streams</p>
+                <p style={{ color: '#5a6080', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads !== undefined ? q.downloads : (q.usedScans || 0)} DL · {q.streams || 0} streams</p>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, color: '#4af09a' }}>✅ {q.validStreams || 0} validés</span>
@@ -1277,7 +1276,7 @@ function ArtistPage() {
               {[
                 { label: 'Visites', val: q.visits || 0, color: '#4285f4' },
                 { label: 'Streams', val: q.streams || 0, color: '#f0b84a' },
-                { label: 'DL', val: q.downloads || 0, color: '#c8f04a' },
+                { label: 'DL', val: q.downloads !== undefined ? q.downloads : (q.usedScans || 0), color: '#c8f04a' },
               ].map((s, i) => (
                 <div key={i} style={{ background: '#0a0b12', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
                   <p style={{ color: s.color, fontWeight: 800, fontSize: 18 }}>{s.val}</p>
