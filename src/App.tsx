@@ -1207,8 +1207,12 @@ function ArtistPage() {
     setLoading(true); setMsg('');
     try {
       // Vérifier que l'artiste est dans la base
-      const snap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
-      if (snap.empty) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
+      // Recherche insensible à la casse et aux accents
+      const allQrSnap = await getDocs(collection(db, 'qrcodes'));
+      const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const found = allQrSnap.docs.some(d => normalize(d.data().artist || '') === normalize(artistName));
+      if (!found) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
+      const snap = allQrSnap;
       // Créer le compte Firebase Auth
       await createUserWithEmailAndPassword(auth, email, password);
       // Enregistrer dans collection artists
