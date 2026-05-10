@@ -1858,59 +1858,133 @@ function AnnonceursPage() {
 // PAGE D'ACCUEIL
 // ─────────────────────────────────────────────
 function HomePage() {
+  const [activeNote, setActiveNote] = useState(0);
+  const [wavePhase, setWavePhase] = useState(0);
+
+  useEffect(() => {
+    const t1 = setInterval(() => setActiveNote(n => (n + 1) % 8), 600);
+    const t2 = setInterval(() => setWavePhase(p => (p + 1) % 100), 50);
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, []);
+
   const etapes = [
-    { num: '01', title: 'L\'artiste crée son QR', desc: 'Il s\'inscrit sur Doniel Zik, uploade sa musique et reçoit un QR code unique.' },
-    { num: '02', title: 'Il imprime sur sa pochette', desc: 'Le QR code est imprimé sur sa pochette physique qu\'il vend à ses fans.' },
-    { num: '03', title: 'Le fan scanne', desc: 'Le fan scanne la pochette avec son téléphone. La musique s\'ouvre instantanément.' },
-    { num: '04', title: 'Il écoute et télécharge', desc: 'Écoute gratuite en streaming. Téléchargement des fichiers originaux.' },
+    { num: '01', icon: '🎤', title: "L'artiste crée son QR", desc: "Il s'inscrit sur Doniel Zik, uploade sa musique et reçoit un QR code unique lié à sa pochette." },
+    { num: '02', icon: '📀', title: 'Il imprime sur sa pochette', desc: 'Le QR code est imprimé sur la pochette physique que l\'artiste vend directement à ses fans.' },
+    { num: '03', icon: '📱', title: 'Le fan scanne', desc: 'Le fan scanne la pochette avec son téléphone. La musique s\'ouvre instantanément, sans appli.' },
+    { num: '04', icon: '🎧', title: 'Il écoute et télécharge', desc: 'Streaming gratuit illimité. Téléchargement des fichiers originaux en qualité maximale.' },
   ];
 
+  const notes = ['🎵','🎶','🎸','🥁','🎹','🎺','🎻','🎤'];
+
   return (
-    <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}} @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0a0015 0%, #06001a 40%, #000d1a 100%)', color: '#fff', fontFamily: "'Segoe UI', sans-serif", overflowX: 'hidden' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
+        @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(0.95)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes wave{0%{transform:scaleY(0.3)}50%{transform:scaleY(1)}100%{transform:scaleY(0.3)}}
+        @keyframes glow{0%,100%{box-shadow:0 0 20px #ff6b3566}50%{box-shadow:0 0 60px #ff6b35cc, 0 0 100px #ff6b3544}}
+        @keyframes colorShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        @keyframes noteFloat{0%{opacity:0;transform:translateY(0) rotate(0deg)}50%{opacity:1}100%{opacity:0;transform:translateY(-80px) rotate(20deg)}}
+        .nav-link:hover{color:#ff6b35 !important;transform:translateY(-2px)}
+        .btn-glow:hover{transform:translateY(-3px);box-shadow:0 8px 40px #ff6b3566 !important}
+        .card-hover:hover{transform:translateY(-6px);border-color:#ff6b3566 !important}
+      `}</style>
 
       {/* NAVBAR */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(6,10,20,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #151c30', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <Logo size="sm" />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <a href="/artiste" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Artistes</a>
-          <a href="/annonceurs" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Annonceurs</a>
-          <a href="/ziko" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Ma Zikothèque</a>
-          <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', fontSize: 12, padding: '8px 16px' }}>Démarrer →</a>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(6,0,20,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,107,53,0.2)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 66 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Logo size="sm" />
+          <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: 15, background: 'linear-gradient(90deg, #ff6b35, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DONIEL ZIK</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {[['Artistes','/artiste'],['Annonceurs','/annonceurs'],['Zikothèque','/ziko']].map(([l,h]) => (
+            <a key={h} href={h} className="nav-link" style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, transition: 'all .2s' }}>{l}</a>
+          ))}
+          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 99, boxShadow: '0 4px 20px #ff6b3544', transition: 'all .2s' }}>Démarrer →</a>
         </div>
       </nav>
 
       {/* HERO */}
-      <section style={{ padding: '80px 24px 60px', textAlign: 'center', maxWidth: 800, margin: '0 auto', animation: 'fadeUp .6s ease' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#0a1535', border: '1px solid #1e6fff44', borderRadius: 99, padding: '6px 16px', marginBottom: 24 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 99, background: '#4da6ff', animation: 'pulse 2s infinite', display: 'inline-block' }} />
-          <span style={{ color: '#4da6ff', fontSize: 12, fontWeight: 600 }}>Distribution musicale nouvelle génération</span>
+      <section style={{ position: 'relative', padding: '80px 24px 60px', textAlign: 'center', maxWidth: 860, margin: '0 auto', overflow: 'hidden' }}>
+        {/* Cercles lumineux de fond */}
+        <div style={{ position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 50, left: '10%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,215,0,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 100, right: '5%', width: 150, height: 150, borderRadius: '50%', background: 'radial-gradient(circle, rgba(100,200,255,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+        {/* Notes flottantes */}
+        {notes.map((n, i) => (
+          <span key={i} style={{ position: 'absolute', fontSize: 20, top: `${20 + (i * 12) % 60}%`, left: `${5 + (i * 13) % 90}%`, animation: `noteFloat ${2 + (i * 0.4)}s ease-in-out ${i * 0.3}s infinite`, opacity: 0, pointerEvents: 'none' }}>{n}</span>
+        ))}
+
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,107,53,0.15)', border: '1px solid rgba(255,107,53,0.4)', borderRadius: 99, padding: '6px 18px', marginBottom: 28, animation: 'fadeUp .5s ease' }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: '#ff6b35', animation: 'pulse 1.5s infinite', display: 'inline-block' }} />
+          <span style={{ color: '#ff6b35', fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>🎵 DISTRIBUTION MUSICALE NOUVELLE GÉNÉRATION</span>
         </div>
-        <h1 style={{ fontSize: 'clamp(32px, 6vw, 52px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 20, fontFamily: 'serif' }}>
-          La Musique.<br /><span style={{ color: '#1e6fff' }}>Un Scan.</span> Un Monde.
+
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(36px, 7vw, 68px)', fontWeight: 900, lineHeight: 1.05, marginBottom: 24, animation: 'fadeUp .6s ease .1s both' }}>
+          Ta Musique.<br />
+          <span style={{ background: 'linear-gradient(90deg, #ff6b35, #ffd700, #ff6b35)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'colorShift 3s linear infinite' }}>Un Scan.</span>
+          {' '}Un Monde.
         </h1>
-        <p style={{ color: '#7888aa', fontSize: 16, lineHeight: 1.8, marginBottom: 36, maxWidth: 540, margin: '0 auto 36px' }}>
-          Doniel Zik connecte les artistes africains à leurs fans via des QR codes sur pochettes physiques. Distribution simple. Revenus réels. Droits conservés.
+
+        <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 17, lineHeight: 1.9, marginBottom: 40, maxWidth: 560, margin: '0 auto 40px', animation: 'fadeUp .6s ease .2s both', fontFamily: "'DM Sans', sans-serif" }}>
+          Doniel Zik connecte les artistes africains à leurs fans via des QR codes sur pochettes physiques. Distribution simple. Revenus réels. Droits conservés à 100%.
         </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', padding: '16px 32px', fontSize: 16, borderRadius: 12, boxShadow: '0 4px 24px rgba(30,111,255,0.3)' }}>🎵 Je suis artiste</a>
-          <a href="/annonceurs" style={{ textDecoration: 'none', padding: '16px 32px', fontSize: 16, borderRadius: 12, border: '1px solid #1a2240', color: '#dde4f5', background: 'transparent', display: 'inline-block', fontWeight: 600 }}>📢 Je veux annoncer</a>
+
+        {/* ONDES SONORES ANIMÉES */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 5, height: 50, marginBottom: 40, animation: 'fadeUp .6s ease .3s both' }}>
+          {Array.from({ length: 16 }, (_, i) => (
+            <div key={i} style={{ width: 5, borderRadius: 99, background: `linear-gradient(180deg, #ff6b35, #ffd700)`, animation: `wave ${0.6 + (i % 4) * 0.15}s ease-in-out ${i * 0.08}s infinite`, height: `${20 + Math.sin(i + wavePhase * 0.1) * 15 + 15}px`, opacity: activeNote === i % 8 ? 1 : 0.5, transition: 'opacity .3s' }} />
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', animation: 'fadeUp .6s ease .4s both' }}>
+          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', textDecoration: 'none', padding: '18px 36px', fontSize: 17, borderRadius: 99, fontWeight: 700, boxShadow: '0 6px 30px #ff6b3555', transition: 'all .25s', display: 'inline-block' }}>
+            🎤 Je suis artiste
+          </a>
+          <a href="/annonceurs" style={{ textDecoration: 'none', padding: '18px 36px', fontSize: 17, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', color: '#fff', background: 'rgba(255,255,255,0.05)', display: 'inline-block', fontWeight: 600, transition: 'all .25s', backdropFilter: 'blur(10px)' }}>
+            📢 Je veux annoncer
+          </a>
+        </div>
+      </section>
+
+      {/* STATS */}
+      <section style={{ padding: '20px 24px 48px' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          {[
+            { val: '100+', label: 'Artistes', icon: '🎤', color: '#ff6b35' },
+            { val: '5 000+', label: 'QR codes', icon: '📱', color: '#ffd700' },
+            { val: '50 000+', label: 'Écoutes', icon: '🎧', color: '#64c8ff' },
+            { val: 'Abidjan', label: '& partout', icon: '🌍', color: '#7fff64' },
+          ].map((s, i) => (
+            <div key={i} className="card-hover" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '18px 12px', textAlign: 'center', transition: 'all .3s', cursor: 'default' }}>
+              <p style={{ fontSize: 26, marginBottom: 6 }}>{s.icon}</p>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: 20, color: s.color, marginBottom: 3 }}>{s.val}</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{s.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* COMMENT ÇA MARCHE */}
-      <section style={{ padding: '64px 24px', maxWidth: 700, margin: '0 auto' }}>
+      <section style={{ padding: '48px 24px', maxWidth: 700, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>FONCTIONNEMENT</p>
-          <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800 }}>Comment ça marche ?</h2>
+          <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— FONCTIONNEMENT —</p>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900 }}>Comment ça marche ?</h2>
         </div>
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div style={{ display: 'grid', gap: 14 }}>
           {etapes.map((e, i) => (
-            <div key={i} style={{ display: 'flex', gap: 20, alignItems: 'flex-start', background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 16, padding: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#0a1535', border: '1px solid #1e6fff33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'serif', fontWeight: 900, color: '#1e6fff', fontSize: 16, flexShrink: 0 }}>{e.num}</div>
+            <div key={i} className="card-hover" style={{ display: 'flex', gap: 20, alignItems: 'flex-start', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '22px 24px', transition: 'all .3s' }}>
+              <div style={{ width: 54, height: 54, borderRadius: 14, background: 'linear-gradient(135deg, rgba(255,107,53,0.25), rgba(255,215,0,0.15))', border: '1px solid rgba(255,107,53,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{e.icon}</div>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{e.title}</p>
-                <p style={{ color: '#7888aa', fontSize: 13, lineHeight: 1.7 }}>{e.desc}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <span style={{ color: '#ff6b35', fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 12 }}>{e.num}</span>
+                  <p style={{ fontWeight: 700, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>{e.title}</p>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 1.75 }}>{e.desc}</p>
               </div>
             </div>
           ))}
@@ -1918,29 +1992,29 @@ function HomePage() {
       </section>
 
       {/* 3 PROFILS */}
-      <section style={{ background: '#0b0f1e', borderTop: '1px solid #151c30', borderBottom: '1px solid #151c30', padding: '64px 24px' }}>
-        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+      <section style={{ padding: '48px 24px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>POUR TOUT LE MONDE</p>
-            <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800 }}>Vous êtes…</h2>
+            <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— POUR TOUT LE MONDE —</p>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900 }}>Vous êtes…</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
             {[
-              { icon: '🎵', title: 'Artiste', color: '#1e6fff', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Tes droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
-              { icon: '🎧', title: 'Mélomane', color: '#4da6ff', items: ['Scanner la pochette', 'Écouter gratuitement', 'Télécharger la musique', 'Retrouver dans ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
-              { icon: '📢', title: 'Annonceur', color: '#f0b84a', items: ['Pub avant chaque écoute', 'Audience engagée locale', 'Stats de campagne', 'Budget flexible'], cta: 'Annoncer', href: '/annonceurs' },
+              { icon: '🎤', title: 'Artiste', color: '#ff6b35', grad: 'rgba(255,107,53,0.12)', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
+              { icon: '🎧', title: 'Mélomane', color: '#64c8ff', grad: 'rgba(100,200,255,0.12)', items: ['Scanner la pochette', 'Écouter gratuitement', 'Télécharger la musique', 'Accéder à ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
+              { icon: '📢', title: 'Annonceur', color: '#ffd700', grad: 'rgba(255,215,0,0.12)', items: ['Pub avant chaque écoute', 'Audience locale engagée', 'Stats de campagne', 'Budget flexible'], cta: 'Annoncer', href: '/annonceurs' },
             ].map((p, i) => (
-              <div key={i} style={{ background: '#060a14', border: `1px solid ${p.color}22`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column' }}>
-                <p style={{ fontSize: 32, marginBottom: 12 }}>{p.icon}</p>
-                <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 16, color: p.color }}>{p.title}</p>
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', flex: 1 }}>
+              <div key={i} className="card-hover" style={{ background: p.grad, border: `1px solid ${p.color}33`, borderRadius: 20, padding: 22, display: 'flex', flexDirection: 'column', transition: 'all .3s' }}>
+                <p style={{ fontSize: 36, marginBottom: 12 }}>{p.icon}</p>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 17, marginBottom: 14, color: p.color }}>{p.title}</p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', flex: 1 }}>
                   {p.items.map((item, j) => (
-                    <li key={j} style={{ color: '#7888aa', fontSize: 12, lineHeight: 1.8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                      <span style={{ color: p.color, flexShrink: 0 }}>✓</span> {item}
+                    <li key={j} style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 1.9, display: 'flex', gap: 6 }}>
+                      <span style={{ color: p.color }}>✓</span> {item}
                     </li>
                   ))}
                 </ul>
-                <a href={p.href} style={{ display: 'block', textAlign: 'center', padding: '10px 16px', borderRadius: 10, border: `1px solid ${p.color}`, color: p.color, textDecoration: 'none', fontWeight: 700, fontSize: 13 }}>{p.cta} →</a>
+                <a href={p.href} style={{ display: 'block', textAlign: 'center', padding: '11px 16px', borderRadius: 12, border: `2px solid ${p.color}`, color: p.color, textDecoration: 'none', fontWeight: 700, fontSize: 13, transition: 'all .2s', background: `${p.color}11` }}>{p.cta} →</a>
               </div>
             ))}
           </div>
@@ -1948,37 +2022,45 @@ function HomePage() {
       </section>
 
       {/* REVENUS */}
-      <section style={{ padding: '64px 24px', maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-        <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>RÉMUNÉRATION</p>
-        <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Ce que tu gagnes</h2>
-        <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
-          Chaque écoute de 30 secondes ou plus génère un revenu pour toi. Et ça augmente avec le temps.
+      <section style={{ padding: '64px 24px', maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
+        <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— RÉMUNÉRATION —</p>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, marginBottom: 12 }}>Ce que tu gagnes</h2>
+        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.9, marginBottom: 36, maxWidth: 480, margin: '0 auto 36px' }}>
+          Chaque écoute de 30 secondes génère un revenu pour toi. Plus on intègre d'annonceurs, plus tu gagnes.
         </p>
-        <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'grid', gap: 12, marginBottom: 36 }}>
           {[
-            { label: "Aujourd'hui (pub automatique)", range: '0,03 – 0,10 FCFA / écoute', color: '#f04a6a', tag: 'ACTIF' },
-            { label: 'Bientôt (annonceurs locaux)', range: '1 – 4 FCFA / écoute', color: '#f0b84a', tag: 'PROCHAINEMENT' },
-            { label: 'Perspective (abonnements)', range: "jusqu'à 5 FCFA / écoute", color: '#4da6ff', tag: 'EN DÉVELOPPEMENT' },
+            { label: "Aujourd'hui — pub automatique", range: '0,03 – 0,10 FCFA / écoute', color: '#ff6b35', tag: '● ACTIF', icon: '📡' },
+            { label: 'Bientôt — annonceurs locaux', range: '1 – 4 FCFA / écoute', color: '#ffd700', tag: '◎ PROCHAINEMENT', icon: '🚀' },
+            { label: 'Perspective — abonnements fans', range: "jusqu'à 5 FCFA / écoute", color: '#64c8ff', tag: '◌ EN DEV', icon: '💎' },
           ].map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b0f1e', border: `1px solid ${r.color}22`, borderRadius: 12, padding: '16px 20px' }}>
-              <div style={{ textAlign: 'left' }}>
-                <p style={{ color: '#7888aa', fontSize: 12, marginBottom: 4 }}>{r.label}</p>
-                <p style={{ fontWeight: 800, fontSize: 18, color: r.color, fontFamily: 'serif' }}>{r.range}</p>
+            <div key={i} className="card-hover" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: `${r.color}0d`, border: `1px solid ${r.color}33`, borderRadius: 14, padding: '18px 22px', transition: 'all .3s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' }}>
+                <span style={{ fontSize: 28 }}>{r.icon}</span>
+                <div>
+                  <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, marginBottom: 4 }}>{r.label}</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 20, color: r.color }}>{r.range}</p>
+                </div>
               </div>
-              <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 99, background: r.color + '22', color: r.color, fontWeight: 700, letterSpacing: 1 }}>{r.tag}</span>
+              <span style={{ fontSize: 10, padding: '4px 10px', borderRadius: 99, background: `${r.color}22`, color: r.color, fontWeight: 700, letterSpacing: 1, whiteSpace: 'nowrap' }}>{r.tag}</span>
             </div>
           ))}
         </div>
-        <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', padding: '14px 32px', fontSize: 15, borderRadius: 12, display: 'inline-block' }}>Commencer maintenant →</a>
+        <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ffd700)', color: '#000', textDecoration: 'none', padding: '16px 40px', fontSize: 16, borderRadius: 99, fontWeight: 800, display: 'inline-block', boxShadow: '0 6px 30px #ff6b3544', transition: 'all .25s' }}>
+          🎤 Commencer maintenant
+        </a>
       </section>
 
       {/* FOOTER */}
-      <footer style={{ background: '#060a14', borderTop: '1px solid #151c30', padding: '24px', textAlign: 'center' }}>
-        <p style={{ color: '#1a2040', fontSize: 11 }}>
-          © 2025 DONIEL ZIK · La Musique. Un Scan. Un Monde. ·{' '}
-          <a href="/conditions" style={{ color: '#1a2040', textDecoration: 'underline' }}>CGU</a> ·{' '}
-          <a href="/annonceurs" style={{ color: '#1a2040', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
-          <a href="/admin" style={{ color: '#1a2040', textDecoration: 'underline' }}>Admin</a>
+      <footer style={{ background: 'rgba(0,0,0,0.4)', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '28px 24px', textAlign: 'center' }}>
+        <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 14, background: 'linear-gradient(90deg, #ff6b35, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 10 }}>
+          DONIEL ZIK — La Musique. Un Scan. Un Monde.
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
+          © 2025 ·{' '}
+          <a href="/conditions" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>CGU</a> ·{' '}
+          <a href="/annonceurs" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
+          <a href="/admin" style={{ color: 'rgba(255,255,255,0.15)', textDecoration: 'underline' }}>Admin</a>
         </p>
       </footer>
     </div>
