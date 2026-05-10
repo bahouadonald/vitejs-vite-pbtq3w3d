@@ -1652,16 +1652,365 @@ function ZikothequePage({ user }: { user: any }) {
   );
 }
 
+
+// ─────────────────────────────────────────────
+// PAGE CONDITIONS GÉNÉRALES D'UTILISATION
+// ─────────────────────────────────────────────
+function ConditionsPage() {
+  return (
+    <div style={{ ...S.bg, minHeight: '100vh' }}>
+      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+        <Logo size="sm" />
+        <a href="/artiste" style={{ color: '#1e6fff', fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>← Retour</a>
+      </div>
+      <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
+        <h1 style={{ fontFamily: 'serif', fontSize: 26, fontWeight: 800, marginBottom: 8, color: '#1e6fff' }}>
+          Conditions Générales d'Utilisation
+        </h1>
+        <p style={{ color: '#4a5878', fontSize: 13, marginBottom: 32, fontStyle: 'italic' }}>
+          Distribution Non-Exclusive via QR Code — Plateforme DONIEL ZIK
+        </p>
+
+        {[
+          {
+            title: 'ARTICLE 1 — QUI SOMMES-NOUS',
+            content: `Doniel Zik est une plateforme de distribution musicale numérique via QR Code. Notre rôle est de mettre votre musique à disposition de vos fans de manière simple, directe et sécurisée. Nous ne sommes pas un label. Nous sommes un distributeur technique.`
+          },
+          {
+            title: "ARTICLE 2 — VOS DROITS D'AUTEUR",
+            content: `Vous restez propriétaire à 100% de votre musique. En vous inscrivant sur Doniel Zik, vous ne cédez aucun droit sur vos œuvres. Doniel Zik ne peut en aucun cas revendiquer une quelconque propriété sur votre musique, la modifier, la redistribuer ou la sous-licencier sans votre accord explicite.`
+          },
+          {
+            title: 'ARTICLE 3 — CE QUE DONIEL ZIK FAIT POUR VOUS',
+            content: `En rejoignant la plateforme, vous bénéficiez de : la création de QR codes uniques liés à votre musique, l'hébergement sécurisé de vos fichiers audio et vidéo, un accès streaming et téléchargement pour vos fans, un tableau de bord en temps réel avec vos statistiques d'écoute, et un rapport trimestriel détaillé de vos revenus.`
+          },
+          {
+            title: 'ARTICLE 4 — VOS REVENUS DE STREAMING',
+            content: `Chaque écoute de 30 secondes ou plus sur notre plateforme génère un revenu pour vous.\n\nAujourd'hui : chaque écoute vous rapporte entre 0,03 et 0,10 FCFA selon le volume de trafic.\n\nTrès prochainement : l'intégration d'annonceurs locaux augmentera vos revenus à 1 – 4 FCFA par écoute.\n\nEn perspective : les abonnements mélomanes s'ajouteront à vos revenus de streaming.`
+          },
+          {
+            title: 'ARTICLE 5 — CONDITIONS DE PAIEMENT',
+            content: `Vos revenus sont versés tous les trois mois par Mobile Money (Orange Money, Wave, MTN MoMo) dès que votre cumul atteint 15 000 FCFA. En dessous du seuil, vos revenus sont conservés et reportés au trimestre suivant sans perte. Vous suivez tout en temps réel depuis votre tableau de bord.`
+          },
+          {
+            title: 'ARTICLE 6 — VOS OBLIGATIONS',
+            content: `En vous inscrivant, vous vous engagez à : être l'auteur ou détenir tous les droits sur la musique que vous déposez, fournir des fichiers audio de qualité originale, informer Doniel Zik de tout changement de coordonnées Mobile Money, et ne pas partager vos accès avec des tiers.`
+          },
+          {
+            title: 'ARTICLE 7 — RÉSILIATION',
+            content: `Vous pouvez quitter la plateforme à tout moment en nous contactant. Vos fichiers seront supprimés dans un délai de 30 jours. Les revenus accumulés et non encore versés vous seront payés dans ce même délai.`
+          },
+          {
+            title: 'ARTICLE 8 — MODIFICATION DES CONDITIONS',
+            content: `Doniel Zik se réserve le droit de modifier les présentes conditions. Vous serez informé de tout changement par notification sur votre tableau de bord avant son entrée en vigueur.`
+          },
+        ].map((section, i) => (
+          <div key={i} style={{ ...S.card, marginBottom: 16 }}>
+            <p style={{ color: '#1e6fff', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 10 }}>{section.title}</p>
+            <p style={{ color: '#7888aa', fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-line' }}>{section.content}</p>
+          </div>
+        ))}
+
+        <div style={{ background: '#0a1535', border: '1px solid #1e6fff', borderRadius: 12, padding: 20, textAlign: 'center', marginTop: 8 }}>
+          <p style={{ color: '#4a5878', fontSize: 12, fontStyle: 'italic', lineHeight: 1.7 }}>
+            En cochant la case d'acceptation lors de votre inscription, vous confirmez avoir lu et accepté l'intégralité des présentes conditions.
+          </p>
+          <p style={{ color: '#1e6fff', fontWeight: 800, marginTop: 12, fontSize: 14 }}>
+            DONIEL ZIK — La Musique. Un Scan. Un Monde.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE ANNONCEURS
+// ─────────────────────────────────────────────
+function AnnonceursPage() {
+  const [form, setForm] = useState({ nom: '', entreprise: '', telephone: '', email: '', budget: '', format: '', message: '' });
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const budgets = [
+    { label: '10 000 – 50 000 FCFA', value: '10k-50k', desc: 'Campagne locale 7 jours' },
+    { label: '50 000 – 150 000 FCFA', value: '50k-150k', desc: 'Campagne régionale 30 jours' },
+    { label: '150 000 – 500 000 FCFA', value: '150k-500k', desc: 'Campagne nationale 90 jours' },
+    { label: '+500 000 FCFA', value: '500k+', desc: 'Partenariat stratégique' },
+  ];
+
+  const formats = [
+    { label: '🖼️ Bannière image', value: 'image', desc: 'Avant chaque écoute' },
+    { label: '🎬 Vidéo courte', value: 'video', desc: 'Avant chaque clip' },
+    { label: '📢 Audio spot', value: 'audio', desc: 'Message vocal 15s' },
+  ];
+
+  const submit = async () => {
+    if (!form.nom || !form.telephone || !form.budget) { setMsg('Remplissez au moins votre nom, téléphone et budget'); return; }
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'annonceurs'), { ...form, status: 'pending', createdAt: new Date().toISOString() });
+      setSent(true);
+    } catch (e: any) { setMsg('Erreur : ' + e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ ...S.bg, minHeight: '100vh' }}>
+      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+        <Logo size="sm" />
+        <a href="/" style={{ color: '#4a5878', fontSize: 13, textDecoration: 'none' }}>← Accueil</a>
+      </div>
+      <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ display: 'inline-block', background: '#0a1535', border: '1px solid #1e6fff33', borderRadius: 8, padding: '4px 14px', marginBottom: 16 }}>
+            <span style={{ color: '#1e6fff', fontSize: 10, letterSpacing: 3, fontWeight: 700 }}>ANNONCEURS</span>
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
+            Touchez vos clients<br /><span style={{ color: '#1e6fff' }}>pendant qu'ils écoutent</span>
+          </h1>
+          <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, maxWidth: 500, margin: '0 auto' }}>
+            Votre publicité diffusée avant chaque écoute musicale sur Doniel Zik. Une audience engagée, captive, ciblée en Côte d'Ivoire.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 32 }}>
+          {[
+            { icon: '🎯', title: 'Audience captive', desc: 'La pub passe avant la musique. 100% de visibilité.' },
+            { icon: '📍', title: 'Ciblage local', desc: "Fans en Côte d'Ivoire, abonnés à des artistes locaux." },
+            { icon: '📊', title: 'Stats réelles', desc: "Nombre d'écoutes, clics et portée mesurés." },
+          ].map((c, i) => (
+            <div key={i} style={{ background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 14, padding: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
+              <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{c.title}</p>
+              <p style={{ color: '#4a5878', fontSize: 11, lineHeight: 1.6 }}>{c.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ ...S.card, marginBottom: 24 }}>
+          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>💰 CHOISISSEZ VOTRE BUDGET</p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {budgets.map((b, i) => (
+              <div key={i} onClick={() => set('budget', b.value)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#080c1a', borderRadius: 10, padding: '12px 16px', border: `1px solid ${form.budget === b.value ? '#1e6fff' : '#151c30'}`, cursor: 'pointer' }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: form.budget === b.value ? '#1e6fff' : '#dde4f5' }}>{b.label}</p>
+                  <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>{b.desc}</p>
+                </div>
+                <div style={{ width: 20, height: 20, borderRadius: 99, border: `2px solid ${form.budget === b.value ? '#1e6fff' : '#2a3a60'}`, background: form.budget === b.value ? '#1e6fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {form.budget === b.value && <span style={{ color: '#060a14', fontSize: 12, fontWeight: 800 }}>✓</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ ...S.card, marginBottom: 24 }}>
+          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>📢 FORMAT DE PUBLICITÉ</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            {formats.map((f, i) => (
+              <div key={i} onClick={() => set('format', f.value)}
+                style={{ background: '#080c1a', borderRadius: 10, padding: 14, border: `1px solid ${form.format === f.value ? '#1e6fff' : '#151c30'}`, cursor: 'pointer', textAlign: 'center' }}>
+                <p style={{ fontSize: 22, marginBottom: 6 }}>{f.label.split(' ')[0]}</p>
+                <p style={{ fontWeight: 700, fontSize: 12, color: form.format === f.value ? '#1e6fff' : '#dde4f5', marginBottom: 4 }}>{f.label.slice(3)}</p>
+                <p style={{ color: '#4a5878', fontSize: 10 }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {!sent ? (
+          <div style={S.card}>
+            <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 20 }}>📝 DEMANDE DE PARTENARIAT</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div><label style={S.lbl}>Nom & Prénom *</label><input style={S.inp} value={form.nom} onChange={e => set('nom', e.target.value)} placeholder="Jean Kouamé" /></div>
+              <div><label style={S.lbl}>Entreprise / Marque</label><input style={S.inp} value={form.entreprise} onChange={e => set('entreprise', e.target.value)} placeholder="Mon Entreprise CI" /></div>
+              <div><label style={S.lbl}>Téléphone / WhatsApp *</label><input style={S.inp} value={form.telephone} onChange={e => set('telephone', e.target.value)} placeholder="+225 07 00 00 00 00" /></div>
+              <div><label style={S.lbl}>Email (optionnel)</label><input style={S.inp} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contact@entreprise.ci" /></div>
+            </div>
+            <label style={S.lbl}>Message / Détails de votre campagne</label>
+            <textarea style={{ ...S.inp, height: 100, resize: 'vertical' }} value={form.message} onChange={e => set('message', e.target.value)} placeholder="Décrivez votre produit, votre cible, vos objectifs..." />
+            {msg && <p style={{ color: '#f04a6a', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
+            <button style={{ ...S.btn, width: '100%', padding: 16, fontSize: 15, borderRadius: 12 }} onClick={submit} disabled={loading}>
+              {loading ? '⏳ Envoi...' : '📤 Envoyer ma demande'}
+            </button>
+            <p style={{ color: '#2a3a60', fontSize: 11, textAlign: 'center', marginTop: 12 }}>Nous vous répondons sous 24h via WhatsApp ou email</p>
+          </div>
+        ) : (
+          <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
+            <p style={{ fontSize: 52, marginBottom: 16 }}>✅</p>
+            <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Demande envoyée !</h2>
+            <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
+              Merci pour votre intérêt. Notre équipe vous contacte sous 24h pour discuter de votre campagne.
+            </p>
+            <a href="/" style={{ ...S.btn, textDecoration: 'none', display: 'inline-block', padding: '12px 24px' }}>← Retour à l'accueil</a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE D'ACCUEIL
+// ─────────────────────────────────────────────
+function HomePage() {
+  const etapes = [
+    { num: '01', title: 'L\'artiste crée son QR', desc: 'Il s\'inscrit sur Doniel Zik, uploade sa musique et reçoit un QR code unique.' },
+    { num: '02', title: 'Il imprime sur sa pochette', desc: 'Le QR code est imprimé sur sa pochette physique qu\'il vend à ses fans.' },
+    { num: '03', title: 'Le fan scanne', desc: 'Le fan scanne la pochette avec son téléphone. La musique s\'ouvre instantanément.' },
+    { num: '04', title: 'Il écoute et télécharge', desc: 'Écoute gratuite en streaming. Téléchargement des fichiers originaux.' },
+  ];
+
+  return (
+    <div style={{ ...S.bg, minHeight: '100vh' }}>
+      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}} @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+
+      {/* NAVBAR */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(6,10,20,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #151c30', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
+        <Logo size="sm" />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <a href="/artiste" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Artistes</a>
+          <a href="/annonceurs" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Annonceurs</a>
+          <a href="/ziko" style={{ ...S.btn2, textDecoration: 'none', fontSize: 12 }}>Ma Zikothèque</a>
+          <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', fontSize: 12, padding: '8px 16px' }}>Démarrer →</a>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <section style={{ padding: '80px 24px 60px', textAlign: 'center', maxWidth: 800, margin: '0 auto', animation: 'fadeUp .6s ease' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#0a1535', border: '1px solid #1e6fff44', borderRadius: 99, padding: '6px 16px', marginBottom: 24 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: '#4da6ff', animation: 'pulse 2s infinite', display: 'inline-block' }} />
+          <span style={{ color: '#4da6ff', fontSize: 12, fontWeight: 600 }}>Distribution musicale nouvelle génération</span>
+        </div>
+        <h1 style={{ fontSize: 'clamp(32px, 6vw, 52px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 20, fontFamily: 'serif' }}>
+          La Musique.<br /><span style={{ color: '#1e6fff' }}>Un Scan.</span> Un Monde.
+        </h1>
+        <p style={{ color: '#7888aa', fontSize: 16, lineHeight: 1.8, marginBottom: 36, maxWidth: 540, margin: '0 auto 36px' }}>
+          Doniel Zik connecte les artistes africains à leurs fans via des QR codes sur pochettes physiques. Distribution simple. Revenus réels. Droits conservés.
+        </p>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', padding: '16px 32px', fontSize: 16, borderRadius: 12, boxShadow: '0 4px 24px rgba(30,111,255,0.3)' }}>🎵 Je suis artiste</a>
+          <a href="/annonceurs" style={{ textDecoration: 'none', padding: '16px 32px', fontSize: 16, borderRadius: 12, border: '1px solid #1a2240', color: '#dde4f5', background: 'transparent', display: 'inline-block', fontWeight: 600 }}>📢 Je veux annoncer</a>
+        </div>
+      </section>
+
+      {/* COMMENT ÇA MARCHE */}
+      <section style={{ padding: '64px 24px', maxWidth: 700, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>FONCTIONNEMENT</p>
+          <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800 }}>Comment ça marche ?</h2>
+        </div>
+        <div style={{ display: 'grid', gap: 16 }}>
+          {etapes.map((e, i) => (
+            <div key={i} style={{ display: 'flex', gap: 20, alignItems: 'flex-start', background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 16, padding: 20 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#0a1535', border: '1px solid #1e6fff33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'serif', fontWeight: 900, color: '#1e6fff', fontSize: 16, flexShrink: 0 }}>{e.num}</div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{e.title}</p>
+                <p style={{ color: '#7888aa', fontSize: 13, lineHeight: 1.7 }}>{e.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3 PROFILS */}
+      <section style={{ background: '#0b0f1e', borderTop: '1px solid #151c30', borderBottom: '1px solid #151c30', padding: '64px 24px' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>POUR TOUT LE MONDE</p>
+            <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800 }}>Vous êtes…</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+            {[
+              { icon: '🎵', title: 'Artiste', color: '#1e6fff', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Tes droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
+              { icon: '🎧', title: 'Mélomane', color: '#4da6ff', items: ['Scanner la pochette', 'Écouter gratuitement', 'Télécharger la musique', 'Retrouver dans ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
+              { icon: '📢', title: 'Annonceur', color: '#f0b84a', items: ['Pub avant chaque écoute', 'Audience engagée locale', 'Stats de campagne', 'Budget flexible'], cta: 'Annoncer', href: '/annonceurs' },
+            ].map((p, i) => (
+              <div key={i} style={{ background: '#060a14', border: `1px solid ${p.color}22`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: 32, marginBottom: 12 }}>{p.icon}</p>
+                <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 16, color: p.color }}>{p.title}</p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', flex: 1 }}>
+                  {p.items.map((item, j) => (
+                    <li key={j} style={{ color: '#7888aa', fontSize: 12, lineHeight: 1.8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ color: p.color, flexShrink: 0 }}>✓</span> {item}
+                    </li>
+                  ))}
+                </ul>
+                <a href={p.href} style={{ display: 'block', textAlign: 'center', padding: '10px 16px', borderRadius: 10, border: `1px solid ${p.color}`, color: p.color, textDecoration: 'none', fontWeight: 700, fontSize: 13 }}>{p.cta} →</a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* REVENUS */}
+      <section style={{ padding: '64px 24px', maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
+        <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>RÉMUNÉRATION</p>
+        <h2 style={{ fontFamily: 'serif', fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Ce que tu gagnes</h2>
+        <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
+          Chaque écoute de 30 secondes ou plus génère un revenu pour toi. Et ça augmente avec le temps.
+        </p>
+        <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
+          {[
+            { label: "Aujourd'hui (pub automatique)", range: '0,03 – 0,10 FCFA / écoute', color: '#f04a6a', tag: 'ACTIF' },
+            { label: 'Bientôt (annonceurs locaux)', range: '1 – 4 FCFA / écoute', color: '#f0b84a', tag: 'PROCHAINEMENT' },
+            { label: 'Perspective (abonnements)', range: "jusqu'à 5 FCFA / écoute", color: '#4da6ff', tag: 'EN DÉVELOPPEMENT' },
+          ].map((r, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b0f1e', border: `1px solid ${r.color}22`, borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ textAlign: 'left' }}>
+                <p style={{ color: '#7888aa', fontSize: 12, marginBottom: 4 }}>{r.label}</p>
+                <p style={{ fontWeight: 800, fontSize: 18, color: r.color, fontFamily: 'serif' }}>{r.range}</p>
+              </div>
+              <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 99, background: r.color + '22', color: r.color, fontWeight: 700, letterSpacing: 1 }}>{r.tag}</span>
+            </div>
+          ))}
+        </div>
+        <a href="/artiste" style={{ ...S.btn, textDecoration: 'none', padding: '14px 32px', fontSize: 15, borderRadius: 12, display: 'inline-block' }}>Commencer maintenant →</a>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ background: '#060a14', borderTop: '1px solid #151c30', padding: '24px', textAlign: 'center' }}>
+        <p style={{ color: '#1a2040', fontSize: 11 }}>
+          © 2025 DONIEL ZIK · La Musique. Un Scan. Un Monde. ·{' '}
+          <a href="/conditions" style={{ color: '#1a2040', textDecoration: 'underline' }}>CGU</a> ·{' '}
+          <a href="/annonceurs" style={{ color: '#1a2040', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
+          <a href="/admin" style={{ color: '#1a2040', textDecoration: 'underline' }}>Admin</a>
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+        {items.length > 0 && (
+          <div style={{ background: '#080c1a', border: '1px solid #152040', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 8 }}>
+            <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.7 }}>
+              🔒 Le téléchargement depuis Ma Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#1e6fff' }}>Premium</strong> — bientôt disponible.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<HomePage />} />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ziko" element={<UserAuthPage />} />
         <Route path="/ziko/login" element={<UserAuthPage />} />
         <Route path="/artiste" element={<ArtistPage />} />
         <Route path="/artiste/login" element={<ArtistPage />} />
-        <Route path="/*" element={<AdminPage />} />
+        <Route path="/annonceurs" element={<AnnonceursPage />} />
+        <Route path="/conditions" element={<ConditionsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/*" element={<HomePage />} />
       </Routes>
     </BrowserRouter>
   );
