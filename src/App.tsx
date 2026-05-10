@@ -1985,18 +1985,6 @@ function HomePage() {
   );
 }
 
-        {items.length > 0 && (
-          <div style={{ background: '#080c1a', border: '1px solid #152040', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 8 }}>
-            <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.7 }}>
-              🔒 Le téléchargement depuis Ma Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#1e6fff' }}>Premium</strong> — bientôt disponible.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <BrowserRouter>
