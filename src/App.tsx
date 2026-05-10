@@ -28,17 +28,17 @@ const isChromeiOS = () => /CriOS/.test(navigator.userAgent);
 const isMobileDevice = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const S = {
-  bg: { minHeight: '100vh', background: '#060a14', color: '#dde4f5', fontFamily: 'sans-serif' } as React.CSSProperties,
-  card: { background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 16, padding: 24, marginBottom: 16 } as React.CSSProperties,
-  btn: { padding: '10px 20px', borderRadius: 10, border: 'none', background: '#1e6fff', color: '#060a14', fontWeight: 700, cursor: 'pointer', fontSize: 14 } as React.CSSProperties,
-  btn2: { padding: '8px 16px', borderRadius: 8, border: '1px solid #151c30', background: 'transparent', color: '#7888aa', cursor: 'pointer', fontSize: 13 } as React.CSSProperties,
-  btnRed: { padding: '8px 14px', borderRadius: 8, border: '1px solid #f04a6a', background: '#1a0a20', color: '#f04a6a', cursor: 'pointer', fontSize: 12, fontWeight: 700 } as React.CSSProperties,
-  inp: { width: '100%', background: '#080c1a', border: '1px solid #1a2240', borderRadius: 10, padding: '11px 14px', color: '#dde4f5', fontSize: 14, outline: 'none', marginBottom: 12, boxSizing: 'border-box' } as React.CSSProperties,
-  lbl: { display: 'block', color: '#7888aa', fontSize: 12, marginBottom: 6 } as React.CSSProperties,
+  bg: { minHeight: '100vh', background: '#f0f4fb', color: '#1a2340', fontFamily: 'sans-serif' } as React.CSSProperties,
+  card: { background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 24, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,99,255,0.06)' } as React.CSSProperties,
+  btn: { padding: '10px 20px', borderRadius: 10, border: 'none', background: '#1a6bff', color: '#ffffff', fontWeight: 700, cursor: 'pointer', fontSize: 14 } as React.CSSProperties,
+  btn2: { padding: '8px 16px', borderRadius: 8, border: '1px solid #c8d8ef', background: 'transparent', color: '#5a7090', cursor: 'pointer', fontSize: 13 } as React.CSSProperties,
+  btnRed: { padding: '8px 14px', borderRadius: 8, border: '1px solid #e04060', background: '#fff0f3', color: '#e04060', cursor: 'pointer', fontSize: 12, fontWeight: 700 } as React.CSSProperties,
+  inp: { width: '100%', background: '#f5f8ff', border: '1px solid #c8d8ef', borderRadius: 10, padding: '11px 14px', color: '#1a2340', fontSize: 14, outline: 'none', marginBottom: 12, boxSizing: 'border-box' } as React.CSSProperties,
+  lbl: { display: 'block', color: '#5a7090', fontSize: 12, marginBottom: 6 } as React.CSSProperties,
 };
 
-const tabStyle = (a: boolean): React.CSSProperties => ({ padding: '10px 18px', border: 'none', background: 'transparent', color: a ? '#1e6fff' : '#4a5878', cursor: 'pointer', fontSize: 13, fontWeight: a ? 700 : 400, borderBottom: '2px solid ' + (a ? '#1e6fff' : 'transparent') });
-const badgeStyle = (s: string): React.CSSProperties => { const m: any = { active: ['#0a1535', '#4da6ff'], locked: ['#0a1535', '#f0b84a'], pending: ['#0a1535', '#f0b84a'], verified: ['#0a1535', '#4da6ff'], rejected: ['#1a0a20', '#f04a6a'] }; const [bg, c] = m[s] || ['#151c30', '#7888aa']; return { fontSize: 11, padding: '3px 10px', borderRadius: 99, background: bg, color: c, fontWeight: 700 }; };
+const tabStyle = (a: boolean): React.CSSProperties => ({ padding: '10px 18px', border: 'none', background: 'transparent', color: a ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 13, fontWeight: a ? 700 : 400, borderBottom: '2px solid ' + (a ? '#1a6bff' : 'transparent') });
+const badgeStyle = (s: string): React.CSSProperties => { const m: any = { active: ['#eaf1ff', '#1a6bff'], locked: ['#fff8e6', '#b07a00'], pending: ['#fff8e6', '#b07a00'], verified: ['#eaf1ff', '#1a6bff'], rejected: ['#fff0f3', '#e04060'] }; const [bg, c] = m[s] || ['#f0f4fb', '#8098b8']; return { fontSize: 11, padding: '3px 10px', borderRadius: 99, background: bg, color: c, fontWeight: 700 }; };
 const formatSize = (bytes: number) => { if (!bytes) return ''; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB'; return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; };
 const cleanName = (name: string) => name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
 const formatTime = (t: number) => { if (!t || isNaN(t)) return '0:00'; const m = Math.floor(t / 60); const s = Math.floor(t % 60); return m + ':' + (s < 10 ? '0' : '') + s; };
@@ -94,7 +94,7 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   if (!files || files.length === 0) return null;
 
   return (
-    <div style={{ background: '#080c1a', borderRadius: 14, padding: 18, marginBottom: 16 }}>
+    <div style={{ background: '#f5f8ff', borderRadius: 14, padding: 18, marginBottom: 16, border: '1px solid #dce6f7' }}>
       <audio ref={ref} src={cur?.url}
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
@@ -109,36 +109,36 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
         <div style={{ width: 52, height: 52, borderRadius: 99, background: 'linear-gradient(135deg, #1e6fff, #4da6ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 8px', animation: playing ? 'spin 3s linear infinite' : 'none' }}>🎵</div>
         <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}</p>
-        <p style={{ color: '#4a5878', fontSize: 11 }}>{idx + 1} / {files.length}</p>
+        <p style={{ color: '#8098b8', fontSize: 11 }}>{idx + 1} / {files.length}</p>
       </div>
 
       <div onClick={(e) => { if (!ref.current) return; const r = e.currentTarget.getBoundingClientRect(); ref.current.currentTime = ((e.clientX - r.left) / r.width) * ref.current.duration; }}
-        style={{ height: 5, background: '#151c30', borderRadius: 99, marginBottom: 6, cursor: 'pointer' }}>
-        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .1s' }} />
+        style={{ height: 5, background: '#dce6f7', borderRadius: 99, marginBottom: 6, cursor: 'pointer' }}>
+        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .1s' }} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#4a5878', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8098b8', marginBottom: 12 }}>
         <span>{formatTime(ct)}</span><span>{formatTime(dur)}</span>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
         <button onClick={() => { if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; } }} disabled={idx === 0}
-          style={{ background: 'none', border: 'none', color: idx === 0 ? '#1a2040' : '#7888aa', fontSize: 20, cursor: idx === 0 ? 'default' : 'pointer' }}>⏮</button>
+          style={{ background: 'none', border: 'none', color: idx === 0 ? '#c8d8ef' : '#8098b8', fontSize: 20, cursor: idx === 0 ? 'default' : 'pointer' }}>⏮</button>
         <button onClick={toggle}
-          style={{ width: 50, height: 50, borderRadius: 99, border: 'none', background: '#1e6fff', color: '#060a14', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          style={{ width: 50, height: 50, borderRadius: 99, border: 'none', background: '#1a6bff', color: '#ffffff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {playing ? '⏸' : '▶'}
         </button>
         <button onClick={() => { if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; } }} disabled={idx === files.length - 1}
-          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? '#1a2040' : '#7888aa', fontSize: 20, cursor: idx === files.length - 1 ? 'default' : 'pointer' }}>⏭</button>
+          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? '#c8d8ef' : '#8098b8', fontSize: 20, cursor: idx === files.length - 1 ? 'default' : 'pointer' }}>⏭</button>
       </div>
 
       {files.length > 1 && (
-        <div style={{ marginTop: 12, borderTop: '1px solid #151c30', paddingTop: 10 }}>
+        <div style={{ marginTop: 12, borderTop: '1px solid #dce6f7', paddingTop: 10 }}>
           {files.map((f, i) => (
             <div key={i} onClick={() => { setIdx(i); setPlaying(true); streamStart.current = Date.now() / 1000; }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', background: i === idx ? '#0a1a3a' : 'transparent', marginBottom: 2 }}>
-              <span style={{ color: i === idx ? '#1e6fff' : '#4a5878', fontSize: 12, fontWeight: 700, minWidth: 16 }}>{i === idx && playing ? '▶' : (i + 1)}</span>
-              <span style={{ fontSize: 12, color: i === idx ? '#1e6fff' : '#7888aa', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</span>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', background: i === idx ? '#eaf1ff' : 'transparent', marginBottom: 2 }}>
+              <span style={{ color: i === idx ? '#1a6bff' : '#8098b8', fontSize: 12, fontWeight: 700, minWidth: 16 }}>{i === idx && playing ? '▶' : (i + 1)}</span>
+              <span style={{ fontSize: 12, color: i === idx ? '#1a6bff' : '#5a7090', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</span>
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ function VideoPlayer({ files }: { files: any[] }) {
   const cur = files[idx];
 
   return (
-    <div style={{ background: '#080c1a', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+    <div style={{ background: '#f5f8ff', borderRadius: 14, overflow: 'hidden', marginBottom: 16, border: '1px solid #dce6f7' }}>
       {/* Lecteur vidéo */}
       <video
         ref={ref}
@@ -172,18 +172,18 @@ function VideoPlayer({ files }: { files: any[] }) {
         onEnded={() => { if (idx < files.length - 1) setIdx(i => i + 1); }}
       />
       {/* Titre */}
-      <div style={{ padding: '12px 16px', borderBottom: files.length > 1 ? '1px solid #151c30' : 'none' }}>
+      <div style={{ padding: '12px 16px', borderBottom: files.length > 1 ? '1px solid #dce6f7' : 'none' }}>
         <p style={{ fontWeight: 700, fontSize: 13 }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (idx + 1)}</p>
-        <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>{idx + 1} / {files.length}</p>
+        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 2 }}>{idx + 1} / {files.length}</p>
       </div>
       {/* Liste clips */}
       {files.length > 1 && (
         <div style={{ padding: '8px 0' }}>
           {files.map((f, i) => (
             <div key={i} onClick={() => { setIdx(i); setTimeout(() => ref.current?.play(), 100); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', background: i === idx ? '#0d1a3a' : 'transparent' }}>
-              <span style={{ color: i === idx ? '#1e6fff' : '#4a5878', fontSize: 14 }}>{i === idx ? '▶' : '○'}</span>
-              <span style={{ fontSize: 12, color: i === idx ? '#1e6fff' : '#7888aa', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', background: i === idx ? '#eaf1ff' : 'transparent' }}>
+              <span style={{ color: i === idx ? '#1a6bff' : '#8098b8', fontSize: 14 }}>{i === idx ? '▶' : '○'}</span>
+              <span style={{ fontSize: 12, color: i === idx ? '#1a6bff' : '#5a7090', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {f.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (i + 1)}
               </span>
               <span style={{ fontSize: 10, color: '#2a3a60' }}>🎬</span>
@@ -207,18 +207,18 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
     <>
       {audioFiles.length > 0 && (
         <div style={S.card}>
-          <p style={{ color: '#4a5878', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎵 LECTEUR AUDIO — STREAMING GRATUIT</p>
+          <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎵 LECTEUR AUDIO — STREAMING GRATUIT</p>
           <AudioPlayer files={audioFiles} onStream={onStream} />
           {onSafari && !downloaded && (
-            <div style={{ borderTop: '1px solid #151c30', paddingTop: 12 }}>
-              <p style={{ color: '#4a5878', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
+            <div style={{ borderTop: '1px solid #dce6f7', paddingTop: 12 }}>
+              <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
               {audioFiles.map((f: any, i: number) => (
                 <a key={i} href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
                   onClick={i === 0 ? onMarkDownloaded : undefined}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#080c1a', border: '1px solid #151c30', borderRadius: 10, padding: '10px 14px', marginBottom: 8, textDecoration: 'none', color: '#dde4f5' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f5f8ff', border: '1px solid #dce6f7', borderRadius: 10, padding: '10px 14px', marginBottom: 8, textDecoration: 'none', color: '#1a2340' }}>
                   <span>🎵</span>
                   <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '')}</span>
-                  <span style={{ color: '#1e6fff' }}>⬇</span>
+                  <span style={{ color: '#1a6bff' }}>⬇</span>
                 </a>
               ))}
             </div>
@@ -227,7 +227,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
       )}
       {videoFiles.length > 0 && (
         <div style={S.card}>
-          <p style={{ color: '#4a5878', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
+          <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
           <VideoPlayer files={videoFiles} />
         </div>
       )}
@@ -369,7 +369,7 @@ function FanPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', color: '#1a2340', fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -377,15 +377,15 @@ function FanPage() {
         @keyframes wave { 0%,100%{transform:scaleY(0.4)} 50%{transform:scaleY(1)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
         @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-        .track-item:hover { background: rgba(255,107,53,0.08) !important; }
-        .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,107,53,0.4) !important; }
+        .track-item:hover { background: rgba(26,107,255,0.08) !important; }
+        .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(26,107,255,0.4) !important; }
       `}</style>
 
       {/* LOADING */}
       {step === 'loading' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16 }}>
-          <div style={{ width: 48, height: 48, border: '3px solid #ff6b35', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Chargement...</p>
+          <div style={{ width: 48, height: 48, border: '3px solid #1a6bff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
+          <p style={{ color: '#8098b8', fontSize: 14 }}>Chargement...</p>
         </div>
       )}
 
@@ -398,45 +398,45 @@ function FanPage() {
             {qrData.coverUrl ? (
               <img src={qrData.coverUrl} alt={qrData.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1a0030, #ff6b3522, #0a0a1a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80 }}>🎵</div>
+              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #e8f0ff, #c0d8ff, #f0f4fb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80 }}>🎵</div>
             )}
             {/* Overlay gradient */}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(10,10,15,0.95) 100%)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(240,244,251,0.95) 100%)' }} />
             {/* Info artiste sur l'image */}
             <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20 }}>
-              <div style={{ display: 'inline-block', background: 'rgba(255,107,53,0.9)', borderRadius: 6, padding: '3px 10px', marginBottom: 8 }}>
+              <div style={{ display: 'inline-block', background: '#1a6bff', borderRadius: 6, padding: '3px 10px', marginBottom: 8 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#fff' }}>🎵 CONTENU EXCLUSIF</p>
               </div>
               <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 900, lineHeight: 1.1, marginBottom: 4, textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>{qrData.label}</h1>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>par <strong style={{ color: '#ff6b35' }}>{qrData.artist}</strong></p>
+              <p style={{ color: '#5a7090', fontSize: 14 }}>par <strong style={{ color: '#1a6bff' }}>{qrData.artist}</strong></p>
             </div>
           </div>
 
           {/* CONTENU PRINCIPAL */}
-          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto' }}>
+          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 32 }}>
 
             {/* BOUTON TÉLÉCHARGER */}
             {!downloaded ? (
               onSafari ? (
                 <div style={{ marginBottom: 16 }}>
                   <button onClick={() => { const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = currentUrl.replace('https://', 'googlechromes://'); document.body.appendChild(iframe); setTimeout(() => { document.body.removeChild(iframe); window.location.href = 'https://apps.apple.com/app/google-chrome/id535886823'; }, 2500); }}
-                    style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: 'none', background: '#4285f4', color: '#fff', cursor: 'pointer', marginBottom: 8 }}>
+                    style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: 'none', background: '#1a6bff', color: '#fff', cursor: 'pointer', marginBottom: 8 }}>
                     🌐 Ouvrir dans Chrome pour télécharger
                   </button>
                 </div>
               ) : (
                 <button className="dl-btn" onClick={startDownload}
-                  style={{ width: '100%', padding: '18px', fontSize: 17, fontWeight: 800, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', cursor: 'pointer', marginBottom: 16, boxShadow: '0 4px 20px rgba(255,107,53,0.35)', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  style={{ width: '100%', padding: '18px', fontSize: 17, fontWeight: 800, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', cursor: 'pointer', marginBottom: 16, boxShadow: '0 4px 20px rgba(26,107,255,0.3)', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                   <span style={{ fontSize: 20 }}>⬇</span>
                   {(qrData.files?.length || 0) > 1 ? 'Télécharger l\'album complet' : 'Télécharger'}
                 </button>
               )
             ) : (
-              <div style={{ background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 14, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ background: '#eaf1ff', border: '1px solid #1a6bff', borderRadius: 14, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 24 }}>✅</span>
                 <div>
-                  <p style={{ fontWeight: 700, fontSize: 14, color: '#ff6b35' }}>Téléchargement effectué</p>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>Profitez du streaming illimité ci-dessous</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#1a6bff' }}>Téléchargement effectué</p>
+                  <p style={{ color: '#8098b8', fontSize: 12, marginTop: 2 }}>Profitez du streaming illimité ci-dessous</p>
                 </div>
               </div>
             )}
@@ -445,7 +445,7 @@ function FanPage() {
             {/* Écouter en streaming */}
             {qrData.files?.some((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18 }}>🎧</span> Écouter en streaming
                 </p>
                 <AudioPlayer files={qrData.files.filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))} onStream={recordStream} />
@@ -455,22 +455,22 @@ function FanPage() {
             {/* Télécharger titre par titre */}
             {qrData.files?.length > 0 && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18 }}>💿</span> Titres
-                  <span style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 99, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{qrData.files.length}</span>
+                  <span style={{ background: '#eaf1ff', borderRadius: 99, padding: '2px 8px', fontSize: 11, fontWeight: 600, color: '#1a6bff' }}>{qrData.files.length}</span>
                 </p>
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ background: '#ffffff', borderRadius: 14, overflow: 'hidden', border: '1px solid #dce6f7', boxShadow: '0 2px 10px rgba(26,99,255,0.06)' }}>
                   {qrData.files.map((f: any, i: number) => (
-                    <div key={i} className="track-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < qrData.files.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'background .2s', cursor: 'pointer' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,107,53,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div key={i} className="track-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < qrData.files.length - 1 ? '1px solid #edf2fc' : 'none', transition: 'background .2s', cursor: 'pointer' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(26,107,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <span style={{ fontSize: 14 }}>{f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '🎬' : '🎵'}</span>
                       </div>
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
-                        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 }}>{formatSize(f.size || 0)}</p>
+                        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 1 }}>{formatSize(f.size || 0)}</p>
                       </div>
                       <a href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                        style={{ color: '#ff6b35', fontSize: 18, textDecoration: 'none', padding: '4px 8px' }}>⬇</a>
+                        style={{ color: '#1a6bff', fontSize: 18, textDecoration: 'none', padding: '4px 8px' }}>⬇</a>
                     </div>
                   ))}
                 </div>
@@ -480,7 +480,7 @@ function FanPage() {
             {/* Vidéos */}
             {qrData.files?.some((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18 }}>🎬</span> Vidéos
                 </p>
                 <VideoPlayer files={qrData.files.filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i))} />
@@ -488,19 +488,19 @@ function FanPage() {
             )}
 
             {/* Ma Zikothèque */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(26,99,255,0.05)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 22 }}>📚</span>
                 <div>
                   <p style={{ fontWeight: 700, fontSize: 13 }}>Ma Zikothèque</p>
-                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 1 }}>Retrouver vos albums</p>
+                  <p style={{ color: '#8098b8', fontSize: 11, marginTop: 1 }}>Retrouver vos albums</p>
                 </div>
               </div>
-              <a href="/ziko" style={{ background: 'rgba(255,107,53,0.15)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 10, padding: '8px 14px', color: '#ff6b35', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>Accéder →</a>
+              <a href="/ziko" style={{ background: '#eaf1ff', border: '1px solid #1a6bff', borderRadius: 10, padding: '8px 14px', color: '#1a6bff', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>Accéder →</a>
             </div>
 
             {/* Footer */}
-            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: 11, paddingBottom: 16 }}>
+            <p style={{ textAlign: 'center', color: '#b0c4d8', fontSize: 11, paddingBottom: 16 }}>
               DONIEL ZIK · La Musique. Un Scan. Un Monde.
             </p>
           </div>
@@ -510,15 +510,15 @@ function FanPage() {
       {/* ZIPPING */}
       {step === 'zipping' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24 }}>
-          <div style={{ width: '100%', maxWidth: 360, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 36, textAlign: 'center' }}>
-            <div style={{ width: 56, height: 56, border: '3px solid #ff6b35', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 20px', animation: 'spin .8s linear infinite' }} />
+          <div style={{ width: '100%', maxWidth: 360, background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 36, textAlign: 'center', boxShadow: '0 4px 24px rgba(26,99,255,0.1)' }}>
+            <div style={{ width: 56, height: 56, border: '3px solid #1a6bff', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 20px', animation: 'spin .8s linear infinite' }} />
             <p style={{ fontWeight: 700, fontSize: 17, marginBottom: 8 }}>Préparation en cours...</p>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 24 }}>{dlStatus}</p>
-            <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 99, marginBottom: 12 }}>
-              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #ff6b35, #ffd700)', borderRadius: 99, transition: 'width .3s' }} />
+            <p style={{ color: '#8098b8', fontSize: 13, marginBottom: 24 }}>{dlStatus}</p>
+            <div style={{ height: 8, background: '#dce6f7', borderRadius: 99, marginBottom: 12 }}>
+              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
             </div>
-            <p style={{ color: '#ff6b35', fontWeight: 800, fontSize: 32 }}>{dlProgress}%</p>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 16 }}>Ne fermez pas cette page</p>
+            <p style={{ color: '#1a6bff', fontWeight: 800, fontSize: 32 }}>{dlProgress}%</p>
+            <p style={{ color: '#b0c4d8', fontSize: 11, marginTop: 16 }}>Ne fermez pas cette page</p>
           </div>
         </div>
       )}
@@ -532,22 +532,22 @@ function FanPage() {
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(10,10,15,1))' }} />
             </div>
           )}
-          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto' }}>
+          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 32 }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <span style={{ fontSize: 48 }}>🔒</span>
-              <p style={{ color: '#f0b84a', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginTop: 8, marginBottom: 4 }}>SCANS ÉPUISÉS</p>
+              <p style={{ color: '#b07a00', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginTop: 8, marginBottom: 4 }}>SCANS ÉPUISÉS</p>
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{qrData?.label || 'Contenu protégé'}</h2>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>par <strong style={{ color: '#ff6b35' }}>{qrData?.artist}</strong></p>
+              <p style={{ color: '#8098b8', fontSize: 14 }}>par <strong style={{ color: '#1a6bff' }}>{qrData?.artist}</strong></p>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
-              <p style={{ color: '#ff6b35', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🎵 Streaming gratuit disponible</p>
+            <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: 20, marginBottom: 16, boxShadow: '0 2px 8px rgba(26,99,255,0.05)' }}>
+              <p style={{ color: '#1a6bff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🎵 Streaming gratuit disponible</p>
               {qrData?.files && <AudioPlayer files={qrData.files} onStream={recordStream} />}
             </div>
             <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
-              style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: '2px solid #ff6b35', background: 'transparent', color: '#ff6b35', cursor: 'pointer', marginBottom: 8 }}>
+              style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: '2px solid #1a6bff', background: 'transparent', color: '#1a6bff', cursor: 'pointer', marginBottom: 8 }}>
               ⬇️ Télécharger l'album (Accès payant)
             </button>
-            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 11 }}>Paiement en ligne — Même prix que la pochette physique</p>
+            <p style={{ textAlign: 'center', color: '#b0c4d8', fontSize: 11 }}>Paiement en ligne — Même prix que la pochette physique</p>
           </div>
         </div>
       )}
@@ -555,26 +555,26 @@ function FanPage() {
       {/* DONE */}
       {step === 'done' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24 }}>
-          <div style={{ width: '100%', maxWidth: 360, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 36, textAlign: 'center', animation: 'fadeUp .4s ease' }}>
+          <div style={{ width: '100%', maxWidth: 360, background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 36, textAlign: 'center', boxShadow: '0 4px 24px rgba(26,99,255,0.1)', animation: 'fadeUp .4s ease' }}>
             <p style={{ fontSize: 56, marginBottom: 16 }}>{dlStatus.startsWith('Erreur') ? '❌' : '✅'}</p>
             <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
               {dlStatus.startsWith('Erreur') ? 'Erreur de téléchargement' : 'Téléchargement lancé !'}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
               {dlStatus.startsWith('Erreur') ? dlStatus : 'Vérifiez vos téléchargements. Vous pouvez continuer à écouter en streaming.'}
             </p>
             {!dlStatus.startsWith('Erreur') && (
               <>
                 <button onClick={() => setStep('ready')}
-                  style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', cursor: 'pointer', marginBottom: 10 }}>
+                  style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', cursor: 'pointer', marginBottom: 10 }}>
                   🎵 Écouter en streaming
                 </button>
-                <a href="/ziko" style={{ display: 'block', width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', marginBottom: 12, boxSizing: 'border-box' }}>
+                <a href="/ziko" style={{ display: 'block', width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 12, border: '1px solid #dce6f7', color: '#5a7090', textDecoration: 'none', marginBottom: 12, boxSizing: 'border-box' }}>
                   📚 Ma Zikothèque
                 </a>
               </>
             )}
-            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>DONIEL ZIK · Distribution musicale sécurisée</p>
+            <p style={{ color: '#b0c4d8', fontSize: 11 }}>DONIEL ZIK · Distribution musicale sécurisée</p>
           </div>
         </div>
       )}
@@ -597,28 +597,28 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
     <div style={{ marginBottom: 16 }}>
       {/* EN-TÊTE DOSSIER ARTISTE */}
       <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderRadius: open ? '12px 12px 0 0' : 12, background: '#0b0f1e', border: '1px solid #1a2240', cursor: 'pointer', userSelect: 'none' }}>
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderRadius: open ? '12px 12px 0 0' : 12, background: '#ffffff', border: '1px solid #c8d8ef', cursor: 'pointer', userSelect: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 22 }}>{open ? '📂' : '📁'}</span>
           <div>
             <p style={{ fontWeight: 800, fontSize: 15 }}>{artist}</p>
-            <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>
+            <p style={{ color: '#8098b8', fontSize: 11, marginTop: 2 }}>
               {qrcodes.length} QR code{qrcodes.length > 1 ? 's' : ''} · 
-              <span style={{ color: '#4da6ff' }}> {activeCount} actif{activeCount > 1 ? 's' : ''}</span>
-              {lockedCount > 0 && <span style={{ color: '#f0b84a' }}> · {lockedCount} bloqué{lockedCount > 1 ? 's' : ''}</span>}
+              <span style={{ color: '#1a6bff' }}>{activeCount} actif{activeCount > 1 ? 's' : ''}</span>
+              {lockedCount > 0 && <span style={{ color: '#b07a00' }}> · {lockedCount} bloqué{lockedCount > 1 ? 's' : ''}</span>}
             </p>
           </div>
         </div>
-        <span style={{ color: '#4a5878', fontSize: 18 }}>{open ? '▲' : '▼'}</span>
+        <span style={{ color: '#8098b8', fontSize: 18 }}>{open ? '▲' : '▼'}</span>
       </div>
 
       {/* LISTE QR CODES DU DOSSIER */}
       {open && (
-        <div style={{ border: '1px solid #1a2240', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
+        <div style={{ border: '1px solid #c8d8ef', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
           {qrcodes.map((q, i) => {
             const isLocked = q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1);
             return (
-              <div key={q.id} style={{ padding: '16px 18px', borderTop: i === 0 ? 'none' : '1px solid #151c30', background: isLocked ? '#0d0a00' : '#060a14' }}>
+              <div key={q.id} style={{ padding: '16px 18px', borderTop: i === 0 ? 'none' : '1px solid #dce6f7', background: isLocked ? '#fffdf5' : '#fafcff' }}>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   {/* QR CODE IMAGE */}
                   <div style={{ background: 'white', padding: 7, borderRadius: 8, flexShrink: 0, cursor: 'pointer' }} onClick={() => onQrModal(q)}>
@@ -630,18 +630,18 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 800, fontSize: 14 }}>{q.label}</span>
                       <span style={badgeStyle(isLocked ? 'locked' : 'active')}>{isLocked ? 'Bloqué' : 'Actif'}</span>
-                      <span style={{ fontFamily: 'monospace', color: '#1e6fff', fontSize: 11, fontWeight: 700 }}>{q.qrId}</span>
+                      <span style={{ fontFamily: 'monospace', color: '#1a6bff', fontSize: 11, fontWeight: 700 }}>{q.qrId}</span>
                     </div>
-                    <p style={{ color: '#7888aa', fontSize: 12, marginBottom: 4 }}>{q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
-                    <p style={{ color: '#4a5878', fontSize: 11, marginBottom: 6 }}>
+                    <p style={{ color: '#5a7090', fontSize: 12, marginBottom: 4 }}>{q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
+                    <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 6 }}>
                       {q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL · {q.visits || 0} visites
                     </p>
-                    <div style={{ height: 3, background: '#151c30', borderRadius: 99, marginBottom: 4 }}>
-                      <div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#1e6fff', borderRadius: 99 }} />
+                    <div style={{ height: 3, background: '#dce6f7', borderRadius: 99, marginBottom: 4 }}>
+                      <div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#1a6bff', borderRadius: 99 }} />
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                      {q.streams > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a1030', color: '#f0b84a' }}>🎵 {q.streams} streams</span>}
-                      {q.validStreams > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#0a1535', color: '#4da6ff' }}>✅ {q.validStreams} validés</span>}
+                      {q.streams > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#f5f8ff', color: '#b07a00' }}>🎵 {q.streams} streams</span>}
+                      {q.validStreams > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: '#eaf1ff', color: '#1a6bff' }}>✅ {q.validStreams} validés</span>}
                     </div>
                   </div>
                   {/* ACTIONS */}
@@ -649,7 +649,7 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
                     <button style={{ ...S.btn, padding: '6px 10px', fontSize: 11 }} onClick={() => onQrModal(q)}>QR PNG</button>
                     <button style={{ background: '#1a1a2e', border: '1px solid #4a4af0', color: '#a0a0ff', borderRadius: 8, padding: '6px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700 }} onClick={() => onBulk(q)}>🖨️ Masse</button>
                     <button style={{ ...S.btn2, fontSize: 11 }} onClick={() => onEdit(q)}>{isLocked ? '🔓 Réactiver' : '✏️ Modifier'}</button>
-                    <button style={isLocked ? { ...S.btn2, color: '#4da6ff', borderColor: '#4da6ff', fontSize: 11 } : { ...S.btn2, color: '#f0b84a', borderColor: '#f0b84a', fontSize: 11 }}
+                    <button style={isLocked ? { ...S.btn2, color: '#1a6bff', borderColor: '#4da6ff', fontSize: 11 } : { ...S.btn2, color: '#b07a00', borderColor: '#f0b84a', fontSize: 11 }}
                       onClick={() => onToggle(q)}>
                       {isLocked ? '🔓 Activer' : '🔒 Bloquer'}
                     </button>
@@ -848,7 +848,8 @@ function AdminPage() {
   );
 
   if (view === 'login') return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+>
       <div style={{ width: '100%', maxWidth: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Logo size="lg" />
@@ -858,7 +859,7 @@ function AdminPage() {
           <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@securedrop.com" onKeyDown={e => e.key === 'Enter' && login()} />
           <label style={S.lbl}>Mot de passe</label>
           <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && login()} />
-          {msg && <p style={{ color: '#f04a6a', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
+          {msg && <p style={{ color: '#e04060', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
           <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={login} disabled={loading}>
             {loading ? 'Connexion...' : 'Se connecter →'}
           </button>
@@ -891,32 +892,32 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* BULK MODAL */}
       {showBulk && bulkQr && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
+          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Generation en masse</h3>
-            <p style={{ color: '#1e6fff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4 }}>{bulkQr.label}</p>
-            <p style={{ color: '#7888aa', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
-            <div style={{ background: '#080c1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-              <p style={{ color: '#4a5878', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
-              <p style={{ color: '#4a5878', fontSize: 11 }}>30 QR codes par page A4 → PDF imprimable</p>
+            <p style={{ color: '#1a6bff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4, fontSize: 15 }}>{bulkQr.label}</p>
+            <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
+            <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
+              <p style={{ color: '#8098b8', fontSize: 11 }}>30 QR codes par page A4 → PDF imprimable</p>
             </div>
             <label style={S.lbl}>Nombre de QR codes</label>
             <input style={S.inp} type="number" value={bulkCount} onChange={e => setBulkCount(e.target.value)} placeholder="100" min="1" max="5000" />
             <label style={S.lbl}>Scans par QR code</label>
             <input style={S.inp} type="number" value={bulkScans} onChange={e => setBulkScans(e.target.value)} placeholder="1" min="1" />
-            <div style={{ background: '#0a1a3a', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-              <p style={{ color: '#4da6ff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>📄 {Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4</p>
-              <p style={{ color: '#7888aa', fontSize: 12 }}>{bulkCount} QR × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements</p>
+            <div style={{ background: '#eaf1ff', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <p style={{ color: '#1a6bff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>📄 {Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4</p>
+              <p style={{ color: '#5a7090', fontSize: 12 }}>{bulkCount} QR × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements</p>
             </div>
             {bulkLoading && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#7888aa', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5a7090', marginBottom: 6 }}>
                   <span>{bulkProgress < 55 ? 'Creation des QR codes...' : 'Generation du PDF...'}</span>
-                  <span style={{ color: '#1e6fff', fontWeight: 700 }}>{bulkProgress}%</span>
+                  <span style={{ color: '#1a6bff', fontWeight: 700 }}>{bulkProgress}%</span>
                 </div>
-                <div style={{ height: 8, background: '#151c30', borderRadius: 99 }}>
-                  <div style={{ height: '100%', width: bulkProgress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
+                <div style={{ height: 8, background: '#dce6f7', borderRadius: 99 }}>
+                  <div style={{ height: '100%', width: bulkProgress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
                 </div>
-                <p style={{ color: '#4a5878', fontSize: 11, marginTop: 8, textAlign: 'center' }}>Ne fermez pas cette page...</p>
+                <p style={{ color: '#8098b8', fontSize: 11, marginTop: 8, textAlign: 'center' }}>Ne fermez pas cette page...</p>
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
@@ -932,40 +933,40 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* EDIT MODAL */}
       {editModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
-          <div style={{ background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 20, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Modifier</h3>
-            <p style={{ color: '#1e6fff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 20 }}>{editModal.qrId} — {editModal.label}</p>
+            <p style={{ color: '#1a6bff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 20 }}>{editModal.qrId} — {editModal.label}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div><label style={S.lbl}>Prix (FCFA)</label><input style={S.inp} type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} /></div>
               <div><label style={S.lbl}>Nb scans total</label><input style={S.inp} type="number" value={editScans} onChange={e => setEditScans(e.target.value)} /></div>
             </div>
             {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && (
-              <div style={{ background: '#0a1535', border: '1px solid #4da6ff', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#4da6ff' }}>✓ QR sera reactive</div>
+              <div style={{ background: '#eaf1ff', border: '1px solid #4da6ff', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#1a6bff' }}>✓ QR sera reactive</div>
             )}
             <label style={S.lbl}>💬 WhatsApp de l artiste</label>
             <input style={{ ...S.inp, marginBottom: 14 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
             <label style={{ ...S.lbl, marginBottom: 10 }}>Fichiers ({editFiles.length})</label>
-            <div style={{ background: '#080c1a', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-              {editFiles.length === 0 ? <p style={{ color: '#4a5878', fontSize: 13, textAlign: 'center' }}>Aucun fichier</p> :
+            <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+              {editFiles.length === 0 ? <p style={{ color: '#8098b8', fontSize: 13, textAlign: 'center' }}>Aucun fichier</p> :
                 editFiles.map((f, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < editFiles.length - 1 ? '1px solid #151c30' : 'none' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < editFiles.length - 1 ? '1px solid #dce6f7' : 'none' }}>
                     <span>🎵</span>
                     <p style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</p>
                     <button onClick={() => setEditFiles(f => f.filter((_, j) => j !== i))} style={{ ...S.btnRed, padding: '4px 8px', fontSize: 11 }}>🗑️</button>
                   </div>
                 ))}
             </div>
-            <div style={{ border: '2px dashed #1a2240', borderRadius: 10, padding: 14, textAlign: 'center', background: '#080c1a', marginBottom: 14 }}>
+            <div style={{ border: '2px dashed #b8cce8', borderRadius: 10, padding: 14, textAlign: 'center', background: '#f5f8ff', marginBottom: 14 }}>
               <input type="file" accept="audio/*,video/*" multiple onChange={e => setAddFiles(e.target.files)} style={{ display: 'none' }} id="editFileInput" />
               <label htmlFor="editFileInput" style={{ ...S.btn, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block' }}>➕ Ajouter fichiers</label>
               {addFiles && addFiles.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <p style={{ color: '#4da6ff', fontSize: 12, marginBottom: 6 }}>{addFiles.length} fichier(s)</p>
+                  <p style={{ color: '#1a6bff', fontSize: 12, marginBottom: 6 }}>{addFiles.length} fichier(s)</p>
                   {!editUploading && <button onClick={uploadEditFiles} style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>⬆ Uploader</button>}
-                  {editUploading && <p style={{ color: '#7888aa', fontSize: 12 }}>{editUploadMsg}</p>}
+                  {editUploading && <p style={{ color: '#5a7090', fontSize: 12 }}>{editUploadMsg}</p>}
                 </div>
               )}
-              {editUploadMsg && !editUploading && <p style={{ color: '#4da6ff', fontSize: 12, marginTop: 8 }}>{editUploadMsg}</p>}
+              {editUploadMsg && !editUploading && <p style={{ color: '#1a6bff', fontSize: 12, marginTop: 8 }}>{editUploadMsg}</p>}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => setEditModal(null)}>Annuler</button>
@@ -978,16 +979,16 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* QR MODAL */}
       {qrModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420, textAlign: 'center' }}>
-            <p style={{ color: '#7888aa', fontSize: 12, marginBottom: 2 }}>{qrModal.artist}</p>
+          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420, textAlign: 'center' }}>
+            <p style={{ color: '#5a7090', fontSize: 12, marginBottom: 2 }}>{qrModal.artist}</p>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>{qrModal.label}</h3>
-            <p style={{ fontFamily: 'monospace', color: '#1e6fff', fontWeight: 800, fontSize: 20, marginBottom: 20, letterSpacing: 4 }}>{qrModal.qrId}</p>
+            <p style={{ fontFamily: 'monospace', color: '#1a6bff', fontWeight: 800, fontSize: 20, marginBottom: 20, letterSpacing: 4 }}>{qrModal.qrId}</p>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <div style={{ background: 'white', padding: 16, borderRadius: 12 }}>
                 <QRCodeCanvas id={'qr-dl-' + qrModal.id} value={qrModal.url} size={200} bgColor="#ffffff" fgColor="#060a14" level="H" />
               </div>
             </div>
-            <p style={{ color: '#4a5878', fontSize: 10, marginBottom: 20, wordBreak: 'break-all' }}>{qrModal.url}</p>
+            <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 20, wordBreak: 'break-all', background: '#f5f8ff', padding: '8px 12px', borderRadius: 8 }}>{qrModal.url}</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn, flex: 2 }} onClick={() => downloadQR(qrModal)}>Telecharger QR (PNG)</button>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => setQrModal(null)}>Fermer</button>
@@ -999,10 +1000,10 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* CONFIRM DELETE */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#0b0f1e', border: '1px solid #f04a6a', borderRadius: 20, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #f04a6a', borderRadius: 20, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center' }}>
             <p style={{ fontSize: 40, marginBottom: 16 }}>🗑️</p>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 12 }}>Supprimer ce QR code ?</h3>
-            <p style={{ color: '#7888aa', fontSize: 13, marginBottom: 24 }}>Cette action est irreversible.</p>
+            <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 24 }}>Cette action est irreversible.</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => setConfirmDelete(null)}>Annuler</button>
               <button style={{ ...S.btnRed, flex: 1, padding: '10px 20px' }} onClick={async () => { await deleteDoc(doc(db, 'qrcodes', confirmDelete)); setConfirmDelete(null); setMsg('QR supprime !'); }}>Supprimer</button>
@@ -1012,10 +1013,10 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       )}
 
       {/* HEADER */}
-      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
            <Logo size="sm" />
-           <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700 }}>ADMIN</p>
+           <p style={{ color: '#1a6bff', fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>ADMIN</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {pendingPay.length > 0 && <span style={{ ...badgeStyle('pending'), padding: '6px 12px', fontSize: 12 }}>{pendingPay.length} en attente</span>}
@@ -1024,7 +1025,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom: '1px solid #151c30', padding: '0 24px', display: 'flex', background: '#0b0f1e' }}>
+      <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={tabStyle(tab === 'pochettes')} onClick={() => setTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
@@ -1032,7 +1033,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
         {msg && (
-          <div style={{ background: msg.startsWith('Erreur') ? '#1a0a20' : '#0a1535', border: '1px solid ' + (msg.startsWith('Erreur') ? '#f04a6a' : '#4da6ff'), borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: msg.startsWith('Erreur') ? '#f04a6a' : '#4da6ff', fontSize: 13 }}>
+          <div style={{ background: msg.startsWith('Erreur') ? '#fff0f3' : '#eaf1ff', border: '1px solid ' + (msg.startsWith('Erreur') ? '#e04060' : '#1a6bff'), borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: msg.startsWith('Erreur') ? '#e04060' : '#1a6bff', fontSize: 13 }}>
             {msg} <span style={{ cursor: 'pointer', float: 'right' }} onClick={() => setMsg('')}>✕</span>
           </div>
         )}
@@ -1040,15 +1041,15 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         {tab === 'qrcodes' && (
           <>
             {lockedQRs.length > 0 && (
-              <div style={{ background: '#0a1030', border: '1px solid #3a3000', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <p style={{ color: '#f0b84a', fontSize: 13 }}>🔒 {lockedQRs.length} QR bloque(s)</p>
+              <div style={{ background: '#f5f8ff', border: '1px solid #3a3000', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <p style={{ color: '#b07a00', fontSize: 13 }}>🔒 {lockedQRs.length} QR bloque(s)</p>
                 <button style={S.btnRed} onClick={async () => { for (const q of lockedQRs) await deleteDoc(doc(db, 'qrcodes', q.id)); setMsg(lockedQRs.length + ' supprimes !'); }}>🗑️ Supprimer les bloques</button>
               </div>
             )}
 
             {/* CREATE FORM */}
             <div style={S.card}>
-              <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, fontFamily: 'serif' }}>Nouveau QR Code</p>
+              <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, color: '#1a2340' }}>Nouveau QR Code</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label style={S.lbl}>Nom du contenu *</label><input style={S.inp} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Album Vol.1" /></div>
                 <div><label style={S.lbl}>Artiste *</label><input style={S.inp} value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="DJ Lamine" /></div>
@@ -1057,24 +1058,24 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 {[['album','Album'],['single','Single'],['video','Video'],['mix','Mix']].map(([t,l]) => (
-                  <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#1e6fff' : '#1a2240'), background: newType === t ? '#0a1a3a' : 'transparent', color: newType === t ? '#1e6fff' : '#4a5878', cursor: 'pointer', fontSize: 12 }}>{l}</button>
+                  <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#1a6bff' : '#c8d8ef'), background: newType === t ? '#eaf1ff' : 'transparent', color: newType === t ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
               <label style={S.lbl}>💬 WhatsApp de l artiste</label>
               <input style={{ ...S.inp, marginBottom: 14 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
               <label style={S.lbl}>🖼️ Image de pochette (obligatoire)</label>
-              <div style={{ border: '2px dashed #1a2240', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#080c1a' }}>
+              <div style={{ border: '2px dashed #b8cce8', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#f5f8ff' }}>
                 <input type="file" accept="image/*" onChange={e => setCoverFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="coverInput" />
                 <label htmlFor="coverInput" style={{ ...S.btn2, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block', marginBottom: 10 }}>📷 Choisir l'image</label>
                 {coverFile ? (
                   <div>
                     <img src={URL.createObjectURL(coverFile)} alt="cover" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
-                    <p style={{ color: '#4da6ff', fontSize: 11, marginTop: 6 }}>{coverFile.name}</p>
+                    <p style={{ color: '#1a6bff', fontSize: 11, marginTop: 6 }}>{coverFile.name}</p>
                   </div>
-                ) : <p style={{ color: '#4a5878', fontSize: 13 }}>Aucune image</p>}
+                ) : <p style={{ color: '#8098b8', fontSize: 13 }}>Aucune image</p>}
               </div>
               <label style={S.lbl}>Fichiers audio/video</label>
-              <div style={{ border: '2px dashed #1a2240', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#080c1a' }}>
+              <div style={{ border: '2px dashed #b8cce8', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#f5f8ff' }}>
                 <input type="file" accept="audio/*,video/*" multiple onChange={e => setSelectedFiles(e.target.files)} style={{ display: 'none' }} id="fileInput" />
                 <input type="file" accept="audio/*,video/*" onChange={e => setSelectedFiles(e.target.files)} style={{ display: 'none' }} id="folderInput" {...{ webkitdirectory: '', directory: '' } as any} />
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
@@ -1083,15 +1084,15 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 </div>
                 {selectedFiles && selectedFiles.length > 0 ? (
                   <div>
-                    <p style={{ color: '#4da6ff', fontWeight: 700, marginBottom: 6 }}>{selectedFiles.length} fichier(s)</p>
-                    <div style={{ maxHeight: 80, overflowY: 'auto' }}>{Array.from(selectedFiles).map((f, i) => <p key={i} style={{ color: '#7888aa', fontSize: 11, marginBottom: 1 }}>{i + 1}. {f.name} ({formatSize(f.size)})</p>)}</div>
+                    <p style={{ color: '#1a6bff', fontWeight: 700, marginBottom: 6 }}>{selectedFiles.length} fichier(s)</p>
+                    <div style={{ maxHeight: 80, overflowY: 'auto' }}>{Array.from(selectedFiles).map((f, i) => <p key={i} style={{ color: '#5a7090', fontSize: 11, marginBottom: 1 }}>{i + 1}. {f.name} ({formatSize(f.size)})</p>)}</div>
                   </div>
-                ) : <p style={{ color: '#4a5878', fontSize: 13 }}>Aucun fichier</p>}
+                ) : <p style={{ color: '#8098b8', fontSize: 13 }}>Aucun fichier</p>}
               </div>
               {loading && uploadProgress > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#7888aa', marginBottom: 5 }}><span>{uploadMsg}</span><span style={{ color: '#1e6fff' }}>{uploadProgress}%</span></div>
-                  <div style={{ height: 5, background: '#151c30', borderRadius: 99 }}><div style={{ height: '100%', width: uploadProgress + '%', background: '#1e6fff', borderRadius: 99, transition: 'width .3s' }} /></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5a7090', marginBottom: 5 }}><span>{uploadMsg}</span><span style={{ color: '#1a6bff' }}>{uploadProgress}%</span></div>
+                  <div style={{ height: 5, background: '#dce6f7', borderRadius: 99 }}><div style={{ height: '100%', width: uploadProgress + '%', background: '#1a6bff', borderRadius: 99, transition: 'width .3s' }} /></div>
                 </div>
               )}
               <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={createQR} disabled={loading}>
@@ -1099,11 +1100,11 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               </button>
             </div>
 
-            <input style={{ ...S.inp, marginBottom: 16 }} placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <input style={{ width: '100%', background: '#f5f8ff', border: '1px solid #c8d8ef', borderRadius: 10, padding: '11px 14px', color: '#1a2340', fontSize: 14, outline: 'none', marginBottom: 16, boxSizing: 'border-box' }} placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
 
             {filteredQRs.length === 0 ? (
-              <div style={{ ...S.card, textAlign: 'center', color: '#4a5878', padding: 40 }}>
-                {searchTerm ? 'Aucun resultat' : 'Aucun QR code — cree le premier ci-dessus'}
+              <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 40, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center', color: '#8098b8' }}>
+                {searchTerm ? 'Aucun résultat pour "' + searchTerm + '"' : 'Aucun QR code — créez le premier ci-dessus'}
               </div>
 ) : groupedQRs.map(({ artist, qs, activeCount, lockedCount }) => (
               <ArtistFolder key={artist} artist={artist} qrcodes={qs} activeCount={activeCount} lockedCount={lockedCount}
@@ -1119,19 +1120,19 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
         {tab === 'payments' && (
           <>
-            <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, fontFamily: 'serif' }}>Paiements</p>
+            <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, color: '#1a2340' }}>Paiements</p>
             {payments.length === 0 ? (
-              <div style={{ ...S.card, textAlign: 'center', color: '#4a5878', padding: 40 }}>Aucun paiement</div>
+              <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 40, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center', color: '#8098b8' }}>Aucun paiement</div>
             ) : payments.map(p => (
               <div key={p.id} style={S.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <p style={{ fontWeight: 700, marginBottom: 4 }}>{p.note}</p>
-                    <p style={{ color: '#4a5878', fontSize: 12 }}>{p.method} · {p.phone} · {p.date}</p>
-                    {p.qrId && <p style={{ color: '#1e6fff', fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>Ref: {p.qrId}</p>}
+                    <p style={{ color: '#8098b8', fontSize: 12 }}>{p.method} · {p.phone} · {p.date}</p>
+                    {p.qrId && <p style={{ color: '#1a6bff', fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>Ref: {p.qrId}</p>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ color: '#1e6fff', fontWeight: 800, fontSize: 18 }}>{(p.amount || 0).toLocaleString()} FCFA</span>
+                    <span style={{ color: '#1a6bff', fontWeight: 800, fontSize: 18 }}>{(p.amount || 0).toLocaleString()} FCFA</span>
                     <span style={badgeStyle(p.status)}>{p.status}</span>
                     {p.status === 'pending' && <button style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }} onClick={() => verifyPayment(p)}>Valider</button>}
                     <button style={{ ...S.btnRed, fontSize: 11 }} onClick={() => deleteDoc(doc(db, 'payments', p.id)).then(() => setMsg('Supprime !'))}>🗑️</button>
@@ -1183,33 +1184,33 @@ function PochettesTab({ qrcodes }: { qrcodes: any[] }) {
 
   return (
     <>
-      <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, fontFamily: 'serif' }}>Génération de Pochettes</p>
+      <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, color: '#1a2340' }}>Génération de Pochettes</p>
 
       <div style={S.card}>
         <p style={{ fontWeight: 700, marginBottom: 4 }}>1. Template de la pochette</p>
-        <p style={{ color: '#4a5878', fontSize: 12, marginBottom: 16 }}>Uploadez le recto de la pochette en format carré (JPG ou PNG)</p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 12, border: '2px dashed #1a2240', cursor: 'pointer', marginBottom: 12 }}>
+        <p style={{ color: '#8098b8', fontSize: 12, marginBottom: 16 }}>Uploadez le recto de la pochette en format carré (JPG ou PNG)</p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 12, border: '2px dashed #b8cce8', cursor: 'pointer', marginBottom: 12 }}>
           <span style={{ fontSize: 24 }}>🖼️</span>
           <div>
             <p style={{ fontWeight: 700, fontSize: 14 }}>{templateFile ? templateFile.name : 'Choisir une image'}</p>
-            <p style={{ color: '#4a5878', fontSize: 11 }}>Format carré · JPG ou PNG</p>
+            <p style={{ color: '#8098b8', fontSize: 11 }}>Format carré · JPG ou PNG</p>
           </div>
           <input type="file" accept="image/*" onChange={handleTemplate} style={{ display: 'none' }} />
         </label>
         {templatePreview && (
           <div style={{ position: 'relative', display: 'inline-block', marginBottom: 8 }}>
-            <img src={templatePreview} alt="preview" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #1a2240' }} />
-            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 30, height: 30, border: '2px solid #1e6fff', borderRadius: 4, background: 'rgba(30,111,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 8, color: '#1e6fff' }}>QR</span>
+            <img src={templatePreview} alt="preview" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #c8d8ef' }} />
+            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 30, height: 30, border: '2px solid #1a6bff', borderRadius: 4, background: 'rgba(30,111,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 8, color: '#1a6bff' }}>QR</span>
             </div>
-            <p style={{ color: '#4a5878', fontSize: 10, marginTop: 4 }}>Le QR code sera placé en bas à gauche</p>
+            <p style={{ color: '#8098b8', fontSize: 10, marginTop: 4 }}>Le QR code sera placé en bas à gauche</p>
           </div>
         )}
       </div>
 
       <div style={S.card}>
         <p style={{ fontWeight: 700, marginBottom: 4 }}>2. QR codes à générer</p>
-        <p style={{ color: '#4a5878', fontSize: 12, marginBottom: 12 }}>Laissez vide pour générer toutes les pochettes actives ({activeQrcodes.length} QR codes)</p>
+        <p style={{ color: '#8098b8', fontSize: 12, marginBottom: 12 }}>Laissez vide pour générer toutes les pochettes actives ({activeQrcodes.length} QR codes)</p>
         <label style={S.lbl}>Ou choisir un QR code spécifique</label>
         <select value={selectedQr} onChange={e => setSelectedQr(e.target.value)} style={{ ...S.inp, marginBottom: 0 }}>
           <option value="">— Tous les QR codes actifs —</option>
@@ -1223,17 +1224,17 @@ function PochettesTab({ qrcodes }: { qrcodes: any[] }) {
         <p style={{ fontWeight: 700, marginBottom: 16 }}>3. Générer les pochettes</p>
         {generating && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ height: 8, background: '#151c30', borderRadius: 99, marginBottom: 8 }}>
-              <div style={{ height: '100%', width: genProgress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
+            <div style={{ height: 8, background: '#dce6f7', borderRadius: 99, marginBottom: 8 }}>
+              <div style={{ height: '100%', width: genProgress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
             </div>
-            <p style={{ color: '#7888aa', fontSize: 12, textAlign: 'center' }}>{genProgress}% — Génération en cours...</p>
+            <p style={{ color: '#5a7090', fontSize: 12, textAlign: 'center' }}>{genProgress}% — Génération en cours...</p>
           </div>
         )}
         {msg && <p style={{ color: msg.startsWith('✅') ? '#4da6ff' : '#f04a6a', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
         <button style={{ ...S.btn, width: '100%', padding: 14, fontSize: 15 }} onClick={handleGenerate} disabled={generating || !templateFile}>
           {generating ? '⏳ Génération...' : '🖨️ Générer et télécharger les pochettes'}
         </button>
-        <p style={{ color: '#4a5878', fontSize: 11, marginTop: 10, textAlign: 'center' }}>
+        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 10, textAlign: 'center' }}>
           ZIP téléchargé · QR code 22% · Position bas gauche · Texte "Scannez et Téléchargez"
         </p>
       </div>
@@ -1309,10 +1310,10 @@ function ArtistPage() {
 
   if (view === 'dashboard' && user) return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <Logo size="sm" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: '#7888aa', fontSize: 13 }}>{stats.artistName || user.email}</span>
+          <span style={{ color: '#5a7090', fontSize: 13 }}>{stats.artistName || user.email}</span>
           <button style={S.btn2} onClick={logout}>Déconnexion</button>
         </div>
       </div>
@@ -1322,42 +1323,73 @@ function ArtistPage() {
         {/* STATS CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
           {[
-            { label: 'Visites totales', value: stats.visits, icon: '👁️', color: '#4285f4' },
-            { label: 'Téléchargements', value: stats.downloads, icon: '⬇️', color: '#1e6fff' },
-            { label: 'Streams totaux', value: stats.streams, icon: '🎵', color: '#f0b84a' },
-            { label: 'Streams +30s', value: stats.validStreams, icon: '✅', color: '#4da6ff' },
+            { label: 'Visites totales', value: stats.visits, icon: '👁️', color: '#1a6bff' },
+            { label: 'Téléchargements', value: stats.downloads, icon: '⬇️', color: '#1a6bff' },
+            { label: 'Streams totaux', value: stats.streams, icon: '🎵', color: '#b07a00' },
+            { label: 'Streams +30s', value: stats.validStreams, icon: '✅', color: '#1a6bff' },
           ].map((s, i) => (
             <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
               <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
               <p style={{ fontSize: 26, fontWeight: 900, color: s.color, marginBottom: 4 }}>{s.value}</p>
-              <p style={{ color: '#4a5878', fontSize: 11 }}>{s.label}</p>
+              <p style={{ color: '#8098b8', fontSize: 11 }}>{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* QR CODES */}
+
+        {/* RÉMUNÉRATION STREAMING */}
+        <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: '0 2px 12px rgba(26,107,255,0.08)' }}>
+          <p style={{ color: '#1a6bff', fontSize: 10, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>💰 RÉMUNÉRATION STREAMING</p>
+          <h3 style={{ fontFamily: 'serif', fontSize: 17, fontWeight: 800, marginBottom: 12 }}>Ce que vous gagnez</h3>
+          <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.8, marginBottom: 16 }}>
+            Chaque écoute de <strong>30 secondes ou plus</strong> génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {[
+              { label: "Aujourd'hui — pub automatique", range: '0,03 – 0,10 FCFA', tag: '● ACTIF', color: '#1a6bff', icon: '📡' },
+              { label: 'Bientôt — annonceurs locaux', range: '1 – 4 FCFA', tag: '◎ PROCHAINEMENT', color: '#b07a00', icon: '🚀' },
+              { label: 'Perspective — abonnements fans', range: "jusqu'à 5 FCFA", tag: '◌ EN DEV', color: '#5a7090', icon: '💎' },
+            ].map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f8ff', border: `1px solid ${r.color}33`, borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 22 }}>{r.icon}</span>
+                  <div>
+                    <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 2 }}>{r.label}</p>
+                    <p style={{ fontWeight: 800, fontSize: 16, color: r.color }}>{r.range} <span style={{ fontSize: 11, fontWeight: 400, color: '#8098b8' }}>/ écoute</span></p>
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: `${r.color}15`, color: r.color, fontWeight: 700 }}>{r.tag}</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ color: '#b0c4d8', fontSize: 11, marginTop: 14, textAlign: 'center' }}>
+            Versement trimestriel · Orange Money · Wave · MTN MoMo
+          </p>
+        </div>
+
         <h3 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
         {stats.qrcodes.map((q: any) => (
           <div key={q.id} style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <p style={{ fontWeight: 700, marginBottom: 4 }}>{q.label}</p>
-                <p style={{ color: '#4a5878', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads !== undefined ? q.downloads : (q.usedScans || 0)} DL · {q.streams || 0} streams</p>
+                <p style={{ color: '#8098b8', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads !== undefined ? q.downloads : (q.usedScans || 0)} DL · {q.streams || 0} streams</p>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#4da6ff' }}>✅ {q.validStreams || 0} validés</span>
+                <span style={{ fontSize: 11, color: '#1a6bff' }}>✅ {q.validStreams || 0} validés</span>
                 <span style={badgeStyle(q.status)}>{q.status}</span>
               </div>
             </div>
             <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {[
-                { label: 'Visites', val: q.visits || 0, color: '#4285f4' },
-                { label: 'Streams', val: q.streams || 0, color: '#f0b84a' },
-                { label: 'DL', val: q.downloads !== undefined ? q.downloads : (q.usedScans || 0), color: '#1e6fff' },
+                { label: 'Visites', val: q.visits || 0, color: '#1a6bff' },
+                { label: 'Streams', val: q.streams || 0, color: '#b07a00' },
+                { label: 'DL', val: q.downloads !== undefined ? q.downloads : (q.usedScans || 0), color: '#1a6bff' },
               ].map((s, i) => (
-                <div key={i} style={{ background: '#080c1a', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
+                <div key={i} style={{ background: '#f5f8ff', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
                   <p style={{ color: s.color, fontWeight: 800, fontSize: 18 }}>{s.val}</p>
-                  <p style={{ color: '#4a5878', fontSize: 10 }}>{s.label}</p>
+                  <p style={{ color: '#8098b8', fontSize: 10 }}>{s.label}</p>
                 </div>
               ))}
             </div>
@@ -1368,14 +1400,14 @@ function ArtistPage() {
   );
 
   return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 380, padding: '0 16px' }}>
         <div style={{ marginBottom: 32, textAlign: 'center' }}><Logo size="lg" /></div>
         <div style={S.card}>
           <h2 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>
             {view === 'register' ? 'Créer mon compte artiste' : 'Espace artiste'}
           </h2>
-          <p style={{ color: '#4a5878', fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
+          <p style={{ color: '#8098b8', fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
             {view === 'register' ? 'Réservé aux artistes Doniel Zik' : 'Connectez-vous à votre tableau de bord'}
           </p>
           {view === 'register' && (
@@ -1446,7 +1478,7 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
     ctx.fillStyle = '#000000';
     ctx.fillText('Scannez et ', QR_X, textY);
     const scannezWidth = ctx.measureText('Scannez et ').width;
-    ctx.fillStyle = '#1e6fff';
+    ctx.fillStyle = '#1a6bff';
     ctx.fillText('Téléchargez', QR_X + scannezWidth, textY);
     // Exporter en PNG
     const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png', 0.95));
@@ -1538,7 +1570,7 @@ function UserAuthPage() {
   if (user != null) return <ZikothequePage user={user} />;
 
   return (
-    <div style={{ ...S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 380, padding: '0 16px' }}>
         <div style={{ marginBottom: 28, textAlign: 'center' }}><Logo size="lg" /></div>
 
@@ -1546,24 +1578,24 @@ function UserAuthPage() {
           {mode === 'choose' && (
             <>
               <h2 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800, textAlign: 'center', marginBottom: 6 }}>Ma Zikothèque</h2>
-              <p style={{ color: '#4a5878', fontSize: 12, textAlign: 'center', marginBottom: 24 }}>Connectez-vous pour accéder à votre bibliothèque musicale</p>
+              <p style={{ color: '#8098b8', fontSize: 12, textAlign: 'center', marginBottom: 24 }}>Connectez-vous pour accéder à votre bibliothèque musicale</p>
 
               {/* Google */}
               <button onClick={loginGoogle} disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #1a2240', background: '#0b0f1e', color: '#dde4f5', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #c8d8ef', background: '#ffffff', color: '#1a2340', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
                 <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                 Continuer avec Google
               </button>
 
               {/* Téléphone */}
               <button onClick={() => setMode('phone')} disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #1a2240', background: '#0b0f1e', color: '#dde4f5', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #c8d8ef', background: '#ffffff', color: '#1a2340', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
                 📱 Continuer avec le téléphone
               </button>
 
               {/* Email */}
               <button onClick={() => setMode('email')} disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #1a2240', background: '#0b0f1e', color: '#dde4f5', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #c8d8ef', background: '#ffffff', color: '#1a2340', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
                 ✉️ Continuer avec l'email
               </button>
 
@@ -1575,7 +1607,7 @@ function UserAuthPage() {
 
           {mode === 'phone' && (
             <>
-              <button onClick={() => { setMode('choose'); setMsg(''); setStep('input'); }} style={{ background: 'none', border: 'none', color: '#4a5878', cursor: 'pointer', marginBottom: 12, fontSize: 13 }}>← Retour</button>
+              <button onClick={() => { setMode('choose'); setMsg(''); setStep('input'); }} style={{ background: 'none', border: 'none', color: '#8098b8', cursor: 'pointer', marginBottom: 12, fontSize: 13 }}>← Retour</button>
               <h2 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Connexion par téléphone</h2>
               {step === 'input' ? (
                 <>
@@ -1589,10 +1621,10 @@ function UserAuthPage() {
                 </>
               ) : (
                 <>
-                  <p style={{ color: '#4da6ff', fontSize: 13, marginBottom: 12 }}>✅ Code envoyé au {phone}</p>
+                  <p style={{ color: '#1a6bff', fontSize: 13, marginBottom: 12 }}>✅ Code envoyé au {phone}</p>
                   <label style={S.lbl}>Code reçu par SMS</label>
                   <input style={S.inp} value={code} onChange={e => setCode(e.target.value)} placeholder="123456" type="number" maxLength={6} />
-                  {msg && <p style={{ color: '#f04a6a', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
+                  {msg && <p style={{ color: '#e04060', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
                   <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={verifyCode} disabled={loading}>
                     {loading ? 'Vérification...' : 'Confirmer'}
                   </button>
@@ -1603,7 +1635,7 @@ function UserAuthPage() {
 
           {(mode === 'email' || mode === 'register') && (
             <>
-              <button onClick={() => { setMode('choose'); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#4a5878', cursor: 'pointer', marginBottom: 12, fontSize: 13 }}>← Retour</button>
+              <button onClick={() => { setMode('choose'); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#8098b8', cursor: 'pointer', marginBottom: 12, fontSize: 13 }}>← Retour</button>
               <h2 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 800, marginBottom: 16 }}>
                 {mode === 'register' ? 'Créer un compte' : 'Connexion par email'}
               </h2>
@@ -1617,7 +1649,7 @@ function UserAuthPage() {
               <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
               <label style={S.lbl}>Mot de passe</label>
               <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-              {msg && <p style={{ color: '#f04a6a', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
+              {msg && <p style={{ color: '#e04060', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
               <button style={{ ...S.btn, width: '100%', padding: 14, marginBottom: 10 }}
                 onClick={mode === 'register' ? registerEmail : loginEmail} disabled={loading}>
                 {loading ? 'Chargement...' : mode === 'register' ? 'Créer mon compte' : 'Se connecter'}
@@ -1656,10 +1688,10 @@ function ZikothequePage({ user }: { user: any }) {
   return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
       {/* HEADER */}
-      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <Logo size="sm" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#7888aa', fontSize: 12 }}>{user.displayName || user.phoneNumber || user.email}</span>
+          <span style={{ color: '#5a7090', fontSize: 12 }}>{user.displayName || user.phoneNumber || user.email}</span>
           <button style={S.btn2} onClick={logout}>Déconnexion</button>
         </div>
       </div>
@@ -1667,19 +1699,19 @@ function ZikothequePage({ user }: { user: any }) {
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '24px 16px' }}>
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🎵 Ma Zikothèque</h2>
-          <p style={{ color: '#4a5878', fontSize: 13 }}>{items.length} album{items.length > 1 ? 's' : ''} · Streaming gratuit</p>
+          <p style={{ color: '#8098b8', fontSize: 13 }}>{items.length} album{items.length > 1 ? 's' : ''} · Streaming gratuit</p>
         </div>
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60 }}>
             <div style={{ width: 36, height: 36, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 12px', animation: 'spin .8s linear infinite' }} />
-            <p style={{ color: '#4a5878' }}>Chargement...</p>
+            <p style={{ color: '#8098b8' }}>Chargement...</p>
           </div>
         ) : items.length === 0 ? (
-          <div style={{ ...S.card, textAlign: 'center', padding: 48 }}>
+          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 48, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center' }}>
             <p style={{ fontSize: 48, marginBottom: 16 }}>🎵</p>
             <h3 style={{ fontFamily: 'serif', fontSize: 18, marginBottom: 8 }}>Votre Zikothèque est vide</h3>
-            <p style={{ color: '#4a5878', fontSize: 13, lineHeight: 1.7 }}>
+            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7 }}>
               Scannez une pochette musicale et téléchargez un album pour qu'il apparaisse ici automatiquement.
             </p>
           </div>
@@ -1688,12 +1720,12 @@ function ZikothequePage({ user }: { user: any }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <div>
                 <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 3 }}>{item.label}</p>
-                <p style={{ color: '#7888aa', fontSize: 12 }}>par {item.artist} · {item.type}</p>
+                <p style={{ color: '#5a7090', fontSize: 12 }}>par {item.artist} · {item.type}</p>
                 <p style={{ color: '#2a3a60', fontSize: 11, marginTop: 2 }}>{item.files?.length || 0} titre{(item.files?.length || 0) > 1 ? 's' : ''}</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#0a1535', color: '#4da6ff', fontWeight: 700 }}>🎵 Streaming gratuit</span>
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#151c30', color: '#4a5878' }}>
+                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#eaf1ff', color: '#1a6bff', fontWeight: 700 }}>🎵 Streaming gratuit</span>
+                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#f0f4fb', color: '#8098b8' }}>
                   🔒 Téléchargement Premium
                 </span>
               </div>
@@ -1703,11 +1735,11 @@ function ZikothequePage({ user }: { user: any }) {
             {item.files && item.files.length > 0 && (
               playing?.id === item.id ? (
                 <>
-                  <button onClick={() => setPlaying(null)} style={{ ...S.btn2, fontSize: 11, marginBottom: 10 }}>▼ Fermer le lecteur</button>
+                  <button onClick={() => setPlaying(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #c8d8ef', background: 'transparent', color: '#8098b8', cursor: 'pointer', fontSize: 11, marginBottom: 10 }}>▼ Fermer le lecteur</button>
                   <AudioPlayer files={item.files} />
                 </>
               ) : (
-                <button onClick={() => setPlaying(item)} style={{ ...S.btn, width: '100%', padding: 12, fontSize: 14 }}>
+                <button onClick={() => setPlaying(item)} style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#1a6bff', color: '#ffffff', fontWeight: 700, cursor: 'pointer', fontSize: 14, width: '100%' }}>
                   ▶ Écouter — {item.label}
                 </button>
               )
@@ -1717,9 +1749,9 @@ function ZikothequePage({ user }: { user: any }) {
 
         {/* Info Premium */}
         {items.length > 0 && (
-          <div style={{ background: '#080c1a', border: '1px solid #152040', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 8 }}>
-            <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.7 }}>
-              🔒 Le téléchargement depuis Ma Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#1e6fff' }}>Premium</strong> — bientôt disponible.
+          <div style={{ background: '#f5f8ff', border: '1px solid #152040', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 8 }}>
+            <p style={{ color: '#5a7090', fontSize: 12, lineHeight: 1.7 }}>
+              🔒 Le téléchargement depuis Ma Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#0050d0' }}>Premium</strong> — bientôt disponible.
             </p>
           </div>
         )}
@@ -1735,15 +1767,15 @@ function ZikothequePage({ user }: { user: any }) {
 function ConditionsPage() {
   return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <Logo size="sm" />
-        <a href="/artiste" style={{ color: '#1e6fff', fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>← Retour</a>
+        <a href="/artiste" style={{ color: '#1a6bff', fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>← Retour</a>
       </div>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
-        <h1 style={{ fontFamily: 'serif', fontSize: 26, fontWeight: 800, marginBottom: 8, color: '#1e6fff' }}>
+        <h1 style={{ fontFamily: 'serif', fontSize: 26, fontWeight: 800, marginBottom: 8, color: '#1a6bff' }}>
           Conditions Générales d'Utilisation
         </h1>
-        <p style={{ color: '#4a5878', fontSize: 13, marginBottom: 32, fontStyle: 'italic' }}>
+        <p style={{ color: '#8098b8', fontSize: 13, marginBottom: 32, fontStyle: 'italic' }}>
           Distribution Non-Exclusive via QR Code — Plateforme DONIEL ZIK
         </p>
 
@@ -1782,16 +1814,16 @@ function ConditionsPage() {
           },
         ].map((section, i) => (
           <div key={i} style={{ ...S.card, marginBottom: 16 }}>
-            <p style={{ color: '#1e6fff', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 10 }}>{section.title}</p>
-            <p style={{ color: '#7888aa', fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-line' }}>{section.content}</p>
+            <p style={{ color: '#1a6bff', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>{section.title}</p>
+            <p style={{ color: '#5a7090', fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-line' }}>{section.content}</p>
           </div>
         ))}
 
-        <div style={{ background: '#0a1535', border: '1px solid #1e6fff', borderRadius: 12, padding: 20, textAlign: 'center', marginTop: 8 }}>
-          <p style={{ color: '#4a5878', fontSize: 12, fontStyle: 'italic', lineHeight: 1.7 }}>
+        <div style={{ background: '#eaf1ff', border: '1px solid #1a6bff', borderRadius: 12, padding: 20, textAlign: 'center', marginTop: 8 }}>
+          <p style={{ color: '#5a7090', fontSize: 12, fontStyle: 'italic', lineHeight: 1.7 }}>
             En cochant la case d'acceptation lors de votre inscription, vous confirmez avoir lu et accepté l'intégralité des présentes conditions.
           </p>
-          <p style={{ color: '#1e6fff', fontWeight: 800, marginTop: 12, fontSize: 14 }}>
+          <p style={{ color: '#1a6bff', fontWeight: 800, marginTop: 12, fontSize: 14 }}>
             DONIEL ZIK — La Musique. Un Scan. Un Monde.
           </p>
         </div>
@@ -1835,19 +1867,19 @@ function AnnonceursPage() {
 
   return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#0b0f1e', borderBottom: '1px solid #151c30', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <Logo size="sm" />
-        <a href="/" style={{ color: '#4a5878', fontSize: 13, textDecoration: 'none' }}>← Accueil</a>
+        <a href="/" style={{ color: '#8098b8', fontSize: 13, textDecoration: 'none' }}>← Accueil</a>
       </div>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ display: 'inline-block', background: '#0a1535', border: '1px solid #1e6fff33', borderRadius: 8, padding: '4px 14px', marginBottom: 16 }}>
-            <span style={{ color: '#1e6fff', fontSize: 10, letterSpacing: 3, fontWeight: 700 }}>ANNONCEURS</span>
+          <div style={{ display: 'inline-block', background: '#eaf1ff', border: '1px solid #1e6fff33', borderRadius: 8, padding: '4px 14px', marginBottom: 16 }}>
+            <span style={{ color: '#1a6bff', fontSize: 10, letterSpacing: 3, fontWeight: 700 }}>ANNONCEURS</span>
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
-            Touchez vos clients<br /><span style={{ color: '#1e6fff' }}>pendant qu'ils écoutent</span>
+            Touchez vos clients<br /><span style={{ color: '#1a6bff' }}>pendant qu'ils écoutent</span>
           </h1>
-          <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, maxWidth: 500, margin: '0 auto' }}>
+          <p style={{ color: '#5a7090', fontSize: 14, lineHeight: 1.8, maxWidth: 500, margin: '0 auto' }}>
             Votre publicité diffusée avant chaque écoute musicale sur Doniel Zik. Une audience engagée, captive, ciblée en Côte d'Ivoire.
           </p>
         </div>
@@ -1858,26 +1890,26 @@ function AnnonceursPage() {
             { icon: '📍', title: 'Ciblage local', desc: "Fans en Côte d'Ivoire, abonnés à des artistes locaux." },
             { icon: '📊', title: 'Stats réelles', desc: "Nombre d'écoutes, clics et portée mesurés." },
           ].map((c, i) => (
-            <div key={i} style={{ background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 14, padding: 16, textAlign: 'center' }}>
+            <div key={i} style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: 16, textAlign: 'center' }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
               <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{c.title}</p>
-              <p style={{ color: '#4a5878', fontSize: 11, lineHeight: 1.6 }}>{c.desc}</p>
+              <p style={{ color: '#8098b8', fontSize: 11, lineHeight: 1.6 }}>{c.desc}</p>
             </div>
           ))}
         </div>
 
         <div style={{ ...S.card, marginBottom: 24 }}>
-          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>💰 CHOISISSEZ VOTRE BUDGET</p>
+          <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>💰 CHOISISSEZ VOTRE BUDGET</p>
           <div style={{ display: 'grid', gap: 10 }}>
             {budgets.map((b, i) => (
               <div key={i} onClick={() => set('budget', b.value)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#080c1a', borderRadius: 10, padding: '12px 16px', border: `1px solid ${form.budget === b.value ? '#1e6fff' : '#151c30'}`, cursor: 'pointer' }}>
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f8ff', borderRadius: 10, padding: '12px 16px', border: `1px solid ${form.budget === b.value ? '#1a6bff' : '#c8d8ef'}`, cursor: 'pointer' }}>
                 <div>
-                  <p style={{ fontWeight: 700, fontSize: 14, color: form.budget === b.value ? '#1e6fff' : '#dde4f5' }}>{b.label}</p>
-                  <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>{b.desc}</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: form.budget === b.value ? '#1a6bff' : '#1a2340' }}>{b.label}</p>
+                  <p style={{ color: '#8098b8', fontSize: 11, marginTop: 2 }}>{b.desc}</p>
                 </div>
-                <div style={{ width: 20, height: 20, borderRadius: 99, border: `2px solid ${form.budget === b.value ? '#1e6fff' : '#2a3a60'}`, background: form.budget === b.value ? '#1e6fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {form.budget === b.value && <span style={{ color: '#060a14', fontSize: 12, fontWeight: 800 }}>✓</span>}
+                <div style={{ width: 20, height: 20, borderRadius: 99, border: `2px solid ${form.budget === b.value ? '#1a6bff' : '#2a3a60'}`, background: form.budget === b.value ? '#1a6bff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {form.budget === b.value && <span style={{ color: '#ffffff', fontSize: 12, fontWeight: 800 }}>✓</span>}
                 </div>
               </div>
             ))}
@@ -1885,14 +1917,14 @@ function AnnonceursPage() {
         </div>
 
         <div style={{ ...S.card, marginBottom: 24 }}>
-          <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>📢 FORMAT DE PUBLICITÉ</p>
+          <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>📢 FORMAT DE PUBLICITÉ</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
             {formats.map((f, i) => (
               <div key={i} onClick={() => set('format', f.value)}
-                style={{ background: '#080c1a', borderRadius: 10, padding: 14, border: `1px solid ${form.format === f.value ? '#1e6fff' : '#151c30'}`, cursor: 'pointer', textAlign: 'center' }}>
+                style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, border: `1px solid ${form.format === f.value ? '#1a6bff' : '#c8d8ef'}`, cursor: 'pointer', textAlign: 'center' }}>
                 <p style={{ fontSize: 22, marginBottom: 6 }}>{f.label.split(' ')[0]}</p>
-                <p style={{ fontWeight: 700, fontSize: 12, color: form.format === f.value ? '#1e6fff' : '#dde4f5', marginBottom: 4 }}>{f.label.slice(3)}</p>
-                <p style={{ color: '#4a5878', fontSize: 10 }}>{f.desc}</p>
+                <p style={{ fontWeight: 700, fontSize: 12, color: form.format === f.value ? '#1a6bff' : '#1a2340', marginBottom: 4 }}>{f.label.slice(3)}</p>
+                <p style={{ color: '#8098b8', fontSize: 10 }}>{f.desc}</p>
               </div>
             ))}
           </div>
@@ -1900,7 +1932,7 @@ function AnnonceursPage() {
 
         {!sent ? (
           <div style={S.card}>
-            <p style={{ color: '#4a5878', fontSize: 10, letterSpacing: 2, marginBottom: 20 }}>📝 DEMANDE DE PARTENARIAT</p>
+            <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 20 }}>📝 DEMANDE DE PARTENARIAT</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div><label style={S.lbl}>Nom & Prénom *</label><input style={S.inp} value={form.nom} onChange={e => set('nom', e.target.value)} placeholder="Jean Kouamé" /></div>
               <div><label style={S.lbl}>Entreprise / Marque</label><input style={S.inp} value={form.entreprise} onChange={e => set('entreprise', e.target.value)} placeholder="Mon Entreprise CI" /></div>
@@ -1909,17 +1941,17 @@ function AnnonceursPage() {
             </div>
             <label style={S.lbl}>Message / Détails de votre campagne</label>
             <textarea style={{ ...S.inp, height: 100, resize: 'vertical' }} value={form.message} onChange={e => set('message', e.target.value)} placeholder="Décrivez votre produit, votre cible, vos objectifs..." />
-            {msg && <p style={{ color: '#f04a6a', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
+            {msg && <p style={{ color: '#e04060', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
             <button style={{ ...S.btn, width: '100%', padding: 16, fontSize: 15, borderRadius: 12 }} onClick={submit} disabled={loading}>
               {loading ? '⏳ Envoi...' : '📤 Envoyer ma demande'}
             </button>
             <p style={{ color: '#2a3a60', fontSize: 11, textAlign: 'center', marginTop: 12 }}>Nous vous répondons sous 24h via WhatsApp ou email</p>
           </div>
         ) : (
-          <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
+          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 40, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center' }}>
             <p style={{ fontSize: 52, marginBottom: 16 }}>✅</p>
             <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Demande envoyée !</h2>
-            <p style={{ color: '#7888aa', fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
+            <p style={{ color: '#5a7090', fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
               Merci pour votre intérêt. Notre équipe vous contacte sous 24h pour discuter de votre campagne.
             </p>
             <a href="/" style={{ ...S.btn, textDecoration: 'none', display: 'inline-block', padding: '12px 24px' }}>← Retour à l'accueil</a>
@@ -1953,7 +1985,7 @@ function HomePage() {
   const notes = ['🎵','🎶','🎸','🥁','🎹','🎺','🎻','🎤'];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0a0015 0%, #06001a 40%, #000d1a 100%)', color: '#fff', fontFamily: "'Segoe UI', sans-serif", overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #060d2a 0%, #091840 40%, #040e28 100%)', color: '#fff', fontFamily: "'Segoe UI', sans-serif", overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
@@ -1961,32 +1993,32 @@ function HomePage() {
         @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(0.95)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes wave{0%{transform:scaleY(0.3)}50%{transform:scaleY(1)}100%{transform:scaleY(0.3)}}
-        @keyframes glow{0%,100%{box-shadow:0 0 20px #ff6b3566}50%{box-shadow:0 0 60px #ff6b35cc, 0 0 100px #ff6b3544}}
+        @keyframes glow{0%,100%{box-shadow:0 0 20px #1a6bff66}50%{box-shadow:0 0 60px #1a6bffcc, 0 0 100px #1a6bff44}}
         @keyframes colorShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes noteFloat{0%{opacity:0;transform:translateY(0) rotate(0deg)}50%{opacity:1}100%{opacity:0;transform:translateY(-80px) rotate(20deg)}}
-        .nav-link:hover{color:#ff6b35 !important;transform:translateY(-2px)}
-        .btn-glow:hover{transform:translateY(-3px);box-shadow:0 8px 40px #ff6b3566 !important}
-        .card-hover:hover{transform:translateY(-6px);border-color:#ff6b3566 !important}
+        .nav-link:hover{color:#1a6bff !important;transform:translateY(-2px)}
+        .btn-glow:hover{transform:translateY(-3px);box-shadow:0 8px 40px #1a6bff66 !important}
+        .card-hover:hover{transform:translateY(-6px);border-color:#1a6bff66 !important}
       `}</style>
 
       {/* NAVBAR */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(6,0,20,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,107,53,0.2)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 66 }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(6,13,40,0.92)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(26,107,255,0.2)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 66 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Logo size="sm" />
-          <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: 15, background: 'linear-gradient(90deg, #ff6b35, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DONIEL ZIK</span>
+          <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: 15, background: 'linear-gradient(90deg, #1a6bff, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DONIEL ZIK</span>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {[['Artistes','/artiste'],['Annonceurs','/annonceurs'],['Zikothèque','/ziko']].map(([l,h]) => (
             <a key={h} href={h} className="nav-link" style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, transition: 'all .2s' }}>{l}</a>
           ))}
-          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 99, boxShadow: '0 4px 20px #ff6b3544', transition: 'all .2s' }}>Démarrer →</a>
+          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 99, boxShadow: '0 4px 20px #1a6bff44', transition: 'all .2s' }}>Démarrer →</a>
         </div>
       </nav>
 
       {/* HERO */}
       <section style={{ position: 'relative', padding: '80px 24px 60px', textAlign: 'center', maxWidth: 860, margin: '0 auto', overflow: 'hidden' }}>
         {/* Cercles lumineux de fond */}
-        <div style={{ position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(26,107,255,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 50, left: '10%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,215,0,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 100, right: '5%', width: 150, height: 150, borderRadius: '50%', background: 'radial-gradient(circle, rgba(100,200,255,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
@@ -1995,14 +2027,14 @@ function HomePage() {
           <span key={i} style={{ position: 'absolute', fontSize: 20, top: `${20 + (i * 12) % 60}%`, left: `${5 + (i * 13) % 90}%`, animation: `noteFloat ${2 + (i * 0.4)}s ease-in-out ${i * 0.3}s infinite`, opacity: 0, pointerEvents: 'none' }}>{n}</span>
         ))}
 
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,107,53,0.15)', border: '1px solid rgba(255,107,53,0.4)', borderRadius: 99, padding: '6px 16px', marginBottom: 28, animation: 'fadeUp .5s ease', maxWidth: '90%' }}>
-          <span style={{ width: 8, height: 8, borderRadius: 99, background: '#ff6b35', animation: 'pulse 1.5s infinite', display: 'inline-block', flexShrink: 0 }} />
-          <span style={{ color: '#ff6b35', fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>🎵 DISTRIBUTION MUSICALE NOUVELLE GÉNÉRATION</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(26,107,255,0.15)', border: '1px solid rgba(26,107,255,0.5)', borderRadius: 99, padding: '6px 16px', marginBottom: 28, animation: 'fadeUp .5s ease', maxWidth: '90%' }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: '#1a6bff', animation: 'pulse 1.5s infinite', display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ color: '#1a6bff', fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>🎵 DISTRIBUTION MUSICALE NOUVELLE GÉNÉRATION</span>
         </div>
 
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(36px, 7vw, 68px)', fontWeight: 900, lineHeight: 1.05, marginBottom: 24, animation: 'fadeUp .6s ease .1s both' }}>
           Ta Musique.<br />
-          <span style={{ background: 'linear-gradient(90deg, #ff6b35, #ffd700, #ff6b35)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'colorShift 3s linear infinite' }}>Un Scan.</span>
+          <span style={{ background: 'linear-gradient(90deg, #1a6bff, #ffd700, #1a6bff)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'colorShift 3s linear infinite' }}>Un Scan.</span>
           {' '}Un Monde.
         </h1>
 
@@ -2013,12 +2045,12 @@ function HomePage() {
         {/* ONDES SONORES ANIMÉES */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 5, height: 50, marginBottom: 40, animation: 'fadeUp .6s ease .3s both' }}>
           {Array.from({ length: 16 }, (_, i) => (
-            <div key={i} style={{ width: 5, borderRadius: 99, background: `linear-gradient(180deg, #ff6b35, #ffd700)`, animation: `wave ${0.6 + (i % 4) * 0.15}s ease-in-out ${i * 0.08}s infinite`, height: `${20 + Math.sin(i + wavePhase * 0.1) * 15 + 15}px`, opacity: activeNote === i % 8 ? 1 : 0.5, transition: 'opacity .3s' }} />
+            <div key={i} style={{ width: 5, borderRadius: 99, background: `linear-gradient(180deg, #1a6bff, #ffd700)`, animation: `wave ${0.6 + (i % 4) * 0.15}s ease-in-out ${i * 0.08}s infinite`, height: `${20 + Math.sin(i + wavePhase * 0.1) * 15 + 15}px`, opacity: activeNote === i % 8 ? 1 : 0.5, transition: 'opacity .3s' }} />
           ))}
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', animation: 'fadeUp .6s ease .4s both', padding: '0 16px' }}>
-          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ff4500)', color: '#fff', textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, fontWeight: 700, boxShadow: '0 6px 30px #ff6b3555', transition: 'all .25s', display: 'inline-block' }}>
+          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, fontWeight: 700, boxShadow: '0 6px 30px #1a6bff55', transition: 'all .25s', display: 'inline-block' }}>
             🎤 Je suis artiste
           </a>
           <a href="/annonceurs" style={{ textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', color: '#fff', background: 'rgba(255,255,255,0.05)', display: 'inline-block', fontWeight: 600, transition: 'all .25s', backdropFilter: 'blur(10px)' }}>
@@ -2031,7 +2063,7 @@ function HomePage() {
       <section style={{ padding: '20px 24px 48px' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           {[
-            { val: '100+', label: 'Artistes', icon: '🎤', color: '#ff6b35' },
+            { val: '100+', label: 'Artistes', icon: '🎤', color: '#1a6bff' },
             { val: '5 000+', label: 'QR codes', icon: '📱', color: '#ffd700' },
             { val: '50 000+', label: 'Écoutes', icon: '🎧', color: '#64c8ff' },
             { val: 'Abidjan', label: '& partout', icon: '🌍', color: '#7fff64' },
@@ -2039,7 +2071,7 @@ function HomePage() {
             <div key={i} className="card-hover" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '18px 12px', textAlign: 'center', transition: 'all .3s', cursor: 'default' }}>
               <p style={{ fontSize: 26, marginBottom: 6 }}>{s.icon}</p>
               <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900, fontSize: 20, color: s.color, marginBottom: 3 }}>{s.val}</p>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{s.label}</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -2048,19 +2080,19 @@ function HomePage() {
       {/* COMMENT ÇA MARCHE */}
       <section style={{ padding: '48px 24px', maxWidth: 700, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— FONCTIONNEMENT —</p>
+          <p style={{ color: '#1a6bff', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— FONCTIONNEMENT —</p>
           <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900 }}>Comment ça marche ?</h2>
         </div>
         <div style={{ display: 'grid', gap: 14 }}>
           {etapes.map((e, i) => (
             <div key={i} className="card-hover" style={{ display: 'flex', gap: 20, alignItems: 'flex-start', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '22px 24px', transition: 'all .3s' }}>
-              <div style={{ width: 54, height: 54, borderRadius: 14, background: 'linear-gradient(135deg, rgba(255,107,53,0.25), rgba(255,215,0,0.15))', border: '1px solid rgba(255,107,53,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{e.icon}</div>
+              <div style={{ width: 54, height: 54, borderRadius: 14, background: 'linear-gradient(135deg, rgba(26,107,255,0.25), rgba(255,215,0,0.15))', border: '1px solid rgba(26,107,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{e.icon}</div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <span style={{ color: '#ff6b35', fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 12 }}>{e.num}</span>
+                  <span style={{ color: '#1a6bff', fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 12 }}>{e.num}</span>
                   <p style={{ fontWeight: 700, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>{e.title}</p>
                 </div>
-                <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 1.75 }}>{e.desc}</p>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.75 }}>{e.desc}</p>
               </div>
             </div>
           ))}
@@ -2071,12 +2103,12 @@ function HomePage() {
       <section style={{ padding: '48px 24px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— POUR TOUT LE MONDE —</p>
+            <p style={{ color: '#1a6bff', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— POUR TOUT LE MONDE —</p>
             <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900 }}>Vous êtes…</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             {[
-              { icon: '🎤', title: 'Artiste', color: '#ff6b35', grad: 'rgba(255,107,53,0.12)', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
+              { icon: '🎤', title: 'Artiste', color: '#1a6bff', grad: 'rgba(26,107,255,0.12)', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
               { icon: '🎧', title: 'Mélomane', color: '#64c8ff', grad: 'rgba(100,200,255,0.12)', items: ['Scanner la pochette', 'Écouter gratuitement', 'Télécharger la musique', 'Accéder à ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
               { icon: '📢', title: 'Annonceur', color: '#ffd700', grad: 'rgba(255,215,0,0.12)', items: ['Pub avant chaque écoute', 'Audience locale engagée', 'Stats de campagne', 'Budget flexible'], cta: 'Annoncer', href: '/annonceurs' },
             ].map((p, i) => (
@@ -2085,7 +2117,7 @@ function HomePage() {
                 <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 17, marginBottom: 14, color: p.color }}>{p.title}</p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', flex: 1 }}>
                   {p.items.map((item, j) => (
-                    <li key={j} style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 1.9, display: 'flex', gap: 6 }}>
+                    <li key={j} style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, lineHeight: 1.9, display: 'flex', gap: 6 }}>
                       <span style={{ color: p.color }}>✓</span> {item}
                     </li>
                   ))}
@@ -2097,42 +2129,12 @@ function HomePage() {
         </div>
       </section>
 
-      {/* REVENUS */}
-      <section style={{ padding: '64px 24px', maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
-        <p style={{ color: '#ff6b35', fontSize: 11, letterSpacing: 4, fontWeight: 700, marginBottom: 10 }}>— RÉMUNÉRATION —</p>
-        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, marginBottom: 12 }}>Ce que tu gagnes</h2>
-        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.9, marginBottom: 36, maxWidth: 480, margin: '0 auto 36px' }}>
-          Chaque écoute de 30 secondes génère un revenu pour toi. Plus on intègre d'annonceurs, plus tu gagnes.
-        </p>
-        <div style={{ display: 'grid', gap: 12, marginBottom: 36 }}>
-          {[
-            { label: "Aujourd'hui — pub automatique", range: '0,03 – 0,10 FCFA / écoute', color: '#ff6b35', tag: '● ACTIF', icon: '📡' },
-            { label: 'Bientôt — annonceurs locaux', range: '1 – 4 FCFA / écoute', color: '#ffd700', tag: '◎ PROCHAINEMENT', icon: '🚀' },
-            { label: 'Perspective — abonnements fans', range: "jusqu'à 5 FCFA / écoute", color: '#64c8ff', tag: '◌ EN DEV', icon: '💎' },
-          ].map((r, i) => (
-            <div key={i} className="card-hover" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: `${r.color}0d`, border: `1px solid ${r.color}33`, borderRadius: 14, padding: '18px 22px', transition: 'all .3s' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' }}>
-                <span style={{ fontSize: 28 }}>{r.icon}</span>
-                <div>
-                  <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, marginBottom: 4 }}>{r.label}</p>
-                  <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 20, color: r.color }}>{r.range}</p>
-                </div>
-              </div>
-              <span style={{ fontSize: 10, padding: '4px 10px', borderRadius: 99, background: `${r.color}22`, color: r.color, fontWeight: 700, letterSpacing: 1, whiteSpace: 'nowrap' }}>{r.tag}</span>
-            </div>
-          ))}
-        </div>
-        <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #ff6b35, #ffd700)', color: '#000', textDecoration: 'none', padding: '16px 40px', fontSize: 16, borderRadius: 99, fontWeight: 800, display: 'inline-block', boxShadow: '0 6px 30px #ff6b3544', transition: 'all .25s' }}>
-          🎤 Commencer maintenant
-        </a>
-      </section>
-
       {/* FOOTER */}
       <footer style={{ background: 'rgba(0,0,0,0.4)', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '28px 24px', textAlign: 'center' }}>
-        <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 14, background: 'linear-gradient(90deg, #ff6b35, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 10 }}>
+        <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 14, background: 'linear-gradient(90deg, #1a6bff, #ffd700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 10 }}>
           DONIEL ZIK — La Musique. Un Scan. Un Monde.
         </p>
-        <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
+        <p style={{ color: '#b0c4d8', fontSize: 11 }}>
           © 2025 ·{' '}
           <a href="/conditions" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>CGU</a> ·{' '}
           <a href="/annonceurs" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
