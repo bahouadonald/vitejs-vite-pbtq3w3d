@@ -561,7 +561,7 @@ function FanPage() {
               {dlStatus.startsWith('Erreur') ? 'Erreur de téléchargement' : 'Téléchargement lancé !'}
             </h2>
             <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
-              {dlStatus.startsWith('Erreur') ? dlStatus : 'Vos fichiers s'ouvrent dans un nouvel onglet. Appuyez longuement pour enregistrer.'}
+              {dlStatus.startsWith('Erreur') ? dlStatus : "Vos fichiers s'ouvrent dans un nouvel onglet. Appuyez longuement pour enregistrer."}
             </p>
             {!dlStatus.startsWith('Erreur') && (
               <>
