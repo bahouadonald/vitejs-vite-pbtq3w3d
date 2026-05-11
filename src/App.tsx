@@ -1052,7 +1052,22 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, color: '#1a2340' }}>Nouveau QR Code</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div><label style={S.lbl}>Nom du contenu *</label><input style={S.inp} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Album Vol.1" /></div>
-                <div><label style={S.lbl}>Artiste *</label><input style={S.inp} value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="DJ Lamine" /></div>
+                <div>
+                  <label style={S.lbl}>Artiste *</label>
+                  <input
+                    style={S.inp}
+                    value={newArtist}
+                    onChange={e => setNewArtist(e.target.value)}
+                    placeholder="Sélectionner ou saisir un artiste"
+                    list="artistsList"
+                    autoComplete="off"
+                  />
+                  <datalist id="artistsList">
+                    {Array.from(new Set(qrcodes.map((q: any) => q.artist).filter(Boolean))).sort().map((a: any) => (
+                      <option key={a} value={a} />
+                    ))}
+                  </datalist>
+                </div>
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
@@ -2146,23 +2161,16 @@ function HomePage() {
 }
 
 
-// ─────────────────────────────────────────────
-// PWA INSTALL BANNER — toutes les pages
-// ─────────────────────────────────────────────
 function PWAInstallBanner() {
   const [show, setShow] = useState(false);
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true); return;
-    }
+    if (window.matchMedia('(display-mode: standalone)').matches) { setInstalled(true); return; }
     const onAvailable = () => {
       const dismissed = localStorage.getItem('pwa-dismissed');
       const dismissedAt = dismissed ? parseInt(dismissed) : 0;
-      if (Date.now() - dismissedAt > 24 * 60 * 60 * 1000) {
-        setTimeout(() => setShow(true), 2000);
-      }
+      if (Date.now() - dismissedAt > 24 * 60 * 60 * 1000) setTimeout(() => setShow(true), 2000);
     };
     window.addEventListener('pwaInstallAvailable', onAvailable);
     if ((window as any).installPWA) onAvailable();
@@ -2170,43 +2178,23 @@ function PWAInstallBanner() {
   }, []);
 
   const handleInstall = async () => {
-    if ((window as any).installPWA) {
-      await (window as any).installPWA();
-      setShow(false); setInstalled(true);
-    }
+    if ((window as any).installPWA) { await (window as any).installPWA(); setShow(false); setInstalled(true); }
   };
-
-  const handleDismiss = () => {
-    localStorage.setItem('pwa-dismissed', Date.now().toString());
-    setShow(false);
-  };
+  const handleDismiss = () => { localStorage.setItem('pwa-dismissed', Date.now().toString()); setShow(false); };
 
   if (!show || installed) return null;
-
   return (
     <>
       <style>{`@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-        background: '#ffffff', borderTop: '2px solid #1a6bff',
-        boxShadow: '0 -4px 24px rgba(26,107,255,0.15)',
-        padding: '14px 20px', animation: 'slideUp 0.4s ease',
-        display: 'flex', alignItems: 'center', gap: 14,
-      }}>
-        <img src={LOGO_B64} alt="DZ" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 10, flexShrink: 0 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#ffffff', borderTop: '2px solid #1a6bff', boxShadow: '0 -4px 24px rgba(26,107,255,0.15)', padding: '14px 20px', animation: 'slideUp 0.4s ease', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <img src="/icon-192x192.png" alt="DZ" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 10, flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <p style={{ fontWeight: 800, fontSize: 14, color: '#1a2340', marginBottom: 2 }}>Installer Doniel Zik</p>
           <p style={{ color: '#8098b8', fontSize: 12 }}>Accès rapide · Fonctionne hors-ligne</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={handleDismiss} style={{
-            padding: '8px 12px', borderRadius: 8, border: '1px solid #dce6f7',
-            background: 'transparent', color: '#8098b8', fontSize: 12, cursor: 'pointer', fontWeight: 600,
-          }}>Plus tard</button>
-          <button onClick={handleInstall} style={{
-            padding: '8px 16px', borderRadius: 8, border: 'none',
-            background: '#1a6bff', color: '#ffffff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}>⬇ Installer</button>
+          <button onClick={handleDismiss} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #dce6f7', background: 'transparent', color: '#8098b8', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Plus tard</button>
+          <button onClick={handleInstall} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a6bff', color: '#ffffff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>⬇ Installer</button>
         </div>
       </div>
     </>
