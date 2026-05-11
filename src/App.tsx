@@ -322,19 +322,19 @@ function FanPage() {
 
     setStep('zipping');
 
-    // Mobile — direct file download one by one
+    // Mobile — marquer AVANT le téléchargement pour ne pas perdre le tracking
     if (isMobileDevice()) {
+      // 1. Marquer immédiatement comme téléchargé
+      await markAsDownloaded();
+      setDlStatus('Telechargement lance !');
+      // 2. Ouvrir chaque fichier dans un nouvel onglet
       for (let i = 0; i < files.length; i++) {
-        setDlStatus('Telechargement ' + (i + 1) + '/' + files.length);
         setDlProgress(Math.round(((i + 1) / files.length) * 100));
         const dlUrl = files[i].url.replace('/upload/', '/upload/fl_attachment/');
-        const a = document.createElement('a');
-        a.href = dlUrl; a.download = files[i].name; a.target = '_blank';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        await new Promise(r => setTimeout(r, 2000));
+        window.open(dlUrl, '_blank');
+        if (i < files.length - 1) await new Promise(r => setTimeout(r, 1500));
       }
       setDlProgress(100);
-      await markAsDownloaded();
       setStep('done');
       return;
     }
@@ -560,18 +560,26 @@ function FanPage() {
             <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
               {dlStatus.startsWith('Erreur') ? 'Erreur de téléchargement' : 'Téléchargement lancé !'}
             </h2>
-            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
-              {dlStatus.startsWith('Erreur') ? dlStatus : 'Vérifiez vos téléchargements. Vous pouvez continuer à écouter en streaming.'}
+            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
+              {dlStatus.startsWith('Erreur') ? dlStatus : 'Vos fichiers s'ouvrent dans un nouvel onglet. Appuyez longuement pour enregistrer.'}
             </p>
             {!dlStatus.startsWith('Erreur') && (
               <>
+                {/* Message Zikothèque */}
+                <div style={{ background: 'linear-gradient(135deg, #eef4ff, #dce8ff)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
+                  <p style={{ fontWeight: 800, fontSize: 14, color: '#1a6bff', marginBottom: 6 }}>🎵 Retrouvez votre musique dans Ma Zikothèque</p>
+                  <p style={{ color: '#5a7090', fontSize: 12, lineHeight: 1.6 }}>
+                    Toute la musique que vous téléchargez est sauvegardée automatiquement dans votre Zikothèque. Créez votre compte gratuit pour y accéder et écouter en streaming à tout moment.
+                  </p>
+                </div>
+                <a href="/ziko"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box' }}>
+                  📚 Accéder à Ma Zikothèque
+                </a>
                 <button onClick={() => setStep('ready')}
-                  style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', cursor: 'pointer', marginBottom: 10 }}>
+                  style={{ width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 12, border: '1px solid #dce6f7', background: 'transparent', color: '#5a7090', cursor: 'pointer', marginBottom: 12 }}>
                   🎵 Écouter en streaming
                 </button>
-                <a href="/ziko" style={{ display: 'block', width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 12, border: '1px solid #dce6f7', color: '#5a7090', textDecoration: 'none', marginBottom: 12, boxSizing: 'border-box' }}>
-                  📚 Ma Zikothèque
-                </a>
               </>
             )}
             <p style={{ color: '#b0c4d8', fontSize: 11 }}>DONIEL ZIK · Distribution musicale sécurisée</p>
