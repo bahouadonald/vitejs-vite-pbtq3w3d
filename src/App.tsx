@@ -369,23 +369,22 @@ function FanPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4fb', color: '#1a2340', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
-        @keyframes wave { 0%,100%{transform:scaleY(0.4)} 50%{transform:scaleY(1)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-        .track-item:hover { background: rgba(26,107,255,0.08) !important; }
-        .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(26,107,255,0.4) !important; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes glow { 0%,100%{box-shadow:0 0 20px rgba(30,111,255,0.4)} 50%{box-shadow:0 0 40px rgba(30,111,255,0.7)} }
+        .track-item:hover { background: rgba(30,111,255,0.1) !important; }
+        .dl-btn { transition: all .25s !important; }
+        .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(30,111,255,0.6) !important; }
       `}</style>
 
       {/* LOADING */}
       {step === 'loading' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16 }}>
-          <div style={{ width: 48, height: 48, border: '3px solid #1a6bff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
-          <p style={{ color: '#8098b8', fontSize: 14 }}>Chargement...</p>
+          <div style={{ width: 48, height: 48, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
+          <p style={{ color: '#4a5878', fontSize: 14 }}>Chargement...</p>
         </div>
       )}
 
@@ -393,200 +392,214 @@ function FanPage() {
       {step === 'ready' && qrData && (
         <div style={{ animation: 'fadeUp .4s ease' }}>
 
-          {/* HERO — Image pochette */}
-          <div style={{ position: 'relative', width: '100%', height: 320, overflow: 'hidden' }}>
+          {/* HERO — Image pochette plein écran avec overlay sombre */}
+          <div style={{ position: 'relative', width: '100%', height: 380, overflow: 'hidden' }}>
             {qrData.coverUrl ? (
-              <img src={qrData.coverUrl} alt={qrData.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={qrData.coverUrl} alt={qrData.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.7)' }} />
             ) : (
-              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #e8f0ff, #c0d8ff, #f0f4fb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80 }}>🎵</div>
-            )}
-            {/* Overlay gradient */}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(240,244,251,0.95) 100%)' }} />
-            {/* Info artiste sur l'image */}
-            <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20 }}>
-              <div style={{ display: 'inline-block', background: '#1a6bff', borderRadius: 6, padding: '3px 10px', marginBottom: 8 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#fff' }}>🎵 CONTENU EXCLUSIF</p>
+              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={LOGO_B64} alt="DZ" style={{ width: 120, height: 120, objectFit: 'contain', opacity: 0.4 }} />
               </div>
-              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 900, lineHeight: 1.1, marginBottom: 4, textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>{qrData.label}</h1>
-              <p style={{ color: '#5a7090', fontSize: 14 }}>par <strong style={{ color: '#1a6bff' }}>{qrData.artist}</strong></p>
+            )}
+            {/* Overlay sombre dégradé bleu */}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.3) 0%, rgba(6,8,15,0.98) 100%)' }} />
+            {/* Badge + Infos artiste */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 28px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(30,111,255,0.2)', border: '1px solid rgba(30,111,255,0.5)', borderRadius: 99, padding: '4px 12px', marginBottom: 12, backdropFilter: 'blur(8px)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: 99, background: '#1e6fff', animation: 'glow 2s infinite' }} />
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4da6ff' }}>CONTENU EXCLUSIF</p>
+              </div>
+              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 900, lineHeight: 1.1, marginBottom: 6, color: '#ffffff', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>{qrData.label}</h1>
+              <p style={{ fontSize: 14, color: '#7888aa' }}>par <strong style={{ color: '#4da6ff', fontWeight: 700 }}>{qrData.artist}</strong></p>
             </div>
           </div>
 
           {/* CONTENU PRINCIPAL */}
-          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 32 }}>
+          <div style={{ padding: '24px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 40 }}>
 
             {/* BOUTON TÉLÉCHARGER */}
             {!downloaded ? (
               onSafari ? (
                 <div style={{ marginBottom: 16 }}>
                   <button onClick={() => { const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = currentUrl.replace('https://', 'googlechromes://'); document.body.appendChild(iframe); setTimeout(() => { document.body.removeChild(iframe); window.location.href = 'https://apps.apple.com/app/google-chrome/id535886823'; }, 2500); }}
-                    style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: 'none', background: '#1a6bff', color: '#fff', cursor: 'pointer', marginBottom: 8 }}>
+                    style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: 'none', background: '#1e6fff', color: '#fff', cursor: 'pointer', marginBottom: 8 }}>
                     🌐 Ouvrir dans Chrome pour télécharger
                   </button>
                 </div>
               ) : (
                 <button className="dl-btn" onClick={startDownload}
-                  style={{ width: '100%', padding: '18px', fontSize: 17, fontWeight: 800, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', cursor: 'pointer', marginBottom: 16, boxShadow: '0 4px 20px rgba(26,107,255,0.3)', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>⬇</span>
-                  {(qrData.files?.length || 0) > 1 ? 'Télécharger l\'album complet' : 'Télécharger'}
+                  style={{ width: '100%', padding: '18px', fontSize: 17, fontWeight: 800, borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', cursor: 'pointer', marginBottom: 20, boxShadow: '0 6px 30px rgba(30,111,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 22 }}>⬇</span>
+                  {(qrData.files?.length || 0) > 1 ? "Télécharger l'album complet" : 'Télécharger'}
                 </button>
               )
             ) : (
-              <div style={{ background: '#eaf1ff', border: '1px solid #1a6bff', borderRadius: 14, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 24 }}>✅</span>
+              <div style={{ background: 'rgba(30,111,255,0.12)', border: '1px solid rgba(30,111,255,0.4)', borderRadius: 14, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 99, background: 'rgba(30,111,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>✅</div>
                 <div>
-                  <p style={{ fontWeight: 700, fontSize: 14, color: '#1a6bff' }}>Téléchargement effectué</p>
-                  <p style={{ color: '#8098b8', fontSize: 12, marginTop: 2 }}>Profitez du streaming illimité ci-dessous</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#4da6ff' }}>Téléchargement effectué</p>
+                  <p style={{ color: '#4a5878', fontSize: 12, marginTop: 2 }}>Streaming illimité disponible ci-dessous</p>
                 </div>
               </div>
             )}
 
-            {/* SECTIONS */}
-            {/* Écouter en streaming */}
+            {/* AUDIO PLAYER */}
             {qrData.files?.some((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>🎧</span> Écouter en streaming
-                </p>
+                <p style={{ color: '#7888aa', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎧 Écouter en streaming</p>
                 <AudioPlayer files={qrData.files.filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))} onStream={recordStream} />
               </div>
             )}
 
-            {/* Télécharger titre par titre */}
+            {/* LISTE TITRES */}
             {qrData.files?.length > 0 && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>💿</span> Titres
-                  <span style={{ background: '#eaf1ff', borderRadius: 99, padding: '2px 8px', fontSize: 11, fontWeight: 600, color: '#1a6bff' }}>{qrData.files.length}</span>
-                </p>
-                <div style={{ background: '#ffffff', borderRadius: 14, overflow: 'hidden', border: '1px solid #dce6f7', boxShadow: '0 2px 10px rgba(26,99,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <p style={{ color: '#7888aa', fontWeight: 700, fontSize: 12, letterSpacing: 2, textTransform: 'uppercase' }}>💿 Titres</p>
+                  <span style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 99, padding: '2px 10px', fontSize: 11, fontWeight: 700, color: '#4da6ff' }}>{qrData.files.length}</span>
+                </div>
+                <div style={{ background: '#0b0f1e', borderRadius: 14, overflow: 'hidden', border: '1px solid #151c30' }}>
                   {qrData.files.map((f: any, i: number) => (
-                    <div key={i} className="track-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < qrData.files.length - 1 ? '1px solid #edf2fc' : 'none', transition: 'background .2s', cursor: 'pointer' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(26,107,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span style={{ fontSize: 14 }}>{f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '🎬' : '🎵'}</span>
+                    <div key={i} className="track-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < qrData.files.length - 1 ? '1px solid #151c30' : 'none', transition: 'background .2s' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(30,111,255,0.2)' }}>
+                        <span style={{ fontSize: 16 }}>{f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '🎬' : '🎵'}</span>
                       </div>
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
-                        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 1 }}>{formatSize(f.size || 0)}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
+                        <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>{formatSize(f.size || 0)}</p>
                       </div>
                       <a href={f.url.replace('/upload/', '/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                        style={{ color: '#1a6bff', fontSize: 18, textDecoration: 'none', padding: '4px 8px' }}>⬇</a>
+                        style={{ color: '#1e6fff', fontSize: 20, textDecoration: 'none', padding: '4px 8px', opacity: 0.8 }}>⬇</a>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Vidéos */}
+            {/* VIDÉOS */}
             {qrData.files?.some((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
               <div style={{ marginBottom: 20 }}>
-                <p style={{ color: '#1a2340', fontWeight: 700, fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>🎬</span> Vidéos
-                </p>
+                <p style={{ color: '#7888aa', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎬 Vidéos</p>
                 <VideoPlayer files={qrData.files.filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i))} />
               </div>
             )}
 
-            {/* Ma Zikothèque */}
-            <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(26,99,255,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 22 }}>📚</span>
+            {/* MA ZIKOTHÈQUE */}
+            <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.1), rgba(77,166,255,0.05))', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 16, padding: '16px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(30,111,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📚</div>
                 <div>
-                  <p style={{ fontWeight: 700, fontSize: 13 }}>Ma Zikothèque</p>
-                  <p style={{ color: '#8098b8', fontSize: 11, marginTop: 1 }}>Retrouver vos albums</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#dde4f5' }}>Ma Zikothèque</p>
+                  <p style={{ color: '#4a5878', fontSize: 11, marginTop: 2 }}>Retrouver vos albums</p>
                 </div>
               </div>
-              <a href="/ziko" style={{ background: '#eaf1ff', border: '1px solid #1a6bff', borderRadius: 10, padding: '8px 14px', color: '#1a6bff', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>Accéder →</a>
+              <a href="/ziko" style={{ background: 'rgba(30,111,255,0.2)', border: '1px solid rgba(30,111,255,0.4)', borderRadius: 10, padding: '8px 14px', color: '#4da6ff', textDecoration: 'none', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>Accéder →</a>
             </div>
 
-            {/* Footer */}
-            <p style={{ textAlign: 'center', color: '#b0c4d8', fontSize: 11, paddingBottom: 16 }}>
-              DONIEL ZIK · La Musique. Un Scan. Un Monde.
-            </p>
+            {/* FOOTER */}
+            <div style={{ textAlign: 'center', paddingBottom: 16 }}>
+              <img src={LOGO_B64} alt="DZ" style={{ width: 40, height: 40, objectFit: 'contain', margin: '0 auto 8px', display: 'block', opacity: 0.6 }} />
+              <p style={{ color: '#2a3a60', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
+            </div>
           </div>
         </div>
       )}
 
       {/* ZIPPING */}
       {step === 'zipping' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24 }}>
-          <div style={{ width: '100%', maxWidth: 360, background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 36, textAlign: 'center', boxShadow: '0 4px 24px rgba(26,99,255,0.1)' }}>
-            <div style={{ width: 56, height: 56, border: '3px solid #1a6bff', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 20px', animation: 'spin .8s linear infinite' }} />
-            <p style={{ fontWeight: 700, fontSize: 17, marginBottom: 8 }}>Préparation en cours...</p>
-            <p style={{ color: '#8098b8', fontSize: 13, marginBottom: 24 }}>{dlStatus}</p>
-            <div style={{ height: 8, background: '#dce6f7', borderRadius: 99, marginBottom: 12 }}>
-              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, background: '#06080f' }}>
+          <div style={{ width: '100%', maxWidth: 360, background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 20, padding: 36, textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 20px', animation: 'spin .8s linear infinite' }} />
+            <p style={{ fontWeight: 700, fontSize: 17, marginBottom: 8, color: '#dde4f5' }}>Préparation en cours...</p>
+            <p style={{ color: '#4a5878', fontSize: 13, marginBottom: 24 }}>{dlStatus}</p>
+            <div style={{ height: 8, background: '#151c30', borderRadius: 99, marginBottom: 12 }}>
+              <div style={{ height: '100%', width: dlProgress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
             </div>
-            <p style={{ color: '#1a6bff', fontWeight: 800, fontSize: 32 }}>{dlProgress}%</p>
-            <p style={{ color: '#b0c4d8', fontSize: 11, marginTop: 16 }}>Ne fermez pas cette page</p>
+            <p style={{ color: '#1e6fff', fontWeight: 800, fontSize: 32 }}>{dlProgress}%</p>
+            <p style={{ color: '#2a3a60', fontSize: 11, marginTop: 16 }}>Ne fermez pas cette page</p>
           </div>
         </div>
       )}
 
       {/* LOCKED */}
       {step === 'locked' && (
-        <div style={{ animation: 'fadeUp .4s ease' }}>
+        <div style={{ animation: 'fadeUp .4s ease', background: '#06080f', minHeight: '100vh' }}>
+          {/* Hero image grisée */}
           {qrData?.coverUrl && (
-            <div style={{ position: 'relative', width: '100%', height: 220, overflow: 'hidden' }}>
-              <img src={qrData.coverUrl} alt={qrData?.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(60%)' }} />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(10,10,15,1))' }} />
+            <div style={{ position: 'relative', width: '100%', height: 260, overflow: 'hidden' }}>
+              <img src={qrData.coverUrl} alt={qrData?.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(80%) brightness(0.4)' }} />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.2), rgba(6,8,15,1))' }} />
+              <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(240,184,74,0.15)', border: '1px solid rgba(240,184,74,0.4)', borderRadius: 99, padding: '4px 12px', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12 }}>🔒</span>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#f0b84a' }}>SCANS ÉPUISÉS</p>
+                </div>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#ffffff', marginBottom: 4 }}>{qrData?.label || 'Contenu protégé'}</h2>
+                <p style={{ color: '#4a5878', fontSize: 13 }}>par <strong style={{ color: '#4da6ff' }}>{qrData?.artist}</strong></p>
+              </div>
             </div>
           )}
-          <div style={{ padding: '20px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 32 }}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <span style={{ fontSize: 48 }}>🔒</span>
-              <p style={{ color: '#b07a00', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginTop: 8, marginBottom: 4 }}>SCANS ÉPUISÉS</p>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{qrData?.label || 'Contenu protégé'}</h2>
-              <p style={{ color: '#8098b8', fontSize: 14 }}>par <strong style={{ color: '#1a6bff' }}>{qrData?.artist}</strong></p>
-            </div>
-            <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: 20, marginBottom: 16, boxShadow: '0 2px 8px rgba(26,99,255,0.05)' }}>
-              <p style={{ color: '#1a6bff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>🎵 Streaming gratuit disponible</p>
+          <div style={{ padding: '24px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 40 }}>
+            {!qrData?.coverUrl && (
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ width: 72, height: 72, borderRadius: 99, background: 'rgba(240,184,74,0.1)', border: '1px solid rgba(240,184,74,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, margin: '0 auto 12px' }}>🔒</div>
+                <p style={{ color: '#f0b84a', fontSize: 11, fontWeight: 800, letterSpacing: 2, marginBottom: 6 }}>SCANS ÉPUISÉS</p>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, color: '#dde4f5', marginBottom: 4 }}>{qrData?.label || 'Contenu protégé'}</h2>
+                <p style={{ color: '#4a5878', fontSize: 14 }}>par <strong style={{ color: '#4da6ff' }}>{qrData?.artist}</strong></p>
+              </div>
+            )}
+            {/* Streaming gratuit */}
+            <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.08), rgba(77,166,255,0.04))', border: '1px solid rgba(30,111,255,0.2)', borderRadius: 16, padding: '16px', marginBottom: 16 }}>
+              <p style={{ color: '#4da6ff', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎵 Streaming gratuit disponible</p>
               {qrData?.files && <AudioPlayer files={qrData.files} onStream={recordStream} />}
             </div>
+            {/* Bouton payant */}
             <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
-              style={{ width: '100%', padding: '16px', fontSize: 16, fontWeight: 700, borderRadius: 14, border: '2px solid #1a6bff', background: 'transparent', color: '#1a6bff', cursor: 'pointer', marginBottom: 8 }}>
-              ⬇️ Télécharger l'album (Accès payant)
+              style={{ width: '100%', padding: '16px', fontSize: 15, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.4)', background: 'rgba(30,111,255,0.08)', color: '#4da6ff', cursor: 'pointer', marginBottom: 8 }}>
+              ⬇️ Télécharger l'album <span style={{ fontSize: 12, color: '#4a5878' }}>(Accès payant)</span>
             </button>
-            <p style={{ textAlign: 'center', color: '#b0c4d8', fontSize: 11 }}>Paiement en ligne — Même prix que la pochette physique</p>
+            <p style={{ textAlign: 'center', color: '#2a3a60', fontSize: 11 }}>Paiement en ligne — Même prix que la pochette physique</p>
           </div>
         </div>
       )}
 
+
       {/* DONE */}
       {step === 'done' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24 }}>
-          <div style={{ width: '100%', maxWidth: 360, background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 36, textAlign: 'center', boxShadow: '0 4px 24px rgba(26,99,255,0.1)', animation: 'fadeUp .4s ease' }}>
-            <p style={{ fontSize: 56, marginBottom: 16 }}>{dlStatus.startsWith('Erreur') ? '❌' : '✅'}</p>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, background: '#06080f' }}>
+          <div style={{ width: '100%', maxWidth: 360, background: '#0b0f1e', border: '1px solid #151c30', borderRadius: 20, padding: 36, textAlign: 'center', animation: 'fadeUp .4s ease' }}>
+            <div style={{ width: 72, height: 72, borderRadius: 99, background: dlStatus.startsWith('Erreur') ? 'rgba(240,74,106,0.15)' : 'rgba(30,111,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, margin: '0 auto 20px', border: dlStatus.startsWith('Erreur') ? '1px solid rgba(240,74,106,0.3)' : '1px solid rgba(30,111,255,0.3)' }}>
+              {dlStatus.startsWith('Erreur') ? '❌' : '✅'}
+            </div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, marginBottom: 8, color: '#dde4f5' }}>
               {dlStatus.startsWith('Erreur') ? 'Erreur de téléchargement' : 'Téléchargement lancé !'}
             </h2>
-            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
+            <p style={{ color: '#4a5878', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
               {dlStatus.startsWith('Erreur') ? dlStatus : "Vos fichiers s'ouvrent dans un nouvel onglet. Appuyez longuement pour enregistrer."}
             </p>
             {!dlStatus.startsWith('Erreur') && (
               <>
-                {/* Message Zikothèque */}
-                <div style={{ background: 'linear-gradient(135deg, #eef4ff, #dce8ff)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
-                  <p style={{ fontWeight: 800, fontSize: 14, color: '#1a6bff', marginBottom: 6 }}>🎵 Retrouvez votre musique dans Ma Zikothèque</p>
-                  <p style={{ color: '#5a7090', fontSize: 12, lineHeight: 1.6 }}>
-                    Toute la musique que vous téléchargez est sauvegardée automatiquement dans votre Zikothèque. Créez votre compte gratuit pour y accéder et écouter en streaming à tout moment.
+                <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.12), rgba(77,166,255,0.06))', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 14, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
+                  <p style={{ fontWeight: 800, fontSize: 14, color: '#4da6ff', marginBottom: 6 }}>🎵 Retrouvez votre musique dans Ma Zikothèque</p>
+                  <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.6 }}>
+                    Votre musique est sauvegardée automatiquement. Créez votre compte gratuit pour y accéder et écouter en streaming à tout moment.
                   </p>
                 </div>
                 <a href="/ziko"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '15px', fontSize: 15, fontWeight: 700, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', textDecoration: 'none', marginBottom: 10, boxSizing: 'border-box', boxShadow: '0 4px 20px rgba(30,111,255,0.4)' }}>
                   📚 Accéder à Ma Zikothèque
                 </a>
                 <button onClick={() => setStep('ready')}
-                  style={{ width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 12, border: '1px solid #dce6f7', background: 'transparent', color: '#5a7090', cursor: 'pointer', marginBottom: 12 }}>
+                  style={{ width: '100%', padding: '13px', fontSize: 14, fontWeight: 700, borderRadius: 14, border: '1px solid #151c30', background: 'transparent', color: '#7888aa', cursor: 'pointer', marginBottom: 12 }}>
                   🎵 Écouter en streaming
                 </button>
               </>
             )}
-            <p style={{ color: '#b0c4d8', fontSize: 11 }}>DONIEL ZIK · Distribution musicale sécurisée</p>
+            <p style={{ color: '#2a3a60', fontSize: 11 }}>DONIEL ZIK · La Musique. Un Scan. Un Monde.</p>
           </div>
         </div>
       )}
-    </div>
+
   );
 }
 // ─────────────────────────────────────────────
