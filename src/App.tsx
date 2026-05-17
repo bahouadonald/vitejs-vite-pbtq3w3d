@@ -303,21 +303,25 @@ function FanPage() {
         status: newUsed >= qrData.totalScans ? 'locked' : 'active',
       });
     } catch(e) { console.error('markDL', e); }
-    // ── Sauvegarde dans Ma Zikothèque si utilisateur connecté ──
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        await addDoc(collection(db, 'zikotheque'), {
-          uid: currentUser.uid,
-          qrId: qrData.qrId || qrId,
-          label: qrData.label || '',
-          artist: qrData.artist || '',
-          type: qrData.type || 'album',
-          files: qrData.files || [],
-          addedAt: new Date().toISOString(),
-        });
-      }
-    } catch (e) { console.error('ziko', e); }
+     // ── Sauvegarde dans Ma Zikothèque ──
+     try {
+       const currentUser = auth.currentUser;
+       const zikoData = {
+         qrId: qrData.qrId || qrId,
+         label: qrData.label || '',
+         artist: qrData.artist || '',
+         type: qrData.type || 'album',
+         files: qrData.files || [],
+         coverUrl: qrData.coverUrl || '',
+         addedAt: new Date().toISOString(),
+       };
+       if (currentUser) {
+         await addDoc(collection(db, 'zikotheque'), { uid: currentUser.uid, ...zikoData });
+       } else {
+         sessionStorage.setItem('pendingZiko', JSON.stringify(zikoData));
+       }
+     } catch (e) { console.error('ziko', e); }
+
   };
 
   const startDownload = async () => {
@@ -705,6 +709,7 @@ function AdminPage() {
   const [newPrice, setNewPrice] = useState('');
   const [newScans, setNewScans] = useState('');
   const [newWhatsapp, setNewWhatsapp] = useState('');
+  const [newArtistEmail, setNewArtistEmail] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [qrModal, setQrModal] = useState<any>(null);
   const [editModal, setEditModal] = useState<any>(null);
@@ -774,7 +779,17 @@ function AdminPage() {
         status: 'active', whatsapp: newWhatsapp, coverUrl,
         createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
       });
-      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans(''); setNewWhatsapp('');
+      // Enregistrer l'artiste dans la collection 'artists' si email fourni
+      if (newArtistEmail) {
+        const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', newArtistEmail)));
+        if (artistSnap.empty) {
+          await addDoc(collection(db, 'artists'), {
+            name: newArtist, email: newArtistEmail, createdAt: new Date().toISOString(),
+          });
+        }
+      }
+      setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
+      setNewWhatsapp(''); setNewArtistEmail('');
       setSelectedFiles(null); setCoverFile(null); setUploadProgress(0); setUploadMsg('');
       setMsg('QR ' + qrId + ' cree avec ' + uploaded.length + ' fichier(s) !');
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
@@ -1091,6 +1106,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                     ))}
                   </datalist>
                 </div>
+                <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
@@ -1723,6 +1739,16 @@ function ZikothequePage({ user }: { user: any }) {
 
   useEffect(() => {
     if (!user) return;
+    // Récupérer musique en attente (téléchargée sans compte)
+    const pending = sessionStorage.getItem('pendingZiko');
+    if (pending) {
+      try {
+        const zikoData = JSON.parse(pending);
+        addDoc(collection(db, 'zikotheque'), { uid: user.uid, ...zikoData })
+          .then(() => sessionStorage.removeItem('pendingZiko'))
+          .catch(console.error);
+      } catch(e) {}
+    }
     const q = query(collection(db, 'zikotheque'), where('uid', '==', user.uid), orderBy('addedAt', 'desc'));
     const unsub = onSnapshot(q, snap => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
