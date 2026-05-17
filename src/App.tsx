@@ -246,20 +246,24 @@ function FanPage() {
   const currentUrl = window.location.href;
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
 
+  const qrDocId = useRef<string>('');
+
   useEffect(() => {
     const load = async () => {
       const q = query(collection(db, 'qrcodes'), where('qrId', '==', qrId));
       const snap = await getDocs(q);
       if (snap.empty) { setStep('locked'); return; }
-      const data = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+      const docId = snap.docs[0].id;
+      qrDocId.current = docId;
+      const data = { id: docId, ...snap.docs[0].data() } as any;
       setQrData(data);
       // ── Compteur de visites ──
       try {
         await addDoc(collection(db, 'visits'), {
-          qrId, artistId: data.artist || '', label: data.label || '',
-          ts: new Date().toISOString(), ua: navigator.userAgent.slice(0, 80),
+          qrId, artist: data.artist || '', label: data.label || '',
+          ts: new Date().toISOString(),
         });
-        await updateDoc(doc(db, 'qrcodes', snap.docs[0].id), {
+        await updateDoc(doc(db, 'qrcodes', docId), {
           visits: (data.visits || 0) + 1,
         });
       } catch (e) { console.error('visit', e); }
@@ -271,18 +275,17 @@ function FanPage() {
 
   // ── Enregistrer un stream ──
   const recordStream = async (trackName: string, duration: number) => {
-    if (!qrData) return;
-    const valid = duration >= 30;
+    if (!qrData || !qrDocId.current) return;
     try {
       await addDoc(collection(db, 'streams'), {
         qrId, artist: qrData.artist || '', label: qrData.label || '',
         track: trackName, duration: Math.round(duration),
-        valid, ts: new Date().toISOString(),
+        valid: true, ts: new Date().toISOString(),
       });
-      await updateDoc(doc(db, 'qrcodes', qrData.id), {
+      await updateDoc(doc(db, 'qrcodes', qrDocId.current), {
         streams: (qrData.streams || 0) + 1,
-        validStreams: valid ? (qrData.validStreams || 0) + 1 : (qrData.validStreams || 0),
       });
+      setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
     } catch (e) { console.error('stream', e); }
   };
 
@@ -291,13 +294,15 @@ function FanPage() {
   };
 
   const markAsDownloaded = async () => {
-    if (!qrData || downloaded) return;
+    if (!qrData || downloaded || !qrDocId.current) return;
     setDownloaded(true);
     const newUsed = (qrData.usedScans || 0) + 1;
-    await updateDoc(doc(db, 'qrcodes', qrData.id), {
-      usedScans: newUsed, downloads: (qrData.downloads || 0) + 1,
-      status: newUsed >= qrData.totalScans ? 'locked' : 'active',
-    });
+    try {
+      await updateDoc(doc(db, 'qrcodes', qrDocId.current), {
+        usedScans: newUsed, downloads: (qrData.downloads || 0) + 1,
+        status: newUsed >= qrData.totalScans ? 'locked' : 'active',
+      });
+    } catch(e) { console.error('markDL', e); }
     // ── Sauvegarde dans Ma Zikothèque si utilisateur connecté ──
     try {
       const currentUser = auth.currentUser;
@@ -405,10 +410,7 @@ function FanPage() {
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.3) 0%, rgba(6,8,15,0.98) 100%)' }} />
             {/* Badge + Infos artiste */}
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 28px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(30,111,255,0.2)', border: '1px solid rgba(30,111,255,0.5)', borderRadius: 99, padding: '4px 12px', marginBottom: 12, backdropFilter: 'blur(8px)' }}>
-                <div style={{ width: 6, height: 6, borderRadius: 99, background: '#1e6fff', animation: 'glow 2s infinite' }} />
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4da6ff' }}>CONTENU EXCLUSIF</p>
-              </div>
+
               <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 900, lineHeight: 1.1, marginBottom: 6, color: '#ffffff', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>{qrData.label}</h1>
               <p style={{ fontSize: 14, color: '#7888aa' }}>par <strong style={{ color: '#4da6ff', fontWeight: 700 }}>{qrData.artist}</strong></p>
             </div>
