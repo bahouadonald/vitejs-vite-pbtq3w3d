@@ -657,7 +657,7 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
                     </div>
                     <p style={{ color: '#5a7090', fontSize: 12, marginBottom: 4 }}>{q.type} · {(q.price || 0).toLocaleString()} FCFA</p>
                     <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 6 }}>
-                      {q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads || 0} DL · {q.visits || 0} visites
+                      {q.fileCount || 0} fichier(s) · {q.usedScans || 0}/{q.totalScans || 0} scans · {(q.downloads !== undefined ? q.downloads : (q.usedScans || 0))} DL · {q.visits || 0} visites · {q.streams || 0} streams
                     </p>
                     <div style={{ height: 3, background: '#dce6f7', borderRadius: 99, marginBottom: 4 }}>
                       <div style={{ height: '100%', width: Math.min(100, Math.round(((q.usedScans || 0) / (q.totalScans || 1)) * 100)) + '%', background: isLocked ? '#f04a6a' : '#1a6bff', borderRadius: 99 }} />
@@ -1300,21 +1300,31 @@ function ArtistPage() {
   }, []);
 
   const loadStats = async (email: string) => {
-    // Trouver l'artiste lié à cet email
-    const snap = await getDocs(query(collection(db, 'artists'), where('email', '==', email)));
-    if (snap.empty) return;
-    const artistData = snap.docs[0].data();
-    const artistName = artistData.name;
-    // QR codes de cet artiste
-    const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
-    const qrList = qrSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    // Pour les anciens QR codes sans champ downloads, utiliser usedScans comme fallback
+    // Trouver l'artiste lié à cet email dans 'artists'
+    const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', email)));
+    let artistName = '';
+    if (!artistSnap.empty) {
+      artistName = artistSnap.docs[0].data().name || '';
+    }
+    // Si pas dans artists, chercher directement dans qrcodes
+    let qrList: any[] = [];
+    if (artistName) {
+      const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
+      qrList = qrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } else {
+      // Fallback: charger tous les QR codes et filtrer par email si possible
+      const allQrSnap = await getDocs(collection(db, 'qrcodes'));
+      // Essayer de trouver le nom artiste depuis les QR codes existants
+      // Pour l'instant afficher message d'erreur
+      setStats({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [], artistName: email, notLinked: true });
+      return;
+    }
     const getDl = (q: any) => q.downloads !== undefined ? q.downloads : (q.usedScans || 0);
     const totalVisits = qrList.reduce((s: number, q: any) => s + (q.visits || 0), 0);
     const totalStreams = qrList.reduce((s: number, q: any) => s + (q.streams || 0), 0);
     const totalValidStreams = qrList.reduce((s: number, q: any) => s + (q.validStreams || 0), 0);
     const totalDl = qrList.reduce((s: number, q: any) => s + getDl(q), 0);
-    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, artistName });
+    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, artistName, notLinked: false });
   };
 
   const register = async () => {
@@ -1364,7 +1374,7 @@ function ArtistPage() {
             { label: 'Visites totales', value: stats.visits, icon: '👁️', color: '#1a6bff' },
             { label: 'Téléchargements', value: stats.downloads, icon: '⬇️', color: '#1a6bff' },
             { label: 'Streams totaux', value: stats.streams, icon: '🎵', color: '#b07a00' },
-            { label: 'Streams +30s', value: stats.validStreams, icon: '✅', color: '#1a6bff' },
+            { label: 'Revenu estimé', value: (stats.streams * 0.1).toFixed(0) + ' FCFA', icon: '💰', color: '#1a6bff' },
           ].map((s, i) => (
             <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
               <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
@@ -1381,11 +1391,11 @@ function ArtistPage() {
           <p style={{ color: '#1a6bff', fontSize: 10, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>💰 RÉMUNÉRATION STREAMING</p>
           <h3 style={{ fontFamily: 'serif', fontSize: 17, fontWeight: 800, marginBottom: 12 }}>Ce que vous gagnez</h3>
           <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.8, marginBottom: 16 }}>
-            Chaque écoute de <strong>30 secondes ou plus</strong> génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
+            Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
           </p>
           <div style={{ display: 'grid', gap: 10 }}>
             {[
-              { label: "Aujourd'hui — pub automatique", range: '0,03 – 0,10 FCFA', tag: '● ACTIF', color: '#1a6bff', icon: '📡' },
+              { label: "Aujourd'hui — pub automatique", range: '0,10 – 0,80 FCFA', tag: '● ACTIF', color: '#1a6bff', icon: '📡' },
               { label: 'Bientôt — annonceurs locaux', range: '1 – 4 FCFA', tag: '◎ PROCHAINEMENT', color: '#b07a00', icon: '🚀' },
               { label: 'Perspective — abonnements fans', range: "jusqu'à 5 FCFA", tag: '◌ EN DEV', color: '#5a7090', icon: '💎' },
             ].map((r, i) => (
