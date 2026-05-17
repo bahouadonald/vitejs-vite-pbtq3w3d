@@ -561,6 +561,7 @@ function FanPage() {
             <p style={{ textAlign: 'center', color: '#2a3a60', fontSize: 11 }}>Paiement en ligne — Même prix que la pochette physique</p>
           </div>
         </div>
+        </div>
       )}
 
 
