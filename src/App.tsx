@@ -107,7 +107,26 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
         preload="metadata" />
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 99, background: 'linear-gradient(135deg, #1e6fff, #4da6ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 8px', animation: playing ? 'spin 3s linear infinite' : 'none' }}>🎵</div>
+        <div style={{ width: 60, height: 52, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, margin: '0 auto 8px' }}>
+          {[
+            { anim: 'bar1', dur: '0.6s' },
+            { anim: 'bar2', dur: '0.4s' },
+            { anim: 'bar3', dur: '0.7s' },
+            { anim: 'bar4', dur: '0.5s' },
+            { anim: 'bar5', dur: '0.8s' },
+            { anim: 'bar6', dur: '0.45s' },
+            { anim: 'bar7', dur: '0.65s' },
+          ].map((b, i) => (
+            <div key={i} style={{
+              width: 5, borderRadius: 3,
+              background: 'linear-gradient(to top, #1e6fff, #4da6ff)',
+              height: playing ? undefined : 6,
+              animation: playing ? `${b.anim} ${b.dur} ease-in-out infinite` : 'none',
+              transition: 'height 0.2s',
+              minHeight: 4,
+            }} />
+          ))}
+        </div>
         <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}</p>
         <p style={{ color: '#8098b8', fontSize: 11 }}>{idx + 1} / {files.length}</p>
       </div>
@@ -384,6 +403,13 @@ function FanPage() {
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
         @keyframes glow { 0%,100%{box-shadow:0 0 20px rgba(30,111,255,0.4)} 50%{box-shadow:0 0 40px rgba(30,111,255,0.7)} }
+        @keyframes bar1 { 0%,100%{height:8px} 50%{height:32px} }
+        @keyframes bar2 { 0%,100%{height:18px} 50%{height:8px} }
+        @keyframes bar3 { 0%,100%{height:28px} 25%{height:10px} 75%{height:38px} }
+        @keyframes bar4 { 0%,100%{height:12px} 40%{height:36px} 80%{height:6px} }
+        @keyframes bar5 { 0%,100%{height:22px} 30%{height:6px} 70%{height:30px} }
+        @keyframes bar6 { 0%,100%{height:10px} 50%{height:40px} }
+        @keyframes bar7 { 0%,100%{height:30px} 25%{height:8px} 75%{height:20px} }
         .track-item:hover { background: rgba(30,111,255,0.1) !important; }
         .dl-btn { transition: all .25s !important; }
         .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(30,111,255,0.6) !important; }
@@ -938,7 +964,16 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
   return (
     <div style={S.bg}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes bar1 { 0%,100%{height:8px} 50%{height:32px} }
+        @keyframes bar2 { 0%,100%{height:18px} 50%{height:8px} }
+        @keyframes bar3 { 0%,100%{height:28px} 25%{height:10px} 75%{height:38px} }
+        @keyframes bar4 { 0%,100%{height:12px} 40%{height:36px} 80%{height:6px} }
+        @keyframes bar5 { 0%,100%{height:22px} 30%{height:6px} 70%{height:30px} }
+        @keyframes bar6 { 0%,100%{height:10px} 50%{height:40px} }
+        @keyframes bar7 { 0%,100%{height:30px} 25%{height:8px} 75%{height:20px} }
+      `}</style>
 
       {/* BULK MODAL */}
       {showBulk && bulkQr && (
@@ -2352,7 +2387,16 @@ function PublicStreamPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: 'sans-serif' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes bar1 { 0%,100%{height:8px} 50%{height:32px} }
+        @keyframes bar2 { 0%,100%{height:18px} 50%{height:8px} }
+        @keyframes bar3 { 0%,100%{height:28px} 25%{height:10px} 75%{height:38px} }
+        @keyframes bar4 { 0%,100%{height:12px} 40%{height:36px} 80%{height:6px} }
+        @keyframes bar5 { 0%,100%{height:22px} 30%{height:6px} 70%{height:30px} }
+        @keyframes bar6 { 0%,100%{height:10px} 50%{height:40px} }
+        @keyframes bar7 { 0%,100%{height:30px} 25%{height:8px} 75%{height:20px} }
+      `}</style>
 
       {/* HERO */}
       <div style={{ position: 'relative', width: '100%', height: 300, overflow: 'hidden' }}>
@@ -2370,13 +2414,17 @@ function PublicStreamPage() {
 
       <div style={{ maxWidth: 500, margin: '0 auto', padding: '24px 16px' }}>
         {/* Info streaming gratuit */}
-        <div style={{ background: 'rgba(30,111,255,0.1)', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'rgba(30,111,255,0.1)', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 20 }}>🎧</span>
           <div>
             <p style={{ fontWeight: 700, fontSize: 13, color: '#4da6ff' }}>Streaming gratuit</p>
-            <p style={{ color: '#4a5878', fontSize: 11 }}>Téléchargement disponible via pochette physique</p>
+            <p style={{ color: '#4a5878', fontSize: 11 }}>Écoutez librement · Téléchargement payant</p>
           </div>
         </div>
+        <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
+          style={{ width: '100%', padding: '15px', fontSize: 15, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.4)', background: 'rgba(30,111,255,0.08)', color: '#4da6ff', cursor: 'pointer', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          ⬇️ Télécharger <span style={{ fontSize: 12, color: '#4a5878' }}>(Accès payant)</span>
+        </button>
 
         {/* Lecteur audio */}
         {audioFiles.length > 0 && (
