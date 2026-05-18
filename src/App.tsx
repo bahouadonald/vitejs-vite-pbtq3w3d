@@ -1806,7 +1806,7 @@ function ZikothequePage({ user }: { user: any }) {
           .catch(console.error);
       } catch(e) {}
     }
-    const q = query(collection(db, 'zikotheque'), where('uid', '==', user.uid), orderBy('addedAt', 'desc'));
+    const q = query(collection(db, 'zikotheque'), where('uid', '==', user.uid));
     const unsub = onSnapshot(q, snap => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -2411,6 +2411,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/fan/:qrId" element={<FanPage />} />
+        <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={<UserAuthPage />} />
         <Route path="/ziko/login" element={<UserAuthPage />} />
         <Route path="/artiste" element={<ArtistPage />} />
