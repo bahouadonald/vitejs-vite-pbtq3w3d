@@ -772,12 +772,22 @@ function AdminPage() {
         coverUrl = d.secure_url || '';
       }
       setUploadProgress(100);
+      // Générer un lien public unique pour cet album (basé sur le contenu uploadé)
+      const publicLinkId = newArtist.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + newLabel.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36);
       await addDoc(collection(db, 'qrcodes'), {
         qrId, label: newLabel, artist: newArtist, type: newType,
         price: parseInt(newPrice), totalScans: parseInt(newScans),
         usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length,
         status: 'active', whatsapp: newWhatsapp, coverUrl,
+        artistEmail: newArtistEmail,
+        publicLinkId,
         createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
+      });
+      // Créer aussi la page publique de streaming
+      await addDoc(collection(db, 'publicLinks'), {
+        publicLinkId, label: newLabel, artist: newArtist, type: newType,
+        files: uploaded, coverUrl, artistEmail: newArtistEmail,
+        createdAt: new Date().toISOString(),
       });
       // Enregistrer l'artiste dans la collection 'artists' si email fourni
       if (newArtistEmail) {
@@ -837,6 +847,9 @@ function AdminPage() {
           price: bulkQr.price, totalScans: scans, usedScans: 0, downloads: 0,
           files: bulkQr.files || [], fileCount: bulkQr.fileCount || 0,
           status: 'active', whatsapp: bulkQr.whatsapp || '',
+          coverUrl: bulkQr.coverUrl || '',
+          artistEmail: bulkQr.artistEmail || '',
+          publicLinkId: bulkQr.publicLinkId || '',
           createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
           bulk: true, bulkParent: bulkQr.qrId,
         })
@@ -1316,31 +1329,39 @@ function ArtistPage() {
   }, []);
 
   const loadStats = async (email: string) => {
-    // Trouver l'artiste lié à cet email dans 'artists'
+    // Chercher dans artists par email
     const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', email)));
     let artistName = '';
-    if (!artistSnap.empty) {
-      artistName = artistSnap.docs[0].data().name || '';
-    }
-    // Si pas dans artists, chercher directement dans qrcodes
+    if (!artistSnap.empty) artistName = artistSnap.docs[0].data().name || '';
+
+    // Chercher QR codes par email artiste OU par nom artiste
     let qrList: any[] = [];
-    if (artistName) {
-      const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
-      qrList = qrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } else {
-      // Fallback: charger tous les QR codes et filtrer par email si possible
-      const allQrSnap = await getDocs(collection(db, 'qrcodes'));
-      // Essayer de trouver le nom artiste depuis les QR codes existants
-      // Pour l'instant afficher message d'erreur
-      setStats({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [], artistName: email, notLinked: true });
+    const qrByEmail = await getDocs(query(collection(db, 'qrcodes'), where('artistEmail', '==', email)));
+    qrList = qrByEmail.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Si rien par email, essayer par nom artiste
+    if (qrList.length === 0 && artistName) {
+      const qrByName = await getDocs(query(collection(db, 'qrcodes'), where('artist', '==', artistName)));
+      qrList = qrByName.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    if (qrList.length === 0 && !artistName) {
+      setStats({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [], pochettes: 0, scansTotal: 0, artistName: email, notLinked: true });
       return;
     }
     const getDl = (q: any) => q.downloads !== undefined ? q.downloads : (q.usedScans || 0);
+    // QR codes originaux (non dupliqués en masse) = les pochettes créées
+    const originalQRs = qrList.filter((q: any) => !q.bulk);
+    const totalPochettes = originalQRs.length;
+    const totalScansEffectues = qrList.reduce((s: number, q: any) => s + (q.usedScans || 0), 0);
     const totalVisits = qrList.reduce((s: number, q: any) => s + (q.visits || 0), 0);
     const totalStreams = qrList.reduce((s: number, q: any) => s + (q.streams || 0), 0);
     const totalValidStreams = qrList.reduce((s: number, q: any) => s + (q.validStreams || 0), 0);
     const totalDl = qrList.reduce((s: number, q: any) => s + getDl(q), 0);
-    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, artistName, notLinked: false });
+    // Lien public de streaming
+    const publicLinks = await getDocs(query(collection(db, 'publicLinks'), where('artistEmail', '==', email)));
+    const linksList = publicLinks.docs.map(d => ({ id: d.id, ...d.data() }));
+    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues, artistName: artistName || email, notLinked: false, publicLinks: linksList });
   };
 
   const register = async () => {
@@ -1384,13 +1405,11 @@ function ArtistPage() {
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
         <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Mon tableau de bord</h2>
 
-        {/* STATS CARDS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        {/* STATS CARDS — Rangée 1 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
           {[
-            { label: 'Visites totales', value: stats.visits, icon: '👁️', color: '#1a6bff' },
-            { label: 'Téléchargements', value: stats.downloads, icon: '⬇️', color: '#1a6bff' },
-            { label: 'Streams totaux', value: stats.streams, icon: '🎵', color: '#b07a00' },
-            { label: 'Revenu estimé', value: (stats.streams * 0.1).toFixed(0) + ' FCFA', icon: '💰', color: '#1a6bff' },
+            { label: 'Pochettes créées', value: stats.pochettes || 0, icon: '💿', color: '#1a6bff' },
+            { label: 'Scans effectués', value: stats.scansTotal || 0, icon: '📱', color: '#1a6bff' },
           ].map((s, i) => (
             <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
               <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
@@ -1399,6 +1418,44 @@ function ArtistPage() {
             </div>
           ))}
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          {[
+            { label: 'Téléchargements', value: stats.downloads || 0, icon: '⬇️', color: '#1a6bff' },
+            { label: 'Streams', value: stats.streams || 0, icon: '🎵', color: '#b07a00' },
+          ].map((s, i) => (
+            <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
+              <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
+              <p style={{ fontSize: 26, fontWeight: 900, color: s.color, marginBottom: 4 }}>{s.value}</p>
+              <p style={{ color: '#8098b8', fontSize: 11 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...S.card, textAlign: 'center', padding: 20, marginBottom: 20, background: 'linear-gradient(135deg, #eef4ff, #dce8ff)' }}>
+          <p style={{ fontSize: 32, marginBottom: 6 }}>💰</p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#1a6bff', marginBottom: 4 }}>{((stats.streams || 0) * 0.45).toFixed(0)} FCFA</p>
+          <p style={{ color: '#8098b8', fontSize: 11 }}>Revenu estimé · 0,10 – 0,80 FCFA / écoute</p>
+        </div>
+
+        {/* LIENS PUBLICS */}
+        {stats.publicLinks && stats.publicLinks.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🔗 Mes liens de streaming</h3>
+            {stats.publicLinks.map((link: any) => (
+              <div key={link.id} style={{ ...S.card, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 14 }}>{link.label}</p>
+                    <p style={{ color: '#8098b8', fontSize: 12 }}>{link.type}</p>
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(BASE_URL + '/ecoute/' + link.publicLinkId); alert('Lien copié !'); }}
+                    style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>📋 Copier</button>
+                </div>
+                <p style={{ color: '#8098b8', fontSize: 10, marginTop: 8, wordBreak: 'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
 
         {/* QR CODES */}
 
@@ -2257,6 +2314,93 @@ function PWAInstallBanner() {
         </div>
       </div>
     </>
+  );
+}
+
+
+// ─────────────────────────────────────────────
+// PAGE STREAMING PUBLIC — /ecoute/:publicLinkId
+// ─────────────────────────────────────────────
+function PublicStreamPage() {
+  const { publicLinkId } = useParams<{ publicLinkId: string }>();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
+      if (!snap.empty) setData({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      setLoading(false);
+    };
+    load();
+  }, [publicLinkId]);
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#06080f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 48, height: 48, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
+    </div>
+  );
+
+  if (!data) return (
+    <div style={{ minHeight: '100vh', background: '#06080f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dde4f5' }}>
+      <div style={{ textAlign: 'center' }}><p style={{ fontSize: 48, marginBottom: 16 }}>🎵</p><p>Contenu non trouvé</p></div>
+    </div>
+  );
+
+  const audioFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i));
+  const videoFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i));
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: 'sans-serif' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+      {/* HERO */}
+      <div style={{ position: 'relative', width: '100%', height: 300, overflow: 'hidden' }}>
+        {data.coverUrl ? (
+          <img src={data.coverUrl} alt={data.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.6)' }} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535)' }} />
+        )}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.2), rgba(6,8,15,0.95))' }} />
+        <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6, color: '#fff' }}>{data.label}</h1>
+          <p style={{ color: '#4da6ff', fontSize: 14 }}>par <strong>{data.artist}</strong></p>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 500, margin: '0 auto', padding: '24px 16px' }}>
+        {/* Info streaming gratuit */}
+        <div style={{ background: 'rgba(30,111,255,0.1)', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🎧</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: 13, color: '#4da6ff' }}>Streaming gratuit</p>
+            <p style={{ color: '#4a5878', fontSize: 11 }}>Téléchargement disponible via pochette physique</p>
+          </div>
+        </div>
+
+        {/* Lecteur audio */}
+        {audioFiles.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ color: '#4a5878', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎵 Écouter</p>
+            <AudioPlayer files={audioFiles} />
+          </div>
+        )}
+
+        {/* Vidéos */}
+        {videoFiles.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ color: '#4a5878', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎬 Vidéos</p>
+            <VideoPlayer files={videoFiles} />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ textAlign: 'center', paddingBottom: 16 }}>
+          <img src={LOGO_B64} alt="DZ" style={{ width: 40, height: 40, objectFit: 'contain', margin: '0 auto 8px', display: 'block', opacity: 0.5 }} />
+          <p style={{ color: '#2a3a60', fontSize: 10, letterSpacing: 2 }}>DONIEL ZIK · La Musique. Un Scan. Un Monde.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
