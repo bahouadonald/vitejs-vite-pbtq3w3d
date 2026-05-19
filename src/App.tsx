@@ -94,70 +94,75 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   if (!files || files.length === 0) return null;
 
   return (
-    <div style={{ background: '#f5f8ff', borderRadius: 14, padding: 18, marginBottom: 16, border: '1px solid #dce6f7' }}>
+    <div style={{ background: 'linear-gradient(180deg, #0d1426 0%, #080c18 100%)', borderRadius: 20, padding: '20px 16px', marginBottom: 16, border: '1px solid rgba(30,111,255,0.15)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
       <audio ref={ref} src={cur?.url}
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
         onEnded={() => {
-          // Enregistrer stream complet
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
           else { setPlaying(false); }
         }}
         preload="metadata" />
 
-      <div style={{ textAlign: 'center', marginBottom: 12 }}>
-        <div style={{ width: 60, height: 52, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, margin: '0 auto 8px' }}>
-          {[
-            { anim: 'bar1', dur: '0.6s' },
-            { anim: 'bar2', dur: '0.4s' },
-            { anim: 'bar3', dur: '0.7s' },
-            { anim: 'bar4', dur: '0.5s' },
-            { anim: 'bar5', dur: '0.8s' },
-            { anim: 'bar6', dur: '0.45s' },
-            { anim: 'bar7', dur: '0.65s' },
-          ].map((b, i) => (
+      {/* SPECTROGRAMME MODERNE */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2.5, height: 48, marginBottom: 14 }}>
+        {Array.from({ length: 28 }, (_, i) => {
+          const anims = ['bar1','bar2','bar3','bar4','bar5','bar6','bar7'];
+          const durs = ['0.5s','0.7s','0.4s','0.8s','0.6s','0.45s','0.65s','0.55s','0.75s'];
+          const anim = anims[i % 7];
+          const dur = durs[i % 9];
+          const hue = 210 + (i / 28) * 60;
+          return (
             <div key={i} style={{
-              width: 5, borderRadius: 3,
-              background: 'linear-gradient(to top, #1e6fff, #4da6ff)',
-              height: playing ? undefined : 6,
-              animation: playing ? `${b.anim} ${b.dur} ease-in-out infinite` : 'none',
-              transition: 'height 0.2s',
+              width: 3.5,
+              borderRadius: 99,
+              background: `linear-gradient(to top, hsl(${hue}, 90%, 55%), hsl(${hue + 30}, 100%, 75%))`,
               minHeight: 4,
+              animation: playing ? `${anim} ${dur} ease-in-out infinite` : 'none',
+              animationDelay: `${(i * 0.04) % 0.5}s`,
+              opacity: playing ? 1 : 0.25,
+              transition: 'opacity 0.3s',
             }} />
-          ))}
-        </div>
-        <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}</p>
-        <p style={{ color: '#8098b8', fontSize: 11 }}>{idx + 1} / {files.length}</p>
+          );
+        })}
       </div>
 
+      {/* TITRE */}
+      <div style={{ textAlign: 'center', marginBottom: 14 }}>
+        <p style={{ fontWeight: 700, fontSize: 14, color: '#e8f0ff', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 8px' }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}</p>
+        <p style={{ color: 'rgba(100,140,220,0.6)', fontSize: 11 }}>{idx + 1} / {files.length}</p>
+      </div>
+
+      {/* BARRE DE PROGRESSION */}
       <div onClick={(e) => { if (!ref.current) return; const r = e.currentTarget.getBoundingClientRect(); ref.current.currentTime = ((e.clientX - r.left) / r.width) * ref.current.duration; }}
-        style={{ height: 5, background: '#dce6f7', borderRadius: 99, marginBottom: 6, cursor: 'pointer' }}>
-        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .1s' }} />
+        style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, marginBottom: 6, cursor: 'pointer', position: 'relative' }}>
+        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff, #80c8ff)', borderRadius: 99, transition: 'width .1s', boxShadow: '0 0 8px rgba(30,111,255,0.6)' }} />
       </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8098b8', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(100,140,220,0.5)', marginBottom: 16 }}>
         <span>{formatTime(ct)}</span><span>{formatTime(dur)}</span>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
+      {/* CONTRÔLES */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
         <button onClick={() => { if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; } }} disabled={idx === 0}
-          style={{ background: 'none', border: 'none', color: idx === 0 ? '#c8d8ef' : '#8098b8', fontSize: 20, cursor: idx === 0 ? 'default' : 'pointer' }}>⏮</button>
+          style={{ background: 'none', border: 'none', color: idx === 0 ? 'rgba(100,140,220,0.2)' : 'rgba(100,140,220,0.6)', fontSize: 22, cursor: idx === 0 ? 'default' : 'pointer', padding: 4 }}>⏮</button>
         <button onClick={toggle}
-          style={{ width: 50, height: 50, borderRadius: 99, border: 'none', background: '#1a6bff', color: '#ffffff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          style={{ width: 56, height: 56, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(30,111,255,0.5)', transition: 'transform 0.15s' }}>
           {playing ? '⏸' : '▶'}
         </button>
         <button onClick={() => { if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; } }} disabled={idx === files.length - 1}
-          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? '#c8d8ef' : '#8098b8', fontSize: 20, cursor: idx === files.length - 1 ? 'default' : 'pointer' }}>⏭</button>
+          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? 'rgba(100,140,220,0.2)' : 'rgba(100,140,220,0.6)', fontSize: 22, cursor: idx === files.length - 1 ? 'default' : 'pointer', padding: 4 }}>⏭</button>
       </div>
 
+      {/* LISTE PISTES */}
       {files.length > 1 && (
-        <div style={{ marginTop: 12, borderTop: '1px solid #dce6f7', paddingTop: 10 }}>
+        <div style={{ marginTop: 16, borderTop: '1px solid rgba(30,111,255,0.1)', paddingTop: 12 }}>
           {files.map((f, i) => (
             <div key={i} onClick={() => { setIdx(i); setPlaying(true); streamStart.current = Date.now() / 1000; }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', background: i === idx ? '#eaf1ff' : 'transparent', marginBottom: 2 }}>
-              <span style={{ color: i === idx ? '#1a6bff' : '#8098b8', fontSize: 12, fontWeight: 700, minWidth: 16 }}>{i === idx && playing ? '▶' : (i + 1)}</span>
-              <span style={{ fontSize: 12, color: i === idx ? '#1a6bff' : '#5a7090', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</span>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', background: i === idx ? 'rgba(30,111,255,0.15)' : 'transparent', marginBottom: 2, transition: 'background 0.2s' }}>
+              <span style={{ color: i === idx ? '#4da6ff' : 'rgba(100,140,220,0.4)', fontSize: 12, fontWeight: 700, minWidth: 18 }}>{i === idx && playing ? '▶' : (i + 1)}</span>
+              <span style={{ fontSize: 12, color: i === idx ? '#e8f0ff' : 'rgba(180,200,240,0.6)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</span>
             </div>
           ))}
         </div>
@@ -2361,6 +2366,26 @@ function PublicStreamPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const recordPublicStream = async (track: string, duration: number) => {
+    if (!data) return;
+    try {
+      await addDoc(collection(db, 'streams'), {
+        publicLinkId, artist: data.artist || '', label: data.label || '',
+        track, duration: Math.round(duration), valid: true,
+        source: 'publicLink', ts: new Date().toISOString(),
+      });
+      // Incrémenter streams dans le QR code parent si possible
+      if (data.artistEmail) {
+        const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artistEmail', '==', data.artistEmail), where('publicLinkId', '==', publicLinkId)));
+        if (!qrSnap.empty) {
+          await updateDoc(doc(db, 'qrcodes', qrSnap.docs[0].id), {
+            streams: (qrSnap.docs[0].data().streams || 0) + 1,
+          });
+        }
+      }
+    } catch(e) { console.error('pubStream', e); }
+  };
+
   useEffect(() => {
     const load = async () => {
       const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
@@ -2389,63 +2414,59 @@ function PublicStreamPage() {
     <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: 'sans-serif' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes bar1 { 0%,100%{height:8px} 50%{height:32px} }
-        @keyframes bar2 { 0%,100%{height:18px} 50%{height:8px} }
-        @keyframes bar3 { 0%,100%{height:28px} 25%{height:10px} 75%{height:38px} }
-        @keyframes bar4 { 0%,100%{height:12px} 40%{height:36px} 80%{height:6px} }
-        @keyframes bar5 { 0%,100%{height:22px} 30%{height:6px} 70%{height:30px} }
-        @keyframes bar6 { 0%,100%{height:10px} 50%{height:40px} }
-        @keyframes bar7 { 0%,100%{height:30px} 25%{height:8px} 75%{height:20px} }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes bar1 { 0%,100%{height:4px} 50%{height:28px} }
+        @keyframes bar2 { 0%,100%{height:14px} 50%{height:4px} }
+        @keyframes bar3 { 0%,100%{height:24px} 25%{height:6px} 75%{height:34px} }
+        @keyframes bar4 { 0%,100%{height:8px} 40%{height:32px} 80%{height:4px} }
+        @keyframes bar5 { 0%,100%{height:18px} 30%{height:4px} 70%{height:26px} }
+        @keyframes bar6 { 0%,100%{height:6px} 50%{height:36px} }
+        @keyframes bar7 { 0%,100%{height:26px} 25%{height:4px} 75%{height:16px} }
       `}</style>
 
-      {/* HERO */}
-      <div style={{ position: 'relative', width: '100%', height: 300, overflow: 'hidden' }}>
+      {/* POCHETTE PLEIN ÉCRAN */}
+      <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
         {data.coverUrl ? (
-          <img src={data.coverUrl} alt={data.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.6)' }} />
+          <img src={data.coverUrl} alt={data.label}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535)' }} />
-        )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.2), rgba(6,8,15,0.95))' }} />
-        <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6, color: '#fff' }}>{data.label}</h1>
-          <p style={{ color: '#4da6ff', fontSize: 14 }}>par <strong>{data.artist}</strong></p>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 500, margin: '0 auto', padding: '24px 16px' }}>
-        {/* Info streaming gratuit */}
-        <div style={{ background: 'rgba(30,111,255,0.1)', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }}>🎧</span>
-          <div>
-            <p style={{ fontWeight: 700, fontSize: 13, color: '#4da6ff' }}>Streaming gratuit</p>
-            <p style={{ color: '#4a5878', fontSize: 11 }}>Écoutez librement · Téléchargement payant</p>
-          </div>
-        </div>
-        <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
-          style={{ width: '100%', padding: '15px', fontSize: 15, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.4)', background: 'rgba(30,111,255,0.08)', color: '#4da6ff', cursor: 'pointer', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          ⬇️ Télécharger <span style={{ fontSize: 12, color: '#4a5878' }}>(Accès payant)</span>
-        </button>
-
-        {/* Lecteur audio */}
-        {audioFiles.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ color: '#4a5878', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎵 Écouter</p>
-            <AudioPlayer files={audioFiles} />
+          <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535, #1e3a6e)' }}>
+            <img src={LOGO_B64} alt="DZ" style={{ width: 120, height: 120, objectFit: 'contain', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', opacity: 0.2 }} />
           </div>
         )}
 
-        {/* Vidéos */}
-        {videoFiles.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ color: '#4a5878', fontWeight: 700, fontSize: 12, letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>🎬 Vidéos</p>
-            <VideoPlayer files={videoFiles} />
-          </div>
-        )}
+        {/* Overlay dégradé sombre en bas */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.1) 0%, rgba(6,8,15,0.3) 40%, rgba(6,8,15,0.95) 75%, rgba(6,8,15,1) 100%)' }} />
 
-        {/* Footer */}
-        <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-          <img src={LOGO_B64} alt="DZ" style={{ width: 40, height: 40, objectFit: 'contain', margin: '0 auto 8px', display: 'block', opacity: 0.5 }} />
-          <p style={{ color: '#2a3a60', fontSize: 10, letterSpacing: 2 }}>DONIEL ZIK · La Musique. Un Scan. Un Monde.</p>
+        {/* CONTENU EN BAS */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 32px', animation: 'fadeUp 0.4s ease' }}>
+
+          {/* Titre artiste */}
+          <p style={{ color: '#4da6ff', fontSize: 13, fontWeight: 600, marginBottom: 4, letterSpacing: 0.5 }}>{data.artist}</p>
+          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#ffffff', marginBottom: 20, lineHeight: 1.1 }}>{data.label}</h1>
+
+          {/* Lecteur compact */}
+          {audioFiles.length > 0 && <AudioPlayer files={audioFiles} onStream={recordPublicStream} />}
+
+          {/* Bouton télécharger */}
+          <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
+            style={{ width: '100%', padding: '14px', fontSize: 14, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.35)', background: 'rgba(30,111,255,0.12)', color: '#4da6ff', cursor: 'pointer', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backdropFilter: 'blur(10px)' }}>
+            ⬇️ Télécharger <span style={{ fontSize: 12, color: 'rgba(77,166,255,0.6)' }}>(Accès payant)</span>
+          </button>
+
+          {/* Vidéos si disponibles */}
+          {videoFiles.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ color: 'rgba(100,140,220,0.5)', fontWeight: 700, fontSize: 11, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>🎬 Vidéos</p>
+              <VideoPlayer files={videoFiles} />
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <img src={LOGO_B64} alt="DZ" style={{ width: 32, height: 32, objectFit: 'contain', margin: '0 auto 6px', display: 'block', opacity: 0.4 }} />
+            <p style={{ color: 'rgba(100,140,220,0.3)', fontSize: 9, letterSpacing: 2 }}>DONIEL ZIK · La Musique. Un Scan. Un Monde.</p>
+          </div>
         </div>
       </div>
     </div>
