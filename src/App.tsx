@@ -74,9 +74,20 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [bars, setBars] = useState<number[]>(Array(28).fill(4));
   const cur = files[idx];
 
-  // Initialiser Web Audio API une seule fois au montage
-  useEffect(() => {
-    if (!ref.current || audioCtxRef.current) return;
+  // Initialiser Web Audio API — recréé si l'élément audio change (changement de fichier/idx)
+  // On mémorise l'élément audio sur lequel le source node a été créé pour éviter le double bind
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+
+  const initAudioContext = () => {
+    if (!ref.current) return;
+    // Si déjà initialisé sur le même élément, ne rien faire
+    if (audioElRef.current === ref.current && audioCtxRef.current) return;
+    // Fermer le contexte précédent proprement
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch(e) {}
+      audioCtxRef.current = null;
+      analyserRef.current = null;
+    }
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = ctx.createMediaElementSource(ref.current);
@@ -86,15 +97,20 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       analyser.connect(ctx.destination); // ← indispensable : renvoie le son aux haut-parleurs
       audioCtxRef.current = ctx;
       analyserRef.current = analyser;
-    } catch(e) {}
-  }, []);
+      audioElRef.current = ref.current;
+    } catch(e) { console.warn('AudioContext init failed', e); }
+  };
+
+  useEffect(() => {
+    initAudioContext();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Boucle d'animation du spectrogramme
   useEffect(() => {
     if (!playing || !analyserRef.current) return;
-    // Reprendre le contexte si suspendu (politique autoplay navigateurs)
+    // Reprendre le contexte si suspendu (politique autoplay iOS/Safari/Chrome)
     if (audioCtxRef.current?.state === 'suspended') {
-      audioCtxRef.current.resume();
+      audioCtxRef.current.resume().catch(() => {});
     }
     const analyser = analyserRef.current;
     const data = new Uint8Array(analyser.frequencyBinCount);
@@ -115,12 +131,22 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
     if (ref.current) {
       ref.current.pause();
       ref.current.load();
+      // Réinitialiser le contexte audio : l'élément <audio> est le même DOM node
+      // mais son src a changé. createMediaElementSource est lié au node, pas à l'URL :
+      // il n'est donc PAS nécessaire de recréer — on s'assure juste que ctx est actif.
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
       if (playing) ref.current.play().catch(() => setPlaying(false));
     }
-  }, [idx]);
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggle = () => {
+  const toggle = async () => {
     if (!ref.current) return;
+    // iOS/Safari : le contexte doit être repris DANS un geste utilisateur
+    if (audioCtxRef.current?.state === 'suspended') {
+      try { await audioCtxRef.current.resume(); } catch(e) {}
+    }
     if (playing) {
       const elapsed = Date.now() / 1000 - streamStart.current;
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
@@ -472,7 +498,7 @@ function FanPage() {
           {/* HERO — Image pochette plein écran avec overlay sombre */}
           <div style={{ position: 'relative', width: '100%', height: 380, overflow: 'hidden' }}>
             {qrData.coverUrl ? (
-              <img src={qrData.coverUrl} alt={qrData.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.7)' }} />
+              <img src={qrData.coverUrl} alt={qrData.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.85)' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img src={LOGO_B64} alt="DZ" style={{ width: 120, height: 120, objectFit: 'contain', opacity: 0.4 }} />
@@ -491,8 +517,8 @@ function FanPage() {
           {/* CONTENU PRINCIPAL */}
           <div style={{ padding: '24px 16px', maxWidth: 500, margin: '0 auto', paddingBottom: 40 }}>
 
-            {/* BOUTON TÉLÉCHARGER */}
-            {!downloaded ? (
+            {/* BOUTON TÉLÉCHARGER — visible si qrData existe et non encore téléchargé */}
+            {qrData && !downloaded ? (
               onSafari ? (
                 <div style={{ marginBottom: 16 }}>
                   <button onClick={() => { const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = currentUrl.replace('https://', 'googlechromes://'); document.body.appendChild(iframe); setTimeout(() => { document.body.removeChild(iframe); window.location.href = 'https://apps.apple.com/app/google-chrome/id535886823'; }, 2500); }}
@@ -2200,10 +2226,10 @@ function AnnonceursPage() {
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const budgets = [
-    { label: '10 000 – 50 000 FCFA', value: '10k-50k', desc: 'Campagne locale 7 jours' },
-    { label: '50 000 – 150 000 FCFA', value: '50k-150k', desc: 'Campagne régionale 30 jours' },
-    { label: '150 000 – 500 000 FCFA', value: '150k-500k', desc: 'Campagne nationale 90 jours' },
-    { label: '+500 000 FCFA', value: '500k+', desc: 'Partenariat stratégique' },
+    { label: '10 000 – 50 000 FCFA', value: '10k-50k', desc: 'Campagne locale 7 jours · ~10 000 – 50 000 vues · 1 000 FCFA / 1 000 vues' },
+    { label: '50 000 – 150 000 FCFA', value: '50k-150k', desc: 'Campagne régionale 30 jours · ~50 000 – 150 000 vues · 1 000 FCFA / 1 000 vues' },
+    { label: '150 000 – 500 000 FCFA', value: '150k-500k', desc: 'Campagne nationale 90 jours · ~150 000 – 500 000 vues · 1 000 FCFA / 1 000 vues' },
+    { label: '+500 000 FCFA', value: '500k+', desc: 'Partenariat stratégique · Tarif CPM négocié' },
   ];
 
   const formats = [
