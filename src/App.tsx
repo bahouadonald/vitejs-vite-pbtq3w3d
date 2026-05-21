@@ -2321,131 +2321,561 @@ function ConditionsPage() {
 }
 
 // ─────────────────────────────────────────────
-// PAGE ANNONCEURS
+// PAGE ANNONCEURS — nouvelle version
+// Tarif unique : 1 000 FCFA = 1 000 vues
 // ─────────────────────────────────────────────
 function AnnonceursPage() {
-  const [form, setForm] = useState({ nom: '', entreprise: '', telephone: '', email: '', budget: '', format: '', message: '' });
+  const [form, setForm] = useState({ nom:'', entreprise:'', telephone:'', email:'', objectif:'', format:'', vues:'', message:'' });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k:string, v:string) => setForm(f => ({...f,[k]:v}));
 
-  const budgets = [
-    { label: '10 000 – 50 000 FCFA', value: '10k-50k', desc: 'Campagne locale 7 jours · ~10 000 – 50 000 vues · 1 000 FCFA / 1 000 vues' },
-    { label: '50 000 – 150 000 FCFA', value: '50k-150k', desc: 'Campagne régionale 30 jours · ~50 000 – 150 000 vues · 1 000 FCFA / 1 000 vues' },
-    { label: '150 000 – 500 000 FCFA', value: '150k-500k', desc: 'Campagne nationale 90 jours · ~150 000 – 500 000 vues · 1 000 FCFA / 1 000 vues' },
-    { label: '+500 000 FCFA', value: '500k+', desc: 'Partenariat stratégique · Tarif CPM négocié' },
-  ];
-
-  const formats = [
-    { label: '🖼️ Bannière image', value: 'image', desc: 'Avant chaque écoute' },
-    { label: '🎬 Vidéo courte', value: 'video', desc: 'Avant chaque clip' },
-    { label: '📢 Audio spot', value: 'audio', desc: 'Message vocal 15s' },
-  ];
+  // Calcul dynamique selon les vues choisies
+  const vuesNum = parseInt(form.vues || '0') || 0;
+  const coutFCFA = vuesNum; // 1 FCFA par vue = 1 000 FCFA / 1 000 vues
+  const clicsMin = Math.round(vuesNum * 0.10);
+  const clicsMax = Math.round(vuesNum * 0.30);
 
   const submit = async () => {
-    if (!form.nom || !form.telephone || !form.budget) { setMsg('Remplissez au moins votre nom, téléphone et budget'); return; }
+    if (!form.nom || !form.telephone || !form.objectif || !form.format) {
+      setMsg('Remplissez votre nom, téléphone, objectif et format'); return;
+    }
     setLoading(true);
     try {
-      await addDoc(collection(db, 'annonceurs'), { ...form, status: 'pending', createdAt: new Date().toISOString() });
+      await addDoc(collection(db, 'annonceurs'), {
+        ...form, vues: vuesNum, cout: coutFCFA,
+        status: 'pending', createdAt: new Date().toISOString()
+      });
       setSent(true);
-    } catch (e: any) { setMsg('Erreur : ' + e.message); }
+    } catch (e:any) { setMsg('Erreur : ' + e.message); }
     setLoading(false);
   };
 
   return (
-    <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
+        @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+        .ann-card:hover{border-color:rgba(255,200,0,0.4)!important;transform:translateY(-2px)}
+        .ann-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
+        .ann-inp::placeholder{color:rgba(255,255,255,0.3)}
+        .ann-inp:focus{border-color:rgba(255,200,0,0.5)}
+        .obj-btn{flex:1;padding:14px 8px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#8098b8;cursor:pointer;font-weight:600;font-size:13px;text-align:center;transition:all .2s}
+        .obj-btn.active{background:rgba(255,200,0,0.12);border-color:rgba(255,200,0,0.5);color:#ffd700}
+        .fmt-btn{flex:1;padding:16px 8px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#8098b8;cursor:pointer;text-align:center;transition:all .2s}
+        .fmt-btn.active{background:rgba(30,111,255,0.15);border-color:rgba(30,111,255,0.5);color:#4da6ff}
+      `}</style>
+
+      {/* HEADER */}
+      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
-        <a href="/" style={{ color: '#8098b8', fontSize: 13, textDecoration: 'none' }}>← Accueil</a>
+        <div style={{ display:'flex', gap:8 }}>
+          <a href="/studio" style={{ background:'rgba(255,200,0,0.1)', border:'1px solid rgba(255,200,0,0.3)', borderRadius:8, padding:'6px 12px', color:'#ffd700', fontSize:12, fontWeight:700, textDecoration:'none' }}>🎬 DZ Studio</a>
+          <a href="/" style={{ color:'#8098b8', fontSize:13, textDecoration:'none', padding:'6px 10px' }}>← Accueil</a>
+        </div>
       </div>
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ display: 'inline-block', background: '#eaf1ff', border: '1px solid #1e6fff33', borderRadius: 8, padding: '4px 14px', marginBottom: 16 }}>
-            <span style={{ color: '#1a6bff', fontSize: 10, letterSpacing: 3, fontWeight: 700 }}>ANNONCEURS</span>
+
+      <div style={{ maxWidth:540, margin:'0 auto', padding:'32px 16px 60px', animation:'fadeUp .35s ease' }}>
+
+        {/* HERO */}
+        <div style={{ textAlign:'center', marginBottom:32 }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,200,0,0.1)', border:'1px solid rgba(255,200,0,0.3)', borderRadius:99, padding:'5px 14px', marginBottom:16 }}>
+            <span style={{ width:7, height:7, borderRadius:99, background:'#ffd700', display:'inline-block' }} />
+            <span style={{ color:'#ffd700', fontSize:11, fontWeight:700, letterSpacing:1 }}>PUBLICITÉ · DONIEL ZIK</span>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
-            Touchez vos clients<br /><span style={{ color: '#1a6bff' }}>pendant qu'ils écoutent</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:900, color:'#fff', marginBottom:10, lineHeight:1.15 }}>
+            Touchez vos clients<br/><span style={{ color:'#ffd700' }}>pendant qu'ils écoutent</span>
           </h1>
-          <p style={{ color: '#5a7090', fontSize: 14, lineHeight: 1.8, maxWidth: 500, margin: '0 auto' }}>
-            Votre publicité diffusée avant chaque écoute musicale sur Doniel Zik. Une audience engagée, captive, ciblée en Côte d'Ivoire.
+          <p style={{ color:'#6a88aa', fontSize:14, lineHeight:1.8 }}>
+            Votre publicité diffusée avant chaque écoute sur Doniel Zik.<br/>Audience captive. Ciblage local. Stats réelles.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 32 }}>
+        {/* TARIF UNIQUE — mise en avant */}
+        <div style={{ background:'linear-gradient(135deg,rgba(255,200,0,0.1),rgba(255,150,0,0.06))', border:'1px solid rgba(255,200,0,0.35)', borderRadius:18, padding:'24px 20px', marginBottom:28, textAlign:'center' }}>
+          <p style={{ color:'#ffd700', fontSize:10, fontWeight:700, letterSpacing:3, marginBottom:12 }}>💰 TARIFICATION SIMPLE</p>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}>
+            <span style={{ fontFamily:"'Playfair Display',serif", fontSize:42, fontWeight:900, color:'#fff' }}>1 000</span>
+            <div style={{ textAlign:'left' }}>
+              <p style={{ color:'#ffd700', fontWeight:800, fontSize:16, margin:0 }}>FCFA</p>
+              <p style={{ color:'#6a88aa', fontSize:12, margin:0 }}>= 1 000 vues</p>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:8 }}>
+            <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
+              <p style={{ color:'#4da6ff', fontWeight:800, fontSize:15, margin:0 }}>100 – 300</p>
+              <p style={{ color:'#6a88aa', fontSize:10, margin:'2px 0 0' }}>clics garantis / 1 000 vues</p>
+            </div>
+            <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
+              <p style={{ color:'#4dff9a', fontWeight:800, fontSize:15, margin:0 }}>100%</p>
+              <p style={{ color:'#6a88aa', fontSize:10, margin:'2px 0 0' }}>visibilité captive</p>
+            </div>
+          </div>
+          <p style={{ color:'rgba(255,200,0,0.5)', fontSize:10, marginTop:14 }}>
+            Paiement via Orange Money · Wave · MTN MoMo
+          </p>
+        </div>
+
+        {/* AVANTAGES */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:28 }}>
           {[
-            { icon: '🎯', title: 'Audience captive', desc: 'La pub passe avant la musique. 100% de visibilité.' },
-            { icon: '📍', title: 'Ciblage local', desc: "Fans en Côte d'Ivoire, abonnés à des artistes locaux." },
-            { icon: '📊', title: 'Stats réelles', desc: "Nombre d'écoutes, clics et portée mesurés." },
-          ].map((c, i) => (
-            <div key={i} style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 14, padding: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
-              <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{c.title}</p>
-              <p style={{ color: '#8098b8', fontSize: 11, lineHeight: 1.6 }}>{c.desc}</p>
+            { icon:'🎯', title:'Captive', desc:'Pub avant la musique' },
+            { icon:'📍', title:'Local CI', desc:"Fans d'artistes locaux" },
+            { icon:'📊', title:'Stats live', desc:'Vues, clics, leads' },
+          ].map((c,i) => (
+            <div key={i} className="ann-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'14px 10px', textAlign:'center', transition:'all .2s' }}>
+              <p style={{ fontSize:24, marginBottom:6 }}>{c.icon}</p>
+              <p style={{ fontWeight:700, fontSize:12, color:'#dde4f5', marginBottom:3 }}>{c.title}</p>
+              <p style={{ color:'#4a5878', fontSize:10, lineHeight:1.5 }}>{c.desc}</p>
             </div>
           ))}
         </div>
 
-        <div style={{ ...S.card, marginBottom: 24 }}>
-          <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>💰 CHOISISSEZ VOTRE BUDGET</p>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {budgets.map((b, i) => (
-              <div key={i} onClick={() => set('budget', b.value)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f8ff', borderRadius: 10, padding: '12px 16px', border: `1px solid ${form.budget === b.value ? '#1a6bff' : '#c8d8ef'}`, cursor: 'pointer' }}>
-                <div>
-                  <p style={{ fontWeight: 700, fontSize: 14, color: form.budget === b.value ? '#1a6bff' : '#1a2340' }}>{b.label}</p>
-                  <p style={{ color: '#8098b8', fontSize: 11, marginTop: 2 }}>{b.desc}</p>
-                </div>
-                <div style={{ width: 20, height: 20, borderRadius: 99, border: `2px solid ${form.budget === b.value ? '#1a6bff' : '#2a3a60'}`, background: form.budget === b.value ? '#1a6bff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {form.budget === b.value && <span style={{ color: '#ffffff', fontSize: 12, fontWeight: 800 }}>✓</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ ...S.card, marginBottom: 24 }}>
-          <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 16 }}>📢 FORMAT DE PUBLICITÉ</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-            {formats.map((f, i) => (
-              <div key={i} onClick={() => set('format', f.value)}
-                style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, border: `1px solid ${form.format === f.value ? '#1a6bff' : '#c8d8ef'}`, cursor: 'pointer', textAlign: 'center' }}>
-                <p style={{ fontSize: 22, marginBottom: 6 }}>{f.label.split(' ')[0]}</p>
-                <p style={{ fontWeight: 700, fontSize: 12, color: form.format === f.value ? '#1a6bff' : '#1a2340', marginBottom: 4 }}>{f.label.slice(3)}</p>
-                <p style={{ color: '#8098b8', fontSize: 10 }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {!sent ? (
-          <div style={S.card}>
-            <p style={{ color: '#8098b8', fontSize: 10, letterSpacing: 2, marginBottom: 20 }}>📝 DEMANDE DE PARTENARIAT</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div><label style={S.lbl}>Nom & Prénom *</label><input style={S.inp} value={form.nom} onChange={e => set('nom', e.target.value)} placeholder="Jean Kouamé" /></div>
-              <div><label style={S.lbl}>Entreprise / Marque</label><input style={S.inp} value={form.entreprise} onChange={e => set('entreprise', e.target.value)} placeholder="Mon Entreprise CI" /></div>
-              <div><label style={S.lbl}>Téléphone / WhatsApp *</label><input style={S.inp} value={form.telephone} onChange={e => set('telephone', e.target.value)} placeholder="+225 07 00 00 00 00" /></div>
-              <div><label style={S.lbl}>Email (optionnel)</label><input style={S.inp} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contact@entreprise.ci" /></div>
+          <>
+            {/* OBJECTIF */}
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
+              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>🎯 VOTRE OBJECTIF</p>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className={'obj-btn' + (form.objectif==='visibilite'?' active':'')} onClick={() => set('objectif','visibilite')}>
+                  <p style={{ fontSize:22, marginBottom:4 }}>👁️</p>
+                  <p style={{ fontWeight:700, margin:'0 0 3px' }}>Visibilité</p>
+                  <p style={{ fontSize:10, opacity:0.7 }}>Max de vues</p>
+                </button>
+                <button className={'obj-btn' + (form.objectif==='leads'?' active':'')} onClick={() => set('objectif','leads')}>
+                  <p style={{ fontSize:22, marginBottom:4 }}>💬</p>
+                  <p style={{ fontWeight:700, margin:'0 0 3px' }}>Leads / Clics</p>
+                  <p style={{ fontSize:10, opacity:0.7 }}>Contacts clients</p>
+                </button>
+              </div>
             </div>
-            <label style={S.lbl}>Message / Détails de votre campagne</label>
-            <textarea style={{ ...S.inp, height: 100, resize: 'vertical' }} value={form.message} onChange={e => set('message', e.target.value)} placeholder="Décrivez votre produit, votre cible, vos objectifs..." />
-            {msg && <p style={{ color: '#e04060', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
-            <button style={{ ...S.btn, width: '100%', padding: 16, fontSize: 15, borderRadius: 12 }} onClick={submit} disabled={loading}>
-              {loading ? '⏳ Envoi...' : '📤 Envoyer ma demande'}
+
+            {/* FORMAT */}
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
+              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>📢 FORMAT</p>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className={'fmt-btn' + (form.format==='image'?' active':'')} onClick={() => set('format','image')}>
+                  <p style={{ fontSize:28, marginBottom:6 }}>🖼️</p>
+                  <p style={{ fontWeight:700, fontSize:13, margin:'0 0 3px' }}>Image</p>
+                  <p style={{ fontSize:10, opacity:0.6 }}>Bannière cliquable</p>
+                </button>
+                <button className={'fmt-btn' + (form.format==='video'?' active':'')} onClick={() => set('format','video')}>
+                  <p style={{ fontSize:28, marginBottom:6 }}>🎬</p>
+                  <p style={{ fontWeight:700, fontSize:13, margin:'0 0 3px' }}>Vidéo</p>
+                  <p style={{ fontSize:10, opacity:0.6 }}>Courte, avant écoute</p>
+                </button>
+              </div>
+            </div>
+
+            {/* SIMULATEUR DE VUES */}
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
+              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:6 }}>📈 SIMULATEUR DE CAMPAGNE</p>
+              <p style={{ color:'#4a5878', fontSize:11, marginBottom:14 }}>Combien de vues voulez-vous ?</p>
+              <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+                {[1000,5000,10000,50000].map(v => (
+                  <button key={v} onClick={() => set('vues', String(v))}
+                    style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${form.vues===String(v)?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.1)'}`, background: form.vues===String(v)?'rgba(255,200,0,0.12)':'rgba(255,255,255,0.04)', color: form.vues===String(v)?'#ffd700':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                    {v.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <input className="ann-inp" type="number" value={form.vues} onChange={e => set('vues',e.target.value)} placeholder="Ou entrez un nombre de vues..." style={{ marginBottom:0 }} />
+              {vuesNum > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:14 }}>
+                  <div style={{ background:'rgba(255,200,0,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:16, margin:0 }}>{vuesNum.toLocaleString()}</p>
+                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>VUES</p>
+                  </div>
+                  <div style={{ background:'rgba(30,111,255,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#4da6ff', fontWeight:800, fontSize:14, margin:0 }}>{clicsMin.toLocaleString()}–{clicsMax.toLocaleString()}</p>
+                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>CLICS EST.</p>
+                  </div>
+                  <div style={{ background:'rgba(77,255,154,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#4dff9a', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
+                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>FCFA</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* FORMULAIRE */}
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
+              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:16 }}>📝 VOS INFORMATIONS</p>
+              <input className="ann-inp" value={form.nom} onChange={e => set('nom',e.target.value)} placeholder="Nom & Prénom *" />
+              <input className="ann-inp" value={form.entreprise} onChange={e => set('entreprise',e.target.value)} placeholder="Entreprise / Marque (optionnel)" />
+              <input className="ann-inp" value={form.telephone} onChange={e => set('telephone',e.target.value)} placeholder="Téléphone WhatsApp * (+225...)" type="tel" />
+              <input className="ann-inp" value={form.email} onChange={e => set('email',e.target.value)} placeholder="Email (optionnel)" type="email" style={{ marginBottom:0 }} />
+            </div>
+
+            {msg && <p style={{ color:'#f04a6a', fontSize:13, marginBottom:12, padding:'10px 14px', background:'rgba(240,74,106,0.1)', borderRadius:10 }}>{msg}</p>}
+
+            <button onClick={submit} disabled={loading}
+              style={{ width:'100%', padding:'16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 4px 24px rgba(255,200,0,0.35)' }}>
+              {loading ? '⏳ Envoi...' : '📤 Lancer ma campagne'}
             </button>
-            <p style={{ color: '#2a3a60', fontSize: 11, textAlign: 'center', marginTop: 12 }}>Nous vous répondons sous 24h via WhatsApp ou email</p>
-          </div>
+            <p style={{ color:'#4a5878', fontSize:11, textAlign:'center', marginTop:10 }}>Réponse sous 24h · WhatsApp ou email</p>
+          </>
         ) : (
-          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 40, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center' }}>
-            <p style={{ fontSize: 52, marginBottom: 16 }}>✅</p>
-            <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Demande envoyée !</h2>
-            <p style={{ color: '#5a7090', fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
-              Merci pour votre intérêt. Notre équipe vous contacte sous 24h pour discuter de votre campagne.
+          <div style={{ background:'rgba(77,255,154,0.08)', border:'1px solid rgba(77,255,154,0.3)', borderRadius:18, padding:36, textAlign:'center', animation:'fadeUp .4s ease' }}>
+            <p style={{ fontSize:48, marginBottom:16 }}>✅</p>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:900, color:'#fff', marginBottom:8 }}>Demande envoyée !</h2>
+            <p style={{ color:'#6a88aa', fontSize:14, lineHeight:1.8, marginBottom:24 }}>
+              Notre équipe vous contacte sous 24h.<br/>Préparez votre visuel (image ou vidéo).
             </p>
-            <a href="/" style={{ ...S.btn, textDecoration: 'none', display: 'inline-block', padding: '12px 24px' }}>← Retour à l'accueil</a>
+            <a href="/studio" style={{ display:'inline-block', padding:'13px 28px', borderRadius:12, background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:14, textDecoration:'none', marginBottom:12 }}>
+              🎬 Accéder à DZ Studio
+            </a>
+            <br/>
+            <a href="/" style={{ color:'#4a5878', fontSize:13, textDecoration:'none' }}>← Retour à l'accueil</a>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// DZ STUDIO — Dashboard Annonceur
+// Stats · Leads · Chat
+// ─────────────────────────────────────────────
+function DzStudioPage() {
+  const [view, setView] = useState<'login'|'dashboard'>('login');
+  const [user, setUser] = useState<any>(null);
+  const [loginTel, setLoginTel] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginMsg, setLoginMsg] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [tab, setTab] = useState<'stats'|'leads'|'chat'>('stats');
+  const [campagnes, setCampagnes] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [chatLeadId, setChatLeadId] = useState<string|null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMsg, setNewMsg] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      if (u) { setUser(u); setView('dashboard'); }
+      else { setView('login'); }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    // Charger les campagnes de cet annonceur
+    const q1 = query(collection(db, 'annonceurs'), where('email', '==', user.email));
+    const u1 = onSnapshot(q1, snap => setCampagnes(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    // Charger les leads
+    const q2 = query(collection(db, 'leads'), where('annonceurId', '==', user.uid), orderBy('createdAt','desc'));
+    const u2 = onSnapshot(q2, snap => setLeads(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    return () => { u1(); u2(); };
+  }, [user]);
+
+  // Charger les messages du lead sélectionné
+  useEffect(() => {
+    if (!chatLeadId) return;
+    const q = query(collection(db, 'leadMessages'), where('leadId','==',chatLeadId), orderBy('ts','asc'));
+    const unsub = onSnapshot(q, snap => setMessages(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    return unsub;
+  }, [chatLeadId]);
+
+  const loginEmail = async () => {
+    setLoginLoading(true); setLoginMsg('');
+    try { await signInWithEmailAndPassword(auth, loginTel, loginPass); }
+    catch { setLoginMsg('Identifiants incorrects'); }
+    setLoginLoading(false);
+  };
+
+  const loginGoogle = async () => {
+    setLoginLoading(true); setLoginMsg('');
+    try { const p = new GoogleAuthProvider(); await signInWithPopup(auth, p); }
+    catch (e:any) { setLoginMsg('Erreur: ' + e.message); }
+    setLoginLoading(false);
+  };
+
+  const sendMessage = async () => {
+    if (!newMsg.trim() || !chatLeadId || !user) return;
+    setSending(true);
+    await addDoc(collection(db, 'leadMessages'), {
+      leadId: chatLeadId, annonceurId: user.uid,
+      from: 'annonceur', text: newMsg.trim(), ts: new Date().toISOString(),
+    });
+    setNewMsg(''); setSending(false);
+  };
+
+  // Stats agrégées
+  const totalVues = campagnes.reduce((s,c) => s + (c.vues||0), 0);
+  const totalLeads = leads.length;
+  const totalDepense = campagnes.reduce((s,c) => s + (c.cout||0), 0);
+
+  // ── LOGIN ──
+  if (view === 'login') return (
+    <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <Logo size="md" />
+          <p style={{ color:'#ffd700', fontWeight:800, fontSize:16, marginTop:10 }}>🎬 DZ Studio</p>
+          <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Dashboard Annonceur</p>
+        </div>
+        <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:18, padding:'24px 20px' }}>
+          <button onClick={loginGoogle} disabled={loginLoading}
+            style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, width:'100%', padding:'14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', marginBottom:14 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Continuer avec Google
+          </button>
+          <div style={{ textAlign:'center', color:'#4a5878', fontSize:11, marginBottom:14 }}>— ou —</div>
+          <input value={loginTel} onChange={e => setLoginTel(e.target.value)} placeholder="Email" type="email"
+            style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' }} />
+          <input value={loginPass} onChange={e => setLoginPass(e.target.value)} placeholder="Mot de passe" type="password"
+            style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:14, boxSizing:'border-box' }}
+            onKeyDown={e => e.key==='Enter' && loginEmail()} />
+          {loginMsg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{loginMsg}</p>}
+          <button onClick={loginEmail} disabled={loginLoading}
+            style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+            {loginLoading ? '⏳...' : 'Se connecter'}
+          </button>
+        </div>
+        <p style={{ textAlign:'center', marginTop:16 }}>
+          <a href="/annonceurs" style={{ color:'#4a5878', fontSize:12, textDecoration:'none' }}>Pas encore annonceur ? Créer une campagne →</a>
+        </p>
+      </div>
+    </div>
+  );
+
+  // ── DASHBOARD ──
+  const selectedLead = leads.find(l => l.id === chatLeadId);
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
+        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .lead-row:hover{background:rgba(255,200,0,0.06)!important}
+        .msg-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;}
+        .msg-inp:focus{border-color:rgba(255,200,0,0.4)}
+      `}</style>
+
+      {/* HEADER */}
+      <div style={{ background:'rgba(6,8,15,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Logo size="sm" />
+          <div>
+            <p style={{ fontWeight:800, fontSize:13, color:'#ffd700', margin:0 }}>DZ Studio</p>
+            <p style={{ color:'#4a5878', fontSize:10, margin:0 }}>{user?.displayName || user?.email}</p>
+          </div>
+        </div>
+        <button onClick={() => signOut(auth)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 10px', color:'#8098b8', cursor:'pointer', fontSize:11 }}>Déco</button>
+      </div>
+
+      {/* TABS */}
+      <div style={{ borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', background:'rgba(6,8,15,0.9)' }}>
+        {[['stats','📊 Stats'],['leads','💬 Leads'],['chat','📩 Chat']].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t as any)}
+            style={{ padding:'12px 16px', border:'none', background:'transparent', color: tab===t ? '#ffd700' : '#4a5878', cursor:'pointer', fontSize:13, fontWeight: tab===t ? 700 : 400, borderBottom:`2px solid ${tab===t?'#ffd700':'transparent'}`, transition:'all .2s' }}>
+            {l}{t==='leads'&&leads.length>0?` (${leads.length})`:''}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* ── STATS ── */}
+        {tab === 'stats' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:20 }}>
+              {[
+                { label:'Vues totales', val: totalVues.toLocaleString(), icon:'👁️', color:'#ffd700' },
+                { label:'Leads', val: totalLeads, icon:'💬', color:'#4da6ff' },
+                { label:'Dépensé', val: totalDepense.toLocaleString()+' F', icon:'💰', color:'#4dff9a' },
+              ].map((s,i) => (
+                <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
+                  <p style={{ fontSize:22, marginBottom:6 }}>{s.icon}</p>
+                  <p style={{ fontWeight:900, fontSize:20, color:s.color, margin:0 }}>{s.val}</p>
+                  <p style={{ color:'#4a5878', fontSize:10, margin:'4px 0 0' }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:12 }}>📋 MES CAMPAGNES</p>
+            {campagnes.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>📢</p>
+                <p style={{ color:'#4a5878', fontSize:13 }}>Aucune campagne — <a href="/annonceurs" style={{ color:'#ffd700', textDecoration:'none' }}>Créer une campagne</a></p>
+              </div>
+            ) : campagnes.map(c => (
+              <div key={c.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px', marginBottom:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                  <div>
+                    <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', margin:0 }}>{c.entreprise||c.nom}</p>
+                    <p style={{ color:'#4a5878', fontSize:11, margin:'3px 0 0' }}>{c.format} · {c.objectif} · {new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                  </div>
+                  <span style={{ background: c.status==='active'?'rgba(77,255,154,0.15)':'rgba(255,200,0,0.15)', border:`1px solid ${c.status==='active'?'rgba(77,255,154,0.4)':'rgba(255,200,0,0.4)'}`, borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700, color: c.status==='active'?'#4dff9a':'#ffd700' }}>
+                    {c.status==='active'?'● Actif':'● En attente'}
+                  </span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                  {[
+                    { label:'Vues', val:(c.vuesLive||0).toLocaleString(), color:'#ffd700' },
+                    { label:'Clics', val:(c.clics||0).toLocaleString(), color:'#4da6ff' },
+                    { label:'Leads', val:(c.leads||0).toLocaleString(), color:'#4dff9a' },
+                  ].map((s,i) => (
+                    <div key={i} style={{ background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px', textAlign:'center' }}>
+                      <p style={{ fontWeight:800, fontSize:16, color:s.color, margin:0 }}>{s.val}</p>
+                      <p style={{ color:'#4a5878', fontSize:9, margin:'2px 0 0' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── LEADS ── */}
+        {tab === 'leads' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:12 }}>💬 PROSPECTS INTÉRESSÉS</p>
+            {leads.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>📭</p>
+                <p style={{ color:'#4a5878', fontSize:13 }}>Aucun lead pour l'instant</p>
+                <p style={{ color:'#2a3a60', fontSize:11, marginTop:4 }}>Les prospects qui cliquent sur votre pub et laissent leur numéro apparaissent ici</p>
+              </div>
+            ) : leads.map(l => (
+              <div key={l.id} className="lead-row"
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', marginBottom:10, cursor:'pointer', transition:'background .15s' }}
+                onClick={() => { setChatLeadId(l.id); setTab('chat'); }}>
+                <div style={{ width:40, height:40, borderRadius:99, background:'linear-gradient(135deg,rgba(255,200,0,0.2),rgba(255,100,0,0.2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>👤</div>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', margin:0 }}>{l.telephone}</p>
+                  <p style={{ color:'#4a5878', fontSize:11, margin:'2px 0 0' }}>{new Date(l.createdAt).toLocaleDateString('fr')} · {l.campagneLabel||'Campagne'}</p>
+                </div>
+                <span style={{ color:'#4da6ff', fontSize:18 }}>→</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── CHAT ── */}
+        {tab === 'chat' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            {!chatLeadId ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>📩</p>
+                <p style={{ color:'#4a5878', fontSize:13 }}>Sélectionnez un lead dans l'onglet Leads pour démarrer une conversation</p>
+                <button onClick={() => setTab('leads')} style={{ marginTop:12, padding:'10px 20px', borderRadius:10, border:'none', background:'rgba(255,200,0,0.15)', color:'#ffd700', cursor:'pointer', fontWeight:700, fontSize:13 }}>Voir mes leads</button>
+              </div>
+            ) : (
+              <>
+                {/* Header chat */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16, padding:'12px 14px', background:'rgba(255,255,255,0.04)', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
+                  <button onClick={() => setChatLeadId(null)} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18, padding:0 }}>←</button>
+                  <div style={{ width:34, height:34, borderRadius:99, background:'linear-gradient(135deg,rgba(255,200,0,0.2),rgba(255,100,0,0.2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>👤</div>
+                  <div>
+                    <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', margin:0 }}>{selectedLead?.telephone}</p>
+                    <p style={{ color:'#4dff9a', fontSize:10, margin:'1px 0 0' }}>● Prospect intéressé</p>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', minHeight:280, maxHeight:380, overflowY:'auto', padding:'14px', marginBottom:12 }}>
+                  {messages.length === 0 ? (
+                    <p style={{ textAlign:'center', color:'#2a3a60', fontSize:12, marginTop:60 }}>Démarrez la conversation</p>
+                  ) : messages.map(m => (
+                    <div key={m.id} style={{ marginBottom:10, display:'flex', justifyContent: m.from==='annonceur' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth:'75%', padding:'10px 14px', borderRadius: m.from==='annonceur' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.from==='annonceur' ? 'rgba(255,200,0,0.15)' : 'rgba(255,255,255,0.06)', border: m.from==='annonceur' ? '1px solid rgba(255,200,0,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+                        <p style={{ color:'#dde4f5', fontSize:14, margin:0, lineHeight:1.5 }}>{m.text}</p>
+                        <p style={{ color:'#4a5878', fontSize:9, margin:'4px 0 0', textAlign:'right' }}>{new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input */}
+                <div style={{ display:'flex', gap:8 }}>
+                  <input className="msg-inp" value={newMsg} onChange={e => setNewMsg(e.target.value)}
+                    onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendMessage()}
+                    placeholder="Écrire un message..." />
+                  <button onClick={sendMessage} disabled={sending||!newMsg.trim()}
+                    style={{ width:44, height:44, borderRadius:10, border:'none', background: newMsg.trim()?'linear-gradient(135deg,#ffd700,#ff9500)':'rgba(255,255,255,0.08)', color: newMsg.trim()?'#000':'#4a5878', cursor: newMsg.trim()?'pointer':'default', fontSize:18, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    ➤
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// WIDGET PUB — affiché dans FanPage/PublicStreamPage
+// Le fan voit la pub et peut laisser son numéro
+// ─────────────────────────────────────────────
+function PubWidget({ annonceurId, campagneId, campagneLabel }: { annonceurId:string, campagneId:string, campagneLabel:string }) {
+  const [showForm, setShowForm] = useState(false);
+  const [tel, setTel] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const submit = async () => {
+    if (!tel || !accepted) return;
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'leads'), {
+        annonceurId, campagneId, campagneLabel,
+        telephone: tel, createdAt: new Date().toISOString(),
+      });
+      // Incrémenter leads sur la campagne
+      await updateDoc(doc(db, 'annonceurs', campagneId), { leads: 1 }); // simplifié
+      setSent(true);
+    } catch(e) { console.error(e); }
+    setSending(false);
+  };
+
+  if (sent) return (
+    <div style={{ padding:'12px 14px', borderRadius:12, background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.3)', display:'flex', alignItems:'center', gap:10 }}>
+      <span style={{ fontSize:20 }}>✅</span>
+      <p style={{ color:'#4dff9a', fontSize:13, fontWeight:700, margin:0 }}>L'annonceur va vous contacter !</p>
+    </div>
+  );
+
+  return (
+    <div style={{ background:'rgba(255,200,0,0.06)', border:'1px solid rgba(255,200,0,0.2)', borderRadius:14, overflow:'hidden', marginBottom:16 }}>
+      <div style={{ padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ background:'rgba(255,200,0,0.15)', borderRadius:6, padding:'3px 7px', fontSize:9, fontWeight:700, color:'#ffd700' }}>PUB</span>
+          <p style={{ color:'#dde4f5', fontSize:13, fontWeight:600, margin:0 }}>{campagneLabel}</p>
+        </div>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            style={{ background:'rgba(255,200,0,0.15)', border:'1px solid rgba(255,200,0,0.3)', borderRadius:8, padding:'6px 12px', color:'#ffd700', cursor:'pointer', fontSize:12, fontWeight:700 }}>
+            En savoir plus
+          </button>
+        )}
+      </div>
+      {showForm && (
+        <div style={{ padding:'0 16px 14px', borderTop:'1px solid rgba(255,200,0,0.15)' }}>
+          <p style={{ color:'#6a88aa', fontSize:12, marginBottom:10 }}>Laissez votre numéro pour être contacté</p>
+          <input value={tel} onChange={e => setTel(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel"
+            style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'11px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' }} />
+          <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:12 }}>
+            <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} id="cgu-pub" style={{ marginTop:2, flexShrink:0 }} />
+            <label htmlFor="cgu-pub" style={{ color:'#4a5878', fontSize:11, lineHeight:1.5 }}>
+              J'accepte d'être contacté par l'annonceur via WhatsApp ou appel téléphonique.
+            </label>
+          </div>
+          <button onClick={submit} disabled={!tel||!accepted||sending}
+            style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', background: tel&&accepted?'linear-gradient(135deg,#ffd700,#ff9500)':'rgba(255,255,255,0.08)', color: tel&&accepted?'#000':'#4a5878', fontWeight:700, fontSize:14, cursor: tel&&accepted?'pointer':'default' }}>
+            {sending ? '⏳...' : '📲 Je suis intéressé'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2924,6 +3354,7 @@ export default function App() {
         <Route path="/artiste" element={<ArtistPage />} />
         <Route path="/artiste/login" element={<ArtistPage />} />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
+        <Route path="/studio" element={<DzStudioPage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
