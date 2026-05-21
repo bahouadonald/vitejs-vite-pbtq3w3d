@@ -333,7 +333,49 @@ function FanPage() {
       else setStep('ready');
     };
     load();
-  }, [qrId]);
+  }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sauvegarde dans Ma Zikothèque ──
+  // Appelée dès le chargement ET au téléchargement.
+  // Utilise localStorage (persiste entre pages) comme fallback si non connecté.
+  const saveToZikotheque = async (data?: any) => {
+    const src = data || qrData;
+    if (!src) return;
+    try {
+      const zikoData = {
+        qrId: src.qrId || qrId,
+        label: src.label || '',
+        artist: src.artist || '',
+        type: src.type || 'album',
+        files: src.files || [],
+        coverUrl: src.coverUrl || '',
+        addedAt: new Date().toISOString(),
+      };
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        // Déjà connecté : écrire directement dans Firestore, sans doublon
+        const existing = await getDocs(query(
+          collection(db, 'zikotheque'),
+          where('uid', '==', currentUser.uid),
+          where('qrId', '==', zikoData.qrId)
+        ));
+        if (existing.empty) {
+          await addDoc(collection(db, 'zikotheque'), { uid: currentUser.uid, ...zikoData });
+        }
+        localStorage.removeItem('pendingZiko');
+      } else {
+        // Non connecté : localStorage (survit à la navigation entre pages)
+        localStorage.setItem('pendingZiko', JSON.stringify(zikoData));
+      }
+    } catch (e) { console.error('ziko', e); }
+  };
+
+  // ── Sauvegarder automatiquement dès que qrData est chargé ──
+  useEffect(() => {
+    if (qrData && qrData.status !== 'locked') {
+      saveToZikotheque(qrData);
+    }
+  }, [qrData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Enregistrer un stream ──
   const recordStream = async (trackName: string, duration: number) => {
@@ -365,25 +407,7 @@ function FanPage() {
         status: newUsed >= qrData.totalScans ? 'locked' : 'active',
       });
     } catch(e) { console.error('markDL', e); }
-     // ── Sauvegarde dans Ma Zikothèque ──
-     try {
-       const currentUser = auth.currentUser;
-       const zikoData = {
-         qrId: qrData.qrId || qrId,
-         label: qrData.label || '',
-         artist: qrData.artist || '',
-         type: qrData.type || 'album',
-         files: qrData.files || [],
-         coverUrl: qrData.coverUrl || '',
-         addedAt: new Date().toISOString(),
-       };
-       if (currentUser) {
-         await addDoc(collection(db, 'zikotheque'), { uid: currentUser.uid, ...zikoData });
-       } else {
-         sessionStorage.setItem('pendingZiko', JSON.stringify(zikoData));
-       }
-     } catch (e) { console.error('ziko', e); }
-
+    await saveToZikotheque(qrData);
   };
 
   const startDownload = async () => {
@@ -1866,21 +1890,38 @@ function ZikothequePage({ user }: { user: any }) {
 
   useEffect(() => {
     if (!user) return;
-    const pending = sessionStorage.getItem('pendingZiko');
-    if (pending) {
-      try {
-        const zikoData = JSON.parse(pending);
-        addDoc(collection(db, 'zikotheque'), { uid: user.uid, ...zikoData })
-          .then(() => sessionStorage.removeItem('pendingZiko'))
-          .catch(console.error);
-      } catch(e) {}
-    }
-    const q = query(collection(db, 'zikotheque'), where('uid', '==', user.uid));
-    const unsub = onSnapshot(q, snap => {
-      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    });
-    return unsub;
+
+    const syncPending = async () => {
+      // Récupérer depuis localStorage (persiste entre pages, contrairement à sessionStorage)
+      const pending = localStorage.getItem('pendingZiko');
+      if (pending) {
+        try {
+          const zikoData = JSON.parse(pending);
+          // Vérifier si déjà présent pour éviter les doublons
+          const existing = await getDocs(query(
+            collection(db, 'zikotheque'),
+            where('uid', '==', user.uid),
+            where('qrId', '==', zikoData.qrId)
+          ));
+          if (existing.empty) {
+            await addDoc(collection(db, 'zikotheque'), { uid: user.uid, ...zikoData });
+          }
+          localStorage.removeItem('pendingZiko');
+        } catch(e) { console.error('sync pending ziko', e); }
+      }
+
+      // Démarrer l'écoute en temps réel APRÈS la sync
+      const q = query(collection(db, 'zikotheque'), where('uid', '==', user.uid));
+      const unsub = onSnapshot(q, snap => {
+        setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      });
+      return unsub;
+    };
+
+    let unsubFn: (() => void) | undefined;
+    syncPending().then(unsub => { unsubFn = unsub; });
+    return () => { if (unsubFn) unsubFn(); };
   }, [user]);
 
   useEffect(() => {
