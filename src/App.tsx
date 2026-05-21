@@ -413,7 +413,57 @@ function FanPage() {
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
-  const currentUrl = window.location.href;
+  // Achat — Flux 3
+  const [achatState, setAchatState] = useState<'idle'|'modal'|'pending'>('idle');
+  const [achatPhone, setAchatPhone] = useState('');
+  const [achatAccepted, setAchatAccepted] = useState(false);
+  const [achatSending, setAchatSending] = useState(false);
+  const [achatVenteId, setAchatVenteId] = useState('');
+  const [achatMsgs, setAchatMsgs] = useState<any[]>([]);
+  const [achatDlActive, setAchatDlActive] = useState(false);
+
+  // Écouter les messages et le statut de la vente
+  useEffect(() => {
+    if (!achatVenteId) return;
+    const qMsg = query(collection(db, 'venteMessages'), where('venteId', '==', achatVenteId), orderBy('ts', 'asc'));
+    const u1 = onSnapshot(qMsg, snap => setAchatMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    // Écouter si le paiement a été validé
+    const u2 = onSnapshot(doc(db, 'ventes', achatVenteId), (d) => {
+      if (d.exists() && d.data()?.dlActive) setAchatDlActive(true);
+    });
+    return () => { u1(); u2(); };
+  }, [achatVenteId]);
+
+  const submitAchat = async () => {
+    if (!achatPhone || !achatAccepted || !qrData) return;
+    setAchatSending(true);
+    try {
+      const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qrId)));
+      let artistId = ''; let artistEmail = '';
+      if (!qrSnap.empty) {
+        const qrDoc = qrSnap.docs[0].data();
+        artistEmail = qrDoc.artistEmail || '';
+        const artSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', artistEmail)));
+        if (!artSnap.empty) artistId = artSnap.docs[0].data().uid || artSnap.docs[0].id;
+      }
+      const venteRef = await addDoc(collection(db, 'ventes'), {
+        qrId, artistId, artistEmail,
+        albumLabel: qrData.label || '',
+        prix: qrData.price || 0,
+        melomanePhone: achatPhone,
+        statut: 'en_attente', dlActive: false,
+        readByArtist: false, createdAt: new Date().toISOString(),
+      });
+      setAchatVenteId(venteRef.id);
+      await addDoc(collection(db, 'venteMessages'), {
+        venteId: venteRef.id, artistId, from: 'melomane',
+        text: `Bonjour ! Je souhaite acheter "${qrData.label}". Mon numéro : ${achatPhone}`,
+        ts: new Date().toISOString(),
+      });
+      setAchatState('pending');
+    } catch(e) { console.error(e); }
+    setAchatSending(false);
+  };
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -597,6 +647,83 @@ function FanPage() {
           </div>
 
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
+
+            {/* ── ACHETER CETTE MUSIQUE ── */}
+            {qrData.price > 0 && (
+              <div style={{ marginBottom:20 }}>
+                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>💰 Acheter</p>
+
+                {achatDlActive ? (
+                  /* Paiement validé → téléchargement actif */
+                  <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+                    <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement validé !</p>
+                    <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 12px' }}>L'artiste a confirmé votre paiement. Téléchargez ci-dessus.</p>
+                    <button onClick={startDownload}
+                      style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                      ⬇ Télécharger maintenant
+                    </button>
+                  </div>
+                ) : achatState === 'pending' && achatVenteId ? (
+                  /* En attente — chat avec l'artiste */
+                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:14 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                      <span style={{ width:8, height:8, borderRadius:99, background:'#4dff9a', display:'inline-block', animation:'pulse 1.5s infinite' }} />
+                      <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>En discussion avec l'artiste</p>
+                    </div>
+                    <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, minHeight:160, maxHeight:260, overflowY:'auto', padding:12, marginBottom:10, border:'1px solid rgba(255,255,255,0.05)' }}>
+                      {achatMsgs.map(m => (
+                        <div key={m.id} style={{ marginBottom:8, display:'flex', justifyContent:m.from==='melomane'?'flex-end':'flex-start' }}>
+                          {m.from==='artiste' && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, marginBottom:2, marginLeft:3 }}>ARTISTE</p>}
+                          <div style={{ maxWidth:'80%', padding:'9px 13px', borderRadius:m.from==='melomane'?'14px 14px 4px 14px':'14px 14px 14px 4px', background:m.from==='melomane'?'rgba(30,111,255,0.2)':'rgba(255,255,255,0.06)', border:m.from==='melomane'?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
+                            <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.5 }}>{m.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {achatMsgs.length === 0 && (
+                        <p style={{ textAlign:'center', color:'#2a3a60', fontSize:11, marginTop:40 }}>L'artiste va vous répondre bientôt...</p>
+                      )}
+                    </div>
+                    <p style={{ color:'#4a5878', fontSize:11, textAlign:'center' }}>
+                      ⏳ En attente de la validation du paiement par l'artiste
+                    </p>
+                  </div>
+                ) : achatState === 'modal' ? (
+                  /* Modal saisie numéro */
+                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:18 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                      <p style={{ fontWeight:800, fontSize:15, color:'#fff', margin:0 }}>💰 Acheter "{qrData.label}"</p>
+                      <button onClick={() => setAchatState('idle')} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18 }}>✕</button>
+                    </div>
+                    <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:14 }}>
+                      <p style={{ color:'#4da6ff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{(qrData.price||0).toLocaleString()} FCFA</p>
+                      <p style={{ color:'#4a5878', fontSize:11, margin:0 }}>Paiement via Mobile Money · Confirmation par l'artiste</p>
+                    </div>
+                    <p style={{ color:'#6a88aa', fontSize:12, marginBottom:10 }}>Votre numéro pour que l'artiste vous contacte :</p>
+                    <input value={achatPhone} onChange={e => setAchatPhone(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel"
+                      style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:15, outline:'none', marginBottom:12, boxSizing:'border-box' }} />
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:16 }}>
+                      <input type="checkbox" checked={achatAccepted} onChange={e => setAchatAccepted(e.target.checked)} id="cgu-achat" style={{ marginTop:3, flexShrink:0 }} />
+                      <label htmlFor="cgu-achat" style={{ color:'#4a5878', fontSize:11, lineHeight:1.6 }}>
+                        J'accepte d'être contacté par l'artiste via ce numéro pour finaliser le paiement et recevoir l'accès au téléchargement.
+                      </label>
+                    </div>
+                    <button onClick={submitAchat} disabled={!achatPhone || !achatAccepted || achatSending}
+                      style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background: achatPhone&&achatAccepted?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.08)', color: achatPhone&&achatAccepted?'#fff':'#4a5878', fontWeight:800, fontSize:15, cursor: achatPhone&&achatAccepted?'pointer':'default' }}>
+                      {achatSending ? '⏳ Envoi...' : '📲 Envoyer ma demande'}
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setAchatState('modal')}
+                    style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)' }}>
+                    <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>💰</span>
+                    <div style={{ textAlign:'left' }}>
+                      <p style={{ margin:0, fontWeight:800 }}>Acheter cette musique</p>
+                      <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{(qrData.price||0).toLocaleString()} FCFA · Téléchargement permanent</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* ── ÉCOUTER EN STREAMING ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
@@ -911,17 +1038,62 @@ function AdminPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [annonceurs, setAnnonceurs] = useState<any[]>([]);
+  const [adminChatId, setAdminChatId] = useState<string|null>(null);
+  const [adminChatMsgs, setAdminChatMsgs] = useState<any[]>([]);
+  const [adminChatInput, setAdminChatInput] = useState('');
+  const [adminChatSending, setAdminChatSending] = useState(false);
 
   useEffect(() => { onAuthStateChanged(auth, (u) => { if (u && u.email === ADMIN_EMAIL) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
   useEffect(() => {
     if (!user) return;
     const u1 = onSnapshot(query(collection(db, 'qrcodes'), orderBy('createdAt', 'desc')), s => setQrcodes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u2 = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), s => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { u1(); u2(); };
+    const u3 = onSnapshot(query(collection(db, 'annonceurs'), orderBy('createdAt', 'desc')), s => setAnnonceurs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { u1(); u2(); u3(); };
   }, [user]);
 
   const login = async () => { setLoading(true); try { await signInWithEmailAndPassword(auth, email, password); setMsg(''); } catch { setMsg('Email ou mot de passe incorrect'); } setLoading(false); };
   const logout = async () => { await signOut(auth); };
+
+  // ── Chat admin ↔ annonceur ──
+  useEffect(() => {
+    if (!adminChatId) return;
+    const q = query(collection(db, 'adminChats'), where('annonceurId','==',adminChatId), orderBy('ts','asc'));
+    const unsub = onSnapshot(q, snap => setAdminChatMsgs(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    return unsub;
+  }, [adminChatId]);
+
+  const sendAdminMsg = async () => {
+    if (!adminChatInput.trim() || !adminChatId) return;
+    setAdminChatSending(true);
+    await addDoc(collection(db, 'adminChats'), {
+      annonceurId: adminChatId, from: 'admin',
+      text: adminChatInput.trim(), ts: new Date().toISOString(), read: false,
+    });
+    setAdminChatInput(''); setAdminChatSending(false);
+  };
+
+  const validerCampagne = async (id: string) => {
+    await updateDoc(doc(db, 'annonceurs', id), { status: 'active', activatedAt: new Date().toISOString() });
+    // Notifier l'annonceur via adminChats
+    await addDoc(collection(db, 'adminChats'), {
+      annonceurId: id, from: 'admin',
+      text: '✅ Votre campagne a été validée et est maintenant active ! Vous allez commencer à recevoir des vues.',
+      ts: new Date().toISOString(), read: false,
+    });
+    setMsg('Campagne activée !');
+  };
+
+  const rejeterCampagne = async (id: string) => {
+    await updateDoc(doc(db, 'annonceurs', id), { status: 'rejected' });
+    await addDoc(collection(db, 'adminChats'), {
+      annonceurId: id, from: 'admin',
+      text: '❌ Votre campagne a été refusée. Contactez-nous pour plus d\'informations.',
+      ts: new Date().toISOString(), read: false,
+    });
+    setMsg('Campagne rejetée.');
+  };
 
   const uploadFile = async (file: File, qrId: string, i: number, total: number, setProgress: (s: string, p: number) => void) => {
     const fd = new FormData();
@@ -1271,6 +1443,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={tabStyle(tab === 'pochettes')} onClick={() => setTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
+        <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
+          📢 Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
+        </button>
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
@@ -1375,6 +1550,148 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         )}
 
         {tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
+
+        {tab === 'annonceurs' && (
+          <div style={{ display: 'grid', gridTemplateColumns: adminChatId ? '1fr 1fr' : '1fr', gap: 20 }}>
+
+            {/* LISTE CAMPAGNES */}
+            <div>
+              <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 16, color: '#1a2340' }}>
+                Campagnes annonceurs
+                {annonceurs.filter(a => a.status === 'pending').length > 0 && (
+                  <span style={{ marginLeft: 10, background: '#fff8e6', border: '1px solid #f0b84a', borderRadius: 99, padding: '2px 10px', fontSize: 12, color: '#b07a00', fontWeight: 700 }}>
+                    {annonceurs.filter(a => a.status === 'pending').length} en attente
+                  </span>
+                )}
+              </p>
+              {annonceurs.length === 0 ? (
+                <div style={{ ...S.card, textAlign: 'center', color: '#8098b8' }}>Aucune campagne reçue</div>
+              ) : annonceurs.map(a => {
+                const isPending = a.status === 'pending';
+                const isActive = a.status === 'active';
+                const isRejected = a.status === 'rejected';
+                return (
+                  <div key={a.id} style={{ ...S.card, marginBottom: 12, borderLeft: `4px solid ${isActive ? '#4dff9a' : isPending ? '#f0b84a' : '#f04a6a'}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                      <div>
+                        <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 2 }}>{a.entreprise || a.nom}</p>
+                        <p style={{ color: '#5a7090', fontSize: 12 }}>{a.nom} · {a.telephone}</p>
+                        {a.email && <p style={{ color: '#8098b8', fontSize: 11 }}>{a.email}</p>}
+                      </div>
+                      <span style={badgeStyle(isActive ? 'active' : isPending ? 'pending' : 'rejected')}>
+                        {isActive ? '● Actif' : isPending ? '⏳ En attente' : '✕ Rejeté'}
+                      </span>
+                    </div>
+
+                    {/* Détails campagne */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                      {[
+                        { label: 'Format', val: a.format || '—' },
+                        { label: 'Objectif', val: a.objectif || '—' },
+                        { label: 'Vues', val: (a.vues || 0).toLocaleString() },
+                        { label: 'Coût', val: (a.cout || 0).toLocaleString() + ' F' },
+                        { label: 'Vues live', val: (a.vuesLive || 0).toLocaleString() },
+                        { label: 'Leads', val: (a.leads || 0).toLocaleString() },
+                      ].map((s, i) => (
+                        <div key={i} style={{ background: '#f5f8ff', borderRadius: 8, padding: '7px 10px' }}>
+                          <p style={{ color: '#8098b8', fontSize: 9, marginBottom: 2 }}>{s.label}</p>
+                          <p style={{ fontWeight: 700, fontSize: 13, color: '#1a2340', margin: 0 }}>{s.val}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Visuel uploadé */}
+                    {a.visualUrl && (
+                      <div style={{ marginBottom: 10 }}>
+                        {a.format === 'video' ? (
+                          <video src={a.visualUrl} controls style={{ width: '100%', maxHeight: 160, borderRadius: 8, background: '#000' }} />
+                        ) : (
+                          <img src={a.visualUrl} alt="visuel" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8 }} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {isPending && (
+                        <>
+                          <button onClick={() => validerCampagne(a.id)}
+                            style={{ background: '#eaffea', border: '1px solid #4dff9a', borderRadius: 8, padding: '8px 14px', color: '#00a040', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                            ✅ Valider
+                          </button>
+                          <button onClick={() => rejeterCampagne(a.id)}
+                            style={{ ...S.btnRed, fontSize: 12 }}>
+                            ✕ Rejeter
+                          </button>
+                        </>
+                      )}
+                      {isActive && (
+                        <button onClick={() => updateDoc(doc(db, 'annonceurs', a.id), { status: 'pending' })}
+                          style={{ ...S.btn2, fontSize: 12, color: '#b07a00', borderColor: '#f0b84a' }}>
+                          ⏸ Suspendre
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setAdminChatId(adminChatId === a.id ? null : a.id)}
+                        style={{ ...S.btn, padding: '8px 14px', fontSize: 12, background: adminChatId === a.id ? '#0050d0' : '#1a6bff' }}>
+                        💬 {adminChatId === a.id ? 'Fermer chat' : 'Chat'}
+                      </button>
+                    </div>
+
+                    <p style={{ color: '#8098b8', fontSize: 10, marginTop: 8 }}>
+                      Soumis le {new Date(a.createdAt).toLocaleDateString('fr')} à {new Date(a.createdAt).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* CHAT ADMIN ↔ ANNONCEUR */}
+            {adminChatId && (() => {
+              const ann = annonceurs.find(a => a.id === adminChatId);
+              return (
+                <div style={{ position: 'sticky', top: 84, height: 'fit-content' }}>
+                  <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #dce6f7' }}>
+                      <div>
+                        <p style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>💬 Chat avec annonceur</p>
+                        <p style={{ color: '#5a7090', fontSize: 12 }}>{ann?.entreprise || ann?.nom} · {ann?.telephone}</p>
+                      </div>
+                      <button onClick={() => setAdminChatId(null)} style={{ background: 'none', border: 'none', color: '#8098b8', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    </div>
+
+                    {/* Messages */}
+                    <div style={{ background: '#f5f8ff', borderRadius: 10, minHeight: 220, maxHeight: 340, overflowY: 'auto', padding: 12, marginBottom: 12 }}>
+                      {adminChatMsgs.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: '#8098b8', fontSize: 12, marginTop: 40 }}>Démarrez la conversation</p>
+                      ) : adminChatMsgs.map(m => (
+                        <div key={m.id} style={{ marginBottom: 8, display: 'flex', justifyContent: m.from === 'admin' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{ maxWidth: '78%', padding: '9px 13px', borderRadius: m.from === 'admin' ? '12px 12px 3px 12px' : '12px 12px 12px 3px', background: m.from === 'admin' ? '#1a6bff' : '#ffffff', border: m.from === 'admin' ? 'none' : '1px solid #dce6f7' }}>
+                            <p style={{ color: m.from === 'admin' ? '#fff' : '#1a2340', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{m.text}</p>
+                            <p style={{ color: m.from === 'admin' ? 'rgba(255,255,255,0.6)' : '#8098b8', fontSize: 9, margin: '3px 0 0', textAlign: 'right' }}>
+                              {new Date(m.ts).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Input */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={adminChatInput} onChange={e => setAdminChatInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendAdminMsg()}
+                        placeholder="Message à l'annonceur..."
+                        style={{ ...S.inp, marginBottom: 0, flex: 1 }} />
+                      <button onClick={sendAdminMsg} disabled={adminChatSending || !adminChatInput.trim()}
+                        style={{ ...S.btn, padding: '0 16px', fontSize: 18, opacity: adminChatInput.trim() ? 1 : 0.5 }}>➤</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {tab === 'payments' && (
           <>
@@ -1511,13 +1828,108 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
+  const [dashTab, setDashTab] = useState<'stats'|'ventes'|'options'>('stats');
+
+  // Ventes / chat mélomane
+  const [ventes, setVentes] = useState<any[]>([]);
+  const [chatVenteId, setChatVenteId] = useState<string|null>(null);
+  const [venteMsgs, setVenteMsgs] = useState<any[]>([]);
+  const [venteInput, setVenteInput] = useState('');
+  const [venteSending, setVenteSending] = useState(false);
+  const [unreadVentes, setUnreadVentes] = useState(0);
+
+  // Option paiement artiste
+  const [optionPaiement, setOptionPaiement] = useState<'dz'|'artiste'|''>('');
+  const [lienPaiement, setLienPaiement] = useState('');
+  const [savingOption, setSavingOption] = useState(false);
+  const [optionMsg, setOptionMsg] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
-      if (u) { setUser(u); setView('dashboard'); loadStats(u.email || ''); }
+      if (u) { setUser(u); setView('dashboard'); loadStats(u.email || ''); loadArtistOptions(u.uid); }
       else { setUser(null); setView('login'); }
     });
   }, []);
+
+  // Charger les demandes d'achat en temps réel
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'ventes'), where('artistId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setVentes(list);
+      setUnreadVentes(list.filter((v: any) => !v.readByArtist).length);
+    });
+    return unsub;
+  }, [user]);
+
+  // Messages de la vente sélectionnée
+  useEffect(() => {
+    if (!chatVenteId) return;
+    const q = query(collection(db, 'venteMessages'), where('venteId', '==', chatVenteId), orderBy('ts', 'asc'));
+    const unsub = onSnapshot(q, snap => setVenteMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    // Marquer comme lu
+    if (chatVenteId) updateDoc(doc(db, 'ventes', chatVenteId), { readByArtist: true }).catch(() => {});
+    return unsub;
+  }, [chatVenteId]);
+
+  const loadArtistOptions = async (uid: string) => {
+    try {
+      const snap = await getDocs(query(collection(db, 'artistOptions'), where('uid', '==', uid)));
+      if (!snap.empty) {
+        const d = snap.docs[0].data();
+        setOptionPaiement(d.optionPaiement || '');
+        setLienPaiement(d.lienPaiement || '');
+      }
+    } catch(e) {}
+  };
+
+  const saveOptions = async () => {
+    if (!user || !optionPaiement) { setOptionMsg('Choisissez une option'); return; }
+    setSavingOption(true); setOptionMsg('');
+    try {
+      const snap = await getDocs(query(collection(db, 'artistOptions'), where('uid', '==', user.uid)));
+      if (snap.empty) {
+        await addDoc(collection(db, 'artistOptions'), { uid: user.uid, optionPaiement, lienPaiement, updatedAt: new Date().toISOString() });
+      } else {
+        await updateDoc(doc(db, 'artistOptions', snap.docs[0].id), { optionPaiement, lienPaiement, updatedAt: new Date().toISOString() });
+      }
+      setOptionMsg('✅ Options sauvegardées !');
+    } catch(e: any) { setOptionMsg('Erreur: ' + e.message); }
+    setSavingOption(false);
+  };
+
+  // Envoyer message à un mélomane
+  const sendVenteMsg = async () => {
+    if (!venteInput.trim() || !chatVenteId || !user) return;
+    setVenteSending(true);
+    await addDoc(collection(db, 'venteMessages'), {
+      venteId: chatVenteId, artistId: user.uid,
+      from: 'artiste', text: venteInput.trim(), ts: new Date().toISOString(),
+    });
+    // Mettre à jour vente comme "contacté"
+    await updateDoc(doc(db, 'ventes', chatVenteId), { statut: 'en_discussion', readByArtist: true });
+    setVenteInput(''); setVenteSending(false);
+  };
+
+  // Valider le paiement → active le téléchargement
+  const validerPaiement = async (venteId: string, qrId: string) => {
+    try {
+      // Activer le téléchargement pour ce mélomane
+      await updateDoc(doc(db, 'ventes', venteId), {
+        statut: 'paye', payeAt: new Date().toISOString(),
+        dlActive: true,
+      });
+      // Message automatique au mélomane
+      await addDoc(collection(db, 'venteMessages'), {
+        venteId, artistId: user.uid,
+        from: 'artiste',
+        text: '✅ Paiement reçu ! Votre téléchargement est maintenant actif. Retournez sur la page de l\'album pour télécharger.',
+        ts: new Date().toISOString(),
+      });
+      setMsg('✅ Paiement validé — téléchargement activé !');
+    } catch(e: any) { setMsg('Erreur: ' + e.message); }
+  };
 
   const loadStats = async (email: string) => {
     // Chercher dans artists par email
@@ -1586,151 +1998,328 @@ function ArtistPage() {
 
   if (view === 'dashboard' && user) return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+      <style>{`
+        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        .vente-row:hover{background:#eaf1ff!important}
+        .art-inp{width:100%;background:#f5f8ff;border:1px solid #c8d8ef;border-radius:10px;padding:12px 14px;color:#1a2340;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+        .art-inp:focus{border-color:#1a6bff}
+      `}</style>
+
+      {/* HEADER */}
+      <div style={{ background:'#ffffff', borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: '#5a7090', fontSize: 13 }}>{stats.artistName || user.email}</span>
-          <button style={S.btn2} onClick={logout}>Déconnexion</button>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          {unreadVentes > 0 && (
+            <span style={{ background:'#fff0f3', border:'1px solid #f04a6a', borderRadius:99, padding:'3px 9px', fontSize:11, fontWeight:700, color:'#f04a6a' }}>
+              {unreadVentes} new
+            </span>
+          )}
+          <span style={{ color:'#5a7090', fontSize:13 }}>{stats.artistName || user.email}</span>
+          <button style={S.btn2} onClick={async () => await signOut(auth)}>Déconnexion</button>
         </div>
       </div>
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
-        <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Mon tableau de bord</h2>
 
-        {/* STATS CARDS — Rangée 1 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          {[
-            { label: 'Pochettes créées', value: stats.pochettes || 0, icon: '💿', color: '#1a6bff' },
-            { label: 'Scans effectués', value: stats.scansTotal || 0, icon: '📱', color: '#1a6bff' },
-          ].map((s, i) => (
-            <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
-              <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
-              <p style={{ fontSize: 26, fontWeight: 900, color: s.color, marginBottom: 4 }}>{s.value}</p>
-              <p style={{ color: '#8098b8', fontSize: 11 }}>{s.label}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          {[
-            { label: 'Téléchargements', value: stats.downloads || 0, icon: '⬇️', color: '#1a6bff' },
-            { label: 'Streams', value: stats.streams || 0, icon: '🎵', color: '#b07a00' },
-          ].map((s, i) => (
-            <div key={i} style={{ ...S.card, textAlign: 'center', padding: 20 }}>
-              <p style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</p>
-              <p style={{ fontSize: 26, fontWeight: 900, color: s.color, marginBottom: 4 }}>{s.value}</p>
-              <p style={{ color: '#8098b8', fontSize: 11 }}>{s.label}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{ ...S.card, textAlign: 'center', padding: 20, marginBottom: 20, background: 'linear-gradient(135deg, #eef4ff, #dce8ff)' }}>
-          <p style={{ fontSize: 32, marginBottom: 6 }}>💰</p>
-          <p style={{ fontSize: 28, fontWeight: 900, color: '#1a6bff', marginBottom: 4 }}>{((stats.streams || 0) * 0.45).toFixed(0)} FCFA</p>
-          <p style={{ color: '#8098b8', fontSize: 11 }}>Revenu estimé · 0,10 – 0,80 FCFA / écoute</p>
-        </div>
+      {/* TABS */}
+      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
+        <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>📊 Stats</button>
+        <button style={tabStyle(dashTab==='ventes')} onClick={() => setDashTab('ventes')}>
+          💰 Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
+          {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
+        </button>
+        <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>⚙️ Options</button>
+      </div>
 
-        {/* LIENS PUBLICS */}
-        {stats.publicLinks && stats.publicLinks.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🔗 Mes liens de streaming</h3>
-            {stats.publicLinks.map((link: any) => (
-              <div key={link.id} style={{ ...S.card, marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: 14 }}>{link.label}</p>
-                    <p style={{ color: '#8098b8', fontSize: 12 }}>{link.type} · Streaming illimité · Sans scan limité</p>
-                  </div>
-                  <button onClick={() => { navigator.clipboard.writeText(BASE_URL + '/ecoute/' + link.publicLinkId); alert('Lien copié !'); }}
-                    style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>📋 Copier</button>
+      <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px' }}>
+        {msg && <div style={{ background:'#eaf1ff', border:'1px solid #1a6bff', borderRadius:10, padding:'10px 14px', marginBottom:16, color:'#1a6bff', fontSize:13 }}>{msg} <span style={{ cursor:'pointer', float:'right' }} onClick={() => setMsg('')}>✕</span></div>}
+
+        {/* ────────── ONGLET STATS ────────── */}
+        {dashTab === 'stats' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:20 }}>Mon tableau de bord</h2>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+              {[
+                { label:'Pochettes créées', value:stats.pochettes||0, icon:'💿', color:'#1a6bff' },
+                { label:'Scans effectués', value:stats.scansTotal||0, icon:'📱', color:'#1a6bff' },
+              ].map((s,i) => (
+                <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
+                  <p style={{ fontSize:28, marginBottom:6 }}>{s.icon}</p>
+                  <p style={{ fontSize:26, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
                 </div>
-                <p style={{ color: '#8098b8', fontSize: 10, marginTop: 8, marginBottom: 12, wordBreak: 'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
-                {/* QR CODE DU LIEN PUBLIC */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#f5f8ff', borderRadius: 12, padding: 14 }}>
-                  <div style={{ background: 'white', padding: 8, borderRadius: 8, border: '1px solid #dce6f7', flexShrink: 0 }}>
-                    <QRCodeCanvas
-                      id={'pub-qr-' + link.id}
-                      value={BASE_URL + '/ecoute/' + link.publicLinkId}
-                      size={90} bgColor="#ffffff" fgColor="#000000" level="H"
-                    />
+              ))}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+              {[
+                { label:'Téléchargements', value:stats.downloads||0, icon:'⬇️', color:'#1a6bff' },
+                { label:'Streams', value:stats.streams||0, icon:'🎵', color:'#b07a00' },
+              ].map((s,i) => (
+                <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
+                  <p style={{ fontSize:28, marginBottom:6 }}>{s.icon}</p>
+                  <p style={{ fontSize:26, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#eef4ff,#dce8ff)' }}>
+              <p style={{ fontSize:32, marginBottom:6 }}>💰</p>
+              <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{((stats.streams||0)*0.45).toFixed(0)} FCFA</p>
+              <p style={{ color:'#8098b8', fontSize:11 }}>Revenu estimé · 0,10 – 0,80 FCFA / écoute</p>
+            </div>
+
+            {/* LIENS PUBLICS */}
+            {stats.publicLinks && stats.publicLinks.length > 0 && (
+              <div style={{ marginBottom:20 }}>
+                <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>🔗 Mes liens de streaming</h3>
+                {stats.publicLinks.map((link:any) => (
+                  <div key={link.id} style={{ ...S.card, marginBottom:8 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                      <div>
+                        <p style={{ fontWeight:700, fontSize:14 }}>{link.label}</p>
+                        <p style={{ color:'#8098b8', fontSize:12 }}>Streaming illimité · Sans scan limité</p>
+                      </div>
+                      <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
+                        style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>📋 Copier</button>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, color: '#1a2340' }}>QR Code du lien public</p>
-                    <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>Imprimez ce QR code pour que vos fans scannent et écoutent en streaming. Chaque écoute vous rémunère.</p>
-                    <button onClick={() => {
-                      const canvas = document.getElementById('pub-qr-' + link.id) as HTMLCanvasElement;
-                      if (!canvas) return;
-                      const a = document.createElement('a');
-                      a.href = canvas.toDataURL('image/png');
-                      a.download = (link.label || 'streaming') + '-QR-public.png';
-                      a.click();
-                    }} style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>
-                      ⬇ Télécharger QR PNG
-                    </button>
+                ))}
+              </div>
+            )}
+
+            {/* POCHETTES */}
+            <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
+            {stats.qrcodes.map((q:any) => (
+              <div key={q.id} style={S.card}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <p style={{ fontWeight:700, marginBottom:4 }}>{q.label}</p>
+                    <p style={{ color:'#8098b8', fontSize:12 }}>{q.usedScans||0}/{q.totalScans||0} scans · {q.downloads!==undefined?q.downloads:(q.usedScans||0)} DL · {q.streams||0} streams</p>
                   </div>
+                  <span style={badgeStyle(q.status)}>{q.status}</span>
+                </div>
+                <div style={{ marginTop:10, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                  {[
+                    { label:'Visites', val:q.visits||0, color:'#1a6bff' },
+                    { label:'Streams', val:q.streams||0, color:'#b07a00' },
+                    { label:'DL', val:q.downloads!==undefined?q.downloads:(q.usedScans||0), color:'#1a6bff' },
+                  ].map((s,i) => (
+                    <div key={i} style={{ background:'#f5f8ff', borderRadius:8, padding:8, textAlign:'center' }}>
+                      <p style={{ color:s.color, fontWeight:800, fontSize:18 }}>{s.val}</p>
+                      <p style={{ color:'#8098b8', fontSize:10 }}>{s.label}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
         )}
 
+        {/* ────────── ONGLET VENTES ────────── */}
+        {dashTab === 'ventes' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            {!chatVenteId ? (
+              <>
+                <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>💰 Demandes d'achat</h2>
+                <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
+                  Les mélomanes qui veulent acheter votre musique apparaissent ici. Discutez, envoyez votre lien de paiement, puis validez.
+                </p>
 
-        {/* QR CODES */}
+                {ventes.length === 0 ? (
+                  <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                    <p style={{ fontSize:40, marginBottom:12 }}>💬</p>
+                    <p style={{ color:'#5a7090', fontSize:14, marginBottom:6 }}>Aucune demande pour l'instant</p>
+                    <p style={{ color:'#8098b8', fontSize:12 }}>Quand un fan veut acheter votre musique, vous le verrez ici</p>
+                  </div>
+                ) : ventes.map(v => {
+                  const isPending = v.statut === 'en_attente';
+                  const isDiscussion = v.statut === 'en_discussion';
+                  const isPaid = v.statut === 'paye';
+                  return (
+                    <div key={v.id} className="vente-row"
+                      style={{ ...S.card, cursor:'pointer', borderLeft:`4px solid ${isPaid?'#4dff9a':isDiscussion?'#1a6bff':'#f0b84a'}`, marginBottom:12, transition:'background .15s' }}
+                      onClick={() => setChatVenteId(v.id)}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                            <span style={{ fontSize:22 }}>👤</span>
+                            <p style={{ fontWeight:700, fontSize:14, margin:0 }}>
+                              {v.melomanePhone || 'Mélomane anonyme'}
+                            </p>
+                            {!v.readByArtist && (
+                              <span style={{ background:'#f04a6a', borderRadius:99, padding:'1px 7px', fontSize:9, color:'#fff', fontWeight:800 }}>NEW</span>
+                            )}
+                          </div>
+                          <p style={{ color:'#5a7090', fontSize:12, marginBottom:3 }}>
+                            🎵 {v.albumLabel} · {(v.prix||0).toLocaleString()} FCFA
+                          </p>
+                          <p style={{ color:'#8098b8', fontSize:11 }}>
+                            {new Date(v.createdAt).toLocaleDateString('fr')} à {new Date(v.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}
+                          </p>
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
+                          <span style={{
+                            background: isPaid?'rgba(77,255,154,0.15)':isDiscussion?'rgba(26,107,255,0.15)':'rgba(240,184,74,0.15)',
+                            border:`1px solid ${isPaid?'rgba(77,255,154,0.4)':isDiscussion?'rgba(26,107,255,0.4)':'rgba(240,184,74,0.4)'}`,
+                            borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700,
+                            color: isPaid?'#4dff9a':isDiscussion?'#1a6bff':'#b07a00',
+                          }}>
+                            {isPaid?'✅ Payé':isDiscussion?'💬 Discussion':'⏳ En attente'}
+                          </span>
+                          {!isPaid && (
+                            <button onClick={e => { e.stopPropagation(); validerPaiement(v.id, v.qrId); }}
+                              style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:8, padding:'6px 12px', color:'#00a040', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                              ✅ Valider paiement
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            ) : (
+              /* ── CHAT AVEC MÉLOMANE ── */
+              (() => {
+                const vente = ventes.find(v => v.id === chatVenteId);
+                return (
+                  <>
+                    {/* Header */}
+                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14, padding:'12px 14px', background:'#ffffff', borderRadius:12, border:'1px solid #dce6f7', boxShadow:'0 2px 8px rgba(26,99,255,0.06)' }}>
+                      <button onClick={() => setChatVenteId(null)} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18, padding:0 }}>←</button>
+                      <span style={{ fontSize:22 }}>👤</span>
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{vente?.melomanePhone || 'Mélomane'}</p>
+                        <p style={{ color:'#5a7090', fontSize:11, margin:'1px 0 0' }}>🎵 {vente?.albumLabel} · {(vente?.prix||0).toLocaleString()} FCFA</p>
+                      </div>
+                      {vente?.statut !== 'paye' && (
+                        <button onClick={() => validerPaiement(chatVenteId!, vente?.qrId)}
+                          style={{ ...S.btn, padding:'8px 14px', fontSize:12, background:'linear-gradient(135deg,#00c060,#00a040)' }}>
+                          ✅ Valider paiement
+                        </button>
+                      )}
+                    </div>
 
-        {/* RÉMUNÉRATION STREAMING */}
-        <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: '0 2px 12px rgba(26,107,255,0.08)' }}>
-          <p style={{ color: '#1a6bff', fontSize: 10, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>💰 RÉMUNÉRATION STREAMING</p>
-          <h3 style={{ fontFamily: 'serif', fontSize: 17, fontWeight: 800, marginBottom: 12 }}>Ce que vous gagnez</h3>
-          <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.8, marginBottom: 16 }}>
-            Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
-          </p>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {[
-              { label: "Aujourd'hui — pub automatique", range: '0,10 – 0,80 FCFA', tag: '● ACTIF', color: '#1a6bff', icon: '📡' },
-              { label: 'Bientôt — annonceurs locaux', range: '1 – 4 FCFA', tag: '◎ PROCHAINEMENT', color: '#b07a00', icon: '🚀' },
-              { label: 'Perspective — abonnements fans', range: "jusqu'à 5 FCFA", tag: '◌ EN DEV', color: '#5a7090', icon: '💎' },
-            ].map((r, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f8ff', border: `1px solid ${r.color}33`, borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 22 }}>{r.icon}</span>
-                  <div>
-                    <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 2 }}>{r.label}</p>
-                    <p style={{ fontWeight: 800, fontSize: 16, color: r.color }}>{r.range} <span style={{ fontSize: 11, fontWeight: 400, color: '#8098b8' }}>/ écoute</span></p>
+                    {/* Instruction lien de paiement */}
+                    {lienPaiement && (
+                      <div style={{ background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:10, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
+                        <span style={{ fontSize:18 }}>🔗</span>
+                        <div style={{ flex:1 }}>
+                          <p style={{ fontWeight:700, fontSize:12, margin:'0 0 2px' }}>Votre lien de paiement</p>
+                          <p style={{ color:'#5a7090', fontSize:11, margin:0, wordBreak:'break-all' }}>{lienPaiement}</p>
+                        </div>
+                        <button onClick={async () => {
+                          await addDoc(collection(db, 'venteMessages'), {
+                            venteId: chatVenteId!, artistId: user.uid,
+                            from:'artiste', text:'💳 Voici mon lien de paiement : '+lienPaiement, ts:new Date().toISOString(),
+                          });
+                          await updateDoc(doc(db,'ventes',chatVenteId!),{statut:'en_discussion'});
+                        }} style={{ ...S.btn, padding:'6px 12px', fontSize:11, whiteSpace:'nowrap' }}>
+                          Envoyer
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Messages */}
+                    <div style={{ background:'#f5f8ff', borderRadius:14, minHeight:260, maxHeight:380, overflowY:'auto', padding:14, marginBottom:12, border:'1px solid #dce6f7' }}>
+                      {venteMsgs.length === 0 ? (
+                        <p style={{ textAlign:'center', color:'#8098b8', fontSize:12, marginTop:60 }}>
+                          Démarrez la conversation — envoyez votre lien de paiement
+                        </p>
+                      ) : venteMsgs.map(m => (
+                        <div key={m.id} style={{ marginBottom:10, display:'flex', justifyContent:m.from==='artiste'?'flex-end':'flex-start' }}>
+                          <div style={{ maxWidth:'78%', padding:'10px 14px', borderRadius:m.from==='artiste'?'14px 14px 4px 14px':'14px 14px 14px 4px', background:m.from==='artiste'?'#1a6bff':'#ffffff', border:m.from==='artiste'?'none':'1px solid #dce6f7' }}>
+                            <p style={{ color:m.from==='artiste'?'#fff':'#1a2340', fontSize:13, margin:0, lineHeight:1.5 }}>{m.text}</p>
+                            <p style={{ color:m.from==='artiste'?'rgba(255,255,255,0.6)':'#8098b8', fontSize:9, margin:'3px 0 0', textAlign:'right' }}>
+                              {new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Input */}
+                    <div style={{ display:'flex', gap:8 }}>
+                      <input className="art-inp" value={venteInput} onChange={e => setVenteInput(e.target.value)}
+                        onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendVenteMsg()}
+                        placeholder="Écrire au mélomane..." style={{ marginBottom:0 }} />
+                      <button onClick={sendVenteMsg} disabled={venteSending || !venteInput.trim()}
+                        style={{ ...S.btn, padding:'0 16px', opacity:venteInput.trim()?1:0.5, fontSize:18 }}>➤</button>
+                    </div>
+                  </>
+                );
+              })()
+            )}
+          </div>
+        )}
+
+        {/* ────────── ONGLET OPTIONS ────────── */}
+        {dashTab === 'options' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>⚙️ Options de paiement</h2>
+            <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.7, marginBottom:24 }}>
+              Choisissez comment vous voulez recevoir le paiement quand un mélomane achète votre musique.
+            </p>
+
+            {/* Option A */}
+            <div onClick={() => setOptionPaiement('dz')}
+              style={{ ...S.card, cursor:'pointer', marginBottom:12, borderLeft:`4px solid ${optionPaiement==='dz'?'#1a6bff':'#dce6f7'}`, background:optionPaiement==='dz'?'#f5f8ff':'#ffffff' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+                <div style={{ width:20, height:20, borderRadius:99, border:`2px solid ${optionPaiement==='dz'?'#1a6bff':'#c8d8ef'}`, background:optionPaiement==='dz'?'#1a6bff':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                  {optionPaiement==='dz' && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
+                </div>
+                <div>
+                  <p style={{ fontWeight:800, fontSize:15, marginBottom:4, color:optionPaiement==='dz'?'#1a6bff':'#1a2340' }}>
+                    Option A — Doniel Zik encaisse
+                  </p>
+                  <p style={{ color:'#5a7090', fontSize:12, lineHeight:1.7 }}>
+                    Doniel Zik reçoit le paiement du mélomane, prélève sa commission, et vous verse le reste automatiquement chaque trimestre via Mobile Money.
+                  </p>
+                  <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Zéro effort</span>
+                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Paiement automatique</span>
                   </div>
                 </div>
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: `${r.color}15`, color: r.color, fontWeight: 700 }}>{r.tag}</span>
               </div>
-            ))}
-          </div>
-          <p style={{ color: '#b0c4d8', fontSize: 11, marginTop: 14, textAlign: 'center' }}>
-            Versement trimestriel · Orange Money · Wave · MTN MoMo
-          </p>
-        </div>
+            </div>
 
-        <h3 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
-        {stats.qrcodes.map((q: any) => (
-          <div key={q.id} style={S.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <p style={{ fontWeight: 700, marginBottom: 4 }}>{q.label}</p>
-                <p style={{ color: '#8098b8', fontSize: 12 }}>{q.usedScans || 0}/{q.totalScans || 0} scans · {q.downloads !== undefined ? q.downloads : (q.usedScans || 0)} DL · {q.streams || 0} streams</p>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#1a6bff' }}>✅ {q.validStreams || 0} validés</span>
-                <span style={badgeStyle(q.status)}>{q.status}</span>
-              </div>
-            </div>
-            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'Visites', val: q.visits || 0, color: '#1a6bff' },
-                { label: 'Streams', val: q.streams || 0, color: '#b07a00' },
-                { label: 'DL', val: q.downloads !== undefined ? q.downloads : (q.usedScans || 0), color: '#1a6bff' },
-              ].map((s, i) => (
-                <div key={i} style={{ background: '#f5f8ff', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
-                  <p style={{ color: s.color, fontWeight: 800, fontSize: 18 }}>{s.val}</p>
-                  <p style={{ color: '#8098b8', fontSize: 10 }}>{s.label}</p>
+            {/* Option B */}
+            <div onClick={() => setOptionPaiement('artiste')}
+              style={{ ...S.card, cursor:'pointer', marginBottom:16, borderLeft:`4px solid ${optionPaiement==='artiste'?'#1a6bff':'#dce6f7'}`, background:optionPaiement==='artiste'?'#f5f8ff':'#ffffff' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+                <div style={{ width:20, height:20, borderRadius:99, border:`2px solid ${optionPaiement==='artiste'?'#1a6bff':'#c8d8ef'}`, background:optionPaiement==='artiste'?'#1a6bff':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                  {optionPaiement==='artiste' && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
                 </div>
-              ))}
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:800, fontSize:15, marginBottom:4, color:optionPaiement==='artiste'?'#1a6bff':'#1a2340' }}>
+                    Option B — Vous encaissez directement
+                  </p>
+                  <p style={{ color:'#5a7090', fontSize:12, lineHeight:1.7, marginBottom:10 }}>
+                    Vous envoyez votre propre lien de paiement (Orange Money, Wave, etc.) au mélomane. Vous validez le paiement manuellement dans votre dashboard. La commission Doniel Zik est prélevée sur vos revenus de streaming.
+                  </p>
+                  {optionPaiement==='artiste' && (
+                    <>
+                      <label style={S.lbl}>Votre lien de paiement Mobile Money</label>
+                      <input className="art-inp" value={lienPaiement} onChange={e => setLienPaiement(e.target.value)}
+                        placeholder="Ex: https://pay.wave.com/m/monlien ou +225 07 00 00 00"
+                        style={{ marginBottom:0 }} />
+                      <p style={{ color:'#8098b8', fontSize:11, marginTop:4 }}>Ce lien sera envoyé automatiquement dans le chat quand un mélomane vous contacte</p>
+                    </>
+                  )}
+                  <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Contrôle total</span>
+                    <span style={{ background:'#fff8e6', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#b07a00', fontWeight:600 }}>Validation manuelle</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {optionMsg && <p style={{ color:optionMsg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:13, marginBottom:12 }}>{optionMsg}</p>}
+            <button onClick={saveOptions} disabled={savingOption || !optionPaiement}
+              style={{ ...S.btn, width:'100%', padding:14, fontSize:15, opacity:optionPaiement?1:0.5 }}>
+              {savingOption ? '⏳ Sauvegarde...' : '💾 Sauvegarder mes options'}
+            </button>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
@@ -2343,8 +2932,10 @@ function AnnonceursPage() {
     }
     setLoading(true);
     try {
+      const currentUser = auth.currentUser;
       await addDoc(collection(db, 'annonceurs'), {
         ...form, vues: vuesNum, cout: coutFCFA,
+        uid: currentUser?.uid || '',
         status: 'pending', createdAt: new Date().toISOString()
       });
       setSent(true);
@@ -2536,23 +3127,37 @@ function AnnonceursPage() {
 }
 
 // ─────────────────────────────────────────────
-// DZ STUDIO — Dashboard Annonceur
-// Stats · Leads · Chat
+// DZ STUDIO — Dashboard Annonceur complet
+// Flux 1 : annonceur ↔ admin (validation campagne + chat)
+// Flux 2 : annonceur ↔ leads (prospects)
 // ─────────────────────────────────────────────
 function DzStudioPage() {
-  const [view, setView] = useState<'login'|'dashboard'>('login');
+  const [view, setView] = useState<'login'|'register'|'dashboard'>('login');
   const [user, setUser] = useState<any>(null);
-  const [loginTel, setLoginTel] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
+  const [regName, setRegName] = useState('');
   const [loginMsg, setLoginMsg] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [tab, setTab] = useState<'stats'|'leads'|'chat'>('stats');
+  const [tab, setTab] = useState<'campagne'|'admin'|'leads'|'chat'>('campagne');
+
+  // Campagne
   const [campagnes, setCampagnes] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
+
+  // Chat admin
+  const [adminMsgs, setAdminMsgs] = useState<any[]>([]);
+  const [adminInput, setAdminInput] = useState('');
+  const [adminSending, setAdminSending] = useState(false);
+  const [unreadAdmin, setUnreadAdmin] = useState(0);
+
+  // Leads & chat leads
   const [leads, setLeads] = useState<any[]>([]);
   const [chatLeadId, setChatLeadId] = useState<string|null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMsg, setNewMsg] = useState('');
-  const [sending, setSending] = useState(false);
+  const [leadMsgs, setLeadMsgs] = useState<any[]>([]);
+  const [leadInput, setLeadInput] = useState('');
+  const [leadSending, setLeadSending] = useState(false);
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -2563,54 +3168,117 @@ function DzStudioPage() {
 
   useEffect(() => {
     if (!user) return;
-    // Charger les campagnes de cet annonceur
-    const q1 = query(collection(db, 'annonceurs'), where('email', '==', user.email));
+    // Campagnes de cet annonceur (par email ou uid)
+    const q1 = query(collection(db, 'annonceurs'), where('uid', '==', user.uid));
     const u1 = onSnapshot(q1, snap => setCampagnes(snap.docs.map(d => ({id:d.id,...d.data()}))));
-    // Charger les leads
-    const q2 = query(collection(db, 'leads'), where('annonceurId', '==', user.uid), orderBy('createdAt','desc'));
+    // Leads de ses campagnes
+    const q2 = query(collection(db, 'leads'), where('annonceurId','==',user.uid), orderBy('createdAt','desc'));
     const u2 = onSnapshot(q2, snap => setLeads(snap.docs.map(d => ({id:d.id,...d.data()}))));
-    return () => { u1(); u2(); };
+    // Messages admin → annonceur
+    const q3 = query(collection(db, 'adminChats'), where('annonceurId','==',user.uid), orderBy('ts','asc'));
+    const u3 = onSnapshot(q3, snap => {
+      const msgs = snap.docs.map(d => ({id:d.id,...d.data()}));
+      setAdminMsgs(msgs);
+      setUnreadAdmin(msgs.filter((m:any) => m.from === 'admin' && !m.read).length);
+    });
+    return () => { u1(); u2(); u3(); };
   }, [user]);
 
-  // Charger les messages du lead sélectionné
+  // Messages du lead sélectionné
   useEffect(() => {
     if (!chatLeadId) return;
     const q = query(collection(db, 'leadMessages'), where('leadId','==',chatLeadId), orderBy('ts','asc'));
-    const unsub = onSnapshot(q, snap => setMessages(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    const unsub = onSnapshot(q, snap => setLeadMsgs(snap.docs.map(d => ({id:d.id,...d.data()}))));
     return unsub;
   }, [chatLeadId]);
 
-  const loginEmail = async () => {
-    setLoginLoading(true); setLoginMsg('');
-    try { await signInWithEmailAndPassword(auth, loginTel, loginPass); }
-    catch { setLoginMsg('Identifiants incorrects'); }
-    setLoginLoading(false);
-  };
-
-  const loginGoogle = async () => {
+  const doLoginGoogle = async () => {
     setLoginLoading(true); setLoginMsg('');
     try { const p = new GoogleAuthProvider(); await signInWithPopup(auth, p); }
     catch (e:any) { setLoginMsg('Erreur: ' + e.message); }
     setLoginLoading(false);
   };
 
-  const sendMessage = async () => {
-    if (!newMsg.trim() || !chatLeadId || !user) return;
-    setSending(true);
-    await addDoc(collection(db, 'leadMessages'), {
-      leadId: chatLeadId, annonceurId: user.uid,
-      from: 'annonceur', text: newMsg.trim(), ts: new Date().toISOString(),
-    });
-    setNewMsg(''); setSending(false);
+  const doLoginEmail = async () => {
+    setLoginLoading(true); setLoginMsg('');
+    try { await signInWithEmailAndPassword(auth, loginEmail, loginPass); }
+    catch { setLoginMsg('Email ou mot de passe incorrect'); }
+    setLoginLoading(false);
   };
 
-  // Stats agrégées
-  const totalVues = campagnes.reduce((s,c) => s + (c.vues||0), 0);
-  const totalLeads = leads.length;
-  const totalDepense = campagnes.reduce((s,c) => s + (c.cout||0), 0);
+  const doRegister = async () => {
+    if (!regName) { setLoginMsg('Entrez votre nom'); return; }
+    setLoginLoading(true); setLoginMsg('');
+    try {
+      const r = await createUserWithEmailAndPassword(auth, loginEmail, loginPass);
+      await updateProfile(r.user, { displayName: regName });
+    } catch (e:any) { setLoginMsg('Erreur: ' + e.message); }
+    setLoginLoading(false);
+  };
+
+  // Upload visuel d'une campagne
+  const uploadVisuel = async (campagneId: string, file: File) => {
+    setUploading(true); setUploadMsg('Upload en cours...');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      fd.append('resource_type', 'auto');
+      fd.append('public_id', 'pubs/' + campagneId + '_visual');
+      const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body:fd });
+      const d = await r.json();
+      await updateDoc(doc(db, 'annonceurs', campagneId), {
+        visualUrl: d.secure_url,
+        visualType: file.type.startsWith('video') ? 'video' : 'image',
+      });
+      setUploadMsg('✅ Visuel uploadé !');
+      // Notifier l'admin via adminChats
+      await addDoc(collection(db, 'adminChats'), {
+        annonceurId: campagneId, from: 'annonceur',
+        text: '📎 Visuel uploadé — campagne prête pour validation.',
+        ts: new Date().toISOString(), read: false,
+      });
+    } catch(e:any) { setUploadMsg('Erreur: ' + e.message); }
+    setUploading(false);
+  };
+
+  // Envoyer message à l'admin
+  const sendAdminMsg = async () => {
+    if (!adminInput.trim() || !user) return;
+    setAdminSending(true);
+    // On utilise l'id de la première campagne comme identifiant de conversation
+    const campId = campagnes[0]?.id || user.uid;
+    await addDoc(collection(db, 'adminChats'), {
+      annonceurId: campId, from: 'annonceur',
+      text: adminInput.trim(), ts: new Date().toISOString(), read: false,
+    });
+    // Marquer les messages admin comme lus
+    adminMsgs.filter((m:any) => m.from === 'admin' && !m.read).forEach(m =>
+      updateDoc(doc(db, 'adminChats', m.id), { read: true })
+    );
+    setAdminInput(''); setAdminSending(false);
+  };
+
+  // Envoyer message à un lead
+  const sendLeadMsg = async () => {
+    if (!leadInput.trim() || !chatLeadId || !user) return;
+    setLeadSending(true);
+    await addDoc(collection(db, 'leadMessages'), {
+      leadId: chatLeadId, annonceurId: user.uid,
+      from: 'annonceur', text: leadInput.trim(), ts: new Date().toISOString(),
+    });
+    setLeadInput(''); setLeadSending(false);
+  };
+
+  const selectedLead = leads.find(l => l.id === chatLeadId);
+  const pendingCamp = campagnes.filter(c => c.status === 'pending').length;
+  const activeCamp = campagnes.filter(c => c.status === 'active').length;
+
+  // ── Styles communs ──
+  const darkInp: React.CSSProperties = { width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' };
 
   // ── LOGIN ──
-  if (view === 'login') return (
+  if (view !== 'dashboard') return (
     <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
@@ -2620,33 +3288,36 @@ function DzStudioPage() {
           <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Dashboard Annonceur</p>
         </div>
         <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:18, padding:'24px 20px' }}>
-          <button onClick={loginGoogle} disabled={loginLoading}
+          <button onClick={doLoginGoogle} disabled={loginLoading}
             style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, width:'100%', padding:'14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', marginBottom:14 }}>
             <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
             Continuer avec Google
           </button>
           <div style={{ textAlign:'center', color:'#4a5878', fontSize:11, marginBottom:14 }}>— ou —</div>
-          <input value={loginTel} onChange={e => setLoginTel(e.target.value)} placeholder="Email" type="email"
-            style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' }} />
-          <input value={loginPass} onChange={e => setLoginPass(e.target.value)} placeholder="Mot de passe" type="password"
-            style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:14, boxSizing:'border-box' }}
-            onKeyDown={e => e.key==='Enter' && loginEmail()} />
+          {view === 'register' && (
+            <input value={regName} onChange={e => setRegName(e.target.value)} placeholder="Votre nom / entreprise" style={darkInp} />
+          )}
+          <input value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email" type="email" style={darkInp} />
+          <input value={loginPass} onChange={e => setLoginPass(e.target.value)} placeholder="Mot de passe" type="password" style={{ ...darkInp, marginBottom:14 }}
+            onKeyDown={e => e.key==='Enter' && (view==='login' ? doLoginEmail() : doRegister())} />
           {loginMsg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{loginMsg}</p>}
-          <button onClick={loginEmail} disabled={loginLoading}
-            style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-            {loginLoading ? '⏳...' : 'Se connecter'}
+          <button onClick={view==='login' ? doLoginEmail : doRegister} disabled={loginLoading}
+            style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+            {loginLoading ? '⏳...' : view==='login' ? 'Se connecter' : 'Créer mon compte'}
+          </button>
+          <button onClick={() => { setView(view==='login'?'register':'login'); setLoginMsg(''); }}
+            style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:13 }}>
+            {view==='login' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
           </button>
         </div>
         <p style={{ textAlign:'center', marginTop:16 }}>
-          <a href="/annonceurs" style={{ color:'#4a5878', fontSize:12, textDecoration:'none' }}>Pas encore annonceur ? Créer une campagne →</a>
+          <a href="/annonceurs" style={{ color:'#4a5878', fontSize:12, textDecoration:'none' }}>← Soumettre une nouvelle campagne</a>
         </p>
       </div>
     </div>
   );
 
   // ── DASHBOARD ──
-  const selectedLead = leads.find(l => l.id === chatLeadId);
-
   return (
     <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
@@ -2654,8 +3325,9 @@ function DzStudioPage() {
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         .lead-row:hover{background:rgba(255,200,0,0.06)!important}
-        .msg-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;}
-        .msg-inp:focus{border-color:rgba(255,200,0,0.4)}
+        .dz-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;}
+        .dz-inp:focus{border-color:rgba(255,200,0,0.4)}
+        .dz-inp::placeholder{color:rgba(255,255,255,0.3)}
       `}</style>
 
       {/* HEADER */}
@@ -2663,80 +3335,186 @@ function DzStudioPage() {
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <Logo size="sm" />
           <div>
-            <p style={{ fontWeight:800, fontSize:13, color:'#ffd700', margin:0 }}>DZ Studio</p>
+            <p style={{ fontWeight:800, fontSize:13, color:'#ffd700', margin:0 }}>🎬 DZ Studio</p>
             <p style={{ color:'#4a5878', fontSize:10, margin:0 }}>{user?.displayName || user?.email}</p>
           </div>
         </div>
-        <button onClick={() => signOut(auth)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 10px', color:'#8098b8', cursor:'pointer', fontSize:11 }}>Déco</button>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          {(pendingCamp > 0) && (
+            <span style={{ background:'rgba(255,200,0,0.15)', border:'1px solid rgba(255,200,0,0.4)', borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700, color:'#ffd700' }}>
+              ⏳ {pendingCamp} en attente
+            </span>
+          )}
+          <button onClick={() => signOut(auth)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, padding:'6px 10px', color:'#8098b8', cursor:'pointer', fontSize:11 }}>Déco</button>
+        </div>
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', background:'rgba(6,8,15,0.9)' }}>
-        {[['stats','📊 Stats'],['leads','💬 Leads'],['chat','📩 Chat']].map(([t,l]) => (
+      <div style={{ borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', background:'rgba(6,8,15,0.9)', overflowX:'auto' }}>
+        {([
+          ['campagne', '📢 Campagnes'],
+          ['admin', `💬 Admin${unreadAdmin > 0 ? ` (${unreadAdmin})` : ''}`],
+          ['leads', `👤 Leads${leads.length > 0 ? ` (${leads.length})` : ''}`],
+          ['chat', '📩 Chat leads'],
+        ] as [string,string][]).map(([t,l]) => (
           <button key={t} onClick={() => setTab(t as any)}
-            style={{ padding:'12px 16px', border:'none', background:'transparent', color: tab===t ? '#ffd700' : '#4a5878', cursor:'pointer', fontSize:13, fontWeight: tab===t ? 700 : 400, borderBottom:`2px solid ${tab===t?'#ffd700':'transparent'}`, transition:'all .2s' }}>
-            {l}{t==='leads'&&leads.length>0?` (${leads.length})`:''}
+            style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t ? '#ffd700' : '#4a5878', cursor:'pointer', fontSize:12, fontWeight: tab===t ? 700 : 400, borderBottom:`2px solid ${tab===t?'#ffd700':'transparent'}`, whiteSpace:'nowrap', flexShrink:0 }}>
+            {l}
           </button>
         ))}
       </div>
 
       <div style={{ maxWidth:640, margin:'0 auto', padding:'20px 16px' }}>
 
-        {/* ── STATS ── */}
-        {tab === 'stats' && (
+        {/* ── CAMPAGNES ── */}
+        {tab === 'campagne' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
+            {/* Statut global */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:20 }}>
               {[
-                { label:'Vues totales', val: totalVues.toLocaleString(), icon:'👁️', color:'#ffd700' },
-                { label:'Leads', val: totalLeads, icon:'💬', color:'#4da6ff' },
-                { label:'Dépensé', val: totalDepense.toLocaleString()+' F', icon:'💰', color:'#4dff9a' },
+                { label:'Actives', val:activeCamp, icon:'✅', color:'#4dff9a' },
+                { label:'En attente', val:pendingCamp, icon:'⏳', color:'#ffd700' },
+                { label:'Leads total', val:leads.length, icon:'👤', color:'#4da6ff' },
               ].map((s,i) => (
                 <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
-                  <p style={{ fontSize:22, marginBottom:6 }}>{s.icon}</p>
-                  <p style={{ fontWeight:900, fontSize:20, color:s.color, margin:0 }}>{s.val}</p>
-                  <p style={{ color:'#4a5878', fontSize:10, margin:'4px 0 0' }}>{s.label}</p>
+                  <p style={{ fontSize:20, marginBottom:4 }}>{s.icon}</p>
+                  <p style={{ fontWeight:900, fontSize:22, color:s.color, margin:0 }}>{s.val}</p>
+                  <p style={{ color:'#4a5878', fontSize:10, margin:'3px 0 0' }}>{s.label}</p>
                 </div>
               ))}
             </div>
 
-            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:12 }}>📋 MES CAMPAGNES</p>
             {campagnes.length === 0 ? (
               <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
                 <p style={{ fontSize:36, marginBottom:10 }}>📢</p>
-                <p style={{ color:'#4a5878', fontSize:13 }}>Aucune campagne — <a href="/annonceurs" style={{ color:'#ffd700', textDecoration:'none' }}>Créer une campagne</a></p>
+                <p style={{ color:'#4a5878', fontSize:13, marginBottom:14 }}>Aucune campagne pour l'instant</p>
+                <a href="/annonceurs" style={{ display:'inline-block', padding:'12px 24px', borderRadius:12, background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:14, textDecoration:'none' }}>
+                  Créer ma première campagne →
+                </a>
               </div>
             ) : campagnes.map(c => (
-              <div key={c.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px', marginBottom:10 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+              <div key={c.id} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${c.status==='active'?'rgba(77,255,154,0.3)':c.status==='rejected'?'rgba(240,74,106,0.3)':'rgba(255,200,0,0.25)'}`, borderRadius:16, padding:16, marginBottom:14 }}>
+                {/* Status + nom */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
                   <div>
-                    <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', margin:0 }}>{c.entreprise||c.nom}</p>
-                    <p style={{ color:'#4a5878', fontSize:11, margin:'3px 0 0' }}>{c.format} · {c.objectif} · {new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                    <p style={{ fontWeight:700, fontSize:15, color:'#fff', margin:0 }}>{c.entreprise || c.nom}</p>
+                    <p style={{ color:'#4a5878', fontSize:11, margin:'3px 0 0' }}>{c.format} · {c.objectif} · {(c.vues||0).toLocaleString()} vues · {(c.cout||0).toLocaleString()} FCFA</p>
                   </div>
-                  <span style={{ background: c.status==='active'?'rgba(77,255,154,0.15)':'rgba(255,200,0,0.15)', border:`1px solid ${c.status==='active'?'rgba(77,255,154,0.4)':'rgba(255,200,0,0.4)'}`, borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700, color: c.status==='active'?'#4dff9a':'#ffd700' }}>
-                    {c.status==='active'?'● Actif':'● En attente'}
+                  <span style={{
+                    background: c.status==='active'?'rgba(77,255,154,0.12)':c.status==='rejected'?'rgba(240,74,106,0.12)':'rgba(255,200,0,0.12)',
+                    border: `1px solid ${c.status==='active'?'rgba(77,255,154,0.4)':c.status==='rejected'?'rgba(240,74,106,0.4)':'rgba(255,200,0,0.4)'}`,
+                    borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700,
+                    color: c.status==='active'?'#4dff9a':c.status==='rejected'?'#f04a6a':'#ffd700',
+                  }}>
+                    {c.status==='active'?'● Actif':c.status==='rejected'?'✕ Rejeté':'⏳ En attente'}
                   </span>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                  {[
-                    { label:'Vues', val:(c.vuesLive||0).toLocaleString(), color:'#ffd700' },
-                    { label:'Clics', val:(c.clics||0).toLocaleString(), color:'#4da6ff' },
-                    { label:'Leads', val:(c.leads||0).toLocaleString(), color:'#4dff9a' },
-                  ].map((s,i) => (
-                    <div key={i} style={{ background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px', textAlign:'center' }}>
-                      <p style={{ fontWeight:800, fontSize:16, color:s.color, margin:0 }}>{s.val}</p>
-                      <p style={{ color:'#4a5878', fontSize:9, margin:'2px 0 0' }}>{s.label}</p>
-                    </div>
-                  ))}
-                </div>
+
+                {/* Métriques live */}
+                {c.status === 'active' && (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                    {[
+                      { label:'Vues', val:(c.vuesLive||0).toLocaleString(), color:'#ffd700' },
+                      { label:'Clics', val:(c.clics||0).toLocaleString(), color:'#4da6ff' },
+                      { label:'Leads', val:(c.leads||0).toLocaleString(), color:'#4dff9a' },
+                    ].map((s,i) => (
+                      <div key={i} style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                        <p style={{ fontWeight:900, fontSize:18, color:s.color, margin:0 }}>{s.val}</p>
+                        <p style={{ color:'#4a5878', fontSize:9, margin:'2px 0 0' }}>{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Visuel uploadé */}
+                {c.visualUrl ? (
+                  <div style={{ marginBottom:12, borderRadius:10, overflow:'hidden' }}>
+                    {c.visualType === 'video' ? (
+                      <video src={c.visualUrl} controls style={{ width:'100%', maxHeight:180, background:'#000' }} />
+                    ) : (
+                      <img src={c.visualUrl} alt="visuel" style={{ width:'100%', maxHeight:180, objectFit:'cover' }} />
+                    )}
+                  </div>
+                ) : (
+                  /* Zone upload visuel */
+                  <div style={{ border:'2px dashed rgba(255,200,0,0.3)', borderRadius:12, padding:16, textAlign:'center', marginBottom:12 }}>
+                    <p style={{ color:'#4a5878', fontSize:12, marginBottom:10 }}>
+                      {c.status === 'active' ? '📎 Uploadez votre visuel pour activer la diffusion' : '📎 Uploadez votre visuel (image ou vidéo)'}
+                    </p>
+                    <input type="file" accept="image/*,video/*" id={'vis-'+c.id} style={{ display:'none' }}
+                      onChange={async e => { if (e.target.files?.[0]) await uploadVisuel(c.id, e.target.files[0]); }} />
+                    <label htmlFor={'vis-'+c.id}
+                      style={{ display:'inline-block', padding:'10px 20px', borderRadius:10, background:'rgba(255,200,0,0.15)', border:'1px solid rgba(255,200,0,0.4)', color:'#ffd700', cursor:'pointer', fontWeight:700, fontSize:13 }}>
+                      {uploading ? uploadMsg : '⬆ Choisir un fichier'}
+                    </label>
+                    {uploadMsg && !uploading && <p style={{ color:'#4dff9a', fontSize:11, marginTop:8 }}>{uploadMsg}</p>}
+                  </div>
+                )}
+
+                {c.status === 'pending' && (
+                  <div style={{ background:'rgba(255,200,0,0.08)', border:'1px solid rgba(255,200,0,0.2)', borderRadius:10, padding:'10px 14px' }}>
+                    <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, margin:'0 0 2px' }}>⏳ En attente de validation</p>
+                    <p style={{ color:'#4a5878', fontSize:11, margin:0 }}>Notre équipe vérifie votre campagne. Vous recevrez une notification dans l'onglet Admin.</p>
+                  </div>
+                )}
+                {c.status === 'rejected' && (
+                  <div style={{ background:'rgba(240,74,106,0.08)', border:'1px solid rgba(240,74,106,0.2)', borderRadius:10, padding:'10px 14px' }}>
+                    <p style={{ color:'#f04a6a', fontSize:12, fontWeight:700, margin:'0 0 4px' }}>✕ Campagne refusée</p>
+                    <button onClick={() => setTab('admin')} style={{ background:'none', border:'none', color:'#4da6ff', cursor:'pointer', fontSize:12, padding:0, textDecoration:'underline' }}>
+                      Voir les détails dans Admin chat →
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
+
+            <a href="/annonceurs" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'14px', borderRadius:14, border:'1px solid rgba(255,200,0,0.25)', background:'rgba(255,200,0,0.06)', color:'#ffd700', textDecoration:'none', fontWeight:700, fontSize:14, boxSizing:'border-box' }}>
+              ➕ Créer une nouvelle campagne
+            </a>
+          </div>
+        )}
+
+        {/* ── CHAT ADMIN ── */}
+        {tab === 'admin' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>💬 MESSAGERIE AVEC DONIEL ZIK</p>
+            <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', minHeight:300, maxHeight:440, overflowY:'auto', padding:14, marginBottom:12 }}>
+              {adminMsgs.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'60px 20px' }}>
+                  <p style={{ fontSize:32, marginBottom:10 }}>💬</p>
+                  <p style={{ color:'#2a3a60', fontSize:13 }}>Pas encore de messages</p>
+                  <p style={{ color:'#2a3a60', fontSize:11, marginTop:4 }}>Posez vos questions à l'équipe Doniel Zik ici</p>
+                </div>
+              ) : adminMsgs.map(m => (
+                <div key={m.id} style={{ marginBottom:10, display:'flex', justifyContent: m.from==='annonceur' ? 'flex-end' : 'flex-start' }}>
+                  <div>
+                    {m.from === 'admin' && (
+                      <p style={{ color:'#ffd700', fontSize:9, fontWeight:700, marginBottom:3, marginLeft:3 }}>DONIEL ZIK</p>
+                    )}
+                    <div style={{ maxWidth:'78%', padding:'10px 14px', borderRadius: m.from==='annonceur'?'14px 14px 4px 14px':'14px 14px 14px 4px', background: m.from==='annonceur'?'rgba(255,200,0,0.15)':'rgba(255,255,255,0.07)', border: m.from==='annonceur'?'1px solid rgba(255,200,0,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
+                      <p style={{ color:'#dde4f5', fontSize:14, margin:0, lineHeight:1.5 }}>{m.text}</p>
+                      <p style={{ color:'#4a5878', fontSize:9, margin:'4px 0 0', textAlign:'right' }}>{new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <input className="dz-inp" value={adminInput} onChange={e => setAdminInput(e.target.value)}
+                onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendAdminMsg()}
+                placeholder="Écrire à l'équipe Doniel Zik..." />
+              <button onClick={sendAdminMsg} disabled={adminSending || !adminInput.trim()}
+                style={{ width:44, height:44, borderRadius:10, border:'none', background: adminInput.trim()?'linear-gradient(135deg,#ffd700,#ff9500)':'rgba(255,255,255,0.08)', color: adminInput.trim()?'#000':'#4a5878', cursor: adminInput.trim()?'pointer':'default', fontSize:18, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ➤
+              </button>
+            </div>
           </div>
         )}
 
         {/* ── LEADS ── */}
         {tab === 'leads' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
-            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:12 }}>💬 PROSPECTS INTÉRESSÉS</p>
+            <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:12 }}>👤 PROSPECTS INTÉRESSÉS PAR MA PUB</p>
             {leads.length === 0 ? (
               <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
                 <p style={{ fontSize:36, marginBottom:10 }}>📭</p>
@@ -2758,48 +3536,43 @@ function DzStudioPage() {
           </div>
         )}
 
-        {/* ── CHAT ── */}
+        {/* ── CHAT LEADS ── */}
         {tab === 'chat' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
             {!chatLeadId ? (
               <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
                 <p style={{ fontSize:36, marginBottom:10 }}>📩</p>
-                <p style={{ color:'#4a5878', fontSize:13 }}>Sélectionnez un lead dans l'onglet Leads pour démarrer une conversation</p>
+                <p style={{ color:'#4a5878', fontSize:13 }}>Sélectionnez un prospect dans Leads</p>
                 <button onClick={() => setTab('leads')} style={{ marginTop:12, padding:'10px 20px', borderRadius:10, border:'none', background:'rgba(255,200,0,0.15)', color:'#ffd700', cursor:'pointer', fontWeight:700, fontSize:13 }}>Voir mes leads</button>
               </div>
             ) : (
               <>
-                {/* Header chat */}
-                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16, padding:'12px 14px', background:'rgba(255,255,255,0.04)', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14, padding:'12px 14px', background:'rgba(255,255,255,0.04)', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
                   <button onClick={() => setChatLeadId(null)} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18, padding:0 }}>←</button>
-                  <div style={{ width:34, height:34, borderRadius:99, background:'linear-gradient(135deg,rgba(255,200,0,0.2),rgba(255,100,0,0.2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>👤</div>
+                  <div style={{ width:36, height:36, borderRadius:99, background:'linear-gradient(135deg,rgba(255,200,0,0.2),rgba(255,100,0,0.2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>👤</div>
                   <div>
                     <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', margin:0 }}>{selectedLead?.telephone}</p>
                     <p style={{ color:'#4dff9a', fontSize:10, margin:'1px 0 0' }}>● Prospect intéressé</p>
                   </div>
                 </div>
-
-                {/* Messages */}
-                <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', minHeight:280, maxHeight:380, overflowY:'auto', padding:'14px', marginBottom:12 }}>
-                  {messages.length === 0 ? (
+                <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)', minHeight:280, maxHeight:360, overflowY:'auto', padding:14, marginBottom:12 }}>
+                  {leadMsgs.length === 0 ? (
                     <p style={{ textAlign:'center', color:'#2a3a60', fontSize:12, marginTop:60 }}>Démarrez la conversation</p>
-                  ) : messages.map(m => (
-                    <div key={m.id} style={{ marginBottom:10, display:'flex', justifyContent: m.from==='annonceur' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth:'75%', padding:'10px 14px', borderRadius: m.from==='annonceur' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.from==='annonceur' ? 'rgba(255,200,0,0.15)' : 'rgba(255,255,255,0.06)', border: m.from==='annonceur' ? '1px solid rgba(255,200,0,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+                  ) : leadMsgs.map(m => (
+                    <div key={m.id} style={{ marginBottom:10, display:'flex', justifyContent: m.from==='annonceur'?'flex-end':'flex-start' }}>
+                      <div style={{ maxWidth:'75%', padding:'10px 14px', borderRadius: m.from==='annonceur'?'14px 14px 4px 14px':'14px 14px 14px 4px', background: m.from==='annonceur'?'rgba(255,200,0,0.15)':'rgba(255,255,255,0.06)', border: m.from==='annonceur'?'1px solid rgba(255,200,0,0.3)':'1px solid rgba(255,255,255,0.08)' }}>
                         <p style={{ color:'#dde4f5', fontSize:14, margin:0, lineHeight:1.5 }}>{m.text}</p>
                         <p style={{ color:'#4a5878', fontSize:9, margin:'4px 0 0', textAlign:'right' }}>{new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-
-                {/* Input */}
                 <div style={{ display:'flex', gap:8 }}>
-                  <input className="msg-inp" value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                    onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendMessage()}
-                    placeholder="Écrire un message..." />
-                  <button onClick={sendMessage} disabled={sending||!newMsg.trim()}
-                    style={{ width:44, height:44, borderRadius:10, border:'none', background: newMsg.trim()?'linear-gradient(135deg,#ffd700,#ff9500)':'rgba(255,255,255,0.08)', color: newMsg.trim()?'#000':'#4a5878', cursor: newMsg.trim()?'pointer':'default', fontSize:18, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <input className="dz-inp" value={leadInput} onChange={e => setLeadInput(e.target.value)}
+                    onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendLeadMsg()}
+                    placeholder="Écrire au prospect..." />
+                  <button onClick={sendLeadMsg} disabled={leadSending || !leadInput.trim()}
+                    style={{ width:44, height:44, borderRadius:10, border:'none', background: leadInput.trim()?'linear-gradient(135deg,#ffd700,#ff9500)':'rgba(255,255,255,0.08)', color: leadInput.trim()?'#000':'#4a5878', cursor: leadInput.trim()?'pointer':'default', fontSize:18, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     ➤
                   </button>
                 </div>
