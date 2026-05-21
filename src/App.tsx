@@ -4,7 +4,7 @@ import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { db, auth } from './firebase';
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc,
+  collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
   onSnapshot, query, orderBy, where, getDocs
 } from 'firebase/firestore';
 import {
@@ -878,10 +878,15 @@ function FanPage() {
               <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>🎵 Streaming gratuit</p>
               {qrData?.files && <AudioPlayer files={qrData.files} onStream={recordStream} />}
             </div>
-            <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
-              style={{ width:'100%', padding:'14px', fontSize:14, fontWeight:700, borderRadius:14, border:'1px solid rgba(30,111,255,0.35)', background:'rgba(30,111,255,0.08)', color:'#4da6ff', cursor:'pointer' }}>
-              ⬇️ Télécharger l'album <span style={{ fontSize:11, color:'#4a5878' }}>(Accès payant)</span>
-            </button>
+            {qrData && (
+              <AchatWidget
+                qrId={qrData.qrId || qrId || ''}
+                albumLabel={qrData.label || ''}
+                artistEmail={qrData.artistEmail || ''}
+                prix={qrData.price || 0}
+                files={qrData.files || []}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1845,11 +1850,23 @@ function ArtistPage() {
   const [optionMsg, setOptionMsg] = useState('');
 
   useEffect(() => {
-    onAuthStateChanged(auth, (u) => {
-      if (u) { setUser(u); setView('dashboard'); loadStats(u.email || ''); loadArtistOptions(u.uid); }
-      else { setUser(null); setView('login'); }
+    onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        // Vérifier que ce compte est bien un artiste (présent dans la collection 'artists')
+        const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', u.email)));
+        if (!artistSnap.empty) {
+          setUser(u); setView('dashboard');
+          loadStats(u.email || '');
+          loadArtistOptions(u.uid);
+        } else {
+          // Compte connecté mais pas artiste → rester sur login
+          setUser(null); setView('login');
+          setMsg("Ce compte n'est pas un compte artiste. Connectez-vous avec votre compte artiste.");
+          await signOut(auth);
+        }
+      } else { setUser(null); setView('login'); }
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Charger les demandes d'achat en temps réel
   useEffect(() => {
@@ -1875,9 +1892,10 @@ function ArtistPage() {
 
   const loadArtistOptions = async (uid: string) => {
     try {
-      const snap = await getDocs(query(collection(db, 'artistOptions'), where('uid', '==', uid)));
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
+      const { getDoc } = await import('firebase/firestore');
+      const snap = await getDoc(doc(db, 'artistOptions', uid));
+      if (snap.exists()) {
+        const d = snap.data();
         setOptionPaiement(d.optionPaiement || '');
         setLienPaiement(d.lienPaiement || '');
       }
@@ -1888,12 +1906,11 @@ function ArtistPage() {
     if (!user || !optionPaiement) { setOptionMsg('Choisissez une option'); return; }
     setSavingOption(true); setOptionMsg('');
     try {
-      const snap = await getDocs(query(collection(db, 'artistOptions'), where('uid', '==', user.uid)));
-      if (snap.empty) {
-        await addDoc(collection(db, 'artistOptions'), { uid: user.uid, optionPaiement, lienPaiement, updatedAt: new Date().toISOString() });
-      } else {
-        await updateDoc(doc(db, 'artistOptions', snap.docs[0].id), { optionPaiement, lienPaiement, updatedAt: new Date().toISOString() });
-      }
+      // setDoc avec merge évite les problèmes de permissions sur addDoc/updateDoc
+      await setDoc(doc(db, 'artistOptions', user.uid), {
+        uid: user.uid, optionPaiement, lienPaiement,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
       setOptionMsg('✅ Options sauvegardées !');
     } catch(e: any) { setOptionMsg('Erreur: ' + e.message); }
     setSavingOption(false);
@@ -2081,10 +2098,63 @@ function ArtistPage() {
                       <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
                         style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>📋 Copier</button>
                     </div>
+                    <p style={{ color:'#8098b8', fontSize:10, marginTop:8, marginBottom:12, wordBreak:'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
+                    {/* QR CODE DU LIEN PUBLIC */}
+                    <div style={{ display:'flex', alignItems:'center', gap:16, background:'#f5f8ff', borderRadius:12, padding:14 }}>
+                      <div style={{ background:'white', padding:8, borderRadius:8, border:'1px solid #dce6f7', flexShrink:0 }}>
+                        <QRCodeCanvas
+                          id={'pub-qr-'+link.id}
+                          value={BASE_URL+'/ecoute/'+link.publicLinkId}
+                          size={90} bgColor="#ffffff" fgColor="#000000" level="H"
+                        />
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, fontSize:13, marginBottom:4, color:'#1a2340' }}>QR Code du lien public</p>
+                        <p style={{ color:'#8098b8', fontSize:11, marginBottom:10, lineHeight:1.5 }}>Imprimez ce QR code pour que vos fans scannent et écoutent en streaming. Chaque écoute vous rémunère.</p>
+                        <button onClick={() => {
+                          const canvas = document.getElementById('pub-qr-'+link.id) as HTMLCanvasElement;
+                          if (!canvas) return;
+                          const a = document.createElement('a');
+                          a.href = canvas.toDataURL('image/png');
+                          a.download = (link.label||'streaming')+'-QR-public.png';
+                          a.click();
+                        }} style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>⬇ Télécharger QR PNG</button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* RÉMUNÉRATION STREAMING */}
+            <div style={{ background:'#ffffff', border:'1px solid #dce6f7', borderRadius:16, padding:24, marginBottom:20, boxShadow:'0 2px 12px rgba(26,107,255,0.08)' }}>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>💰 RÉMUNÉRATION STREAMING</p>
+              <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800, marginBottom:12 }}>Ce que vous gagnez</h3>
+              <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.8, marginBottom:16 }}>
+                Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
+              </p>
+              <div style={{ display:'grid', gap:10 }}>
+                {[
+                  { label:"Aujourd'hui — pub automatique", range:'0,10 – 0,80 FCFA', tag:'● ACTIF', color:'#1a6bff', icon:'📡' },
+                  { label:'Bientôt — annonceurs locaux', range:'1 – 4 FCFA', tag:'◎ PROCHAINEMENT', color:'#b07a00', icon:'🚀' },
+                  { label:'Perspective — abonnements fans', range:"jusqu'à 5 FCFA", tag:'◌ EN DEV', color:'#5a7090', icon:'💎' },
+                ].map((r,i) => (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'#f5f8ff', border:`1px solid ${r.color}33`, borderRadius:12, padding:'14px 16px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <span style={{ fontSize:22 }}>{r.icon}</span>
+                      <div>
+                        <p style={{ color:'#8098b8', fontSize:11, marginBottom:2 }}>{r.label}</p>
+                        <p style={{ fontWeight:800, fontSize:16, color:r.color }}>{r.range} <span style={{ fontSize:11, fontWeight:400, color:'#8098b8' }}>/ écoute</span></p>
+                      </div>
+                    </div>
+                    <span style={{ fontSize:10, padding:'3px 8px', borderRadius:99, background:`${r.color}15`, color:r.color, fontWeight:700 }}>{r.tag}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ color:'#b0c4d8', fontSize:11, marginTop:14, textAlign:'center' }}>
+                Versement trimestriel · Orange Money · Wave · MTN MoMo
+              </p>
+            </div>
 
             {/* POCHETTES */}
             <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
@@ -3879,6 +3949,161 @@ function PWAInstallBanner() {
 
 
 // ─────────────────────────────────────────────
+// ACHAT WIDGET — réutilisable FanPage + PublicStreamPage
+// Flux 3 : mélomane → achat → chat → paiement → téléchargement
+// ─────────────────────────────────────────────
+function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
+  qrId: string; albumLabel: string; artistEmail: string; prix: number; files: any[];
+}) {
+  const [achatState, setAchatState] = useState<'idle'|'modal'|'pending'>('idle');
+  const [phone, setPhone] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [venteId, setVenteId] = useState('');
+  const [msgs, setMsgs] = useState<any[]>([]);
+  const [dlActive, setDlActive] = useState(false);
+  const [msgInput, setMsgInput] = useState('');
+  const [msgSending, setMsgSending] = useState(false);
+
+  useEffect(() => {
+    if (!venteId) return;
+    const u1 = onSnapshot(query(collection(db, 'venteMessages'), where('venteId','==',venteId), orderBy('ts','asc')),
+      snap => setMsgs(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    const u2 = onSnapshot(doc(db, 'ventes', venteId), d => {
+      if (d.exists() && d.data()?.dlActive) setDlActive(true);
+    });
+    return () => { u1(); u2(); };
+  }, [venteId]);
+
+  const submit = async () => {
+    if (!phone || !accepted) return;
+    setSending(true);
+    try {
+      const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
+      let artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
+      const ref = await addDoc(collection(db, 'ventes'), {
+        qrId, artistId, artistEmail, albumLabel, prix,
+        melomanePhone: phone, statut:'en_attente',
+        dlActive:false, readByArtist:false, createdAt:new Date().toISOString(),
+      });
+      setVenteId(ref.id);
+      await addDoc(collection(db, 'venteMessages'), {
+        venteId:ref.id, artistId, from:'melomane',
+        text:`Bonjour ! Je souhaite acheter "${albumLabel}". Mon numéro : ${phone}`,
+        ts:new Date().toISOString(),
+      });
+      setAchatState('pending');
+    } catch(e){ console.error(e); }
+    setSending(false);
+  };
+
+  const sendMsg = async () => {
+    if (!msgInput.trim() || !venteId) return;
+    setMsgSending(true);
+    await addDoc(collection(db, 'venteMessages'), {
+      venteId, from:'melomane', text:msgInput.trim(), ts:new Date().toISOString(),
+    });
+    setMsgInput(''); setMsgSending(false);
+  };
+
+  const downloadAll = () => {
+    files.forEach((f:any, i:number) => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+        a.download = f.name; a.target='_blank';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }, i * 1200);
+    });
+  };
+
+  if (dlActive) return (
+    <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:20 }}>
+      <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement validé par l'artiste !</p>
+      <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Votre téléchargement est maintenant actif.</p>
+      <button onClick={downloadAll}
+        style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+        ⬇ Télécharger maintenant
+      </button>
+    </div>
+  );
+
+  if (achatState === 'pending' && venteId) return (
+    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:14, marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+        <span style={{ width:8,height:8,borderRadius:99,background:'#4dff9a',display:'inline-block' }} />
+        <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>En discussion avec l'artiste</p>
+      </div>
+      <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, minHeight:140, maxHeight:240, overflowY:'auto', padding:12, marginBottom:10, border:'1px solid rgba(255,255,255,0.06)' }}>
+        {msgs.length === 0 ? (
+          <p style={{ textAlign:'center', color:'#2a3a60', fontSize:11, marginTop:40 }}>L'artiste va vous répondre bientôt…</p>
+        ) : msgs.map(m => (
+          <div key={m.id} style={{ marginBottom:8, display:'flex', justifyContent:m.from==='melomane'?'flex-end':'flex-start' }}>
+            {m.from==='artiste' && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, marginBottom:2 }}>ARTISTE</p>}
+            <div style={{ maxWidth:'80%', padding:'9px 13px', borderRadius:m.from==='melomane'?'14px 14px 4px 14px':'14px 14px 14px 4px', background:m.from==='melomane'?'rgba(30,111,255,0.2)':'rgba(255,255,255,0.07)', border:m.from==='melomane'?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
+              <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.5 }}>{m.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
+          onKeyDown={e => e.key==='Enter' && sendMsg()}
+          placeholder="Écrire à l'artiste..."
+          style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'10px 13px', color:'#fff', fontSize:13, outline:'none' }} />
+        <button onClick={sendMsg} disabled={msgSending||!msgInput.trim()}
+          style={{ width:40, height:40, borderRadius:10, border:'none', background: msgInput.trim()?'rgba(30,111,255,0.8)':'rgba(255,255,255,0.08)', color:'#fff', cursor: msgInput.trim()?'pointer':'default', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          ➤
+        </button>
+      </div>
+      <p style={{ color:'#4a5878', fontSize:10, textAlign:'center', marginTop:8 }}>⏳ En attente de validation du paiement</p>
+    </div>
+  );
+
+  if (achatState === 'modal') return (
+    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:14, padding:18, marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+        <p style={{ fontWeight:800, fontSize:15, color:'#fff', margin:0 }}>💰 Acheter "{albumLabel}"</p>
+        <button onClick={() => setAchatState('idle')} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18 }}>✕</button>
+      </div>
+      {prix > 0 && (
+        <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:14 }}>
+          <p style={{ color:'#4da6ff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{prix.toLocaleString()} FCFA</p>
+          <p style={{ color:'#4a5878', fontSize:11, margin:0 }}>Paiement Mobile Money · Confirmation par l'artiste</p>
+        </div>
+      )}
+      <p style={{ color:'#6a88aa', fontSize:12, marginBottom:10 }}>Votre numéro pour être contacté :</p>
+      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel"
+        style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:15, outline:'none', marginBottom:12, boxSizing:'border-box' }} />
+      <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:16 }}>
+        <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} id="cgu-achat-w" style={{ marginTop:3, flexShrink:0 }} />
+        <label htmlFor="cgu-achat-w" style={{ color:'#4a5878', fontSize:11, lineHeight:1.6 }}>
+          J'accepte d'être contacté par l'artiste via ce numéro pour finaliser le paiement.
+        </label>
+      </div>
+      <button onClick={submit} disabled={!phone||!accepted||sending}
+        style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background: phone&&accepted?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.08)', color: phone&&accepted?'#fff':'#4a5878', fontWeight:800, fontSize:15, cursor: phone&&accepted?'pointer':'default' }}>
+        {sending ? '⏳ Envoi...' : '📲 Envoyer ma demande'}
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom:20 }}>
+      <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
+      <button onClick={() => setAchatState('modal')}
+        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
+        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>💰</span>
+        <div style={{ textAlign:'left' }}>
+          <p style={{ margin:0, fontWeight:800 }}>{files.length > 1 ? "Acheter l'album complet" : 'Acheter cette musique'}</p>
+          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{prix > 0 ? `${prix.toLocaleString()} FCFA · Téléchargement permanent` : 'Contacter l\'artiste pour le prix'}</p>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // PAGE STREAMING PUBLIC — /ecoute/:publicLinkId
 // ─────────────────────────────────────────────
 function PublicStreamPage() {
@@ -4004,19 +4229,16 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── TÉLÉCHARGER ── */}
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>⬇ Télécharger</p>
-          <button
-            onClick={() => alert('Paiement en ligne disponible prochainement.')}
-            style={{ width: '100%', padding: '15px 20px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 20px rgba(30,111,255,0.4)' }}>
-            <span style={{ fontSize: 22, background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: '4px 8px' }}>⬇</span>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ margin: 0, fontWeight: 800 }}>{(data.files?.length || 0) > 1 ? "Télécharger l'album" : 'Télécharger'}</p>
-              <p style={{ margin: 0, fontSize: 11, opacity: 0.7 }}>Accès payant · Qualité originale</p>
-            </div>
-          </button>
-        </div>
+        {/* ── ACHETER ── */}
+        {(data.price > 0 || data.files?.length > 0) && (
+          <AchatWidget
+            qrId={data.publicLinkId || publicLinkId || ''}
+            albumLabel={data.label || ''}
+            artistEmail={data.artistEmail || ''}
+            prix={data.price || 0}
+            files={data.files || []}
+          />
+        )}
 
         {/* ── VIDÉOS ── */}
         {videoFiles.length > 0 && (
