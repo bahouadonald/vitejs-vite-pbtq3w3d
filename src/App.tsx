@@ -597,15 +597,56 @@ function FanPage() {
 
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
 
-            {/* ── TÉLÉCHARGER (via AchatWidget) ── */}
+            {/* ── TÉLÉCHARGER ──
+                QR privé (acheté physiquement) → gratuit, direct
+                Lien public → payant via AchatWidget + chat artiste
+            ── */}
             {qrData.files?.length > 0 && (
-              <AchatWidget
-                qrId={qrData.qrId || qrId || ''}
-                albumLabel={qrData.label || ''}
-                artistEmail={qrData.artistEmail || ''}
-                prix={qrData.price || 0}
-                files={qrData.files || []}
-              />
+              qrData.isPublicLink ? (
+                /* Lien public = payant */
+                <AchatWidget
+                  qrId={qrData.qrId || qrId || ''}
+                  albumLabel={qrData.label || ''}
+                  artistEmail={qrData.artistEmail || ''}
+                  prix={qrData.price || 0}
+                  files={qrData.files || []}
+                />
+              ) : (
+                /* QR privé = téléchargement gratuit direct */
+                <div style={{ marginBottom:20 }}>
+                  <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
+                  {!downloaded ? (
+                    onSafari ? (
+                      <button
+                        onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
+                        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
+                        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>🌐</span>
+                        <div style={{ textAlign:'left' }}>
+                          <p style={{ margin:0, fontWeight:800 }}>Ouvrir dans Chrome</p>
+                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Requis pour télécharger sur iPhone</p>
+                        </div>
+                      </button>
+                    ) : (
+                      <button onClick={startDownload}
+                        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)' }}>
+                        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>⬇</span>
+                        <div style={{ textAlign:'left' }}>
+                          <p style={{ margin:0, fontWeight:800 }}>{(qrData.files?.length||0)>1 ? "Télécharger l'album complet" : 'Télécharger'}</p>
+                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{qrData.files?.length||0} fichier{(qrData.files?.length||0)>1?'s':''} · Qualité originale</p>
+                        </div>
+                      </button>
+                    )
+                  ) : (
+                    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,111,255,0.1)', border:'1px solid rgba(30,111,255,0.3)' }}>
+                      <span style={{ fontSize:22 }}>✅</span>
+                      <div>
+                        <p style={{ fontWeight:700, fontSize:14, color:'#4da6ff', margin:0 }}>Téléchargement effectué</p>
+                        <p style={{ color:'#4a5878', fontSize:11, margin:'2px 0 0' }}>Streaming illimité disponible ci-dessous</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
             )}
 
             {/* ── ÉCOUTER EN STREAMING ── */}
@@ -652,8 +693,8 @@ function FanPage() {
               </div>
             )}
 
-            {/* ── AJOUTER À MA ZIKOTHÈQUE ── */}
-            {zikoState === 'done' ? (
+            {/* ── AJOUTER À MA ZIKOTHÈQUE — uniquement si pas encore téléchargé via QR privé ── */}
+            {!downloaded && (zikoState === 'done' ? (
               <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,200,100,0.1)', border:'1px solid rgba(30,200,100,0.3)', marginBottom:24 }}>
                 <span style={{ fontSize:24 }}>✅</span>
                 <div>
@@ -672,7 +713,7 @@ function FanPage() {
                   <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Retrouvez cet album à tout moment</p>
                 </div>
               </button>
-            )}
+            ))}
 
             {/* MODAL CONNEXION RAPIDE */}
             {zikoState === 'modal' && (
@@ -1700,14 +1741,19 @@ function ArtistPage() {
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
       if (u) {
-        // Vérifier que ce compte est bien un artiste (présent dans la collection 'artists')
+        // L'admin ne doit pas être bloqué ici
+        if (u.email === ADMIN_EMAIL) {
+          setUser(null); setView('login');
+          setMsg("Utilisez /admin pour accéder au dashboard administrateur.");
+          return; // Ne pas déconnecter l'admin, juste ne pas afficher le dashboard artiste
+        }
+        // Vérifier que ce compte est bien un artiste
         const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', u.email)));
         if (!artistSnap.empty) {
           setUser(u); setView('dashboard');
           loadStats(u.email || '');
           loadArtistOptions(u.uid);
         } else {
-          // Compte connecté mais pas artiste → rester sur login
           setUser(null); setView('login');
           setMsg("Ce compte n'est pas un compte artiste. Connectez-vous avec votre compte artiste.");
           await signOut(auth);
@@ -1844,9 +1890,12 @@ function ArtistPage() {
       if (!found) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
       const snap = allQrSnap;
       // Créer le compte Firebase Auth
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Enregistrer dans collection artists
-      await addDoc(collection(db, 'artists'), { name: artistName, email, createdAt: new Date().toISOString() });
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      // Enregistrer dans collection artists avec l'uid pour le retrouver depuis AchatWidget
+      await addDoc(collection(db, 'artists'), {
+        name: artistName, email, uid: cred.user.uid,
+        createdAt: new Date().toISOString()
+      });
       setMsg('Compte cree !');
     } catch (e: any) { setMsg('Erreur: ' + (e.message || 'Impossible de creer le compte')); }
     setLoading(false);
@@ -1854,8 +1903,14 @@ function ArtistPage() {
 
   const login = async () => {
     setLoading(true); setMsg('');
-    try { await signInWithEmailAndPassword(auth, email, password); }
-    catch { setMsg('Email ou mot de passe incorrect'); }
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      // Mettre à jour l'uid dans la collection artists si absent (artistes inscrits avant ce fix)
+      const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',email)));
+      if (!artSnap.empty && !artSnap.docs[0].data().uid) {
+        await updateDoc(doc(db, 'artists', artSnap.docs[0].id), { uid: cred.user.uid });
+      }
+    } catch { setMsg('Email ou mot de passe incorrect'); }
     setLoading(false);
   };
 
@@ -3819,17 +3874,24 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
     if (state !== 'idle') return;
     setSending(true);
     try {
-      // Chercher l'artiste et son lien de paiement
+      // Chercher l'artiste par email
       const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
-      let artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
-      // Lire l'option de paiement de l'artiste
+      // L'uid peut être dans le champ 'uid' OU être l'id du document lui-même
+      let artistId = '';
+      if (!artSnap.empty) {
+        const artData = artSnap.docs[0].data();
+        artistId = artData.uid || artSnap.docs[0].id;
+      }
+
+      // Lire le lien de paiement depuis artistOptions (clé = uid de l'artiste)
       if (artistId) {
         try {
-          const { getDoc } = await import('firebase/firestore');
-          const optSnap = await getDoc(doc(db, 'artistOptions', artistId));
+          const { getDoc: gd } = await import('firebase/firestore');
+          const optSnap = await gd(doc(db, 'artistOptions', artistId));
           if (optSnap.exists()) setLienPaiement(optSnap.data().lienPaiement || '');
         } catch(e) {}
       }
+
       // Créer la demande de téléchargement
       const ref = await addDoc(collection(db, 'ventes'), {
         qrId, artistId, artistEmail, albumLabel, prix,
@@ -3837,14 +3899,16 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
         readByArtist: false, createdAt: new Date().toISOString(),
       });
       setVenteId(ref.id);
-      // Message système automatique visible par l'artiste
+
+      // Message système visible par l'artiste dans son dashboard Ventes
       await addDoc(collection(db, 'venteMessages'), {
         venteId: ref.id, artistId, from: 'systeme',
-        text: `📲 Nouveau téléchargement demandé pour "${albumLabel}"${prix > 0 ? ` · ${prix.toLocaleString()} FCFA` : ''}.`,
+        text: `📲 Nouvelle demande de téléchargement pour "${albumLabel}"${prix > 0 ? ` · ${prix.toLocaleString()} FCFA` : ''}.`,
         ts: new Date().toISOString(),
       });
+
       setState('chat');
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error('openChat error:', e); }
     setSending(false);
   };
 
