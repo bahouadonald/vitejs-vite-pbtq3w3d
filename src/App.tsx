@@ -297,17 +297,124 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
   );
 }
 
+// ─────────────────────────────────────────────
+// MODAL CONNEXION RAPIDE POUR ZIKOTHÈQUE
+// S'affiche en overlay sur la page, sans navigation
+// ─────────────────────────────────────────────
+function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => void, onClose: () => void }) {
+  const [mode, setMode] = useState<'choose' | 'email' | 'register'>('choose');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Écouter la connexion en temps réel
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) { onSuccess(u.uid); }
+    });
+    return unsub;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loginGoogle = async () => {
+    setLoading(true); setMsg('');
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      onSuccess(result.user.uid);
+    } catch (e: any) { setMsg('Erreur Google: ' + e.message); setLoading(false); }
+  };
+
+  const loginEmail = async () => {
+    setLoading(true); setMsg('');
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      onSuccess(result.user.uid);
+    } catch { setMsg('Email ou mot de passe incorrect'); setLoading(false); }
+  };
+
+  const registerEmail = async () => {
+    if (!displayName) { setMsg('Entrez votre prénom'); return; }
+    setLoading(true); setMsg('');
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(result.user, { displayName });
+      onSuccess(result.user.uid);
+    } catch (e: any) { setMsg('Erreur: ' + e.message); setLoading(false); }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'0 0 0 0' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ width:'100%', maxWidth:500, background:'#0f1322', borderRadius:'20px 20px 0 0', padding:'28px 20px 40px', border:'1px solid rgba(255,255,255,0.1)' }}>
+
+        {/* Poignée */}
+        <div style={{ width:40, height:4, background:'rgba(255,255,255,0.15)', borderRadius:99, margin:'0 auto 20px' }} />
+
+        {/* Titre */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:18, color:'#fff', margin:0 }}>➕ Ajouter à ma Zikothèque</p>
+            <p style={{ color:'#4a5878', fontSize:12, margin:'4px 0 0' }}>Connectez-vous pour sauvegarder cet album</p>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.08)', border:'none', borderRadius:99, width:32, height:32, color:'#8098b8', cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+        </div>
+
+        {mode === 'choose' && (
+          <>
+            {/* Google */}
+            <button onClick={loginGoogle} disabled={loading}
+              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, width:'100%', padding:'14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', marginBottom:12 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continuer avec Google
+            </button>
+            <button onClick={() => setMode('email')} disabled={loading}
+              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, width:'100%', padding:'14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
+              ✉️ Continuer avec l'email
+            </button>
+          </>
+        )}
+
+        {(mode === 'email' || mode === 'register') && (
+          <>
+            <button onClick={() => { setMode('choose'); setMsg(''); }} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', marginBottom:14, fontSize:13 }}>← Retour</button>
+            {mode === 'register' && (
+              <>
+                <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Prénom ou pseudo"
+                  style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' }} />
+              </>
+            )}
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
+              style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:10, boxSizing:'border-box' }} />
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" type="password"
+              style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:14, outline:'none', marginBottom:14, boxSizing:'border-box' }} />
+            {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+            <button onClick={mode === 'register' ? registerEmail : loginEmail} disabled={loading}
+              style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+              {loading ? '⏳ Chargement...' : mode === 'register' ? 'Créer mon compte' : 'Se connecter'}
+            </button>
+            <button onClick={() => { setMode(mode === 'email' ? 'register' : 'email'); setMsg(''); }}
+              style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:13 }}>
+              {mode === 'email' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
   const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
   const [qrData, setQrData] = useState<any>(null);
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
-  const [copied, setCopied] = useState('');
   const [downloaded, setDownloaded] = useState(false);
+  const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const currentUrl = window.location.href;
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
-
   const qrDocId = useRef<string>('');
 
   useEffect(() => {
@@ -319,15 +426,9 @@ function FanPage() {
       qrDocId.current = docId;
       const data = { id: docId, ...snap.docs[0].data() } as any;
       setQrData(data);
-      // ── Compteur de visites ──
       try {
-        await addDoc(collection(db, 'visits'), {
-          qrId, artist: data.artist || '', label: data.label || '',
-          ts: new Date().toISOString(),
-        });
-        await updateDoc(doc(db, 'qrcodes', docId), {
-          visits: (data.visits || 0) + 1,
-        });
+        await addDoc(collection(db, 'visits'), { qrId, artist: data.artist || '', label: data.label || '', ts: new Date().toISOString() });
+        await updateDoc(doc(db, 'qrcodes', docId), { visits: (data.visits || 0) + 1 });
       } catch (e) { console.error('visit', e); }
       if (data.status === 'locked' || (data.usedScans || 0) >= (data.totalScans || 0)) setStep('locked');
       else setStep('ready');
@@ -335,47 +436,41 @@ function FanPage() {
     load();
   }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sauvegarde dans Ma Zikothèque ──
-  // Appelée dès le chargement ET au téléchargement.
-  // Utilise localStorage (persiste entre pages) comme fallback si non connecté.
-  const saveToZikotheque = async (data?: any) => {
-    const src = data || qrData;
-    if (!src) return;
+  // ── Ajouter à la Zikothèque (appelé après connexion confirmée) ──
+  const doAddToZiko = async (uid: string) => {
+    if (!qrData) return;
+    setZikoState('adding');
     try {
       const zikoData = {
-        qrId: src.qrId || qrId,
-        label: src.label || '',
-        artist: src.artist || '',
-        type: src.type || 'album',
-        files: src.files || [],
-        coverUrl: src.coverUrl || '',
+        qrId: qrData.qrId || qrId,
+        label: qrData.label || '',
+        artist: qrData.artist || '',
+        type: qrData.type || 'album',
+        files: qrData.files || [],
+        coverUrl: qrData.coverUrl || '',
         addedAt: new Date().toISOString(),
       };
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        // Déjà connecté : écrire directement dans Firestore, sans doublon
-        const existing = await getDocs(query(
-          collection(db, 'zikotheque'),
-          where('uid', '==', currentUser.uid),
-          where('qrId', '==', zikoData.qrId)
-        ));
-        if (existing.empty) {
-          await addDoc(collection(db, 'zikotheque'), { uid: currentUser.uid, ...zikoData });
-        }
-        localStorage.removeItem('pendingZiko');
-      } else {
-        // Non connecté : localStorage (survit à la navigation entre pages)
-        localStorage.setItem('pendingZiko', JSON.stringify(zikoData));
+      const existing = await getDocs(query(
+        collection(db, 'zikotheque'),
+        where('uid', '==', uid),
+        where('qrId', '==', zikoData.qrId)
+      ));
+      if (existing.empty) {
+        await addDoc(collection(db, 'zikotheque'), { uid, ...zikoData });
       }
-    } catch (e) { console.error('ziko', e); }
+      setZikoState('done');
+    } catch(e) { console.error('ziko', e); setZikoState('idle'); }
   };
 
-  // ── Sauvegarder automatiquement dès que qrData est chargé ──
-  useEffect(() => {
-    if (qrData && qrData.status !== 'locked') {
-      saveToZikotheque(qrData);
+  // ── Clic sur "Ajouter à ma Zikothèque" ──
+  const handleAddToZiko = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      await doAddToZiko(currentUser.uid);
+    } else {
+      setZikoState('modal');
     }
-  }, [qrData]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
 
   // ── Enregistrer un stream ──
   const recordStream = async (trackName: string, duration: number) => {
@@ -386,15 +481,9 @@ function FanPage() {
         track: trackName, duration: Math.round(duration),
         valid: true, ts: new Date().toISOString(),
       });
-      await updateDoc(doc(db, 'qrcodes', qrDocId.current), {
-        streams: (qrData.streams || 0) + 1,
-      });
+      await updateDoc(doc(db, 'qrcodes', qrDocId.current), { streams: (qrData.streams || 0) + 1 });
       setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
     } catch (e) { console.error('stream', e); }
-  };
-
-  const copy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 2000);
   };
 
   const markAsDownloaded = async () => {
@@ -407,7 +496,6 @@ function FanPage() {
         status: newUsed >= qrData.totalScans ? 'locked' : 'active',
       });
     } catch(e) { console.error('markDL', e); }
-    await saveToZikotheque(qrData);
   };
 
   const startDownload = async () => {
@@ -589,17 +677,35 @@ function FanPage() {
               </div>
             )}
 
-            {/* ── MA ZIKOTHÈQUE ── */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:14, padding:'14px 16px', marginBottom:24 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <span style={{ fontSize:22 }}>📚</span>
+            {/* ── AJOUTER À MA ZIKOTHÈQUE ── */}
+            {zikoState === 'done' ? (
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,200,100,0.1)', border:'1px solid rgba(30,200,100,0.3)', marginBottom:24 }}>
+                <span style={{ fontSize:24 }}>✅</span>
                 <div>
-                  <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>Ma Zikothèque</p>
-                  <p style={{ color:'#4a5878', fontSize:11, margin:'2px 0 0' }}>Retrouvez vos albums</p>
+                  <p style={{ fontWeight:700, fontSize:14, color:'#4dff9a', margin:0 }}>Ajouté à ta Zikothèque !</p>
+                  <a href="/ziko" style={{ color:'#4da6ff', fontSize:12, textDecoration:'none' }}>Voir ma Zikothèque →</a>
                 </div>
               </div>
-              <a href="/ziko" style={{ background:'rgba(30,111,255,0.2)', border:'1px solid rgba(30,111,255,0.4)', borderRadius:10, padding:'7px 14px', color:'#4da6ff', textDecoration:'none', fontSize:12, fontWeight:700, whiteSpace:'nowrap' }}>Accéder →</a>
-            </div>
+            ) : (
+              <button onClick={handleAddToZiko} disabled={zikoState === 'adding'}
+                style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState === 'adding' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
+                <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>
+                  {zikoState === 'adding' ? '⏳' : '➕'}
+                </span>
+                <div style={{ textAlign:'left' }}>
+                  <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : 'Ajouter à ma Zikothèque'}</p>
+                  <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Retrouvez cet album à tout moment</p>
+                </div>
+              </button>
+            )}
+
+            {/* MODAL CONNEXION RAPIDE */}
+            {zikoState === 'modal' && (
+              <ZikoLoginModal
+                onSuccess={(uid) => doAddToZiko(uid)}
+                onClose={() => setZikoState('idle')}
+              />
+            )}
 
             {/* FOOTER */}
             <div style={{ textAlign:'center' }}>
@@ -2576,6 +2682,7 @@ function PublicStreamPage() {
   const { publicLinkId } = useParams<{ publicLinkId: string }>();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
 
   const recordPublicStream = async (track: string, duration: number) => {
     if (!data) return;
@@ -2604,6 +2711,37 @@ function PublicStreamPage() {
     };
     load();
   }, [publicLinkId]);
+
+  const doAddToZiko = async (uid: string) => {
+    if (!data) return;
+    setZikoState('adding');
+    try {
+      const zikoData = {
+        qrId: data.publicLinkId || publicLinkId,
+        label: data.label || '',
+        artist: data.artist || '',
+        type: data.type || 'album',
+        files: data.files || [],
+        coverUrl: data.coverUrl || '',
+        addedAt: new Date().toISOString(),
+      };
+      const existing = await getDocs(query(
+        collection(db, 'zikotheque'),
+        where('uid', '==', uid),
+        where('qrId', '==', zikoData.qrId)
+      ));
+      if (existing.empty) {
+        await addDoc(collection(db, 'zikotheque'), { uid, ...zikoData });
+      }
+      setZikoState('done');
+    } catch(e) { console.error('ziko', e); setZikoState('idle'); }
+  };
+
+  const handleAddToZiko = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) { await doAddToZiko(currentUser.uid); }
+    else { setZikoState('modal'); }
+  };
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2708,17 +2846,35 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── MA ZIKOTHÈQUE ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(30,111,255,0.08)', border: '1px solid rgba(30,111,255,0.2)', borderRadius: 14, padding: '14px 16px', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 22 }}>📚</span>
+        {/* ── AJOUTER À MA ZIKOTHÈQUE ── */}
+        {zikoState === 'done' ? (
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,200,100,0.1)', border:'1px solid rgba(30,200,100,0.3)', marginBottom:24 }}>
+            <span style={{ fontSize:24 }}>✅</span>
             <div>
-              <p style={{ fontWeight: 700, fontSize: 13, color: '#dde4f5', margin: 0 }}>Créez votre Zikothèque</p>
-              <p style={{ color: '#4a5878', fontSize: 11, margin: '2px 0 0' }}>Ne perdez plus cette musique</p>
+              <p style={{ fontWeight:700, fontSize:14, color:'#4dff9a', margin:0 }}>Ajouté à ta Zikothèque !</p>
+              <a href="/ziko" style={{ color:'#4da6ff', fontSize:12, textDecoration:'none' }}>Voir ma Zikothèque →</a>
             </div>
           </div>
-          <a href="/ziko" style={{ background: 'rgba(30,111,255,0.2)', border: '1px solid rgba(30,111,255,0.4)', borderRadius: 10, padding: '7px 14px', color: '#4da6ff', textDecoration: 'none', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>Accéder →</a>
-        </div>
+        ) : (
+          <button onClick={handleAddToZiko} disabled={zikoState === 'adding'}
+            style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState === 'adding' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
+            <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>
+              {zikoState === 'adding' ? '⏳' : '➕'}
+            </span>
+            <div style={{ textAlign:'left' }}>
+              <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : 'Ajouter à ma Zikothèque'}</p>
+              <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Retrouvez cet album à tout moment</p>
+            </div>
+          </button>
+        )}
+
+        {/* MODAL CONNEXION RAPIDE */}
+        {zikoState === 'modal' && (
+          <ZikoLoginModal
+            onSuccess={(uid) => doAddToZiko(uid)}
+            onClose={() => setZikoState('idle')}
+          />
+        )}
 
         {/* FOOTER */}
         <div style={{ textAlign: 'center' }}>
