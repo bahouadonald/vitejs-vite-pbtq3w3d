@@ -742,7 +742,7 @@ function FanPage() {
               {qrData && !downloaded ? (
                 onSafari ? (
                   <button
-                    onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=currentUrl.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
+                    onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
                     style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
                     <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>🌐</span>
                     <div style={{ textAlign:'left' }}>
