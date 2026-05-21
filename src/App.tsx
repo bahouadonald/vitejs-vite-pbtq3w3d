@@ -1516,12 +1516,36 @@ function ArtistPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <div>
                     <p style={{ fontWeight: 700, fontSize: 14 }}>{link.label}</p>
-                    <p style={{ color: '#8098b8', fontSize: 12 }}>{link.type}</p>
+                    <p style={{ color: '#8098b8', fontSize: 12 }}>{link.type} · Streaming illimité · Sans scan limité</p>
                   </div>
                   <button onClick={() => { navigator.clipboard.writeText(BASE_URL + '/ecoute/' + link.publicLinkId); alert('Lien copié !'); }}
                     style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>📋 Copier</button>
                 </div>
-                <p style={{ color: '#8098b8', fontSize: 10, marginTop: 8, wordBreak: 'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
+                <p style={{ color: '#8098b8', fontSize: 10, marginTop: 8, marginBottom: 12, wordBreak: 'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
+                {/* QR CODE DU LIEN PUBLIC */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#f5f8ff', borderRadius: 12, padding: 14 }}>
+                  <div style={{ background: 'white', padding: 8, borderRadius: 8, border: '1px solid #dce6f7', flexShrink: 0 }}>
+                    <QRCodeCanvas
+                      id={'pub-qr-' + link.id}
+                      value={BASE_URL + '/ecoute/' + link.publicLinkId}
+                      size={90} bgColor="#ffffff" fgColor="#000000" level="H"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, color: '#1a2340' }}>QR Code du lien public</p>
+                    <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>Imprimez ce QR code pour que vos fans scannent et écoutent en streaming. Chaque écoute vous rémunère.</p>
+                    <button onClick={() => {
+                      const canvas = document.getElementById('pub-qr-' + link.id) as HTMLCanvasElement;
+                      if (!canvas) return;
+                      const a = document.createElement('a');
+                      a.href = canvas.toDataURL('image/png');
+                      a.download = (link.label || 'streaming') + '-QR-public.png';
+                      a.click();
+                    }} style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }}>
+                      ⬇ Télécharger QR PNG
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1863,11 +1887,20 @@ function UserAuthPage() {
 function ZikothequePage({ user }: { user: any }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState<any>(null);
+  const [currentAlbum, setCurrentAlbum] = useState<any>(null);
+  const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [dur, setDur] = useState(0);
+  const [ct, setCt] = useState(0);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const currentFiles = currentAlbum?.files || [];
+  const currentTrack = currentFiles[currentTrackIdx];
 
   useEffect(() => {
     if (!user) return;
-    // Récupérer musique en attente (téléchargée sans compte)
     const pending = sessionStorage.getItem('pendingZiko');
     if (pending) {
       try {
@@ -1885,79 +1918,216 @@ function ZikothequePage({ user }: { user: any }) {
     return unsub;
   }, [user]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.load();
+      if (playing) audioRef.current.play().catch(() => setPlaying(false));
+    }
+  }, [currentTrackIdx, currentAlbum]);
+
+  const playAlbum = (item: any, trackIdx = 0) => {
+    setCurrentAlbum(item);
+    setCurrentTrackIdx(trackIdx);
+    setPlaying(true);
+  };
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play().catch(() => setPlaying(false)); setPlaying(true); }
+  };
+
+  const onEnded = () => {
+    if (currentTrackIdx < currentFiles.length - 1) {
+      setCurrentTrackIdx(i => i + 1);
+    } else { setPlaying(false); }
+  };
+
   const logout = async () => { await signOut(auth); };
 
   return (
-    <div style={{ ...S.bg, minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 90 : 0 }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+        .track-row:hover { background: rgba(30,111,255,0.08) !important; }
+        .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.2) !important; }
+      `}</style>
+
+      {/* AUDIO ENGINE */}
+      {currentTrack && (
+        <audio ref={audioRef} src={currentTrack.url}
+          onTimeUpdate={() => { if (audioRef.current) { setCt(audioRef.current.currentTime); setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100 || 0); } }}
+          onLoadedMetadata={() => { if (audioRef.current) setDur(audioRef.current.duration); }}
+          onEnded={onEnded} preload="metadata" />
+      )}
+
       {/* HEADER */}
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
-        <Logo size="sm" />
+      <div style={{ background: 'rgba(6,8,15,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#5a7090', fontSize: 12 }}>{user.displayName || user.phoneNumber || user.email}</span>
-          <button style={S.btn2} onClick={logout}>Déconnexion</button>
+          <Logo size="sm" />
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 13, color: '#dde4f5' }}>Ma Zikothèque</p>
+            <p style={{ color: '#4a5878', fontSize: 10 }}>{items.length} album{items.length > 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ color: '#4a5878', fontSize: 11, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName || user.email?.split('@')[0]}</span>
+          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', color: '#8098b8', cursor: 'pointer', fontSize: 12 }}>Déco</button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '24px 16px' }}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🎵 Ma Zikothèque</h2>
-          <p style={{ color: '#8098b8', fontSize: 13 }}>{items.length} album{items.length > 1 ? 's' : ''} · Streaming gratuit</p>
-        </div>
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 60 }}>
+          <div style={{ textAlign: 'center', padding: 80 }}>
             <div style={{ width: 36, height: 36, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, margin: '0 auto 12px', animation: 'spin .8s linear infinite' }} />
-            <p style={{ color: '#8098b8' }}>Chargement...</p>
           </div>
         ) : items.length === 0 ? (
-          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 16, padding: 48, marginBottom: 16, boxShadow: '0 2px 12px rgba(26,107,255,0.06)', textAlign: 'center' }}>
-            <p style={{ fontSize: 48, marginBottom: 16 }}>🎵</p>
-            <h3 style={{ fontFamily: 'serif', fontSize: 18, marginBottom: 8 }}>Votre Zikothèque est vide</h3>
-            <p style={{ color: '#8098b8', fontSize: 13, lineHeight: 1.7 }}>
-              Scannez une pochette musicale et téléchargez un album pour qu'il apparaisse ici automatiquement.
+          <div style={{ textAlign: 'center', padding: '80px 20px', animation: 'fadeUp .4s ease' }}>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>🎵</div>
+            <h3 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 12, color: '#dde4f5' }}>Votre Zikothèque est vide</h3>
+            <p style={{ color: '#4a5878', fontSize: 14, lineHeight: 1.8, marginBottom: 28 }}>
+              Scannez une pochette musicale ou recevez un lien<br />pour ajouter vos premiers albums.
             </p>
+            <a href="/" style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 12, background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+              🎵 Découvrir de la musique
+            </a>
           </div>
-        ) : items.map(item => (
-          <div key={item.id} style={{ ...S.card, marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-              <div>
-                <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 3 }}>{item.label}</p>
-                <p style={{ color: '#5a7090', fontSize: 12 }}>par {item.artist} · {item.type}</p>
-                <p style={{ color: '#2a3a60', fontSize: 11, marginTop: 2 }}>{item.files?.length || 0} titre{(item.files?.length || 0) > 1 ? 's' : ''}</p>
+        ) : (
+          <div style={{ animation: 'fadeUp .4s ease' }}>
+            {/* NOW PLAYING — si un album est sélectionné */}
+            {currentAlbum && (
+              <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.15), rgba(77,166,255,0.05))', border: '1px solid rgba(30,111,255,0.2)', borderRadius: 16, padding: 16, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                {currentAlbum.coverUrl ? (
+                  <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 52, height: 52, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🎵</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 11, color: '#4da6ff', fontWeight: 700, marginBottom: 2, letterSpacing: 1 }}>EN COURS</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentTrack?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentTrackIdx + 1)}</p>
+                  <p style={{ color: '#4a5878', fontSize: 11 }}>{currentAlbum.label} · {currentAlbum.artist}</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {playing && <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 18 }}>
+                    {[1,2,3,4].map(i => <div key={i} style={{ width: 3, background: '#4da6ff', borderRadius: 99, animation: `bar${i} ${0.4 + i * 0.1}s ease infinite alternate`, minHeight: 3 }} />)}
+                  </div>}
+                </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#eaf1ff', color: '#1a6bff', fontWeight: 700 }}>🎵 Streaming gratuit</span>
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 99, background: '#f0f4fb', color: '#8098b8' }}>
-                  🔒 Téléchargement Premium
-                </span>
-              </div>
-            </div>
-
-            {/* Lecteur audio */}
-            {item.files && item.files.length > 0 && (
-              playing?.id === item.id ? (
-                <>
-                  <button onClick={() => setPlaying(null)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #c8d8ef', background: 'transparent', color: '#8098b8', cursor: 'pointer', fontSize: 11, marginBottom: 10 }}>▼ Fermer le lecteur</button>
-                  <AudioPlayer files={item.files} />
-                </>
-              ) : (
-                <button onClick={() => setPlaying(item)} style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#1a6bff', color: '#ffffff', fontWeight: 700, cursor: 'pointer', fontSize: 14, width: '100%' }}>
-                  ▶ Écouter — {item.label}
-                </button>
-              )
             )}
-          </div>
-        ))}
 
-        {/* Info Premium */}
-        {items.length > 0 && (
-          <div style={{ background: '#f5f8ff', border: '1px solid #152040', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 8 }}>
-            <p style={{ color: '#5a7090', fontSize: 12, lineHeight: 1.7 }}>
-              🔒 Le téléchargement depuis Ma Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#0050d0' }}>Premium</strong> — bientôt disponible.
-            </p>
+            {/* LISTE ALBUMS */}
+            <p style={{ color: '#4a5878', fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 14, textTransform: 'uppercase' }}>MES ALBUMS</p>
+            {items.map((item, idx) => {
+              const audioFiles = (item.files || []).filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i));
+              const isActive = currentAlbum?.id === item.id;
+              return (
+                <div key={item.id} className="album-card"
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 14, background: isActive ? 'rgba(30,111,255,0.12)' : 'rgba(255,255,255,0.03)', border: isActive ? '1px solid rgba(30,111,255,0.3)' : '1px solid rgba(255,255,255,0.04)', marginBottom: 10, cursor: 'pointer', transition: 'all .2s' }}
+                  onClick={() => playAlbum(item)}>
+                  {item.coverUrl ? (
+                    <img src={item.coverUrl} alt={item.label} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 56, height: 56, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+                      {item.type === 'video' ? '🎬' : '🎵'}
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, fontSize: 14, color: isActive ? '#4da6ff' : '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{item.label}</p>
+                    <p style={{ color: '#4a5878', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.artist} · {audioFiles.length} titre{audioFiles.length > 1 ? 's' : ''}</p>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); if (isActive) { togglePlay(); } else { playAlbum(item); } }}
+                    style={{ width: 40, height: 40, borderRadius: 99, border: 'none', background: isActive ? 'linear-gradient(135deg, #1e6fff, #0050d0)' : 'rgba(30,111,255,0.15)', color: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s' }}>
+                    {isActive && playing ? '⏸' : '▶'}
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Info Premium */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 16 }}>
+              <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.7 }}>
+                🔒 Le téléchargement depuis la Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#4da6ff' }}>Premium</strong> — bientôt disponible.
+              </p>
+            </div>
           </div>
         )}
       </div>
+
+      {/* MINI LECTEUR EN BAS — style Spotify */}
+      {currentAlbum && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, animation: 'slideUp .3s ease' }}>
+          {/* PLAYLIST PANEL — slide up */}
+          {showPlaylist && (
+            <div style={{ background: '#0b0f1e', borderTop: '1px solid rgba(255,255,255,0.08)', maxHeight: '45vh', overflowY: 'auto', padding: '12px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px 10px' }}>
+                <p style={{ color: '#4da6ff', fontWeight: 700, fontSize: 13 }}>Playlist — {currentAlbum.label}</p>
+                <button onClick={() => setShowPlaylist(false)} style={{ background: 'none', border: 'none', color: '#4a5878', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              </div>
+              {currentFiles.map((f: any, i: number) => (
+                <div key={i} className="track-row"
+                  onClick={() => { setCurrentTrackIdx(i); setPlaying(true); setShowPlaylist(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', cursor: 'pointer', background: i === currentTrackIdx ? 'rgba(30,111,255,0.12)' : 'transparent', transition: 'background .15s' }}>
+                  <span style={{ color: i === currentTrackIdx ? '#4da6ff' : '#4a5878', fontSize: 13, fontWeight: 700, minWidth: 20 }}>
+                    {i === currentTrackIdx && playing ? '▶' : (i + 1)}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, color: i === currentTrackIdx ? '#dde4f5' : '#8098b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}
+                  </span>
+                  {i === currentTrackIdx && playing && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 14 }}>
+                      {[1,2,3].map(j => <div key={j} style={{ width: 3, background: '#4da6ff', borderRadius: 99, height: j * 4 + 2, animation: `bar${j} ${0.4 + j * 0.15}s ease infinite alternate` }} />)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* MINI PLAYER BAR */}
+          <div style={{ background: 'rgba(11,15,30,0.98)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.08)', padding: '10px 16px' }}>
+            {/* Progress bar */}
+            <div onClick={(e) => { if (!audioRef.current) return; const r = e.currentTarget.getBoundingClientRect(); audioRef.current.currentTime = ((e.clientX - r.left) / r.width) * audioRef.current.duration; }}
+              style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 99, marginBottom: 10, cursor: 'pointer' }}>
+              <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .1s' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* Album cover */}
+              {currentAlbum.coverUrl ? (
+                <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 44, height: 44, borderRadius: 8, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎵</div>
+              )}
+              {/* Track info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: 13, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentTrack?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentTrackIdx + 1)}
+                </p>
+                <p style={{ color: '#4a5878', fontSize: 11 }}>{currentAlbum.artist}</p>
+              </div>
+              {/* Time */}
+              <span style={{ color: '#4a5878', fontSize: 10, flexShrink: 0 }}>{formatTime(ct)} / {formatTime(dur)}</span>
+              {/* Controls */}
+              <button onClick={() => { if (currentTrackIdx > 0) { setCurrentTrackIdx(i => i - 1); setPlaying(true); } }}
+                style={{ background: 'none', border: 'none', color: currentTrackIdx === 0 ? '#2a3a60' : '#8098b8', fontSize: 18, cursor: 'pointer', padding: 4 }}>⏮</button>
+              <button onClick={togglePlay}
+                style={{ width: 42, height: 42, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 16px rgba(30,111,255,0.4)' }}>
+                {playing ? '⏸' : '▶'}
+              </button>
+              <button onClick={() => { if (currentTrackIdx < currentFiles.length - 1) { setCurrentTrackIdx(i => i + 1); setPlaying(true); } }}
+                style={{ background: 'none', border: 'none', color: currentTrackIdx === currentFiles.length - 1 ? '#2a3a60' : '#8098b8', fontSize: 18, cursor: 'pointer', padding: 4 }}>⏭</button>
+              {/* Playlist toggle */}
+              <button onClick={() => setShowPlaylist(!showPlaylist)}
+                style={{ background: showPlaylist ? 'rgba(30,111,255,0.2)' : 'none', border: showPlaylist ? '1px solid rgba(30,111,255,0.4)' : '1px solid transparent', borderRadius: 6, padding: '6px 10px', color: showPlaylist ? '#4da6ff' : '#4a5878', cursor: 'pointer', fontSize: 16 }}>
+                ☰
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2479,6 +2649,17 @@ function PublicStreamPage() {
             ⬇️ Télécharger <span style={{ fontSize: 12, color: 'rgba(77,166,255,0.6)' }}>(Accès payant)</span>
           </button>
 
+          {/* CTA ZIKOTHÈQUE */}
+          <div style={{ marginTop: 16, background: 'rgba(30,111,255,0.08)', border: '1px solid rgba(30,111,255,0.2)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: 13, color: '#dde4f5', marginBottom: 3 }}>📚 Créez votre Zikothèque</p>
+              <p style={{ color: '#4a5878', fontSize: 11, lineHeight: 1.5 }}>Ne perdez plus cette musique — retrouvez-la à tout moment.</p>
+            </div>
+            <a href="/ziko" style={{ background: 'linear-gradient(135deg, #1e6fff, #0050d0)', borderRadius: 10, padding: '8px 14px', color: '#fff', fontWeight: 700, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              Accéder →
+            </a>
+          </div>
+
           {videoFiles.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <p style={{ color: 'rgba(100,140,220,0.5)', fontWeight: 700, fontSize: 11, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>🎬 Vidéos</p>
@@ -2497,21 +2678,48 @@ function PublicStreamPage() {
 }
 
 export default function App() {
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return unsub;
+  }, []);
+
   return (
     <BrowserRouter>
       <PWAInstallBanner />
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        {/* Zikothèque = Page d'accueil */}
+        <Route path="/" element={
+          authLoading ? (
+            <div style={{ minHeight: '100vh', background: '#06080f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 48, height: 48, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          ) : user ? (
+            <ZikothequePage user={user} />
+          ) : (
+            <UserAuthPage />
+          )
+        } />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
-        <Route path="/ziko" element={<UserAuthPage />} />
+        <Route path="/ziko" element={
+          authLoading ? null : user ? <ZikothequePage user={user} /> : <UserAuthPage />
+        } />
         <Route path="/ziko/login" element={<UserAuthPage />} />
         <Route path="/artiste" element={<ArtistPage />} />
         <Route path="/artiste/login" element={<ArtistPage />} />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/*" element={<HomePage />} />
+        <Route path="/*" element={
+          authLoading ? null : user ? <ZikothequePage user={user} /> : <UserAuthPage />
+        } />
       </Routes>
     </BrowserRouter>
   );
