@@ -68,7 +68,41 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [ct, setCt] = useState(0);
   const ref = useRef<HTMLAudioElement>(null);
   const streamStart = useRef<number>(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number>(0);
+  const [bars, setBars] = useState<number[]>(Array(28).fill(4));
   const cur = files[idx];
+
+  // Web Audio API pour spectrogramme réel
+  const setupAnalyser = () => {
+    if (!ref.current || analyserRef.current) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = ctx.createMediaElementSource(ref.current);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      analyserRef.current = analyser;
+    } catch(e) {}
+  };
+
+  useEffect(() => {
+    if (!playing || !analyserRef.current) return;
+    const analyser = analyserRef.current;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const animate = () => {
+      analyser.getByteFrequencyData(data);
+      const newBars = Array.from({ length: 28 }, (_, i) => {
+        const idx = Math.floor(i * data.length / 28);
+        return Math.max(4, (data[idx] / 255) * 44);
+      });
+      setBars(newBars);
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [playing]);
 
   useEffect(() => {
     if (ref.current) {
@@ -81,11 +115,11 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const toggle = () => {
     if (!ref.current) return;
     if (playing) {
-      // Enregistrer la durée écoutée à la pause
       const elapsed = Date.now() / 1000 - streamStart.current;
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause(); setPlaying(false);
     } else {
+      setupAnalyser();
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false)); setPlaying(true);
     }
@@ -105,24 +139,21 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
         }}
         preload="metadata" />
 
-      {/* SPECTROGRAMME MODERNE */}
+      {/* SPECTROGRAMME — synchronisé avec Web Audio API */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2.5, height: 48, marginBottom: 14 }}>
-        {Array.from({ length: 28 }, (_, i) => {
-          const anims = ['bar1','bar2','bar3','bar4','bar5','bar6','bar7'];
-          const durs = ['0.5s','0.7s','0.4s','0.8s','0.6s','0.45s','0.65s','0.55s','0.75s'];
-          const anim = anims[i % 7];
-          const dur = durs[i % 9];
+        {bars.map((h, i) => {
           const hue = 210 + (i / 28) * 60;
           return (
             <div key={i} style={{
               width: 3.5,
               borderRadius: 99,
-              background: `linear-gradient(to top, hsl(${hue}, 90%, 55%), hsl(${hue + 30}, 100%, 75%))`,
+              background: `linear-gradient(to top, hsl(${hue}, 90%, 55%), hsl(${hue + 30}, 100%, 80%))`,
+              height: playing ? h : 4,
               minHeight: 4,
-              animation: playing ? `${anim} ${dur} ease-in-out infinite` : 'none',
-              animationDelay: `${(i * 0.04) % 0.5}s`,
-              opacity: playing ? 1 : 0.25,
-              transition: 'opacity 0.3s',
+              maxHeight: 48,
+              opacity: playing ? 0.9 : 0.2,
+              transition: playing ? 'height 0.05s ease' : 'height 0.3s ease, opacity 0.3s',
+              boxShadow: playing && h > 20 ? `0 0 6px hsl(${hue}, 90%, 65%)` : 'none',
             }} />
           );
         })}
@@ -2424,47 +2455,39 @@ function PublicStreamPage() {
         @keyframes bar7 { 0%,100%{height:26px} 25%{height:4px} 75%{height:16px} }
       `}</style>
 
-      {/* POCHETTE PLEIN ÉCRAN */}
-      <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
-        {data.coverUrl ? (
-          <img src={data.coverUrl} alt={data.label}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535, #1e3a6e)' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 120, height: 120, objectFit: 'contain', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', opacity: 0.2 }} />
-          </div>
-        )}
+      {/* POCHETTE EN FOND — visible */}
+      <div style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
+        {/* Image fixe en fond */}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+          {data.coverUrl ? (
+            <img src={data.coverUrl} alt={data.label} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.55)' }} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #06080f, #0a1535)' }} />
+          )}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(6,8,15,0.45)' }} />
+        </div>
 
-        {/* Overlay dégradé sombre en bas */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,8,15,0.1) 0%, rgba(6,8,15,0.3) 40%, rgba(6,8,15,0.95) 75%, rgba(6,8,15,1) 100%)' }} />
+        {/* CONTENU scrollable au-dessus */}
+        <div style={{ position: 'relative', zIndex: 1, padding: '60px 20px 40px', maxWidth: 500, margin: '0 auto', animation: 'fadeUp 0.4s ease' }}>
+          <p style={{ color: '#4da6ff', fontSize: 13, fontWeight: 600, marginBottom: 6, letterSpacing: 0.5 }}>{data.artist}</p>
+          <h1 style={{ fontSize: 30, fontWeight: 900, color: '#ffffff', marginBottom: 32, lineHeight: 1.1, textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>{data.label}</h1>
 
-        {/* CONTENU EN BAS */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 32px', animation: 'fadeUp 0.4s ease' }}>
-
-          {/* Titre artiste */}
-          <p style={{ color: '#4da6ff', fontSize: 13, fontWeight: 600, marginBottom: 4, letterSpacing: 0.5 }}>{data.artist}</p>
-          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#ffffff', marginBottom: 20, lineHeight: 1.1 }}>{data.label}</h1>
-
-          {/* Lecteur compact */}
           {audioFiles.length > 0 && <AudioPlayer files={audioFiles} onStream={recordPublicStream} />}
 
-          {/* Bouton télécharger */}
           <button onClick={() => alert('Paiement en ligne disponible prochainement.')}
-            style={{ width: '100%', padding: '14px', fontSize: 14, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.35)', background: 'rgba(30,111,255,0.12)', color: '#4da6ff', cursor: 'pointer', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backdropFilter: 'blur(10px)' }}>
+            style={{ width: '100%', padding: '14px', fontSize: 14, fontWeight: 700, borderRadius: 14, border: '1px solid rgba(30,111,255,0.35)', background: 'rgba(6,8,15,0.6)', color: '#4da6ff', cursor: 'pointer', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backdropFilter: 'blur(16px)' }}>
             ⬇️ Télécharger <span style={{ fontSize: 12, color: 'rgba(77,166,255,0.6)' }}>(Accès payant)</span>
           </button>
 
-          {/* Vidéos si disponibles */}
           {videoFiles.length > 0 && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 20 }}>
               <p style={{ color: 'rgba(100,140,220,0.5)', fontWeight: 700, fontSize: 11, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>🎬 Vidéos</p>
               <VideoPlayer files={videoFiles} />
             </div>
           )}
 
-          {/* Footer */}
-          <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 32, height: 32, objectFit: 'contain', margin: '0 auto 6px', display: 'block', opacity: 0.4 }} />
+          <div style={{ textAlign: 'center', marginTop: 24 }}>
+            <img src={LOGO_B64} alt='DZ' style={{ width: 32, height: 32, objectFit: 'contain', margin: '0 auto 6px', display: 'block', opacity: 0.4 }} />
             <p style={{ color: 'rgba(100,140,220,0.3)', fontSize: 9, letterSpacing: 2 }}>DONIEL ZIK · La Musique. Un Scan. Un Monde.</p>
           </div>
         </div>
