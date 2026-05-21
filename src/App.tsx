@@ -413,8 +413,6 @@ function FanPage() {
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
-  const currentUrl = window.location.href;
-  const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
