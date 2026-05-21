@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
-const ADMIN_EMAIL = 'admin@securedrop.com';
+const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.vercel.app';
@@ -798,7 +798,7 @@ function AdminPage() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
-  useEffect(() => { onAuthStateChanged(auth, (u) => { if (u) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
+  useEffect(() => { onAuthStateChanged(auth, (u) => { if (u && u.email === ADMIN_EMAIL) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
   useEffect(() => {
     if (!user) return;
     const u1 = onSnapshot(query(collection(db, 'qrcodes'), orderBy('createdAt', 'desc')), s => setQrcodes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
