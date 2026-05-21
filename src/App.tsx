@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
-const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
+const ADMIN_EMAIL = 'admin@doniel.art';
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.vercel.app';
