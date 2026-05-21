@@ -413,57 +413,8 @@ function FanPage() {
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
-  // Achat — Flux 3
-  const [achatState, setAchatState] = useState<'idle'|'modal'|'pending'>('idle');
-  const [achatPhone, setAchatPhone] = useState('');
-  const [achatAccepted, setAchatAccepted] = useState(false);
-  const [achatSending, setAchatSending] = useState(false);
-  const [achatVenteId, setAchatVenteId] = useState('');
-  const [achatMsgs, setAchatMsgs] = useState<any[]>([]);
-  const [achatDlActive, setAchatDlActive] = useState(false);
-
-  // Écouter les messages et le statut de la vente
-  useEffect(() => {
-    if (!achatVenteId) return;
-    const qMsg = query(collection(db, 'venteMessages'), where('venteId', '==', achatVenteId), orderBy('ts', 'asc'));
-    const u1 = onSnapshot(qMsg, snap => setAchatMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    // Écouter si le paiement a été validé
-    const u2 = onSnapshot(doc(db, 'ventes', achatVenteId), (d) => {
-      if (d.exists() && d.data()?.dlActive) setAchatDlActive(true);
-    });
-    return () => { u1(); u2(); };
-  }, [achatVenteId]);
-
-  const submitAchat = async () => {
-    if (!achatPhone || !achatAccepted || !qrData) return;
-    setAchatSending(true);
-    try {
-      const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qrId)));
-      let artistId = ''; let artistEmail = '';
-      if (!qrSnap.empty) {
-        const qrDoc = qrSnap.docs[0].data();
-        artistEmail = qrDoc.artistEmail || '';
-        const artSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', artistEmail)));
-        if (!artSnap.empty) artistId = artSnap.docs[0].data().uid || artSnap.docs[0].id;
-      }
-      const venteRef = await addDoc(collection(db, 'ventes'), {
-        qrId, artistId, artistEmail,
-        albumLabel: qrData.label || '',
-        prix: qrData.price || 0,
-        melomanePhone: achatPhone,
-        statut: 'en_attente', dlActive: false,
-        readByArtist: false, createdAt: new Date().toISOString(),
-      });
-      setAchatVenteId(venteRef.id);
-      await addDoc(collection(db, 'venteMessages'), {
-        venteId: venteRef.id, artistId, from: 'melomane',
-        text: `Bonjour ! Je souhaite acheter "${qrData.label}". Mon numéro : ${achatPhone}`,
-        ts: new Date().toISOString(),
-      });
-      setAchatState('pending');
-    } catch(e) { console.error(e); }
-    setAchatSending(false);
-  };
+  const currentUrl = window.location.href;
+  const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -648,81 +599,15 @@ function FanPage() {
 
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
 
-            {/* ── ACHETER CETTE MUSIQUE ── */}
-            {qrData.price > 0 && (
-              <div style={{ marginBottom:20 }}>
-                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>💰 Acheter</p>
-
-                {achatDlActive ? (
-                  /* Paiement validé → téléchargement actif */
-                  <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
-                    <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement validé !</p>
-                    <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 12px' }}>L'artiste a confirmé votre paiement. Téléchargez ci-dessus.</p>
-                    <button onClick={startDownload}
-                      style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-                      ⬇ Télécharger maintenant
-                    </button>
-                  </div>
-                ) : achatState === 'pending' && achatVenteId ? (
-                  /* En attente — chat avec l'artiste */
-                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:14 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-                      <span style={{ width:8, height:8, borderRadius:99, background:'#4dff9a', display:'inline-block', animation:'pulse 1.5s infinite' }} />
-                      <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>En discussion avec l'artiste</p>
-                    </div>
-                    <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, minHeight:160, maxHeight:260, overflowY:'auto', padding:12, marginBottom:10, border:'1px solid rgba(255,255,255,0.05)' }}>
-                      {achatMsgs.map(m => (
-                        <div key={m.id} style={{ marginBottom:8, display:'flex', justifyContent:m.from==='melomane'?'flex-end':'flex-start' }}>
-                          {m.from==='artiste' && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, marginBottom:2, marginLeft:3 }}>ARTISTE</p>}
-                          <div style={{ maxWidth:'80%', padding:'9px 13px', borderRadius:m.from==='melomane'?'14px 14px 4px 14px':'14px 14px 14px 4px', background:m.from==='melomane'?'rgba(30,111,255,0.2)':'rgba(255,255,255,0.06)', border:m.from==='melomane'?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
-                            <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.5 }}>{m.text}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {achatMsgs.length === 0 && (
-                        <p style={{ textAlign:'center', color:'#2a3a60', fontSize:11, marginTop:40 }}>L'artiste va vous répondre bientôt...</p>
-                      )}
-                    </div>
-                    <p style={{ color:'#4a5878', fontSize:11, textAlign:'center' }}>
-                      ⏳ En attente de la validation du paiement par l'artiste
-                    </p>
-                  </div>
-                ) : achatState === 'modal' ? (
-                  /* Modal saisie numéro */
-                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:18 }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                      <p style={{ fontWeight:800, fontSize:15, color:'#fff', margin:0 }}>💰 Acheter "{qrData.label}"</p>
-                      <button onClick={() => setAchatState('idle')} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18 }}>✕</button>
-                    </div>
-                    <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:14 }}>
-                      <p style={{ color:'#4da6ff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{(qrData.price||0).toLocaleString()} FCFA</p>
-                      <p style={{ color:'#4a5878', fontSize:11, margin:0 }}>Paiement via Mobile Money · Confirmation par l'artiste</p>
-                    </div>
-                    <p style={{ color:'#6a88aa', fontSize:12, marginBottom:10 }}>Votre numéro pour que l'artiste vous contacte :</p>
-                    <input value={achatPhone} onChange={e => setAchatPhone(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel"
-                      style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:15, outline:'none', marginBottom:12, boxSizing:'border-box' }} />
-                    <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:16 }}>
-                      <input type="checkbox" checked={achatAccepted} onChange={e => setAchatAccepted(e.target.checked)} id="cgu-achat" style={{ marginTop:3, flexShrink:0 }} />
-                      <label htmlFor="cgu-achat" style={{ color:'#4a5878', fontSize:11, lineHeight:1.6 }}>
-                        J'accepte d'être contacté par l'artiste via ce numéro pour finaliser le paiement et recevoir l'accès au téléchargement.
-                      </label>
-                    </div>
-                    <button onClick={submitAchat} disabled={!achatPhone || !achatAccepted || achatSending}
-                      style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background: achatPhone&&achatAccepted?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.08)', color: achatPhone&&achatAccepted?'#fff':'#4a5878', fontWeight:800, fontSize:15, cursor: achatPhone&&achatAccepted?'pointer':'default' }}>
-                      {achatSending ? '⏳ Envoi...' : '📲 Envoyer ma demande'}
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setAchatState('modal')}
-                    style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)' }}>
-                    <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>💰</span>
-                    <div style={{ textAlign:'left' }}>
-                      <p style={{ margin:0, fontWeight:800 }}>Acheter cette musique</p>
-                      <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{(qrData.price||0).toLocaleString()} FCFA · Téléchargement permanent</p>
-                    </div>
-                  </button>
-                )}
-              </div>
+            {/* ── TÉLÉCHARGER (via AchatWidget) ── */}
+            {qrData.files?.length > 0 && (
+              <AchatWidget
+                qrId={qrData.qrId || qrId || ''}
+                albumLabel={qrData.label || ''}
+                artistEmail={qrData.artistEmail || ''}
+                prix={qrData.price || 0}
+                files={qrData.files || []}
+              />
             )}
 
             {/* ── ÉCOUTER EN STREAMING ── */}
@@ -735,41 +620,6 @@ function FanPage() {
                 />
               </div>
             )}
-
-            {/* ── TÉLÉCHARGER ── */}
-            <div style={{ marginBottom:20 }}>
-              <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
-              {qrData && !downloaded ? (
-                onSafari ? (
-                  <button
-                    onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
-                    style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
-                    <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>🌐</span>
-                    <div style={{ textAlign:'left' }}>
-                      <p style={{ margin:0, fontWeight:800 }}>Ouvrir dans Chrome</p>
-                      <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Requis pour télécharger sur iPhone</p>
-                    </div>
-                  </button>
-                ) : (
-                  <button className="fp-btn-dl" onClick={startDownload}
-                    style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)', transition:'all .2s' }}>
-                    <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>⬇</span>
-                    <div style={{ textAlign:'left' }}>
-                      <p style={{ margin:0, fontWeight:800 }}>{(qrData.files?.length||0)>1 ? "Télécharger l'album complet" : 'Télécharger'}</p>
-                      <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{qrData.files?.length||0} fichier{(qrData.files?.length||0)>1?'s':''} · Qualité originale</p>
-                    </div>
-                  </button>
-                )
-              ) : (
-                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,111,255,0.1)', border:'1px solid rgba(30,111,255,0.3)' }}>
-                  <span style={{ fontSize:22 }}>✅</span>
-                  <div>
-                    <p style={{ fontWeight:700, fontSize:14, color:'#4da6ff', margin:0 }}>Téléchargement effectué</p>
-                    <p style={{ color:'#4a5878', fontSize:11, margin:'2px 0 0' }}>Streaming illimité disponible ci-dessus</p>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* ── VIDÉOS ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
@@ -3949,59 +3799,80 @@ function PWAInstallBanner() {
 
 
 // ─────────────────────────────────────────────
-// ACHAT WIDGET — réutilisable FanPage + PublicStreamPage
-// Flux 3 : mélomane → achat → chat → paiement → téléchargement
+// TÉLÉCHARGER WIDGET — FanPage + PublicStreamPage
+// Flux 3 : clic → chat direct artiste → lien paiement auto → artiste valide → DL
+// Pas de formulaire numéro pour le mélomane
 // ─────────────────────────────────────────────
 function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   qrId: string; albumLabel: string; artistEmail: string; prix: number; files: any[];
 }) {
-  const [achatState, setAchatState] = useState<'idle'|'modal'|'pending'>('idle');
-  const [phone, setPhone] = useState('');
-  const [accepted, setAccepted] = useState(false);
+  const [state, setState] = useState<'idle'|'chat'|'done'>('idle');
   const [sending, setSending] = useState(false);
   const [venteId, setVenteId] = useState('');
   const [msgs, setMsgs] = useState<any[]>([]);
   const [dlActive, setDlActive] = useState(false);
   const [msgInput, setMsgInput] = useState('');
   const [msgSending, setMsgSending] = useState(false);
+  const [lienPaiement, setLienPaiement] = useState('');
+  const msgsEndRef = useRef<HTMLDivElement>(null);
+
+  // Ouvrir le chat — créer la demande automatiquement au clic
+  const openChat = async () => {
+    if (state !== 'idle') return;
+    setSending(true);
+    try {
+      // Chercher l'artiste et son lien de paiement
+      const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
+      let artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
+      // Lire l'option de paiement de l'artiste
+      if (artistId) {
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const optSnap = await getDoc(doc(db, 'artistOptions', artistId));
+          if (optSnap.exists()) setLienPaiement(optSnap.data().lienPaiement || '');
+        } catch(e) {}
+      }
+      // Créer la demande de téléchargement
+      const ref = await addDoc(collection(db, 'ventes'), {
+        qrId, artistId, artistEmail, albumLabel, prix,
+        statut: 'en_attente', dlActive: false,
+        readByArtist: false, createdAt: new Date().toISOString(),
+      });
+      setVenteId(ref.id);
+      // Message système automatique visible par l'artiste
+      await addDoc(collection(db, 'venteMessages'), {
+        venteId: ref.id, artistId, from: 'systeme',
+        text: `📲 Nouveau téléchargement demandé pour "${albumLabel}"${prix > 0 ? ` · ${prix.toLocaleString()} FCFA` : ''}.`,
+        ts: new Date().toISOString(),
+      });
+      setState('chat');
+    } catch(e) { console.error(e); }
+    setSending(false);
+  };
 
   useEffect(() => {
     if (!venteId) return;
-    const u1 = onSnapshot(query(collection(db, 'venteMessages'), where('venteId','==',venteId), orderBy('ts','asc')),
-      snap => setMsgs(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    const u1 = onSnapshot(
+      query(collection(db, 'venteMessages'), where('venteId','==',venteId), orderBy('ts','asc')),
+      snap => {
+        setMsgs(snap.docs.map(d => ({id:d.id,...d.data()})));
+        // Auto-scroll
+        setTimeout(() => msgsEndRef.current?.scrollIntoView({behavior:'smooth'}), 100);
+      }
+    );
     const u2 = onSnapshot(doc(db, 'ventes', venteId), d => {
-      if (d.exists() && d.data()?.dlActive) setDlActive(true);
+      if (d.exists() && d.data()?.dlActive) { setDlActive(true); setState('done'); }
+      // Récupérer le lien de paiement depuis la vente si mis à jour
+      if (d.exists() && d.data()?.lienPaiement) setLienPaiement(d.data().lienPaiement);
     });
     return () => { u1(); u2(); };
   }, [venteId]);
-
-  const submit = async () => {
-    if (!phone || !accepted) return;
-    setSending(true);
-    try {
-      const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
-      let artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
-      const ref = await addDoc(collection(db, 'ventes'), {
-        qrId, artistId, artistEmail, albumLabel, prix,
-        melomanePhone: phone, statut:'en_attente',
-        dlActive:false, readByArtist:false, createdAt:new Date().toISOString(),
-      });
-      setVenteId(ref.id);
-      await addDoc(collection(db, 'venteMessages'), {
-        venteId:ref.id, artistId, from:'melomane',
-        text:`Bonjour ! Je souhaite acheter "${albumLabel}". Mon numéro : ${phone}`,
-        ts:new Date().toISOString(),
-      });
-      setAchatState('pending');
-    } catch(e){ console.error(e); }
-    setSending(false);
-  };
 
   const sendMsg = async () => {
     if (!msgInput.trim() || !venteId) return;
     setMsgSending(true);
     await addDoc(collection(db, 'venteMessages'), {
-      venteId, from:'melomane', text:msgInput.trim(), ts:new Date().toISOString(),
+      venteId, from: 'melomane', text: msgInput.trim(), ts: new Date().toISOString(),
     });
     setMsgInput(''); setMsgSending(false);
   };
@@ -4011,92 +3882,111 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
       setTimeout(() => {
         const a = document.createElement('a');
         a.href = f.url.replace('/upload/','/upload/fl_attachment/');
-        a.download = f.name; a.target='_blank';
+        a.download = f.name; a.target = '_blank';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
       }, i * 1200);
     });
   };
 
-  if (dlActive) return (
+  // ── TÉLÉCHARGEMENT ACTIVÉ ──
+  if (state === 'done') return (
     <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:20 }}>
-      <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement validé par l'artiste !</p>
-      <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Votre téléchargement est maintenant actif.</p>
+      <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement confirmé !</p>
+      <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>L'artiste a validé votre paiement. Votre téléchargement est prêt.</p>
       <button onClick={downloadAll}
-        style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-        ⬇ Télécharger maintenant
+        style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+        <span style={{ fontSize:22 }}>⬇</span> Télécharger maintenant
       </button>
     </div>
   );
 
-  if (achatState === 'pending' && venteId) return (
-    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:14, marginBottom:20 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-        <span style={{ width:8,height:8,borderRadius:99,background:'#4dff9a',display:'inline-block' }} />
-        <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>En discussion avec l'artiste</p>
+  // ── CHAT AVEC L'ARTISTE ──
+  if (state === 'chat') return (
+    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, overflow:'hidden', marginBottom:20 }}>
+      {/* Header */}
+      <div style={{ background:'rgba(30,111,255,0.12)', padding:'12px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ width:8, height:8, borderRadius:99, background:'#4dff9a', display:'inline-block', flexShrink:0 }} />
+        <div style={{ flex:1 }}>
+          <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>Chat avec l'artiste</p>
+          <p style={{ color:'#4a5878', fontSize:10, margin:'1px 0 0' }}>
+            {prix > 0 ? `${prix.toLocaleString()} FCFA · Payez puis attendez la validation` : albumLabel}
+          </p>
+        </div>
+        {dlActive && <span style={{ background:'rgba(77,255,154,0.2)', border:'1px solid rgba(77,255,154,0.5)', borderRadius:99, padding:'2px 9px', fontSize:10, color:'#4dff9a', fontWeight:700 }}>✅ Validé</span>}
       </div>
-      <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, minHeight:140, maxHeight:240, overflowY:'auto', padding:12, marginBottom:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-        {msgs.length === 0 ? (
-          <p style={{ textAlign:'center', color:'#2a3a60', fontSize:11, marginTop:40 }}>L'artiste va vous répondre bientôt…</p>
-        ) : msgs.map(m => (
-          <div key={m.id} style={{ marginBottom:8, display:'flex', justifyContent:m.from==='melomane'?'flex-end':'flex-start' }}>
-            {m.from==='artiste' && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, marginBottom:2 }}>ARTISTE</p>}
-            <div style={{ maxWidth:'80%', padding:'9px 13px', borderRadius:m.from==='melomane'?'14px 14px 4px 14px':'14px 14px 14px 4px', background:m.from==='melomane'?'rgba(30,111,255,0.2)':'rgba(255,255,255,0.07)', border:m.from==='melomane'?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
-              <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.5 }}>{m.text}</p>
-            </div>
+
+      {/* Lien de paiement automatique */}
+      {lienPaiement && (
+        <div style={{ margin:'10px 12px 0', background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>💳</span>
+          <div style={{ flex:1 }}>
+            <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 2px' }}>Lien de paiement de l'artiste</p>
+            <p style={{ color:'#6a88aa', fontSize:10, margin:0, wordBreak:'break-all' }}>{lienPaiement}</p>
           </div>
-        ))}
+          <a href={lienPaiement} target="_blank" rel="noreferrer"
+            style={{ background:'linear-gradient(135deg,#ffd700,#ff9500)', borderRadius:8, padding:'8px 12px', color:'#000', fontWeight:800, fontSize:12, textDecoration:'none', flexShrink:0, whiteSpace:'nowrap' }}>
+            Payer →
+          </a>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div style={{ minHeight:160, maxHeight:280, overflowY:'auto', padding:'12px 12px 6px' }}>
+        {msgs.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'40px 20px' }}>
+            <p style={{ fontSize:28, marginBottom:8 }}>💬</p>
+            <p style={{ color:'#2a3a60', fontSize:12 }}>Votre demande a été envoyée à l'artiste.<br/>Il va vous répondre bientôt.</p>
+          </div>
+        ) : msgs.map(m => {
+          const isSystem = m.from === 'systeme';
+          const isMelomane = m.from === 'melomane';
+          if (isSystem) return (
+            <div key={m.id} style={{ textAlign:'center', marginBottom:10 }}>
+              <span style={{ background:'rgba(255,255,255,0.05)', borderRadius:99, padding:'4px 12px', fontSize:10, color:'#4a5878' }}>{m.text}</span>
+            </div>
+          );
+          return (
+            <div key={m.id} style={{ marginBottom:10, display:'flex', flexDirection:'column', alignItems: isMelomane?'flex-end':'flex-start' }}>
+              {!isMelomane && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, margin:'0 0 3px 4px' }}>ARTISTE</p>}
+              <div style={{ maxWidth:'82%', padding:'10px 14px', borderRadius: isMelomane?'14px 14px 4px 14px':'14px 14px 14px 4px', background: isMelomane?'rgba(30,111,255,0.22)':'rgba(255,255,255,0.07)', border: isMelomane?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
+                <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.55, wordBreak:'break-word' }}>{m.text}</p>
+                <p style={{ color:'rgba(100,140,200,0.4)', fontSize:9, margin:'4px 0 0', textAlign:'right' }}>
+                  {new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={msgsEndRef} />
       </div>
-      <div style={{ display:'flex', gap:8 }}>
+
+      {/* Input */}
+      <div style={{ padding:'8px 10px 12px', borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:8 }}>
         <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
-          onKeyDown={e => e.key==='Enter' && sendMsg()}
+          onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendMsg()}
           placeholder="Écrire à l'artiste..."
-          style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'10px 13px', color:'#fff', fontSize:13, outline:'none' }} />
-        <button onClick={sendMsg} disabled={msgSending||!msgInput.trim()}
-          style={{ width:40, height:40, borderRadius:10, border:'none', background: msgInput.trim()?'rgba(30,111,255,0.8)':'rgba(255,255,255,0.08)', color:'#fff', cursor: msgInput.trim()?'pointer':'default', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 13px', color:'#fff', fontSize:13, outline:'none' }} />
+        <button onClick={sendMsg} disabled={msgSending || !msgInput.trim()}
+          style={{ width:42, height:42, borderRadius:10, border:'none', background: msgInput.trim()?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.06)', color:'#fff', cursor: msgInput.trim()?'pointer':'default', fontSize:17, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           ➤
         </button>
       </div>
-      <p style={{ color:'#4a5878', fontSize:10, textAlign:'center', marginTop:8 }}>⏳ En attente de validation du paiement</p>
+      <p style={{ color:'#2a3a60', fontSize:10, textAlign:'center', paddingBottom:10 }}>
+        ⏳ Payez via le lien ci-dessus · L'artiste validera votre paiement
+      </p>
     </div>
   );
 
-  if (achatState === 'modal') return (
-    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:14, padding:18, marginBottom:20 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <p style={{ fontWeight:800, fontSize:15, color:'#fff', margin:0 }}>💰 Acheter "{albumLabel}"</p>
-        <button onClick={() => setAchatState('idle')} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:18 }}>✕</button>
-      </div>
-      {prix > 0 && (
-        <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:14 }}>
-          <p style={{ color:'#4da6ff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{prix.toLocaleString()} FCFA</p>
-          <p style={{ color:'#4a5878', fontSize:11, margin:0 }}>Paiement Mobile Money · Confirmation par l'artiste</p>
-        </div>
-      )}
-      <p style={{ color:'#6a88aa', fontSize:12, marginBottom:10 }}>Votre numéro pour être contacté :</p>
-      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel"
-        style={{ width:'100%', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'12px 14px', color:'#fff', fontSize:15, outline:'none', marginBottom:12, boxSizing:'border-box' }} />
-      <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:16 }}>
-        <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} id="cgu-achat-w" style={{ marginTop:3, flexShrink:0 }} />
-        <label htmlFor="cgu-achat-w" style={{ color:'#4a5878', fontSize:11, lineHeight:1.6 }}>
-          J'accepte d'être contacté par l'artiste via ce numéro pour finaliser le paiement.
-        </label>
-      </div>
-      <button onClick={submit} disabled={!phone||!accepted||sending}
-        style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background: phone&&accepted?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.08)', color: phone&&accepted?'#fff':'#4a5878', fontWeight:800, fontSize:15, cursor: phone&&accepted?'pointer':'default' }}>
-        {sending ? '⏳ Envoi...' : '📲 Envoyer ma demande'}
-      </button>
-    </div>
-  );
-
+  // ── BOUTON INITIAL ──
   return (
     <div style={{ marginBottom:20 }}>
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
-      <button onClick={() => setAchatState('modal')}
-        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
-        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>💰</span>
+      <button onClick={openChat} disabled={sending}
+        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)', opacity: sending ? 0.7 : 1 }}>
+        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px', flexShrink:0 }}>⬇</span>
         <div style={{ textAlign:'left' }}>
-          <p style={{ margin:0, fontWeight:800 }}>{files.length > 1 ? "Acheter l'album complet" : 'Acheter cette musique'}</p>
-          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{prix > 0 ? `${prix.toLocaleString()} FCFA · Téléchargement permanent` : 'Contacter l\'artiste pour le prix'}</p>
+          <p style={{ margin:0, fontWeight:800 }}>{sending ? 'Chargement...' : (files.length > 1 ? "Télécharger l'album" : 'Télécharger')}</p>
+          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{prix > 0 ? `${prix.toLocaleString()} FCFA · Paiement Mobile Money` : 'Contacter l\'artiste'}</p>
         </div>
       </button>
     </div>
