@@ -68,34 +68,41 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [ct, setCt] = useState(0);
   const ref = useRef<HTMLAudioElement>(null);
   const streamStart = useRef<number>(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const [bars, setBars] = useState<number[]>(Array(28).fill(4));
   const cur = files[idx];
 
-  // Web Audio API pour spectrogramme réel
-  const setupAnalyser = () => {
-    if (!ref.current || analyserRef.current) return;
+  // Initialiser Web Audio API une seule fois au montage
+  useEffect(() => {
+    if (!ref.current || audioCtxRef.current) return;
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = ctx.createMediaElementSource(ref.current);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 64;
       source.connect(analyser);
-      analyser.connect(ctx.destination);
+      analyser.connect(ctx.destination); // ← indispensable : renvoie le son aux haut-parleurs
+      audioCtxRef.current = ctx;
       analyserRef.current = analyser;
     } catch(e) {}
-  };
+  }, []);
 
+  // Boucle d'animation du spectrogramme
   useEffect(() => {
     if (!playing || !analyserRef.current) return;
+    // Reprendre le contexte si suspendu (politique autoplay navigateurs)
+    if (audioCtxRef.current?.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
     const analyser = analyserRef.current;
     const data = new Uint8Array(analyser.frequencyBinCount);
     const animate = () => {
       analyser.getByteFrequencyData(data);
       const newBars = Array.from({ length: 28 }, (_, i) => {
-        const idx = Math.floor(i * data.length / 28);
-        return Math.max(4, (data[idx] / 255) * 44);
+        const bin = Math.floor(i * data.length / 28);
+        return Math.max(4, (data[bin] / 255) * 44);
       });
       setBars(newBars);
       animFrameRef.current = requestAnimationFrame(animate);
@@ -119,7 +126,6 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause(); setPlaying(false);
     } else {
-      setupAnalyser();
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false)); setPlaying(true);
     }
@@ -139,7 +145,7 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
         }}
         preload="metadata" />
 
-      {/* SPECTROGRAMME — synchronisé avec Web Audio API */}
+      {/* SPECTROGRAMME — fréquences réelles via Web Audio API */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2.5, height: 48, marginBottom: 14 }}>
         {bars.map((h, i) => {
           const hue = 210 + (i / 28) * 60;
@@ -147,13 +153,13 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
             <div key={i} style={{
               width: 3.5,
               borderRadius: 99,
-              background: `linear-gradient(to top, hsl(${hue}, 90%, 55%), hsl(${hue + 30}, 100%, 80%))`,
+              background: `linear-gradient(to top, hsl(${hue},90%,55%), hsl(${hue+30},100%,80%))`,
               height: playing ? h : 4,
               minHeight: 4,
               maxHeight: 48,
               opacity: playing ? 0.9 : 0.2,
               transition: playing ? 'height 0.05s ease' : 'height 0.3s ease, opacity 0.3s',
-              boxShadow: playing && h > 20 ? `0 0 6px hsl(${hue}, 90%, 65%)` : 'none',
+              boxShadow: playing && h > 20 ? `0 0 6px hsl(${hue},90%,65%)` : 'none',
             }} />
           );
         })}
@@ -1793,7 +1799,7 @@ function UserAuthPage() {
         <div style={{ display: 'flex', gap: 6 }}>
           <a href="/artiste" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
           <a href="/annonceurs" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
-          <a href="/admin" style={{ background: '#f5f8ff', border: '1px solid #dce6f7', borderRadius: 8, padding: '5px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>⚙️ Admin</a>
+          <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'transparent', fontSize: 6, fontWeight: 600, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
         </div>
       </div>
       <div style={{ width: '100%', maxWidth: 380, padding: '52px 16px 0' }}>
@@ -1812,12 +1818,6 @@ function UserAuthPage() {
                 Continuer avec Google
               </button>
 
-              {/* Téléphone */}
-              <button onClick={() => setMode('phone')} disabled={loading}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #c8d8ef', background: '#ffffff', color: '#1a2340', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
-                📱 Continuer avec le téléphone
-              </button>
-
               {/* Email */}
               <button onClick={() => setMode('email')} disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%', padding: '14px 20px', borderRadius: 12, border: '1px solid #c8d8ef', background: '#ffffff', color: '#1a2340', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
@@ -1827,34 +1827,6 @@ function UserAuthPage() {
               <p style={{ color: '#2a3a60', fontSize: 11, textAlign: 'center', marginTop: 8 }}>
                 Votre compte vous permet d'accéder à Ma Zikothèque — votre bibliothèque musicale personnelle
               </p>
-            </>
-          )}
-
-          {mode === 'phone' && (
-            <>
-              <button onClick={() => { setMode('choose'); setMsg(''); setStep('input'); }} style={{ background: 'none', border: 'none', color: '#8098b8', cursor: 'pointer', marginBottom: 12, fontSize: 13 }}>← Retour</button>
-              <h2 style={{ fontFamily: 'serif', fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Connexion par téléphone</h2>
-              {step === 'input' ? (
-                <>
-                  <label style={S.lbl}>Numéro de téléphone</label>
-                  <input style={S.inp} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+225 07 00 00 00 00" type="tel" />
-                  <div ref={recaptchaRef} />
-                  {msg && <p style={{ color: msg.includes('envoyé') ? '#4da6ff' : '#f04a6a', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
-                  <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={sendSMS} disabled={loading}>
-                    {loading ? 'Envoi...' : 'Envoyer le code SMS'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p style={{ color: '#1a6bff', fontSize: 13, marginBottom: 12 }}>✅ Code envoyé au {phone}</p>
-                  <label style={S.lbl}>Code reçu par SMS</label>
-                  <input style={S.inp} value={code} onChange={e => setCode(e.target.value)} placeholder="123456" type="number" maxLength={6} />
-                  {msg && <p style={{ color: '#e04060', fontSize: 12, marginBottom: 8 }}>{msg}</p>}
-                  <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={verifyCode} disabled={loading}>
-                    {loading ? 'Vérification...' : 'Confirmer'}
-                  </button>
-                </>
-              )}
             </>
           )}
 
@@ -1986,7 +1958,7 @@ function ZikothequePage({ user }: { user: any }) {
           <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
           <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
           {user.email === ADMIN_EMAIL && (
-            <a href="/admin" style={{ background: 'rgba(200,240,74,0.1)', border: '1px solid rgba(200,240,74,0.3)', borderRadius: 8, padding: '6px 10px', color: '#c8f04a', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>⚙️ Admin</a>
+            <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
           )}
           <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', cursor: 'pointer', fontSize: 11 }}>Déco</button>
         </div>
@@ -2523,7 +2495,7 @@ function HomePage() {
           © 2025 ·{' '}
           <a href="/conditions" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>CGU</a> ·{' '}
           <a href="/annonceurs" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
-          <a href="/admin" style={{ color: 'rgba(255,255,255,0.15)', textDecoration: 'underline' }}>Admin</a>
+          <a href="/admin" style={{ color: 'transparent', textDecoration: 'none', fontSize: 4, opacity: 0.05 }}>·</a>
         </p>
       </footer>
     </div>
