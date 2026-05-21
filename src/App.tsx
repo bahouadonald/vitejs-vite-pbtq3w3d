@@ -598,20 +598,13 @@ function FanPage() {
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
 
             {/* ── TÉLÉCHARGER ──
-                QR privé (acheté physiquement) → gratuit, direct
-                Lien public → payant via AchatWidget + chat artiste
+                QR privé (totalScans défini, acheté physiquement) → gratuit, direct
+                Lien public (price > 0 ou pas de totalScans) → payant via AchatWidget
             ── */}
-            {qrData.files?.length > 0 && (
-              qrData.isPublicLink ? (
-                /* Lien public = payant */
-                <AchatWidget
-                  qrId={qrData.qrId || qrId || ''}
-                  albumLabel={qrData.label || ''}
-                  artistEmail={qrData.artistEmail || ''}
-                  prix={qrData.price || 0}
-                  files={qrData.files || []}
-                />
-              ) : (
+            {qrData.files?.length > 0 && (() => {
+              // Un QR privé a toujours totalScans défini et price = 0
+              const isPrivateQR = (qrData.totalScans > 0) && !(qrData.price > 0);
+              return isPrivateQR ? (
                 /* QR privé = téléchargement gratuit direct */
                 <div style={{ marginBottom:20 }}>
                   <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
@@ -646,8 +639,17 @@ function FanPage() {
                     </div>
                   )}
                 </div>
-              )
-            )}
+              ) : (
+                /* Lien public / QR payant = AchatWidget */
+                <AchatWidget
+                  qrId={qrData.qrId || qrId || ''}
+                  albumLabel={qrData.label || ''}
+                  artistEmail={qrData.artistEmail || ''}
+                  prix={qrData.price || 0}
+                  files={qrData.files || []}
+                />
+              );
+            })()}
 
             {/* ── ÉCOUTER EN STREAMING ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
@@ -938,7 +940,36 @@ function AdminPage() {
   const [adminChatInput, setAdminChatInput] = useState('');
   const [adminChatSending, setAdminChatSending] = useState(false);
 
-  useEffect(() => { onAuthStateChanged(auth, (u) => { if (u && u.email === ADMIN_EMAIL) { setUser(u); setView('dashboard'); } else { setUser(null); setView('login'); } }); }, []);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u && u.email === ADMIN_EMAIL) {
+        setUser(u); setView('dashboard');
+      } else if (u && u.email !== ADMIN_EMAIL) {
+        // Un autre utilisateur est connecté — ne pas toucher à son état
+        // mais afficher le formulaire admin normalement
+        setUser(null); setView('login');
+      } else {
+        setUser(null); setView('login');
+      }
+    });
+    return unsub;
+  }, []);
+
+  const login = async () => {
+    setLoading(true); setMsg('');
+    try {
+      // Déconnecter d'abord tout autre utilisateur connecté
+      await signOut(auth);
+      await signInWithEmailAndPassword(auth, email, password);
+      setMsg('');
+    } catch (e: any) {
+      setMsg('Email ou mot de passe incorrect');
+    }
+    setLoading(false);
+  };
+
+  const logout = async () => { await signOut(auth); };
+
   useEffect(() => {
     if (!user) return;
     const u1 = onSnapshot(query(collection(db, 'qrcodes'), orderBy('createdAt', 'desc')), s => setQrcodes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -946,9 +977,6 @@ function AdminPage() {
     const u3 = onSnapshot(query(collection(db, 'annonceurs'), orderBy('createdAt', 'desc')), s => setAnnonceurs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     return () => { u1(); u2(); u3(); };
   }, [user]);
-
-  const login = async () => { setLoading(true); try { await signInWithEmailAndPassword(auth, email, password); setMsg(''); } catch { setMsg('Email ou mot de passe incorrect'); } setLoading(false); };
-  const logout = async () => { await signOut(auth); };
 
   // ── Chat admin ↔ annonceur ──
   useEffect(() => {
