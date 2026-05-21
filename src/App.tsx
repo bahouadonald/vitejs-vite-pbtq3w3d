@@ -1786,8 +1786,17 @@ function UserAuthPage() {
   if (user != null) return <ZikothequePage user={user} />;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 380, padding: '0 16px' }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      {/* NAV */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(240,244,251,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #dce6f7', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 50 }}>
+        <Logo size="sm" />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <a href="/artiste" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
+          <a href="/annonceurs" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
+          <a href="/admin" style={{ background: '#f5f8ff', border: '1px solid #dce6f7', borderRadius: 8, padding: '5px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>⚙️ Admin</a>
+        </div>
+      </div>
+      <div style={{ width: '100%', maxWidth: 380, padding: '52px 16px 0' }}>
         <div style={{ marginBottom: 28, textAlign: 'center' }}><Logo size="lg" /></div>
 
         <div style={S.card}>
@@ -1973,9 +1982,13 @@ function ZikothequePage({ user }: { user: any }) {
             <p style={{ color: '#4a5878', fontSize: 10 }}>{items.length} album{items.length > 1 ? 's' : ''}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ color: '#4a5878', fontSize: 11, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName || user.email?.split('@')[0]}</span>
-          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', color: '#8098b8', cursor: 'pointer', fontSize: 12 }}>Déco</button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
+          <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
+          {user.email === ADMIN_EMAIL && (
+            <a href="/admin" style={{ background: 'rgba(200,240,74,0.1)', border: '1px solid rgba(200,240,74,0.3)', borderRadius: 8, padding: '6px 10px', color: '#c8f04a', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>⚙️ Admin</a>
+          )}
+          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', cursor: 'pointer', fontSize: 11 }}>Déco</button>
         </div>
       </div>
 
