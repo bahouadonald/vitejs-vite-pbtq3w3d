@@ -3880,91 +3880,69 @@ function PWAInstallBanner() {
 
 
 // ─────────────────────────────────────────────
-// TÉLÉCHARGER WIDGET — FanPage + PublicStreamPage
-// Flux 3 : clic → chat direct artiste → lien paiement auto → artiste valide → DL
-// Pas de formulaire numéro pour le mélomane
+// TÉLÉCHARGER WIDGET — paiement Wave automatique
+// Flux : clic → session Wave créée côté serveur → redirection Wave → webhook → DL actif
 // ─────────────────────────────────────────────
 function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   qrId: string; albumLabel: string; artistEmail: string; prix: number; files: any[];
 }) {
-  const [state, setState] = useState<'idle'|'chat'|'done'>('idle');
-  const [sending, setSending] = useState(false);
-  const [venteId, setVenteId] = useState('');
-  const [msgs, setMsgs] = useState<any[]>([]);
+  const [state, setState] = useState<'idle'|'loading'|'done'|'error'>('idle');
+  const [errMsg, setErrMsg] = useState('');
   const [dlActive, setDlActive] = useState(false);
-  const [msgInput, setMsgInput] = useState('');
-  const [msgSending, setMsgSending] = useState(false);
-  const [lienPaiement, setLienPaiement] = useState('');
-  const msgsEndRef = useRef<HTMLDivElement>(null);
+  const [venteId, setVenteId] = useState('');
 
-  // Ouvrir le chat — créer la demande automatiquement au clic
-  const openChat = async () => {
-    if (state !== 'idle') return;
-    setSending(true);
+  // Écouter en temps réel si le paiement a été confirmé (via webhook Wave)
+  useEffect(() => {
+    if (!venteId) return;
+    const unsub = onSnapshot(doc(db, 'ventes', venteId), (d) => {
+      if (d.exists() && d.data()?.dlActive) setDlActive(true);
+    });
+    return unsub;
+  }, [venteId]);
+
+  const handlePay = async () => {
+    if (state === 'loading') return;
+    setState('loading');
+    setErrMsg('');
     try {
-      // Chercher l'artiste par email
+      // 1. Créer la demande dans Firestore
       const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
-      // L'uid peut être dans le champ 'uid' OU être l'id du document lui-même
-      let artistId = '';
-      if (!artSnap.empty) {
-        const artData = artSnap.docs[0].data();
-        artistId = artData.uid || artSnap.docs[0].id;
-      }
-
-      // Lire le lien de paiement depuis artistOptions (clé = uid de l'artiste)
-      if (artistId) {
-        try {
-          const { getDoc: gd } = await import('firebase/firestore');
-          const optSnap = await gd(doc(db, 'artistOptions', artistId));
-          if (optSnap.exists()) setLienPaiement(optSnap.data().lienPaiement || '');
-        } catch(e) {}
-      }
-
-      // Créer la demande de téléchargement
-      const ref = await addDoc(collection(db, 'ventes'), {
+      const artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
+      const venteRef = await addDoc(collection(db, 'ventes'), {
         qrId, artistId, artistEmail, albumLabel, prix,
         statut: 'en_attente', dlActive: false,
         readByArtist: false, createdAt: new Date().toISOString(),
       });
-      setVenteId(ref.id);
+      setVenteId(venteRef.id);
 
-      // Message système visible par l'artiste dans son dashboard Ventes
-      await addDoc(collection(db, 'venteMessages'), {
-        venteId: ref.id, artistId, from: 'systeme',
-        text: `📲 Nouvelle demande de téléchargement pour "${albumLabel}"${prix > 0 ? ` · ${prix.toLocaleString()} FCFA` : ''}.`,
-        ts: new Date().toISOString(),
+      // 2. Appeler la Vercel Serverless Function pour créer la session Wave
+      const res = await fetch('/api/wave-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: prix,
+          albumLabel,
+          qrId,
+          venteId: venteRef.id,
+          type: 'album',
+        }),
       });
 
-      setState('chat');
-    } catch(e) { console.error('openChat error:', e); }
-    setSending(false);
-  };
-
-  useEffect(() => {
-    if (!venteId) return;
-    const u1 = onSnapshot(
-      query(collection(db, 'venteMessages'), where('venteId','==',venteId), orderBy('ts','asc')),
-      snap => {
-        setMsgs(snap.docs.map(d => ({id:d.id,...d.data()})));
-        // Auto-scroll
-        setTimeout(() => msgsEndRef.current?.scrollIntoView({behavior:'smooth'}), 100);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Erreur serveur');
       }
-    );
-    const u2 = onSnapshot(doc(db, 'ventes', venteId), d => {
-      if (d.exists() && d.data()?.dlActive) { setDlActive(true); setState('done'); }
-      // Récupérer le lien de paiement depuis la vente si mis à jour
-      if (d.exists() && d.data()?.lienPaiement) setLienPaiement(d.data().lienPaiement);
-    });
-    return () => { u1(); u2(); };
-  }, [venteId]);
 
-  const sendMsg = async () => {
-    if (!msgInput.trim() || !venteId) return;
-    setMsgSending(true);
-    await addDoc(collection(db, 'venteMessages'), {
-      venteId, from: 'melomane', text: msgInput.trim(), ts: new Date().toISOString(),
-    });
-    setMsgInput(''); setMsgSending(false);
+      const { wave_launch_url } = await res.json();
+
+      // 3. Rediriger vers Wave pour le paiement
+      // Wave redirigera vers /fan/:qrId?payment=success après paiement
+      window.location.href = wave_launch_url;
+
+    } catch (e: any) {
+      setErrMsg(e.message || 'Erreur lors de la création du paiement');
+      setState('error');
+    }
   };
 
   const downloadAll = () => {
@@ -3978,107 +3956,46 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
     });
   };
 
-  // ── TÉLÉCHARGEMENT ACTIVÉ ──
-  if (state === 'done') return (
-    <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:20 }}>
-      <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement confirmé !</p>
-      <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>L'artiste a validé votre paiement. Votre téléchargement est prêt.</p>
-      <button onClick={downloadAll}
-        style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-        <span style={{ fontSize:22 }}>⬇</span> Télécharger maintenant
-      </button>
-    </div>
-  );
-
-  // ── CHAT AVEC L'ARTISTE ──
-  if (state === 'chat') return (
-    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, overflow:'hidden', marginBottom:20 }}>
-      {/* Header */}
-      <div style={{ background:'rgba(30,111,255,0.12)', padding:'12px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:10 }}>
-        <span style={{ width:8, height:8, borderRadius:99, background:'#4dff9a', display:'inline-block', flexShrink:0 }} />
-        <div style={{ flex:1 }}>
-          <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>Chat avec l'artiste</p>
-          <p style={{ color:'#4a5878', fontSize:10, margin:'1px 0 0' }}>
-            {prix > 0 ? `${prix.toLocaleString()} FCFA · Payez puis attendez la validation` : albumLabel}
-          </p>
-        </div>
-        {dlActive && <span style={{ background:'rgba(77,255,154,0.2)', border:'1px solid rgba(77,255,154,0.5)', borderRadius:99, padding:'2px 9px', fontSize:10, color:'#4dff9a', fontWeight:700 }}>✅ Validé</span>}
-      </div>
-
-      {/* Lien de paiement automatique */}
-      {lienPaiement && (
-        <div style={{ margin:'10px 12px 0', background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
-          <span style={{ fontSize:20, flexShrink:0 }}>💳</span>
-          <div style={{ flex:1 }}>
-            <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 2px' }}>Lien de paiement de l'artiste</p>
-            <p style={{ color:'#6a88aa', fontSize:10, margin:0, wordBreak:'break-all' }}>{lienPaiement}</p>
-          </div>
-          <a href={lienPaiement} target="_blank" rel="noreferrer"
-            style={{ background:'linear-gradient(135deg,#ffd700,#ff9500)', borderRadius:8, padding:'8px 12px', color:'#000', fontWeight:800, fontSize:12, textDecoration:'none', flexShrink:0, whiteSpace:'nowrap' }}>
-            Payer →
-          </a>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div style={{ minHeight:160, maxHeight:280, overflowY:'auto', padding:'12px 12px 6px' }}>
-        {msgs.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'40px 20px' }}>
-            <p style={{ fontSize:28, marginBottom:8 }}>💬</p>
-            <p style={{ color:'#2a3a60', fontSize:12 }}>Votre demande a été envoyée à l'artiste.<br/>Il va vous répondre bientôt.</p>
-          </div>
-        ) : msgs.map(m => {
-          const isSystem = m.from === 'systeme';
-          const isMelomane = m.from === 'melomane';
-          if (isSystem) return (
-            <div key={m.id} style={{ textAlign:'center', marginBottom:10 }}>
-              <span style={{ background:'rgba(255,255,255,0.05)', borderRadius:99, padding:'4px 12px', fontSize:10, color:'#4a5878' }}>{m.text}</span>
-            </div>
-          );
-          return (
-            <div key={m.id} style={{ marginBottom:10, display:'flex', flexDirection:'column', alignItems: isMelomane?'flex-end':'flex-start' }}>
-              {!isMelomane && <p style={{ color:'#4da6ff', fontSize:9, fontWeight:700, margin:'0 0 3px 4px' }}>ARTISTE</p>}
-              <div style={{ maxWidth:'82%', padding:'10px 14px', borderRadius: isMelomane?'14px 14px 4px 14px':'14px 14px 14px 4px', background: isMelomane?'rgba(30,111,255,0.22)':'rgba(255,255,255,0.07)', border: isMelomane?'1px solid rgba(30,111,255,0.3)':'1px solid rgba(255,255,255,0.1)' }}>
-                <p style={{ color:'#dde4f5', fontSize:13, margin:0, lineHeight:1.55, wordBreak:'break-word' }}>{m.text}</p>
-                <p style={{ color:'rgba(100,140,200,0.4)', fontSize:9, margin:'4px 0 0', textAlign:'right' }}>
-                  {new Date(m.ts).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={msgsEndRef} />
-      </div>
-
-      {/* Input */}
-      <div style={{ padding:'8px 10px 12px', borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:8 }}>
-        <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
-          onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendMsg()}
-          placeholder="Écrire à l'artiste..."
-          style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 13px', color:'#fff', fontSize:13, outline:'none' }} />
-        <button onClick={sendMsg} disabled={msgSending || !msgInput.trim()}
-          style={{ width:42, height:42, borderRadius:10, border:'none', background: msgInput.trim()?'linear-gradient(135deg,#1e6fff,#0050d0)':'rgba(255,255,255,0.06)', color:'#fff', cursor: msgInput.trim()?'pointer':'default', fontSize:17, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          ➤
+  // Téléchargement activé (après confirmation Wave webhook)
+  if (dlActive) return (
+    <div style={{ marginBottom:20 }}>
+      <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
+      <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+        <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement confirmé !</p>
+        <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Wave a confirmé votre paiement. Votre téléchargement est prêt.</p>
+        <button onClick={downloadAll}
+          style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+          <span style={{ fontSize:22 }}>⬇</span> Télécharger maintenant
         </button>
       </div>
-      <p style={{ color:'#2a3a60', fontSize:10, textAlign:'center', paddingBottom:10 }}>
-        ⏳ Payez via le lien ci-dessus · L'artiste validera votre paiement
-      </p>
     </div>
   );
 
-  // ── BOUTON INITIAL ──
   return (
     <div style={{ marginBottom:20 }}>
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
-      <button onClick={openChat} disabled={sending}
-        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)', opacity: sending ? 0.7 : 1 }}>
-        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px', flexShrink:0 }}>⬇</span>
+      {state === 'error' && (
+        <div style={{ background:'rgba(240,74,106,0.1)', border:'1px solid rgba(240,74,106,0.3)', borderRadius:10, padding:'10px 14px', marginBottom:12 }}>
+          <p style={{ color:'#f04a6a', fontSize:12, margin:0 }}>⚠ {errMsg}</p>
+        </div>
+      )}
+      <button onClick={handlePay} disabled={state === 'loading'}
+        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background: state === 'loading' ? 'rgba(30,111,255,0.5)' : 'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor: state === 'loading' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
+        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px', flexShrink:0 }}>
+          {state === 'loading' ? '⏳' : '⬇'}
+        </span>
         <div style={{ textAlign:'left' }}>
-          <p style={{ margin:0, fontWeight:800 }}>{sending ? 'Chargement...' : (files.length > 1 ? "Télécharger l'album" : 'Télécharger')}</p>
-          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{prix > 0 ? `${prix.toLocaleString()} FCFA · Paiement Mobile Money` : 'Contacter l\'artiste'}</p>
+          <p style={{ margin:0, fontWeight:800 }}>
+            {state === 'loading' ? 'Préparation du paiement...' : (files.length > 1 ? "Télécharger l'album" : 'Télécharger')}
+          </p>
+          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>
+            {prix > 0 ? `${prix.toLocaleString()} FCFA · Paiement sécurisé Wave` : 'Paiement Wave'}
+          </p>
         </div>
       </button>
+      <p style={{ color:'#2a3a60', fontSize:10, textAlign:'center', marginTop:8 }}>
+        🔒 Paiement sécurisé via Wave · Téléchargement automatique après confirmation
+      </p>
     </div>
   );
 }
