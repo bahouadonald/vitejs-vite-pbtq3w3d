@@ -956,31 +956,14 @@ function AdminPage() {
   const login = async () => {
     setLoading(true); setMsg('');
     try {
-      // Créer une deuxième instance Firebase Auth uniquement pour l'admin
-      // pour ne pas perturber la session artiste/mélomane existante
-      const { initializeApp, getApps } = await import('firebase/app');
-      const { getAuth, signInWithEmailAndPassword: signInAdmin } = await import('firebase/auth');
-
-      // App Firebase secondaire dédiée à l'admin
-      const adminAppName = 'admin-app';
-      const adminApp = getApps().find(a => a.name === adminAppName)
-        || initializeApp({
-            apiKey: "AIzaSyBi5sE2GVlS5SoG8D0FBQBV6Y-ZMHn28gg",
-            authDomain: "drop-platform-68cbc.firebaseapp.com",
-            projectId: "drop-platform-68cbc",
-          }, adminAppName);
-
-      const adminAuth = getAuth(adminApp);
-      const cred = await signInAdmin(adminAuth, email, password);
-
+      const cred = await signInWithEmailAndPassword(auth, email, password);
       if (cred.user.email !== ADMIN_EMAIL) {
+        await signOut(auth);
         setMsg('Accès refusé — compte non autorisé');
         setLoading(false);
         return;
       }
-
-      // Connexion admin réussie — mettre à jour l'état local sans toucher à auth principal
-      setUser(cred.user as any);
+      setUser(cred.user);
       setView('dashboard');
       setMsg('');
     } catch (e: any) {
@@ -994,13 +977,7 @@ function AdminPage() {
   };
 
   const logout = async () => {
-    // Déconnecter uniquement l'app admin secondaire
-    try {
-      const { getApps } = await import('firebase/app');
-      const { getAuth } = await import('firebase/auth');
-      const adminApp = getApps().find(a => a.name === 'admin-app');
-      if (adminApp) await getAuth(adminApp).signOut();
-    } catch(e) {}
+    await signOut(auth);
     setUser(null); setView('login');
   };
 
