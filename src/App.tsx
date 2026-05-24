@@ -11,10 +11,11 @@ import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup,
   RecaptchaVerifier, signInWithPhoneNumber, updateProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
-const ADMIN_EMAIL = 'admin@doniel.art';
+const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.vercel.app';
@@ -1208,20 +1209,32 @@ function AdminPage() {
   );
 
   if (view === 'login') return (
-    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
->
+    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Logo size="lg" />
+          <p style={{ color:'#8098b8', fontSize:13, marginTop:8 }}>La Musique. Un Scan. Un Monde.</p>
         </div>
         <div style={S.card}>
           <label style={S.lbl}>Email</label>
-          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@securedrop.com" onKeyDown={e => e.key === 'Enter' && login()} />
+          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@doniel.art" onKeyDown={e => e.key === 'Enter' && login()} />
           <label style={S.lbl}>Mot de passe</label>
           <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && login()} />
-          {msg && <p style={{ color: '#e04060', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
-          <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={login} disabled={loading}>
+          {msg && <p style={{ color: msg.startsWith('✅') ? '#1a6bff' : '#e04060', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
+          <button style={{ ...S.btn, width: '100%', padding: 14, marginBottom: 10 }} onClick={login} disabled={loading}>
             {loading ? 'Connexion...' : 'Se connecter →'}
+          </button>
+          <button onClick={async () => {
+            if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+            try {
+              await sendPasswordResetEmail(auth, email);
+              setMsg('✅ Email de réinitialisation envoyé à ' + email);
+            } catch(e:any) {
+              setMsg('Erreur: ' + (e.code === 'auth/user-not-found' ? 'Email introuvable' : e.message));
+            }
+          }}
+            style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:13, textDecoration:'underline' }}>
+            Mot de passe oublié ?
           </button>
         </div>
       </div>
@@ -2379,11 +2392,25 @@ function ArtistPage() {
           <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
           <label style={S.lbl}>Mot de passe</label>
           <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-          {msg && <p style={{ color: msg.includes('Erreur') || msg.includes('incorrect') || msg.includes('non reconnu') ? '#f04a6a' : '#4da6ff', fontSize: 12, marginBottom: 10 }}>{msg}</p>}
+          {msg && <p style={{ color: msg.startsWith('✅') ? '#1a6bff' : '#f04a6a', fontSize: 12, marginBottom: 10 }}>{msg}</p>}
           <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={view === 'register' ? register : login} disabled={loading}>
             {loading ? 'Chargement...' : view === 'register' ? 'Créer mon compte' : 'Se connecter'}
           </button>
-          <button style={{ ...S.btn2, width: '100%', marginTop: 10, textAlign: 'center' }}
+          {view === 'login' && (
+            <button onClick={async () => {
+              if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+              try {
+                await sendPasswordResetEmail(auth, email);
+                setMsg('✅ Email de réinitialisation envoyé à ' + email);
+              } catch(e:any) {
+                setMsg('Email introuvable dans notre système');
+              }
+            }}
+              style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+              Mot de passe oublié ?
+            </button>
+          )}
+          <button style={{ ...S.btn2, width: '100%', marginTop: 8, textAlign: 'center' }}
             onClick={() => { setView(view === 'login' ? 'register' : 'login'); setMsg(''); }}>
             {view === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
           </button>
@@ -3334,11 +3361,25 @@ function DzStudioPage() {
           <input value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email" type="email" style={darkInp} />
           <input value={loginPass} onChange={e => setLoginPass(e.target.value)} placeholder="Mot de passe" type="password" style={{ ...darkInp, marginBottom:14 }}
             onKeyDown={e => e.key==='Enter' && (view==='login' ? doLoginEmail() : doRegister())} />
-          {loginMsg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{loginMsg}</p>}
+          {loginMsg && <p style={{ color: loginMsg.startsWith('✅') ? '#4dff9a' : '#f04a6a', fontSize:12, marginBottom:10 }}>{loginMsg}</p>}
           <button onClick={view==='login' ? doLoginEmail : doRegister} disabled={loginLoading}
             style={{ width:'100%', padding:'14px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
             {loginLoading ? '⏳...' : view==='login' ? 'Se connecter' : 'Créer mon compte'}
           </button>
+          {view === 'login' && (
+            <button onClick={async () => {
+              if (!loginEmail) { setLoginMsg('Entrez votre email d\'abord'); return; }
+              try {
+                await sendPasswordResetEmail(auth, loginEmail);
+                setLoginMsg('✅ Email de réinitialisation envoyé à ' + loginEmail);
+              } catch(e:any) {
+                setLoginMsg('Email introuvable');
+              }
+            }}
+              style={{ width:'100%', padding:'8px', background:'transparent', border:'none', color:'#4a5878', cursor:'pointer', fontSize:12, textDecoration:'underline', marginBottom:6 }}>
+              Mot de passe oublié ?
+            </button>
+          )}
           <button onClick={() => { setView(view==='login'?'register':'login'); setLoginMsg(''); }}
             style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:13 }}>
             {view==='login' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
