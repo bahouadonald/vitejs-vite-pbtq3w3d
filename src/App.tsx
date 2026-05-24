@@ -941,16 +941,13 @@ function AdminPage() {
   const [adminChatSending, setAdminChatSending] = useState(false);
 
   useEffect(() => {
+    // Vérifier silencieusement si l'admin est déjà connecté au chargement
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u && u.email === ADMIN_EMAIL) {
         setUser(u); setView('dashboard');
-      } else if (u && u.email !== ADMIN_EMAIL) {
-        // Un autre utilisateur est connecté — ne pas toucher à son état
-        // mais afficher le formulaire admin normalement
-        setUser(null); setView('login');
-      } else {
-        setUser(null); setView('login');
       }
+      // Si c'est un autre utilisateur ou personne → on reste sur login
+      // SANS toucher à leur session — on ne déconnecte JAMAIS ici
     });
     return unsub;
   }, []);
@@ -958,17 +955,53 @@ function AdminPage() {
   const login = async () => {
     setLoading(true); setMsg('');
     try {
-      // Déconnecter d'abord tout autre utilisateur connecté
-      await signOut(auth);
-      await signInWithEmailAndPassword(auth, email, password);
+      // Créer une deuxième instance Firebase Auth uniquement pour l'admin
+      // pour ne pas perturber la session artiste/mélomane existante
+      const { initializeApp, getApps } = await import('firebase/app');
+      const { getAuth, signInWithEmailAndPassword: signInAdmin } = await import('firebase/auth');
+
+      // App Firebase secondaire dédiée à l'admin
+      const adminAppName = 'admin-app';
+      const adminApp = getApps().find(a => a.name === adminAppName)
+        || initializeApp({
+            apiKey: "AIzaSyBi5sE2GVlS5SoG8D0FBQBV6Y-ZMHn28gg",
+            authDomain: "drop-platform-68cbc.firebaseapp.com",
+            projectId: "drop-platform-68cbc",
+          }, adminAppName);
+
+      const adminAuth = getAuth(adminApp);
+      const cred = await signInAdmin(adminAuth, email, password);
+
+      if (cred.user.email !== ADMIN_EMAIL) {
+        setMsg('Accès refusé — compte non autorisé');
+        setLoading(false);
+        return;
+      }
+
+      // Connexion admin réussie — mettre à jour l'état local sans toucher à auth principal
+      setUser(cred.user as any);
+      setView('dashboard');
       setMsg('');
     } catch (e: any) {
-      setMsg('Email ou mot de passe incorrect');
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+        setMsg('Email ou mot de passe incorrect');
+      } else {
+        setMsg('Erreur: ' + e.message);
+      }
     }
     setLoading(false);
   };
 
-  const logout = async () => { await signOut(auth); };
+  const logout = async () => {
+    // Déconnecter uniquement l'app admin secondaire
+    try {
+      const { getApps } = await import('firebase/app');
+      const { getAuth } = await import('firebase/auth');
+      const adminApp = getApps().find(a => a.name === 'admin-app');
+      if (adminApp) await getAuth(adminApp).signOut();
+    } catch(e) {}
+    setUser(null); setView('login');
+  };
 
   useEffect(() => {
     if (!user) return;
