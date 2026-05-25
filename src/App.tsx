@@ -117,6 +117,13 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const streamStart = useRef<number>(0);
   const cur = files[idx];
 
+  // Pub avant play
+  const [showPubPlay, setShowPubPlay] = useState(false);
+  const [pendingPlay, setPendingPlay] = useState(false);
+  // Pub entre pistes
+  const [showPubTrack, setShowPubTrack] = useState(false);
+  const [pendingTrackIdx, setPendingTrackIdx] = useState<number|null>(null);
+
   useEffect(() => {
     if (!ref.current) return;
     ref.current.pause();
@@ -132,26 +139,69 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       ref.current.pause();
       setPlaying(false);
     } else {
+      // Montrer pub avant de jouer
+      setPendingPlay(true);
+      setShowPubPlay(true);
+    }
+  };
+
+  const prev = () => {
+    if (idx > 0) {
+      setPendingTrackIdx(idx - 1);
+      setShowPubTrack(true);
+    }
+  };
+
+  const next = () => {
+    if (idx < files.length - 1) {
+      setPendingTrackIdx(idx + 1);
+      setShowPubTrack(true);
+    }
+  };
+
+  // Après pub play → lancer la lecture
+  const afterPubPlay = () => {
+    setShowPubPlay(false);
+    if (pendingPlay && ref.current) {
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
+    setPendingPlay(false);
   };
 
-  const prev = () => { if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; } };
-  const next = () => { if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; } };
+  // Après pub entre pistes → changer de piste
+  const afterPubTrack = () => {
+    setShowPubTrack(false);
+    if (pendingTrackIdx !== null) {
+      setIdx(pendingTrackIdx);
+      setPlaying(true);
+      streamStart.current = Date.now() / 1000;
+    }
+    setPendingTrackIdx(null);
+  };
 
   if (!files || files.length === 0) return null;
 
   return (
     <div style={{ background: 'rgba(15,20,40,0.95)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(30,111,255,0.18)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+
+      {/* PUB avant play */}
+      {showPubPlay && <PubOverlay trigger="play" onDone={afterPubPlay} />}
+      {/* PUB entre pistes */}
+      {showPubTrack && <PubOverlay trigger="track" onDone={afterPubTrack} />}
+
       <audio ref={ref} src={cur?.url}
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
         onEnded={() => {
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
-          if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
-          else { setPlaying(false); }
+          if (idx < files.length - 1) {
+            // Pub entre pistes automatique
+            setPendingTrackIdx(idx + 1);
+            setShowPubTrack(true);
+            setPlaying(false);
+          } else { setPlaying(false); }
         }}
         preload="metadata" />
 
@@ -408,7 +458,7 @@ function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => vo
 
 function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
-  const [step, setStep] = useState<'loading' | 'ready' | 'locked' | 'zipping' | 'done'>('loading');
+  const [step, setStep] = useState<'loading' | 'ready' | 'zipping' | 'done'>('loading');
   const [qrData, setQrData] = useState<any>(null);
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
@@ -421,7 +471,7 @@ function FanPage() {
     const load = async () => {
       const q = query(collection(db, 'qrcodes'), where('qrId', '==', qrId));
       const snap = await getDocs(q);
-      if (snap.empty) { setStep('locked'); return; }
+      if (snap.empty) { setStep('ready'); return; } // QR inexistant → page vide mais pas bloquée
       const docId = snap.docs[0].id;
       qrDocId.current = docId;
       const data = { id: docId, ...snap.docs[0].data() } as any;
@@ -430,8 +480,8 @@ function FanPage() {
         await addDoc(collection(db, 'visits'), { qrId, artist: data.artist || '', label: data.label || '', ts: new Date().toISOString() });
         await updateDoc(doc(db, 'qrcodes', docId), { visits: (data.visits || 0) + 1 });
       } catch (e) { console.error('visit', e); }
-      if (data.status === 'locked' || (data.usedScans || 0) >= (data.totalScans || 0)) setStep('locked');
-      else setStep('ready');
+      // Plus de mode locked — toujours ready, le DL épuisé est géré dans le JSX
+      setStep('ready');
     };
     load();
   }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -493,7 +543,8 @@ function FanPage() {
     try {
       await updateDoc(doc(db, 'qrcodes', qrDocId.current), {
         usedScans: newUsed, downloads: (qrData.downloads || 0) + 1,
-        status: newUsed >= qrData.totalScans ? 'locked' : 'active',
+        // On ne bloque plus jamais — le DL devient payant quand épuisé
+        status: 'active',
       });
     } catch(e) { console.error('markDL', e); }
   };
@@ -573,6 +624,9 @@ function FanPage() {
       {step === 'ready' && qrData && (
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
+          {/* PUB MAISON — avant tout le contenu */}
+          <PubBanner />
+
           {/* POCHETTE — grande, visible, centrée en haut */}
           <div style={{ position:'relative', width:'100%', background:'#0a0c14' }}>
             {qrData.coverUrl ? (
@@ -599,20 +653,22 @@ function FanPage() {
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
 
             {/* ── TÉLÉCHARGER ──
-                QR privé (totalScans défini, acheté physiquement) → gratuit, direct
-                Lien public (price > 0 ou pas de totalScans) → payant via AchatWidget
+                QR privé (totalScans défini, price=0) :
+                  - scans restants → DL gratuit direct
+                  - scans épuisés → DL payant via Wave (AchatWidget)
+                Lien public (price > 0) → AchatWidget
             ── */}
             {qrData.files?.length > 0 && (() => {
-              // Un QR privé a toujours totalScans défini et price = 0
               const isPrivateQR = (qrData.totalScans > 0) && !(qrData.price > 0);
-              return isPrivateQR ? (
-                /* QR privé = téléchargement gratuit direct */
+              const dlsEpuises = isPrivateQR && (qrData.usedScans || 0) >= (qrData.totalScans || 0);
+
+              if (isPrivateQR && !dlsEpuises) return (
+                /* QR privé avec scans restants = téléchargement gratuit */
                 <div style={{ marginBottom:20 }}>
                   <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
                   {!downloaded ? (
                     onSafari ? (
-                      <button
-                        onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
+                      <button onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
                         style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
                         <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>🌐</span>
                         <div style={{ textAlign:'left' }}>
@@ -626,7 +682,9 @@ function FanPage() {
                         <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>⬇</span>
                         <div style={{ textAlign:'left' }}>
                           <p style={{ margin:0, fontWeight:800 }}>{(qrData.files?.length||0)>1 ? "Télécharger l'album complet" : 'Télécharger'}</p>
-                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>{qrData.files?.length||0} fichier{(qrData.files?.length||0)>1?'s':''} · Qualité originale</p>
+                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>
+                            {(qrData.totalScans||0) - (qrData.usedScans||0)} téléchargement{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''} gratuit{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''} restant{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''}
+                          </p>
                         </div>
                       </button>
                     )
@@ -640,15 +698,27 @@ function FanPage() {
                     </div>
                   )}
                 </div>
-              ) : (
-                /* Lien public / QR payant = AchatWidget */
-                <AchatWidget
-                  qrId={qrData.qrId || qrId || ''}
-                  albumLabel={qrData.label || ''}
-                  artistEmail={qrData.artistEmail || ''}
-                  prix={qrData.price || 0}
-                  files={qrData.files || []}
-                />
+              );
+
+              // DL épuisés ou lien public → AchatWidget (payant)
+              return (
+                <>
+                  {dlsEpuises && (
+                    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, background:'rgba(255,200,0,0.08)', border:'1px solid rgba(255,200,0,0.2)', marginBottom:12 }}>
+                      <span style={{ fontSize:16 }}>ℹ️</span>
+                      <p style={{ color:'#ffd700', fontSize:12, fontWeight:600, margin:0 }}>
+                        Les téléchargements gratuits de cette pochette sont épuisés. Le téléchargement est maintenant disponible via paiement.
+                      </p>
+                    </div>
+                  )}
+                  <AchatWidget
+                    qrId={qrData.qrId || qrId || ''}
+                    albumLabel={qrData.label || ''}
+                    artistEmail={qrData.artistEmail || ''}
+                    prix={qrData.price || 0}
+                    files={qrData.files || []}
+                  />
+                </>
               );
             })()}
 
@@ -751,38 +821,6 @@ function FanPage() {
       )}
 
       {/* ── LOCKED ── */}
-      {step === 'locked' && (
-        <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
-          {qrData?.coverUrl && (
-            <div style={{ position:'relative', width:'100%' }}>
-              <img src={qrData.coverUrl} alt={qrData?.label} style={{ width:'100%', maxHeight:320, objectFit:'cover', display:'block', filter:'grayscale(70%) brightness(0.5)' }} />
-              <div style={{ position:'absolute', bottom:0, left:0, right:0, height:100, background:'linear-gradient(transparent,#0a0c14)' }} />
-            </div>
-          )}
-          <div style={{ padding:'16px 18px', maxWidth:500, margin:'0 auto' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(240,184,74,0.12)', border:'1px solid rgba(240,184,74,0.35)', borderRadius:99, padding:'4px 12px', marginBottom:12 }}>
-              <span style={{ fontSize:11 }}>🔒</span>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:2, color:'#f0b84a', margin:0 }}>SCANS ÉPUISÉS</p>
-            </div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:900, color:'#fff', marginBottom:4 }}>{qrData?.label||'Contenu protégé'}</h2>
-            <p style={{ color:'#6a88aa', fontSize:13, marginBottom:20 }}>par <strong style={{ color:'#4da6ff' }}>{qrData?.artist}</strong></p>
-            <div style={{ marginBottom:16 }}>
-              <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>🎵 Streaming gratuit</p>
-              {qrData?.files && <AudioPlayer files={qrData.files} onStream={recordStream} />}
-            </div>
-            {qrData && (
-              <AchatWidget
-                qrId={qrData.qrId || qrId || ''}
-                albumLabel={qrData.label || ''}
-                artistEmail={qrData.artistEmail || ''}
-                prix={qrData.price || 0}
-                files={qrData.files || []}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── DONE ── */}
       {step === 'done' && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', padding:24 }}>
@@ -818,8 +856,145 @@ function FanPage() {
 // ADMIN PAGE
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
-// ARTIST FOLDER COMPONENT
+// ARTISTES TAB — Liste des artistes enregistrés
 // ─────────────────────────────────────────────
+function ArtistesTab({ db, qrcodes }: { db: any, qrcodes: any[] }) {
+  const [artistes, setArtistes] = useState<any[]>([]);
+  const [nom, setNom] = useState('');
+  const [email, setEmail] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'artists'), orderBy('name', 'asc')),
+      snap => setArtistes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, [db]);
+
+  const addArtiste = async () => {
+    if (!nom.trim() || !email.trim()) { setMsg('Nom et email requis'); return; }
+    setLoading(true); setMsg('');
+    try {
+      // Vérifier si email déjà enregistré
+      const existing = await getDocs(query(collection(db, 'artists'), where('email','==', email.trim().toLowerCase())));
+      if (!existing.empty) { setMsg('Cet email est déjà enregistré'); setLoading(false); return; }
+      await addDoc(collection(db, 'artists'), {
+        name: nom.trim(),
+        email: email.trim().toLowerCase(),
+        createdAt: new Date().toISOString(),
+      });
+      setMsg('✅ Artiste enregistré ! Il peut maintenant créer son compte sur /artiste');
+      setNom(''); setEmail('');
+    } catch(e:any) { setMsg('Erreur: ' + e.message); }
+    setLoading(false);
+  };
+
+  const filtered = artistes.filter(a =>
+    a.name?.toLowerCase().includes(search.toLowerCase()) ||
+    a.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+        <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800 }}>🎤 Artistes enregistrés</h2>
+        <span style={{ background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:99, padding:'3px 12px', fontSize:12, color:'#1a6bff', fontWeight:700 }}>
+          {artistes.length} artiste{artistes.length > 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* FORMULAIRE AJOUT */}
+      <div style={{ ...S.card, marginBottom:20, background:'#f5f8ff' }}>
+        <p style={{ fontWeight:700, fontSize:14, marginBottom:14, color:'#1a2340' }}>➕ Enregistrer un nouvel artiste</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+          <div>
+            <label style={S.lbl}>Nom d'artiste *</label>
+            <input style={S.inp} value={nom} onChange={e => setNom(e.target.value)}
+              placeholder="Ex: Élite Doniel" onKeyDown={e => e.key==='Enter' && addArtiste()} />
+          </div>
+          <div>
+            <label style={S.lbl}>Email *</label>
+            <input style={{ ...S.inp, marginBottom:0 }} type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="artiste@email.com" onKeyDown={e => e.key==='Enter' && addArtiste()} />
+          </div>
+        </div>
+        {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+        <button style={{ ...S.btn, padding:'10px 24px' }} onClick={addArtiste} disabled={loading}>
+          {loading ? '⏳...' : '✅ Enregistrer'}
+        </button>
+        <p style={{ color:'#8098b8', fontSize:11, marginTop:10 }}>
+          Après enregistrement, l'artiste peut aller sur <strong>/artiste</strong> et créer son compte avec cet email.
+        </p>
+      </div>
+
+      {/* RECHERCHE */}
+      <input style={{ ...S.inp, marginBottom:16 }} value={search} onChange={e => setSearch(e.target.value)}
+        placeholder="🔍 Rechercher un artiste..." />
+
+      {/* LISTE */}
+      {filtered.length === 0 ? (
+        <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+          <p style={{ fontSize:36, marginBottom:10 }}>🎤</p>
+          <p style={{ color:'#5a7090', fontSize:14 }}>Aucun artiste enregistré</p>
+        </div>
+      ) : filtered.map(a => {
+        // Compter les QR codes de cet artiste
+        const artistQRs = qrcodes.filter(q => q.artistEmail === a.email || q.artist === a.name);
+        const totalStreams = artistQRs.reduce((s:number, q:any) => s + (q.streams||0), 0);
+        const totalDL = artistQRs.reduce((s:number, q:any) => s + (q.downloads||q.usedScans||0), 0);
+
+        return (
+          <div key={a.id} style={{ ...S.card, marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:99, background:'linear-gradient(135deg,#eaf1ff,#c8d8ef)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+                  🎤
+                </div>
+                <div>
+                  <p style={{ fontWeight:800, fontSize:15, marginBottom:2 }}>{a.name}</p>
+                  <p style={{ color:'#8098b8', fontSize:12 }}>{a.email}</p>
+                  <p style={{ color:'#b0c4d8', fontSize:10, marginTop:2 }}>
+                    Enregistré le {new Date(a.createdAt).toLocaleDateString('fr')}
+                    {a.uid && <span style={{ marginLeft:8, color:'#4dff9a', fontWeight:700 }}>✅ Compte créé</span>}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                {!a.uid && (
+                  <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'2px 10px', fontSize:10, color:'#b07a00', fontWeight:700 }}>
+                    ⏳ En attente
+                  </span>
+                )}
+                <button onClick={() => { if (window.confirm(`Supprimer ${a.name} ?`)) import('firebase/firestore').then(({deleteDoc:dd,doc:d})=>dd(d(db,'artists',a.id))); }}
+                  style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>🗑️</button>
+              </div>
+            </div>
+
+            {/* Stats rapides */}
+            {artistQRs.length > 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:12 }}>
+                {[
+                  { label:'QR codes', val:artistQRs.length, color:'#1a6bff' },
+                  { label:'Streams', val:totalStreams, color:'#b07a00' },
+                  { label:'Téléchargements', val:totalDL, color:'#1a6bff' },
+                ].map((s,i) => (
+                  <div key={i} style={{ background:'#f5f8ff', borderRadius:8, padding:'8px', textAlign:'center' }}>
+                    <p style={{ fontWeight:800, fontSize:16, color:s.color, margin:0 }}>{s.val}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'2px 0 0' }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrModal, onBulk, onToggle, onDelete }:
   { artist: string, qrcodes: any[], activeCount: number, lockedCount: number,
     onEdit: (q: any) => void, onQrModal: (q: any) => void, onBulk: (q: any) => void,
@@ -897,6 +1072,136 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
     </div>
   );
 }
+// ─────────────────────────────────────────────
+// HOOK — charger une pub active aléatoire
+// ─────────────────────────────────────────────
+function useActivePub() {
+  const [pub, setPub] = useState<any>(null);
+  useEffect(() => {
+    getDocs(query(collection(db, 'pubs'), where('active','==',true)))
+      .then(snap => {
+        if (snap.empty) return;
+        const list = snap.docs.map(d => ({id:d.id,...d.data()}));
+        setPub(list[Math.floor(Math.random()*list.length)]);
+      }).catch(()=>{});
+  }, []);
+  return pub;
+}
+
+// ─────────────────────────────────────────────
+// PUB OVERLAY — modal plein écran avec countdown
+// trigger: 'page'(10s) | 'play'(5s) | 'download'(5s) | 'track'(5s)
+// ─────────────────────────────────────────────
+function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'track', onDone: () => void }) {
+  const pub = useActivePub();
+  const duration = trigger === 'page' ? 10 : 5;
+  const [countdown, setCountdown] = useState(duration);
+  const [dismissed, setDismissed] = useState(false);
+
+  // Compter la vue une seule fois
+  useEffect(() => {
+    if (!pub) return;
+    updateDoc(doc(db, 'pubs', pub.id), { vues: (pub.vues||0) + 1 }).catch(()=>{});
+  }, [pub?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Countdown
+  useEffect(() => {
+    if (!pub || dismissed) return;
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c-1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, pub, dismissed]);
+
+  const handleClick = async () => {
+    if (!pub) return;
+    try { await updateDoc(doc(db,'pubs',pub.id),{clics:(pub.clics||0)+1}); } catch(e){}
+    if (pub.lienType==='tel') window.location.href=`tel:${pub.lien}`;
+    else if (pub.lienType==='whatsapp') window.open(`https://wa.me/${pub.lien.replace(/\D/g,'')}`, '_blank');
+    else window.open(pub.lien, '_blank');
+  };
+
+  const handleIgnore = () => { setDismissed(true); onDone(); };
+
+  // Si pas de pub active → continuer directement
+  if (!pub) { setTimeout(onDone, 0); return null; }
+  if (dismissed) return null;
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.92)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+      <style>{`@keyframes pubIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:scale(1)}}`}</style>
+
+      {/* Pub cliquable */}
+      <div style={{ width:'100%', maxWidth:500, animation:'pubIn .3s ease', cursor:'pointer', position:'relative' }}
+        onClick={handleClick}>
+        {pub.imageUrl ? (
+          <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'60vh', objectFit:'cover', display:'block', borderRadius:12 }} />
+        ) : (
+          <div style={{ width:'100%', height:220, borderRadius:12, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:14 }}>Publicité</p>
+          </div>
+        )}
+
+        {/* Overlay texte */}
+        {(pub.titre||pub.sousTitre) && (
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'linear-gradient(transparent,rgba(0,0,0,0.8))', padding:'32px 16px 14px', borderRadius:'0 0 12px 12px' }}>
+            {pub.titre && <p style={{ color:'#fff', fontWeight:700, fontSize:15, margin:'0 0 3px' }}>{pub.titre}</p>}
+            {pub.sousTitre && <p style={{ color:'rgba(255,255,255,0.7)', fontSize:12, margin:0 }}>{pub.sousTitre}</p>}
+          </div>
+        )}
+
+        {/* Badge PUB */}
+        <div style={{ position:'absolute', top:10, left:12, background:'rgba(0,0,0,0.65)', borderRadius:4, padding:'2px 8px' }}>
+          <span style={{ color:'#fff', fontSize:9, fontWeight:700, letterSpacing:1 }}>PUB</span>
+        </div>
+
+        {/* Bouton d'action si lien */}
+        {pub.lien && (
+          <div style={{ position:'absolute', bottom:14, right:12 }}>
+            <span style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)', borderRadius:8, padding:'5px 12px', color:'#fff', fontSize:12, fontWeight:700 }}>
+              {pub.lienType==='tel'?'📞 Appeler':pub.lienType==='whatsapp'?'💬 WhatsApp':'🌐 Voir'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Bouton ignorer + countdown */}
+      <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
+        {countdown > 0 ? (
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:36, height:36, borderRadius:99, border:'2px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+              <span style={{ color:'#fff', fontWeight:800, fontSize:14 }}>{countdown}</span>
+            </div>
+            <span style={{ color:'rgba(255,255,255,0.5)', fontSize:12 }}>Pub dans {countdown}s</span>
+          </div>
+        ) : (
+          <button onClick={handleIgnore}
+            style={{ background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:8, padding:'9px 20px', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+            ✕ Ignorer et continuer
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PUB BANNER — affichage inline (ouverture page)
+// Remplacé par PubOverlay mais gardé pour compatibilité
+// ─────────────────────────────────────────────
+function PubBanner() {
+  const [shown, setShown] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    // Afficher la pub d'ouverture de page avec un léger délai
+    const t = setTimeout(() => setShown(true), 800);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!shown || done) return null;
+  return <PubOverlay trigger="page" onDone={() => setDone(true)} />;
+}
+
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -936,6 +1241,10 @@ function AdminPage() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
+  const [pubs, setPubs] = useState<any[]>([]);
+  const [pubModal, setPubModal] = useState(false);
+  const [pubForm, setPubForm] = useState({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+  const [pubUploading, setPubUploading] = useState(false);
   const [adminChatId, setAdminChatId] = useState<string|null>(null);
   const [adminChatMsgs, setAdminChatMsgs] = useState<any[]>([]);
   const [adminChatInput, setAdminChatInput] = useState('');
@@ -986,7 +1295,8 @@ function AdminPage() {
     const u1 = onSnapshot(query(collection(db, 'qrcodes'), orderBy('createdAt', 'desc')), s => setQrcodes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u2 = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), s => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(collection(db, 'annonceurs'), orderBy('createdAt', 'desc')), s => setAnnonceurs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { u1(); u2(); u3(); };
+    const u4 = onSnapshot(query(collection(db, 'pubs'), orderBy('createdAt', 'desc')), s => setPubs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { u1(); u2(); u3(); u4(); };
   }, [user]);
 
   // ── Chat admin ↔ annonceur ──
@@ -1384,12 +1694,15 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff' }}>
+      <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff', overflowX:'auto' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
-        <button style={tabStyle(tab === 'pochettes')} onClick={() => setTab('pochettes')}>Pochettes</button>
+        <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>🎤 Artistes</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
           📢 Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
+        </button>
+        <button style={tabStyle(tab === 'pubs')} onClick={() => setTab('pubs')}>
+          🎬 Pubs {pubs.length > 0 ? `(${pubs.length})` : ''}
         </button>
       </div>
 
@@ -1494,7 +1807,127 @@ const pendingPay = payments.filter(p => p.status === 'pending');
           </>
         )}
 
-        {tab === 'pochettes' && <PochettesTab qrcodes={qrcodes} />}
+        {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} />}
+
+        {tab === 'pubs' && (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800 }}>🎬 Mes publicités</h2>
+              <button style={S.btn} onClick={() => setPubModal(true)}>+ Créer une pub</button>
+            </div>
+
+            {/* MODAL CRÉATION PUB */}
+            {pubModal && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+                onClick={e => { if (e.target === e.currentTarget) setPubModal(false); }}>
+                <div style={{ ...S.card, width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
+                    <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800 }}>Nouvelle publicité</h3>
+                    <button onClick={() => setPubModal(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#8098b8' }}>✕</button>
+                  </div>
+
+                  <label style={S.lbl}>Titre de la pub *</label>
+                  <input style={S.inp} value={pubForm.titre} onChange={e => setPubForm(f => ({...f, titre:e.target.value}))} placeholder="Ex: Votre publicité ici · Doniel Zik" />
+
+                  <label style={S.lbl}>Sous-titre</label>
+                  <input style={S.inp} value={pubForm.sousTitre} onChange={e => setPubForm(f => ({...f, sousTitre:e.target.value}))} placeholder="Ex: Contactez-nous pour diffuser votre pub" />
+
+                  <label style={S.lbl}>Type d'action au clic</label>
+                  <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                    {[['url','🌐 Site web'],['whatsapp','💬 WhatsApp'],['tel','📞 Appel']].map(([type, label]) => (
+                      <button key={type} onClick={() => setPubForm(f => ({...f, lienType:type}))}
+                        style={{ flex:1, padding:'9px 6px', borderRadius:8, border:`1px solid ${pubForm.lienType===type?'#1a6bff':'#c8d8ef'}`, background: pubForm.lienType===type?'#eaf1ff':'#fff', color: pubForm.lienType===type?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label style={S.lbl}>
+                    {pubForm.lienType==='url' ? 'URL du site' : pubForm.lienType==='whatsapp' ? 'Numéro WhatsApp (+225...)' : 'Numéro de téléphone'}
+                  </label>
+                  <input style={S.inp} value={pubForm.lien} onChange={e => setPubForm(f => ({...f, lien:e.target.value}))}
+                    placeholder={pubForm.lienType==='url' ? 'https://...' : '+225 07 00 00 00 00'} />
+
+                  <label style={S.lbl}>Image de la pub (JPEG/PNG — 1200×600px recommandé)</label>
+                  <input type="file" accept="image/*" id="pub-img-upload" style={{ display:'none' }}
+                    onChange={async e => {
+                      const file = e.target.files?.[0]; if (!file) return;
+                      setPubUploading(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                        fd.append('public_id', 'pubs/pub_' + Date.now());
+                        const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method:'POST', body:fd });
+                        const d = await r.json();
+                        setPubForm(f => ({...f, imageUrl: d.secure_url}));
+                      } catch(e) { console.error(e); }
+                      setPubUploading(false);
+                    }} />
+                  <label htmlFor="pub-img-upload"
+                    style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'12px', borderRadius:10, border:'2px dashed #c8d8ef', background:'#f5f8ff', cursor:'pointer', marginBottom:12, boxSizing:'border-box' }}>
+                    {pubUploading ? '⏳ Upload...' : pubForm.imageUrl ? '✅ Image uploadée' : '📷 Choisir une image'}
+                  </label>
+                  {pubForm.imageUrl && <img src={pubForm.imageUrl} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, marginBottom:12 }} />}
+
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+                    <input type="checkbox" checked={pubForm.active} onChange={e => setPubForm(f => ({...f, active:e.target.checked}))} id="pub-active" />
+                    <label htmlFor="pub-active" style={{ color:'#5a7090', fontSize:13 }}>Activer immédiatement</label>
+                  </div>
+
+                  <button onClick={async () => {
+                    if (!pubForm.titre || !pubForm.lien) { alert('Titre et lien requis'); return; }
+                    await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
+                    setPubModal(false);
+                    setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+                  }} style={{ ...S.btn, width:'100%', padding:14, fontSize:15 }}>
+                    🚀 Publier la publicité
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* LISTE PUBS */}
+            {pubs.length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ fontSize:40, marginBottom:12 }}>🎬</p>
+                <p style={{ color:'#5a7090', fontSize:14, marginBottom:16 }}>Aucune publicité créée</p>
+                <p style={{ color:'#8098b8', fontSize:12 }}>Créez votre première pub maison pour promouvoir Doniel Zik, un artiste ou inviter des annonceurs.</p>
+              </div>
+            ) : pubs.map(p => (
+              <div key={p.id} style={{ ...S.card, marginBottom:12 }}>
+                <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                  {p.imageUrl && <img src={p.imageUrl} alt={p.titre} style={{ width:100, height:60, objectFit:'cover', borderRadius:8, flexShrink:0 }} />}
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8, marginBottom:6 }}>
+                      <p style={{ fontWeight:700, fontSize:14 }}>{p.titre}</p>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <span style={{ background: p.active?'#eaffea':'#fff5f5', border:`1px solid ${p.active?'#4dff9a':'#f04a6a'}`, borderRadius:99, padding:'2px 9px', fontSize:10, fontWeight:700, color:p.active?'#00a040':'#f04a6a' }}>
+                          {p.active ? '● Actif' : '○ Inactif'}
+                        </span>
+                        <button onClick={() => updateDoc(doc(db,'pubs',p.id),{active:!p.active})}
+                          style={{ ...S.btn2, fontSize:11, padding:'3px 8px' }}>{p.active?'Pause':'Activer'}</button>
+                        <button onClick={() => { if (window.confirm('Supprimer cette pub ?')) import('firebase/firestore').then(({deleteDoc,doc:d})=>deleteDoc(d(db,'pubs',p.id))); }}
+                          style={{ ...S.btnRed, fontSize:11, padding:'3px 8px' }}>🗑️</button>
+                      </div>
+                    </div>
+                    <p style={{ color:'#8098b8', fontSize:11, marginBottom:8 }}>
+                      {p.lienType==='whatsapp'?'💬':p.lienType==='tel'?'📞':'🌐'} {p.lien}
+                    </p>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                      {[{label:'Vues',val:p.vues||0,color:'#1a6bff'},{label:'Clics',val:p.clics||0,color:'#b07a00'},{label:'CTR',val:p.vues>0?((p.clics||0)*100/(p.vues||1)).toFixed(1)+'%':'—',color:'#1a6bff'}].map((s,i)=>(
+                        <div key={i} style={{ background:'#f5f8ff', borderRadius:8, padding:'8px', textAlign:'center' }}>
+                          <p style={{ fontWeight:800, fontSize:16, color:s.color, margin:0 }}>{s.val}</p>
+                          <p style={{ color:'#8098b8', fontSize:9, margin:'2px 0 0' }}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {tab === 'annonceurs' && (
           <div style={{ display: 'grid', gridTemplateColumns: adminChatId ? '1fr 1fr' : '1fr', gap: 20 }}>
@@ -1666,101 +2099,6 @@ const pendingPay = payments.filter(p => p.status === 'pending');
     </div>
   );
 }
-
-
-// ─────────────────────────────────────────────
-// POCHETTES TAB
-// ─────────────────────────────────────────────
-function PochettesTab({ qrcodes }: { qrcodes: any[] }) {
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
-  const [templatePreview, setTemplatePreview] = useState<string>('');
-  const [selectedQr, setSelectedQr] = useState<string>('');
-  const [genProgress, setGenProgress] = useState(0);
-  const [generating, setGenerating] = useState(false);
-  const [msg, setMsg] = useState('');
-
-  const handleTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setTemplateFile(f);
-    const reader = new FileReader();
-    reader.onload = (ev) => setTemplatePreview(ev.target?.result as string);
-    reader.readAsDataURL(f);
-  };
-
-  const handleGenerate = async () => {
-    if (!templateFile) { setMsg('Veuillez uploader une image de pochette'); return; }
-    const targets = selectedQr ? qrcodes.filter(q => q.qrId === selectedQr) : qrcodes.filter(q => q.status === 'active');
-    if (targets.length === 0) { setMsg('Aucun QR code disponible'); return; }
-    setGenerating(true); setMsg(''); setGenProgress(0);
-    try {
-      await generatePochettes(targets, templateFile, setGenProgress);
-      setMsg('✅ ' + targets.length + ' pochette(s) générée(s) et téléchargées !');
-    } catch (e: any) { setMsg('Erreur: ' + e.message); }
-    setGenerating(false);
-  };
-
-  const activeQrcodes = qrcodes.filter(q => q.status === 'active');
-
-  return (
-    <>
-      <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 20, color: '#1a2340' }}>Génération de Pochettes</p>
-
-      <div style={S.card}>
-        <p style={{ fontWeight: 700, marginBottom: 4 }}>1. Template de la pochette</p>
-        <p style={{ color: '#8098b8', fontSize: 12, marginBottom: 16 }}>Uploadez le recto de la pochette en format carré (JPG ou PNG)</p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 12, border: '2px dashed #b8cce8', cursor: 'pointer', marginBottom: 12 }}>
-          <span style={{ fontSize: 24 }}>🖼️</span>
-          <div>
-            <p style={{ fontWeight: 700, fontSize: 14 }}>{templateFile ? templateFile.name : 'Choisir une image'}</p>
-            <p style={{ color: '#8098b8', fontSize: 11 }}>Format carré · JPG ou PNG</p>
-          </div>
-          <input type="file" accept="image/*" onChange={handleTemplate} style={{ display: 'none' }} />
-        </label>
-        {templatePreview && (
-          <div style={{ position: 'relative', display: 'inline-block', marginBottom: 8 }}>
-            <img src={templatePreview} alt="preview" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #c8d8ef' }} />
-            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 30, height: 30, border: '2px solid #1a6bff', borderRadius: 4, background: 'rgba(30,111,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 8, color: '#1a6bff' }}>QR</span>
-            </div>
-            <p style={{ color: '#8098b8', fontSize: 10, marginTop: 4 }}>Le QR code sera placé en bas à gauche</p>
-          </div>
-        )}
-      </div>
-
-      <div style={S.card}>
-        <p style={{ fontWeight: 700, marginBottom: 4 }}>2. QR codes à générer</p>
-        <p style={{ color: '#8098b8', fontSize: 12, marginBottom: 12 }}>Laissez vide pour générer toutes les pochettes actives ({activeQrcodes.length} QR codes)</p>
-        <label style={S.lbl}>Ou choisir un QR code spécifique</label>
-        <select value={selectedQr} onChange={e => setSelectedQr(e.target.value)} style={{ ...S.inp, marginBottom: 0 }}>
-          <option value="">— Tous les QR codes actifs —</option>
-          {activeQrcodes.map(q => (
-            <option key={q.id} value={q.qrId}>{q.label} · {q.artist} · {q.qrId}</option>
-          ))}
-        </select>
-      </div>
-
-      <div style={S.card}>
-        <p style={{ fontWeight: 700, marginBottom: 16 }}>3. Générer les pochettes</p>
-        {generating && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ height: 8, background: '#dce6f7', borderRadius: 99, marginBottom: 8 }}>
-              <div style={{ height: '100%', width: genProgress + '%', background: 'linear-gradient(90deg, #1a6bff, #4da6ff)', borderRadius: 99, transition: 'width .3s' }} />
-            </div>
-            <p style={{ color: '#5a7090', fontSize: 12, textAlign: 'center' }}>{genProgress}% — Génération en cours...</p>
-          </div>
-        )}
-        {msg && <p style={{ color: msg.startsWith('✅') ? '#4da6ff' : '#f04a6a', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
-        <button style={{ ...S.btn, width: '100%', padding: 14, fontSize: 15 }} onClick={handleGenerate} disabled={generating || !templateFile}>
-          {generating ? '⏳ Génération...' : '🖨️ Générer et télécharger les pochettes'}
-        </button>
-        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 10, textAlign: 'center' }}>
-          ZIP téléchargé · QR code 22% · Position bas gauche · Texte "Scannez et Téléchargez"
-        </p>
-      </div>
-    </>
-  );
-}
 // ─────────────────────────────────────────────
 // ARTIST PAGE
 // ─────────────────────────────────────────────
@@ -1768,7 +2106,6 @@ function ArtistPage() {
   const [view, setView] = useState<'login' | 'register' | 'dashboard'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [artistName, setArtistName] = useState('');
   const [user, setUser] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1788,6 +2125,9 @@ function ArtistPage() {
   const [lienPaiement, setLienPaiement] = useState('');
   const [savingOption, setSavingOption] = useState(false);
   const [optionMsg, setOptionMsg] = useState('');
+  const [pubActionType, setPubActionType] = useState('url');
+  const [pubActionLien, setPubActionLien] = useState('');
+  const [pubActionMsg, setPubActionMsg] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -1930,25 +2270,27 @@ function ArtistPage() {
   };
 
   const register = async () => {
-    if (!artistName || !email || !password) { setMsg('Remplis tous les champs'); return; }
+    if (!email || !password) { setMsg('Email et mot de passe requis'); return; }
+    if (password.length < 8) { setMsg('Le mot de passe doit faire au moins 8 caractères'); return; }
     setLoading(true); setMsg('');
     try {
-      // Vérifier que l'artiste est dans la base
-      // Recherche insensible à la casse et aux accents
-      const allQrSnap = await getDocs(collection(db, 'qrcodes'));
-      const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-      const found = allQrSnap.docs.some(d => normalize(d.data().artist || '') === normalize(artistName));
-      if (!found) { setMsg("Nom d'artiste non reconnu. Vous devez avoir fait une duplication chez Doniel Zik."); setLoading(false); return; }
-      const snap = allQrSnap;
+      // Vérifier que l'email est dans la liste des artistes enregistrés par l'admin
+      const artistSnap = await getDocs(query(collection(db, 'artists'), where('email','==', email)));
+      if (artistSnap.empty) {
+        setMsg('Cet email n\'est pas enregistré comme artiste Doniel Zik. Contactez-nous pour vous enregistrer.');
+        setLoading(false); return;
+      }
       // Créer le compte Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      // Enregistrer dans collection artists avec l'uid pour le retrouver depuis AchatWidget
-      await addDoc(collection(db, 'artists'), {
-        name: artistName, email, uid: cred.user.uid,
-        createdAt: new Date().toISOString()
-      });
-      setMsg('Compte cree !');
-    } catch (e: any) { setMsg('Erreur: ' + (e.message || 'Impossible de creer le compte')); }
+      // Mettre à jour l'uid dans le document artiste existant
+      await updateDoc(doc(db, 'artists', artistSnap.docs[0].id), { uid: cred.user.uid });
+      setMsg('✅ Compte créé ! Bienvenue.');
+    } catch (e: any) {
+      if (e.code === 'auth/email-already-in-use') {
+        setMsg('Ce compte existe déjà. Connectez-vous.');
+        setView('login');
+      } else { setMsg('Erreur: ' + e.message); }
+    }
     setLoading(false);
   };
 
@@ -2339,9 +2681,46 @@ function ArtistPage() {
 
             {optionMsg && <p style={{ color:optionMsg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:13, marginBottom:12 }}>{optionMsg}</p>}
             <button onClick={saveOptions} disabled={savingOption || !optionPaiement}
-              style={{ ...S.btn, width:'100%', padding:14, fontSize:15, opacity:optionPaiement?1:0.5 }}>
+              style={{ ...S.btn, width:'100%', padding:14, fontSize:15, opacity:optionPaiement?1:0.5, marginBottom:28 }}>
               {savingOption ? '⏳ Sauvegarde...' : '💾 Sauvegarder mes options'}
             </button>
+
+            {/* ── ACTION PUB ANNONCEUR — 3 boutons ── */}
+            <div style={{ borderTop:'1px solid #dce6f7', paddingTop:24 }}>
+              <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:800, marginBottom:6 }}>📢 Action de ma publicité</h3>
+              <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.7, marginBottom:16 }}>
+                Quand quelqu'un clique sur votre pub, où voulez-vous le rediriger ?
+              </p>
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                {[['url','🌐 Mon site'],['whatsapp','💬 WhatsApp'],['tel','📞 Appel direct']].map(([type, label]) => (
+                  <button key={type} onClick={() => { setOptionPaiement(optionPaiement); setPubActionType(type); }}
+                    style={{ flex:1, padding:'12px 6px', borderRadius:10, border:`1px solid ${pubActionType===type?'#1a6bff':'#c8d8ef'}`, background: pubActionType===type?'#eaf1ff':'#fff', color: pubActionType===type?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:700, textAlign:'center' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label style={S.lbl}>
+                {pubActionType==='url' ? 'URL de votre site ou boutique' : pubActionType==='whatsapp' ? 'Numéro WhatsApp (+225...)' : 'Numéro de téléphone'}
+              </label>
+              <input className="art-inp" value={pubActionLien} onChange={e => setPubActionLien(e.target.value)}
+                placeholder={pubActionType==='url' ? 'https://votre-boutique.com' : '+225 07 00 00 00 00'}
+                style={{ marginBottom:4 }} />
+              <p style={{ color:'#8098b8', fontSize:11, marginBottom:12 }}>
+                Ce lien sera utilisé quand quelqu'un clique sur votre publicité
+              </p>
+              <button onClick={async () => {
+                if (!pubActionLien) { setPubActionMsg('Entrez un lien ou numéro'); return; }
+                try {
+                  await setDoc(doc(db, 'artistOptions', user.uid), {
+                    pubActionType, pubActionLien, updatedAt: new Date().toISOString()
+                  }, { merge: true });
+                  setPubActionMsg('✅ Action sauvegardée !');
+                } catch(e:any) { setPubActionMsg('Erreur: '+e.message); }
+              }} style={{ ...S.btn, width:'100%', padding:12, fontSize:14 }}>
+                💾 Sauvegarder l'action
+              </button>
+              {pubActionMsg && <p style={{ color: pubActionMsg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginTop:8 }}>{pubActionMsg}</p>}
+            </div>
           </div>
         )}
       </div>
@@ -2349,48 +2728,110 @@ function ArtistPage() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 380, padding: '0 16px' }}>
-        <div style={{ marginBottom: 32, textAlign: 'center' }}><Logo size="lg" /></div>
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ width:'100%', maxWidth:380 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <Logo size="lg" />
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, marginTop:8 }}>🎤 Espace Artiste</p>
+        </div>
+
         <div style={S.card}>
-          <h2 style={{ fontFamily: 'serif', fontSize: 18, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>
-            {view === 'register' ? 'Créer mon compte artiste' : 'Espace artiste'}
-          </h2>
-          <p style={{ color: '#8098b8', fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
-            {view === 'register' ? 'Réservé aux artistes Doniel Zik' : 'Connectez-vous à votre tableau de bord'}
-          </p>
-          {view === 'register' && (
+          {view === 'login' ? (
             <>
-              <label style={S.lbl}>Nom d'artiste (tel qu'enregistré chez nous)</label>
-              <input style={S.inp} value={artistName} onChange={e => setArtistName(e.target.value)} placeholder="Ex: Élite Doniel" />
+              <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center' }}>Connexion</h2>
+              <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
+                Connectez-vous avec l'email enregistré par Doniel Zik
+              </p>
+
+              {/* Google */}
+              <button onClick={async () => {
+                setLoading(true); setMsg('');
+                try {
+                  const provider = new GoogleAuthProvider();
+                  const cred = await signInWithPopup(auth, provider);
+                  // Vérifier que cet email est dans la liste artistes
+                  const snap = await getDocs(query(collection(db, 'artists'), where('email','==', cred.user.email)));
+                  if (snap.empty) {
+                    await signOut(auth);
+                    setMsg('Cet email n\'est pas enregistré comme artiste. Contactez Doniel Zik.');
+                  }
+                } catch(e:any) { setMsg('Erreur: ' + e.message); }
+                setLoading(false);
+              }} disabled={loading}
+                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', padding:'12px', borderRadius:10, border:'1px solid #c8d8ef', background:'#fff', cursor:'pointer', fontWeight:600, fontSize:14, marginBottom:12 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Continuer avec Google
+              </button>
+
+              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0 12px' }}>
+                <div style={{ flex:1, height:1, background:'#dce6f7' }} />
+                <span style={{ color:'#8098b8', fontSize:11 }}>ou</span>
+                <div style={{ flex:1, height:1, background:'#dce6f7' }} />
+              </div>
+
+              <label style={S.lbl}>Email</label>
+              <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
+              <label style={S.lbl}>Mot de passe</label>
+              <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+
+              {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+
+              <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
+                {loading ? '⏳ Vérification...' : 'Se connecter'}
+              </button>
+
+              <button onClick={async () => {
+                if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+                try {
+                  await sendPasswordResetEmail(auth, email);
+                  setMsg('✅ Email de réinitialisation envoyé à ' + email);
+                } catch(e:any) { setMsg('Email introuvable'); }
+              }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+                Mot de passe oublié ?
+              </button>
+
+              <div style={{ borderTop:'1px solid #dce6f7', marginTop:14, paddingTop:14 }}>
+                <p style={{ color:'#8098b8', fontSize:11, textAlign:'center', marginBottom:10, lineHeight:1.6 }}>
+                  Première connexion ? Créez votre compte avec l'email que vous avez fourni à Doniel Zik.
+                </p>
+                <button style={{ ...S.btn2, width:'100%', textAlign:'center' }}
+                  onClick={() => { setView('register'); setMsg(''); }}>
+                  Créer mon compte artiste →
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center' }}>Créer mon compte</h2>
+              <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
+                Utilisez l'email que vous avez communiqué à Doniel Zik lors de votre enregistrement.
+              </p>
+
+              <label style={S.lbl}>Email (celui enregistré chez nous) *</label>
+              <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
+              <label style={S.lbl}>Choisissez un mot de passe *</label>
+              <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="8 caractères minimum" />
+
+              {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+
+              <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={register} disabled={loading}>
+                {loading ? '⏳ Création...' : 'Créer mon compte'}
+              </button>
+
+              <button style={{ ...S.btn2, width:'100%', marginTop:10, textAlign:'center' }}
+                onClick={() => { setView('login'); setMsg(''); }}>
+                ← Déjà un compte ? Se connecter
+              </button>
+
+              <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', marginTop:14 }}>
+                <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.7, margin:0 }}>
+                  ⚠️ Seuls les artistes dont l'email a été enregistré par Doniel Zik peuvent accéder au dashboard. Si votre email n'est pas reconnu, contactez-nous.
+                </p>
+              </div>
             </>
           )}
-          <label style={S.lbl}>Email</label>
-          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
-          <label style={S.lbl}>Mot de passe</label>
-          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-          {msg && <p style={{ color: msg.startsWith('✅') ? '#1a6bff' : '#f04a6a', fontSize: 12, marginBottom: 10 }}>{msg}</p>}
-          <button style={{ ...S.btn, width: '100%', padding: 14 }} onClick={view === 'register' ? register : login} disabled={loading}>
-            {loading ? 'Chargement...' : view === 'register' ? 'Créer mon compte' : 'Se connecter'}
-          </button>
-          {view === 'login' && (
-            <button onClick={async () => {
-              if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-              try {
-                await sendPasswordResetEmail(auth, email);
-                setMsg('✅ Email de réinitialisation envoyé à ' + email);
-              } catch(e:any) {
-                setMsg('Email introuvable dans notre système');
-              }
-            }}
-              style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
-              Mot de passe oublié ?
-            </button>
-          )}
-          <button style={{ ...S.btn2, width: '100%', marginTop: 8, textAlign: 'center' }}
-            onClick={() => { setView(view === 'login' ? 'register' : 'login'); setMsg(''); }}>
-            {view === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
-          </button>
         </div>
       </div>
     </div>
@@ -3951,7 +4392,20 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
     return unsub;
   }, [venteId]);
 
+  const [showPubDL, setShowPubDL] = useState(false);
+  const [pendingPay, setPendingPay] = useState(false);
+
   const handlePay = async () => {
+    // Montrer pub 5s avant de lancer le paiement
+    setPendingPay(true);
+    setShowPubDL(true);
+  };
+
+  const afterPubDL = async () => {
+    setShowPubDL(false);
+    if (!pendingPay) return;
+    setPendingPay(false);
+    // Lancer le vrai paiement Wave
     if (state === 'loading') return;
     setState('loading');
     setErrMsg('');
@@ -4024,6 +4478,8 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
 
   return (
     <div style={{ marginBottom:20 }}>
+      {/* Pub avant téléchargement */}
+      {showPubDL && <PubOverlay trigger="download" onDone={afterPubDL} />}
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
       {state === 'error' && (
         <div style={{ background:'rgba(240,74,106,0.1)', border:'1px solid rgba(240,74,106,0.3)', borderRadius:10, padding:'10px 14px', marginBottom:12 }}>
@@ -4143,6 +4599,9 @@ function PublicStreamPage() {
         @keyframes fadeUp { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
         .ps-row:hover { background: rgba(255,255,255,0.04) !important; }
       `}</style>
+
+      {/* PUB MAISON */}
+      <PubBanner />
 
       {/* ── POCHETTE — grande, visible, pleine largeur ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease' }}>
