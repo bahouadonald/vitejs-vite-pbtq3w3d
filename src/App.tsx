@@ -464,6 +464,7 @@ function FanPage() {
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
+  const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -570,6 +571,7 @@ function FanPage() {
       }
       setDlProgress(100);
       setStep('done');
+      setShowPubAfterDL(true); // pub après DL mobile
       return;
     }
 
@@ -595,6 +597,7 @@ function FanPage() {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       await markAsDownloaded();
       setDlStatus('Telechargement lance !');
+      setShowPubAfterDL(true); // pub après DL desktop
       setTimeout(() => setStep('done'), 1500);
     } catch (e: any) {
       setDlStatus('Erreur: ' + e.message);
@@ -624,7 +627,12 @@ function FanPage() {
       {step === 'ready' && qrData && (
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
-          {/* PUB MAISON — avant tout le contenu */}
+          {/* PUB après téléchargement gratuit */}
+      {showPubAfterDL && (
+        <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
+      )}
+
+      {/* PUB MAISON — avant tout le contenu */}
           <PubBanner />
 
           {/* POCHETTE — grande, visible, centrée en haut */}
@@ -1089,28 +1097,54 @@ function useActivePub() {
 }
 
 // ─────────────────────────────────────────────
-// PUB OVERLAY — modal plein écran avec countdown
-// trigger: 'page'(10s) | 'play'(5s) | 'download'(5s) | 'track'(5s)
+// PUB OVERLAY — 2 pubs en séquence
+// Règle Doniel Zik : bouton Passer après 8s toujours
+// Durée pub : 30s — si pas de clic Passer, pub suivante automatique
 // ─────────────────────────────────────────────
 function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'track', onDone: () => void }) {
-  const pub = useActivePub();
-  const duration = trigger === 'page' ? 10 : 5;
-  const [countdown, setCountdown] = useState(duration);
+  const [pubs, setPubs] = useState<any[]>([]);
+  const [pubIndex, setPubIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0); // secondes écoulées sur la pub courante
   const [dismissed, setDismissed] = useState(false);
 
-  // Compter la vue une seule fois
+  const PUB_DURATION = 30; // durée totale par pub
+  const SKIP_AFTER = 8;    // bouton Passer disponible après 8s
+
+  // Charger 2 pubs actives
+  useEffect(() => {
+    getDocs(query(collection(db, 'pubs'), where('active','==',true)))
+      .then(snap => {
+        if (snap.empty) { onDone(); return; }
+        const list = snap.docs.map(d => ({id:d.id,...d.data()}));
+        const shuffled = list.sort(() => Math.random() - 0.5);
+        setPubs(shuffled.slice(0, 2));
+      }).catch(() => onDone());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pub = pubs[pubIndex];
+
+  // Compter la vue
   useEffect(() => {
     if (!pub) return;
-    updateDoc(doc(db, 'pubs', pub.id), { vues: (pub.vues||0) + 1 }).catch(()=>{});
+    updateDoc(doc(db,'pubs',pub.id),{vues:(pub.vues||0)+1}).catch(()=>{});
+    setElapsed(0); // reset chrono à chaque nouvelle pub
   }, [pub?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Countdown
+  // Chrono — 1 tick par seconde
   useEffect(() => {
     if (!pub || dismissed) return;
-    if (countdown <= 0) return;
-    const t = setTimeout(() => setCountdown(c => c-1), 1000);
+    if (elapsed >= PUB_DURATION) {
+      // Pub terminée — passer à la suivante ou finir
+      if (pubIndex < pubs.length - 1) {
+        setPubIndex(i => i + 1);
+      } else {
+        onDone();
+      }
+      return;
+    }
+    const t = setTimeout(() => setElapsed(e => e + 1), 1000);
     return () => clearTimeout(t);
-  }, [countdown, pub, dismissed]);
+  }, [elapsed, pub, dismissed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClick = async () => {
     if (!pub) return;
@@ -1120,63 +1154,85 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
     else window.open(pub.lien, '_blank');
   };
 
-  const handleIgnore = () => { setDismissed(true); onDone(); };
+  const handleSkip = () => {
+    if (elapsed < SKIP_AFTER) return;
+    if (pubIndex < pubs.length - 1) {
+      setPubIndex(i => i + 1);
+    } else {
+      setDismissed(true);
+      onDone();
+    }
+  };
 
-  // Si pas de pub active → continuer directement
-  if (!pub) { setTimeout(onDone, 0); return null; }
-  if (dismissed) return null;
+  if (!pub || dismissed) return null;
+
+  const canSkip = elapsed >= SKIP_AFTER;
+  const isLastPub = pubIndex === pubs.length - 1;
+  const remaining = PUB_DURATION - elapsed;
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.92)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.92)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'0 16px' }}>
       <style>{`@keyframes pubIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:scale(1)}}`}</style>
 
+      {/* Indicateur 1/2 · 2/2 */}
+      {pubs.length > 1 && (
+        <div style={{ display:'flex', gap:6, marginBottom:12, width:'100%', maxWidth:500 }}>
+          {pubs.map((_,i) => (
+            <div key={i} style={{ flex:1, height:3, borderRadius:99, background: i < pubIndex ? '#fff' : i === pubIndex ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)', position:'relative', overflow:'hidden' }}>
+              {i === pubIndex && (
+                <div style={{ position:'absolute', left:0, top:0, height:'100%', background:'#fff', width: (elapsed/PUB_DURATION*100)+'%', transition:'width 1s linear' }} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Pub cliquable */}
-      <div style={{ width:'100%', maxWidth:500, animation:'pubIn .3s ease', cursor:'pointer', position:'relative' }}
+      <div key={pubIndex} style={{ width:'100%', maxWidth:500, animation:'pubIn .3s ease', cursor:'pointer', position:'relative' }}
         onClick={handleClick}>
         {pub.imageUrl ? (
-          <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'60vh', objectFit:'cover', display:'block', borderRadius:12 }} />
+          <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'65vh', objectFit:'cover', display:'block', borderRadius:12 }} />
         ) : (
-          <div style={{ width:'100%', height:220, borderRadius:12, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ width:'100%', height:240, borderRadius:12, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <p style={{ color:'rgba(255,255,255,0.3)', fontSize:14 }}>Publicité</p>
           </div>
         )}
 
         {/* Overlay texte */}
         {(pub.titre||pub.sousTitre) && (
-          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'linear-gradient(transparent,rgba(0,0,0,0.8))', padding:'32px 16px 14px', borderRadius:'0 0 12px 12px' }}>
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'linear-gradient(transparent,rgba(0,0,0,0.85))', padding:'32px 16px 14px', borderRadius:'0 0 12px 12px' }}>
             {pub.titre && <p style={{ color:'#fff', fontWeight:700, fontSize:15, margin:'0 0 3px' }}>{pub.titre}</p>}
             {pub.sousTitre && <p style={{ color:'rgba(255,255,255,0.7)', fontSize:12, margin:0 }}>{pub.sousTitre}</p>}
           </div>
         )}
 
         {/* Badge PUB */}
-        <div style={{ position:'absolute', top:10, left:12, background:'rgba(0,0,0,0.65)', borderRadius:4, padding:'2px 8px' }}>
+        <div style={{ position:'absolute', top:10, left:12, background:'rgba(0,0,0,0.65)', borderRadius:4, padding:'2px 8px', display:'flex', gap:6, alignItems:'center' }}>
           <span style={{ color:'#fff', fontSize:9, fontWeight:700, letterSpacing:1 }}>PUB</span>
+          {pubs.length > 1 && <span style={{ color:'rgba(255,255,255,0.5)', fontSize:9 }}>{pubIndex+1}/{pubs.length}</span>}
         </div>
 
-        {/* Bouton d'action si lien */}
+        {/* Bouton action */}
         {pub.lien && (
           <div style={{ position:'absolute', bottom:14, right:12 }}>
             <span style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)', borderRadius:8, padding:'5px 12px', color:'#fff', fontSize:12, fontWeight:700 }}>
-              {pub.lienType==='tel'?'📞 Appeler':pub.lienType==='whatsapp'?'💬 WhatsApp':'🌐 Voir'}
+              {pub.lienType==='tel'?'Appeler':pub.lienType==='whatsapp'?'WhatsApp':'Voir'}
             </span>
           </div>
         )}
       </div>
 
-      {/* Bouton ignorer + countdown */}
-      <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12 }}>
-        {countdown > 0 ? (
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ width:36, height:36, borderRadius:99, border:'2px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-              <span style={{ color:'#fff', fontWeight:800, fontSize:14 }}>{countdown}</span>
-            </div>
-            <span style={{ color:'rgba(255,255,255,0.5)', fontSize:12 }}>Pub dans {countdown}s</span>
+      {/* Bouton Passer / compteur */}
+      <div style={{ marginTop:14, display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', maxWidth:500 }}>
+        <span style={{ color:'rgba(255,255,255,0.35)', fontSize:11 }}>{remaining}s</span>
+        {!canSkip ? (
+          <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:8, padding:'7px 16px' }}>
+            <span style={{ color:'rgba(255,255,255,0.4)', fontSize:12 }}>Passer dans {SKIP_AFTER - elapsed}s</span>
           </div>
         ) : (
-          <button onClick={handleIgnore}
-            style={{ background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:8, padding:'9px 20px', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
-            ✕ Ignorer et continuer
+          <button onClick={handleSkip}
+            style={{ background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:8, padding:'8px 18px', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+            {isLastPub ? 'Ignorer et continuer' : 'Passer ›'}
           </button>
         )}
       </div>
@@ -1185,22 +1241,58 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
 }
 
 // ─────────────────────────────────────────────
-// PUB BANNER — affichage inline (ouverture page)
-// Remplacé par PubOverlay mais gardé pour compatibilité
+// PUB BANNER — ouverture page + page inactive
 // ─────────────────────────────────────────────
 function PubBanner() {
   const [shown, setShown] = useState(false);
   const [done, setDone] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [inactiveDone, setInactiveDone] = useState(false);
+  const inactiveTimer = useRef<any>(null);
+  const INACTIVE_DELAY = 5 * 60 * 1000; // 5 minutes
 
+  // Pub d'ouverture de page
   useEffect(() => {
-    // Afficher la pub d'ouverture de page avec un léger délai
     const t = setTimeout(() => setShown(true), 800);
     return () => clearTimeout(t);
   }, []);
 
-  if (!shown || done) return null;
-  return <PubOverlay trigger="page" onDone={() => setDone(true)} />;
+  // Pub page inactive — se déclenche après 5 min sans activité
+  const resetInactiveTimer = () => {
+    if (inactiveTimer.current) clearTimeout(inactiveTimer.current);
+    inactiveTimer.current = setTimeout(() => {
+      setInactiveDone(false);
+      setShowInactive(true);
+    }, INACTIVE_DELAY);
+  };
+
+  useEffect(() => {
+    // Écouter les événements d'activité
+    const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach(e => window.addEventListener(e, resetInactiveTimer));
+    resetInactiveTimer(); // démarrer le timer dès le montage
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetInactiveTimer));
+      if (inactiveTimer.current) clearTimeout(inactiveTimer.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      {/* Pub ouverture page */}
+      {shown && !done && <PubOverlay trigger="page" onDone={() => setDone(true)} />}
+      {/* Pub page inactive */}
+      {showInactive && !inactiveDone && (
+        <PubOverlay trigger="page" onDone={() => {
+          setInactiveDone(true);
+          setShowInactive(false);
+          resetInactiveTimer(); // relancer le timer après la pub
+        }} />
+      )}
+    </>
+  );
 }
+
 
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
@@ -4383,29 +4475,21 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   const [dlActive, setDlActive] = useState(false);
   const [venteId, setVenteId] = useState('');
 
+  const [showPubAfterPay, setShowPubAfterPay] = useState(false);
+
   // Écouter en temps réel si le paiement a été confirmé (via webhook Wave)
   useEffect(() => {
     if (!venteId) return;
     const unsub = onSnapshot(doc(db, 'ventes', venteId), (d) => {
-      if (d.exists() && d.data()?.dlActive) setDlActive(true);
+      if (d.exists() && d.data()?.dlActive) {
+        setDlActive(true);
+        setShowPubAfterPay(true); // pub après paiement confirmé
+      }
     });
     return unsub;
   }, [venteId]);
 
-  const [showPubDL, setShowPubDL] = useState(false);
-  const [pendingPay, setPendingPay] = useState(false);
-
   const handlePay = async () => {
-    // Montrer pub 5s avant de lancer le paiement
-    setPendingPay(true);
-    setShowPubDL(true);
-  };
-
-  const afterPubDL = async () => {
-    setShowPubDL(false);
-    if (!pendingPay) return;
-    setPendingPay(false);
-    // Lancer le vrai paiement Wave
     if (state === 'loading') return;
     setState('loading');
     setErrMsg('');
@@ -4464,6 +4548,10 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   // Téléchargement activé (après confirmation Wave webhook)
   if (dlActive) return (
     <div style={{ marginBottom:20 }}>
+      {/* Pub après paiement confirmé */}
+      {showPubAfterPay && (
+        <PubOverlay trigger="download" onDone={() => setShowPubAfterPay(false)} />
+      )}
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
       <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
         <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement confirmé !</p>
@@ -4478,8 +4566,6 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
 
   return (
     <div style={{ marginBottom:20 }}>
-      {/* Pub avant téléchargement */}
-      {showPubDL && <PubOverlay trigger="download" onDone={afterPubDL} />}
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
       {state === 'error' && (
         <div style={{ background:'rgba(240,74,106,0.1)', border:'1px solid rgba(240,74,106,0.3)', borderRadius:10, padding:'10px 14px', marginBottom:12 }}>
