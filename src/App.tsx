@@ -1193,7 +1193,22 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
       <div key={pubIndex} style={{ width:'100%', maxWidth:500, animation:'pubIn .3s ease', cursor:'pointer', position:'relative' }}
         onClick={handleClick}>
         {pub.imageUrl ? (
-          <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'65vh', objectFit:'cover', display:'block', borderRadius:12 }} />
+          pub.mediaType === 'video' ? (
+            <video
+              src={pub.imageUrl}
+              autoPlay
+              muted={false}
+              playsInline
+              style={{ width:'100%', maxHeight:'65vh', display:'block', borderRadius:12, background:'#000' }}
+              onEnded={() => {
+                // Vidéo terminée → passer à la pub suivante ou finir
+                if (pubIndex < pubs.length - 1) setPubIndex(i => i + 1);
+                else onDone();
+              }}
+            />
+          ) : (
+            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'65vh', objectFit:'cover', display:'block', borderRadius:12 }} />
+          )
         ) : (
           <div style={{ width:'100%', height:240, borderRadius:12, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <p style={{ color:'rgba(255,255,255,0.3)', fontSize:14 }}>Publicité</p>
@@ -1938,27 +1953,33 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   <input style={S.inp} value={pubForm.lien} onChange={e => setPubForm(f => ({...f, lien:e.target.value}))}
                     placeholder={pubForm.lienType==='url' ? 'https://...' : '+225 07 00 00 00 00'} />
 
-                  <label style={S.lbl}>Image de la pub (JPEG/PNG — 1200×600px recommandé)</label>
-                  <input type="file" accept="image/*" id="pub-img-upload" style={{ display:'none' }}
+                  <label style={S.lbl}>Visuel de la pub (image ou vidéo)</label>
+                  <input type="file" accept="image/*,video/*" id="pub-img-upload" style={{ display:'none' }}
                     onChange={async e => {
                       const file = e.target.files?.[0]; if (!file) return;
                       setPubUploading(true);
+                      const isVideo = file.type.startsWith('video');
                       try {
                         const fd = new FormData();
                         fd.append('file', file);
                         fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                         fd.append('public_id', 'pubs/pub_' + Date.now());
-                        const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method:'POST', body:fd });
+                        const endpoint = isVideo ? 'video' : 'image';
+                        const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${endpoint}/upload`, { method:'POST', body:fd });
                         const d = await r.json();
-                        setPubForm(f => ({...f, imageUrl: d.secure_url}));
+                        setPubForm(f => ({...f, imageUrl: d.secure_url, mediaType: isVideo ? 'video' : 'image'}));
                       } catch(e) { console.error(e); }
                       setPubUploading(false);
                     }} />
                   <label htmlFor="pub-img-upload"
                     style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'12px', borderRadius:10, border:'2px dashed #c8d8ef', background:'#f5f8ff', cursor:'pointer', marginBottom:12, boxSizing:'border-box' }}>
-                    {pubUploading ? '⏳ Upload...' : pubForm.imageUrl ? '✅ Image uploadée' : '📷 Choisir une image'}
+                    {pubUploading ? '⏳ Upload...' : pubForm.imageUrl ? `✅ ${(pubForm as any).mediaType === 'video' ? 'Vidéo' : 'Image'} uploadée` : '📷 Choisir image ou vidéo'}
                   </label>
-                  {pubForm.imageUrl && <img src={pubForm.imageUrl} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, marginBottom:12 }} />}
+                  {pubForm.imageUrl && (
+                    (pubForm as any).mediaType === 'video'
+                      ? <video src={pubForm.imageUrl} controls style={{ width:'100%', height:120, borderRadius:8, marginBottom:12, background:'#000' }} />
+                      : <img src={pubForm.imageUrl} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, marginBottom:12 }} />
+                  )}
 
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
                     <input type="checkbox" checked={pubForm.active} onChange={e => setPubForm(f => ({...f, active:e.target.checked}))} id="pub-active" />
