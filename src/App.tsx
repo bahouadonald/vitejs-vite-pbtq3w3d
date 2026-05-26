@@ -1706,8 +1706,6 @@ const pendingPay = payments.filter(p => p.status === 'pending');
             {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && (
               <div style={{ background: '#eaf1ff', border: '1px solid #4da6ff', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#1a6bff' }}>✓ QR sera reactive</div>
             )}
-            <label style={S.lbl}>💬 WhatsApp de l artiste</label>
-            <input style={{ ...S.inp, marginBottom: 14 }} value={editWhatsapp} onChange={e => setEditWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
             <label style={{ ...S.lbl, marginBottom: 10 }}>Fichiers ({editFiles.length})</label>
             <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 12, marginBottom: 14 }}>
               {editFiles.length === 0 ? <p style={{ color: '#8098b8', fontSize: 13, textAlign: 'center' }}>Aucun fichier</p> :
@@ -1846,8 +1844,6 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#1a6bff' : '#c8d8ef'), background: newType === t ? '#eaf1ff' : 'transparent', color: newType === t ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
-              <label style={S.lbl}>💬 WhatsApp de l artiste</label>
-              <input style={{ ...S.inp, marginBottom: 14 }} value={newWhatsapp} onChange={e => setNewWhatsapp(e.target.value)} placeholder="+225 07 00 00 00 00" />
               <label style={S.lbl}>🖼️ Image de pochette (obligatoire)</label>
               <div style={{ border: '2px dashed #b8cce8', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#f5f8ff' }}>
                 <input type="file" accept="image/*" onChange={e => setCoverFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="coverInput" />
