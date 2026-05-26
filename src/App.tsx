@@ -3205,7 +3205,16 @@ function ZikothequePage({ user }: { user: any }) {
     }
   }, [currentTrackIdx, currentAlbum]);
 
+  const [showPubZiko, setShowPubZiko] = useState(false);
+  const [pendingAlbum, setPendingAlbum] = useState<{item:any, trackIdx:number}|null>(null);
+
   const playAlbum = (item: any, trackIdx = 0) => {
+    // Montrer pub avant lecture
+    setPendingAlbum({ item, trackIdx });
+    setShowPubZiko(true);
+  };
+
+  const doPlayAlbum = (item: any, trackIdx = 0) => {
     setCurrentAlbum(item);
     setCurrentTrackIdx(trackIdx);
     setPlaying(true);
@@ -3214,12 +3223,18 @@ function ZikothequePage({ user }: { user: any }) {
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else { audioRef.current.play().catch(() => setPlaying(false)); setPlaying(true); }
+    else {
+      // Pub avant reprise lecture
+      setPendingAlbum(null);
+      setShowPubZiko(true);
+    }
   };
 
   const onEnded = () => {
     if (currentTrackIdx < currentFiles.length - 1) {
-      setCurrentTrackIdx(i => i + 1);
+      // Pub entre pistes
+      setPendingAlbum(null);
+      setShowPubZiko(true);
     } else { setPlaying(false); }
   };
 
@@ -3234,6 +3249,28 @@ function ZikothequePage({ user }: { user: any }) {
         .track-row:hover { background: rgba(30,111,255,0.08) !important; }
         .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.2) !important; }
       `}</style>
+
+      {/* PUB */}
+      <PubBanner />
+
+      {/* PUB avant/entre lectures */}
+      {showPubZiko && (
+        <PubOverlay trigger="play" onDone={() => {
+          setShowPubZiko(false);
+          if (pendingAlbum) {
+            // Play album demandé
+            doPlayAlbum(pendingAlbum.item, pendingAlbum.trackIdx);
+            setPendingAlbum(null);
+          } else if (currentTrackIdx < currentFiles.length - 1) {
+            // Piste suivante
+            setCurrentTrackIdx(i => i + 1);
+          } else {
+            // Reprendre lecture
+            audioRef.current?.play().catch(() => setPlaying(false));
+            setPlaying(true);
+          }
+        }} />
+      )}
 
       {/* AUDIO ENGINE */}
       {currentTrack && (
