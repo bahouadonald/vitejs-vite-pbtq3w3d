@@ -667,7 +667,9 @@ function FanPage() {
                 Lien public (price > 0) → AchatWidget
             ── */}
             {qrData.files?.length > 0 && (() => {
-              const isPrivateQR = (qrData.totalScans > 0) && !(qrData.price > 0);
+              // QR privé = a un totalScans défini ET n'est pas un lien public
+              // Un lien public a un publicLinkId ou vient de /ecoute/
+              const isPrivateQR = (qrData.totalScans > 0) && !qrData.publicLinkId;
               const dlsEpuises = isPrivateQR && (qrData.usedScans || 0) >= (qrData.totalScans || 0);
 
               if (isPrivateQR && !dlsEpuises) return (
@@ -4534,7 +4536,13 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
       window.location.href = wave_launch_url;
 
     } catch (e: any) {
-      setErrMsg(e.message || 'Erreur lors de la création du paiement');
+      if (e.message?.includes('permissions')) {
+        setErrMsg('Connexion Firestore refusée. Vérifiez les règles de sécurité.');
+      } else if (e.message?.includes('wave-checkout') || e.message?.includes('fetch')) {
+        setErrMsg('Service de paiement non disponible. Réessayez plus tard.');
+      } else {
+        setErrMsg(e.message || 'Erreur lors de la création du paiement');
+      }
       setState('error');
     }
   };
