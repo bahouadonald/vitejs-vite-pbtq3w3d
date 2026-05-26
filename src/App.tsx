@@ -1968,10 +1968,15 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   </div>
 
                   <button onClick={async () => {
-                    if (!pubForm.titre || !pubForm.lien) { alert('Titre et lien requis'); return; }
-                    await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
-                    setPubModal(false);
-                    setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+                    if (!pubForm.titre || !pubForm.lien) { setMsg('Titre et lien requis'); return; }
+                    try {
+                      await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
+                      setPubModal(false);
+                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+                      setMsg('✅ Pub publiée !');
+                    } catch(e:any) {
+                      setMsg('Erreur: ' + e.message);
+                    }
                   }} style={{ ...S.btn, width:'100%', padding:14, fontSize:15 }}>
                     🚀 Publier la publicité
                   </button>
