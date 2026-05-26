@@ -1330,6 +1330,7 @@ function AdminPage() {
   const [newScans, setNewScans] = useState('');
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [newArtistEmail, setNewArtistEmail] = useState('');
+  const [newCommercialEmail, setNewCommercialEmail] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [qrModal, setQrModal] = useState<any>(null);
   const [editModal, setEditModal] = useState<any>(null);
@@ -1486,6 +1487,7 @@ function AdminPage() {
         usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length,
         status: 'active', whatsapp: newWhatsapp, coverUrl,
         artistEmail: newArtistEmail,
+        commercialEmail: newCommercialEmail || '',
         publicLinkId,
         createdAt: new Date().toISOString(), url: BASE_URL + '/fan/' + qrId,
       });
@@ -1500,12 +1502,14 @@ function AdminPage() {
         const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', newArtistEmail)));
         if (artistSnap.empty) {
           await addDoc(collection(db, 'artists'), {
-            name: newArtist, email: newArtistEmail, createdAt: new Date().toISOString(),
+            name: newArtist, email: newArtistEmail,
+            commercialEmail: newCommercialEmail || '',
+            createdAt: new Date().toISOString(),
           });
         }
       }
       setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
-      setNewWhatsapp(''); setNewArtistEmail('');
+      setNewWhatsapp(''); setNewArtistEmail(''); setNewCommercialEmail('');
       setSelectedFiles(null); setCoverFile(null); setUploadProgress(0); setUploadMsg('');
       setMsg('QR ' + qrId + ' cree avec ' + uploaded.length + ' fichier(s) !');
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
@@ -1851,6 +1855,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   </datalist>
                 </div>
                 <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
+                <div><label style={S.lbl}>Email du commercial (optionnel)</label><input style={S.inp} type="email" value={newCommercialEmail} onChange={e => setNewCommercialEmail(e.target.value)} placeholder="commercial@email.com" /></div>
                 <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
@@ -3904,7 +3909,8 @@ function AnnonceursPage() {
               <input className="ann-inp" value={form.nom} onChange={e => set('nom',e.target.value)} placeholder="Nom & Prénom *" />
               <input className="ann-inp" value={form.entreprise} onChange={e => set('entreprise',e.target.value)} placeholder="Entreprise / Marque (optionnel)" />
               <input className="ann-inp" value={form.telephone} onChange={e => set('telephone',e.target.value)} placeholder="Téléphone WhatsApp * (+225...)" type="tel" />
-              <input className="ann-inp" value={form.email} onChange={e => set('email',e.target.value)} placeholder="Email (optionnel)" type="email" style={{ marginBottom:0 }} />
+              <input className="ann-inp" value={form.email} onChange={e => set('email',e.target.value)} placeholder="Email (optionnel)" type="email" />
+              <input className="ann-inp" value={(form as any).commercialEmail||''} onChange={e => set('commercialEmail',e.target.value)} placeholder="Email du commercial (si applicable)" type="email" style={{ marginBottom:0 }} />
             </div>
 
             {msg && <p style={{ color:'#f04a6a', fontSize:13, marginBottom:12, padding:'10px 14px', background:'rgba(240,74,106,0.1)', borderRadius:10 }}>{msg}</p>}
