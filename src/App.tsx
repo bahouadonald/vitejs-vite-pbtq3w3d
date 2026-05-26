@@ -1110,7 +1110,7 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
   const [dismissed, setDismissed] = useState(false);
 
   const PUB_DURATION = 30; // durée totale par pub
-  const SKIP_AFTER = 8;    // bouton Passer disponible après 8s
+  const SKIP_AFTER = 5;    // bouton Passer disponible après 5s — règle Doniel Zik
 
   // Charger 2 pubs actives
   useEffect(() => {
@@ -1855,7 +1855,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {[['album','Album'],['single','Single'],['video','Video'],['mix','Mix']].map(([t,l]) => (
+                {[['album','Album'],['single','Single'],['video','Vidéo'],['court-metrage','Court-métrage'],['contenu-humoristique','Contenu humoristique'],['mix','Mix']].map(([t,l]) => (
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#1a6bff' : '#c8d8ef'), background: newType === t ? '#eaf1ff' : 'transparent', color: newType === t ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
@@ -2739,67 +2739,27 @@ function ArtistPage() {
           <div style={{ animation:'fadeUp .3s ease' }}>
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>⚙️ Options de paiement</h2>
             <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.7, marginBottom:24 }}>
-              Choisissez comment vous voulez recevoir le paiement quand un mélomane achète votre musique.
+              Les paiements sont gérés automatiquement via Wave.
             </p>
 
-            {/* Option A */}
-            <div onClick={() => setOptionPaiement('dz')}
-              style={{ ...S.card, cursor:'pointer', marginBottom:12, borderLeft:`4px solid ${optionPaiement==='dz'?'#1a6bff':'#dce6f7'}`, background:optionPaiement==='dz'?'#f5f8ff':'#ffffff' }}>
+            <div style={{ ...S.card, background:'linear-gradient(135deg,#eef4ff,#dce8ff)', border:'1px solid #1a6bff33', marginBottom:28 }}>
               <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <div style={{ width:20, height:20, borderRadius:99, border:`2px solid ${optionPaiement==='dz'?'#1a6bff':'#c8d8ef'}`, background:optionPaiement==='dz'?'#1a6bff':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
-                  {optionPaiement==='dz' && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
+                <div style={{ width:24, height:24, borderRadius:99, background:'#1a6bff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                  <span style={{ color:'#fff', fontSize:13, fontWeight:800 }}>✓</span>
                 </div>
                 <div>
-                  <p style={{ fontWeight:800, fontSize:15, marginBottom:4, color:optionPaiement==='dz'?'#1a6bff':'#1a2340' }}>
-                    Option A — Doniel Zik encaisse
-                  </p>
-                  <p style={{ color:'#5a7090', fontSize:12, lineHeight:1.7 }}>
+                  <p style={{ fontWeight:800, fontSize:15, marginBottom:6, color:'#1a6bff' }}>Paiement automatique via Wave</p>
+                  <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7, marginBottom:10 }}>
                     Doniel Zik reçoit le paiement du mélomane, prélève sa commission, et vous verse le reste automatiquement chaque trimestre via Mobile Money.
                   </p>
-                  <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Zéro effort</span>
                     <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Paiement automatique</span>
+                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Versement trimestriel</span>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Option B */}
-            <div onClick={() => setOptionPaiement('artiste')}
-              style={{ ...S.card, cursor:'pointer', marginBottom:16, borderLeft:`4px solid ${optionPaiement==='artiste'?'#1a6bff':'#dce6f7'}`, background:optionPaiement==='artiste'?'#f5f8ff':'#ffffff' }}>
-              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <div style={{ width:20, height:20, borderRadius:99, border:`2px solid ${optionPaiement==='artiste'?'#1a6bff':'#c8d8ef'}`, background:optionPaiement==='artiste'?'#1a6bff':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
-                  {optionPaiement==='artiste' && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
-                </div>
-                <div style={{ flex:1 }}>
-                  <p style={{ fontWeight:800, fontSize:15, marginBottom:4, color:optionPaiement==='artiste'?'#1a6bff':'#1a2340' }}>
-                    Option B — Vous encaissez directement
-                  </p>
-                  <p style={{ color:'#5a7090', fontSize:12, lineHeight:1.7, marginBottom:10 }}>
-                    Vous envoyez votre propre lien de paiement (Orange Money, Wave, etc.) au mélomane. Vous validez le paiement manuellement dans votre dashboard. La commission Doniel Zik est prélevée sur vos revenus de streaming.
-                  </p>
-                  {optionPaiement==='artiste' && (
-                    <>
-                      <label style={S.lbl}>Votre lien de paiement Mobile Money</label>
-                      <input className="art-inp" value={lienPaiement} onChange={e => setLienPaiement(e.target.value)}
-                        placeholder="Ex: https://pay.wave.com/m/monlien ou +225 07 00 00 00"
-                        style={{ marginBottom:0 }} />
-                      <p style={{ color:'#8098b8', fontSize:11, marginTop:4 }}>Ce lien sera envoyé automatiquement dans le chat quand un mélomane vous contacte</p>
-                    </>
-                  )}
-                  <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
-                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Contrôle total</span>
-                    <span style={{ background:'#fff8e6', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#b07a00', fontWeight:600 }}>Validation manuelle</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {optionMsg && <p style={{ color:optionMsg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:13, marginBottom:12 }}>{optionMsg}</p>}
-            <button onClick={saveOptions} disabled={savingOption || !optionPaiement}
-              style={{ ...S.btn, width:'100%', padding:14, fontSize:15, opacity:optionPaiement?1:0.5, marginBottom:28 }}>
-              {savingOption ? '⏳ Sauvegarde...' : '💾 Sauvegarder mes options'}
-            </button>
 
             {/* ── ACTION PUB ANNONCEUR — 3 boutons ── */}
             <div style={{ borderTop:'1px solid #dce6f7', paddingTop:24 }}>
@@ -3473,6 +3433,222 @@ function ZikothequePage({ user }: { user: any }) {
 // ─────────────────────────────────────────────
 // PAGE CONDITIONS GÉNÉRALES D'UTILISATION
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// DASHBOARD COMMERCIAL — /commercial
+// Suivi artistes recrutés, marchands, commissions
+// ─────────────────────────────────────────────
+function CommercialPage() {
+  const [view, setView] = useState<'login'|'dashboard'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [user, setUser] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<'stats'|'artistes'|'marchands'>('stats');
+  const [artistes, setArtistes] = useState<any[]>([]);
+  const [marchands, setMarchands] = useState<any[]>([]);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      if (u) { setUser(u); setView('dashboard'); }
+      else { setUser(null); setView('login'); }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    // Artistes recrutés par ce commercial
+    const u1 = onSnapshot(
+      query(collection(db, 'artists'), where('commercialEmail','==', user.email)),
+      snap => setArtistes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    // Marchands recrutés par ce commercial
+    const u2 = onSnapshot(
+      query(collection(db, 'annonceurs'), where('commercialEmail','==', user.email), orderBy('createdAt','desc')),
+      snap => setMarchands(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { u1(); u2(); };
+  }, [user]);
+
+  const login = async () => {
+    setLoading(true); setMsg('');
+    try { await signInWithEmailAndPassword(auth, email, password); }
+    catch { setMsg('Email ou mot de passe incorrect'); }
+    setLoading(false);
+  };
+
+  // Calcul commissions
+  const commInscriptions = artistes.length * 1000;
+  const commPochettes = artistes.reduce((s,a) => s + ((a.pochettes||0) * 100), 0);
+  const commDL = artistes.reduce((s,a) => s + ((a.downloads||0) * (a.prixDL||1000) * 0.1), 0);
+  const commPub = marchands.reduce((s,m) => s + ((m.cout||0) * 0.1), 0);
+  const totalCommissions = commInscriptions + commPochettes + commDL + commPub;
+
+  if (view === 'login') return (
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ width:'100%', maxWidth:380 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <Logo size="lg" />
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>👔 Espace Commercial</p>
+        </div>
+        <div style={S.card}>
+          <label style={S.lbl}>Email</label>
+          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
+          <label style={S.lbl}>Mot de passe</label>
+          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
+            {loading ? '⏳...' : 'Se connecter'}
+          </button>
+          <button onClick={async () => {
+            if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+            try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+            catch { setMsg('Email introuvable'); }
+          }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+            Mot de passe oublié ?
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ ...S.bg, minHeight:'100vh' }}>
+      {/* HEADER */}
+      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Logo size="sm" />
+          <div>
+            <p style={{ fontWeight:700, fontSize:13, color:'#1a6bff', margin:0 }}>👔 Espace Commercial</p>
+            <p style={{ color:'#8098b8', fontSize:10, margin:0 }}>{user?.email}</p>
+          </div>
+        </div>
+        <button style={S.btn2} onClick={() => signOut(auth)}>Déco</button>
+      </div>
+
+      {/* TABS */}
+      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', background:'#fff' }}>
+        {[['stats','📊 Stats'],['artistes',`🎤 Artistes (${artistes.length})`],['marchands',`📢 Marchands (${marchands.length})`]].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t as any)}
+            style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:13, fontWeight: tab===t?700:400, borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}` }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* STATS */}
+        {tab === 'stats' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Mes commissions</h2>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
+              {[
+                { label:'Inscriptions artistes', val: commInscriptions.toLocaleString()+' F', detail: artistes.length+' × 1 000 F', color:'#1a6bff' },
+                { label:'Pochettes dupliquées', val: commPochettes.toLocaleString()+' F', detail: '× 100 F/pochette', color:'#1a6bff' },
+                { label:'Téléchargements', val: commDL.toLocaleString()+' F', detail: '10% par DL', color:'#b07a00' },
+                { label:'Campagnes pub', val: commPub.toLocaleString()+' F', detail: '10% par campagne', color:'#b07a00' },
+              ].map((s,i) => (
+                <div key={i} style={S.card}>
+                  <p style={{ color:s.color, fontWeight:900, fontSize:20, margin:'0 0 4px' }}>{s.val}</p>
+                  <p style={{ fontWeight:700, fontSize:12, marginBottom:2 }}>{s.label}</p>
+                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.detail}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ ...S.card, textAlign:'center', background:'linear-gradient(135deg,#eef4ff,#dce8ff)', padding:24 }}>
+              <p style={{ color:'#8098b8', fontSize:12, marginBottom:4 }}>Total commissions estimées</p>
+              <p style={{ color:'#1a6bff', fontWeight:900, fontSize:32, margin:0 }}>{totalCommissions.toLocaleString()} FCFA</p>
+            </div>
+
+            <div style={{ ...S.card, marginTop:16 }}>
+              <p style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>Objectifs recommandés</p>
+              {[
+                { label:'Artistes actifs', actuel: artistes.length, objectif: 20 },
+                { label:'Marchands actifs', actuel: marchands.filter(m=>m.status==='active').length, objectif: 30 },
+              ].map((o,i) => (
+                <div key={i} style={{ marginBottom:14 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <p style={{ fontSize:13, fontWeight:600 }}>{o.label}</p>
+                    <p style={{ fontSize:13, color:'#1a6bff', fontWeight:700 }}>{o.actuel}/{o.objectif}</p>
+                  </div>
+                  <div style={{ height:8, background:'#dce6f7', borderRadius:99 }}>
+                    <div style={{ height:'100%', width: Math.min((o.actuel/o.objectif)*100, 100)+'%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99, transition:'width .3s' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ARTISTES */}
+        {tab === 'artistes' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Mes artistes recrutés</h2>
+            <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
+              Ces artistes ont été enregistrés avec votre email comme référence.
+            </p>
+            {artistes.length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>🎤</p>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucun artiste recruté pour l'instant</p>
+              </div>
+            ) : artistes.map(a => (
+              <div key={a.id} style={{ ...S.card, marginBottom:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ width:40, height:40, borderRadius:99, background:'linear-gradient(135deg,#eaf1ff,#c8d8ef)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🎤</div>
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{a.name}</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{a.email}</p>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, margin:0 }}>+1 000 F</p>
+                    <p style={{ color:'#8098b8', fontSize:10 }}>commission</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* MARCHANDS */}
+        {tab === 'marchands' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Mes marchands recrutés</h2>
+            <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
+              Ces annonceurs ont été enregistrés avec votre email comme référence.
+            </p>
+            {marchands.length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>📢</p>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucun marchand recruté pour l'instant</p>
+              </div>
+            ) : marchands.map(m => (
+              <div key={m.id} style={{ ...S.card, marginBottom:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                  <div>
+                    <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{m.entreprise||m.nom}</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{m.telephone}</p>
+                    <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>{new Date(m.createdAt).toLocaleDateString('fr')}</p>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <span style={{ background: m.status==='active'?'#eaffea':'#fff8e6', border:`1px solid ${m.status==='active'?'#4dff9a':'#f0b84a'}`, borderRadius:99, padding:'2px 10px', fontSize:10, fontWeight:700, color: m.status==='active'?'#00a040':'#b07a00' }}>
+                      {m.status==='active'?'● Actif':'⏳ En attente'}
+                    </span>
+                    {m.status==='active' && (
+                      <p style={{ color:'#1a6bff', fontWeight:700, fontSize:12, margin:'4px 0 0' }}>+{((m.cout||0)*0.1).toLocaleString()} F</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ConditionsPage() {
   return (
     <div style={{ ...S.bg, minHeight: '100vh' }}>
@@ -4910,6 +5086,7 @@ export default function App() {
         <Route path="/artiste/login" element={<ArtistPage />} />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
+        <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
