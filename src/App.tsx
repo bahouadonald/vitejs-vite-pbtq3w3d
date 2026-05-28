@@ -4009,12 +4009,11 @@ function AnnonceursPage() {
         {/* AVANTAGES */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:28 }}>
           {[
-            { icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>, title:'Captive', desc:'Pub avant la musique' },
-            { icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>, title:'Local CI', desc:"Fans d'artistes locaux" },
-            { icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, title:'Stats live', desc:'Vues, clics, leads' },
+            { title:'Captive', desc:'Pub avant la musique' },
+            { title:'Local CI', desc:"Fans d'artistes locaux" },
+            { title:'Stats live', desc:'Vues, clics, leads' },
           ].map((c,i) => (
             <div key={i} className="ann-card" style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:14, padding:'14px 10px', textAlign:'center', transition:'all .2s', boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <div style={{ display:'flex', justifyContent:'center', marginBottom:6 }}>{c.icon}</div>
               <p style={{ fontWeight:700, fontSize:12, color:'#1a2340', marginBottom:3 }}>{c.title}</p>
               <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.5 }}>{c.desc}</p>
             </div>
