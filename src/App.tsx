@@ -1174,22 +1174,21 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
       {/* Pub cliquable */}
       <div key={pubIndex} style={{ width:'100%', maxWidth:500, animation:'pubIn .3s ease', cursor:'pointer', position:'relative' }}
         onClick={handleClick}>
-        {pub.imageUrl ? (
+      {pub.imageUrl ? (
           pub.mediaType === 'video' ? (
             <video
               src={pub.imageUrl}
               autoPlay
               muted={false}
               playsInline
-              style={{ width:'100%', maxHeight:'65vh', display:'block', borderRadius:12, background:'#000' }}
+              style={{ width:'100%', height:'100%', maxHeight:'70vh', display:'block', borderRadius:12, background:'#000', objectFit:'contain' }}
               onEnded={() => {
-                // Vidéo terminée → passer à la pub suivante ou finir
                 if (pubIndex < pubs.length - 1) setPubIndex(i => i + 1);
                 else onDone();
               }}
             />
           ) : (
-            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'65vh', objectFit:'cover', display:'block', borderRadius:12 }} />
+            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'70vh', objectFit:'contain', display:'block', borderRadius:12 }} />
           )
         ) : (
           <div style={{ width:'100%', height:240, borderRadius:12, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -2439,7 +2438,7 @@ function ArtistPage() {
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>📊 Stats</button>
         <button style={tabStyle(dashTab==='ventes')} onClick={() => setDashTab('ventes')}>
-          💰 Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
+          Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
           {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
         </button>
         <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>⚙️ Options</button>
@@ -2455,30 +2454,27 @@ function ArtistPage() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               {[
-                { label:'Pochettes créées', value:stats.pochettes||0, icon:'💿', color:'#1a6bff' },
-                { label:'Scans effectués', value:stats.scansTotal||0, icon:'📱', color:'#1a6bff' },
+                { label:'Pochettes créées', value:stats.pochettes||0, color:'#1a6bff' },
+                { label:'Scans effectués', value:stats.scansTotal||0, color:'#1a6bff' },
               ].map((s,i) => (
                 <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
-                  <p style={{ fontSize:28, marginBottom:6 }}>{s.icon}</p>
-                  <p style={{ fontSize:26, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ fontSize:28, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
                   <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
                 </div>
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               {[
-                { label:'Téléchargements', value:stats.downloads||0, icon:'⬇️', color:'#1a6bff' },
-                { label:'Streams', value:stats.streams||0, icon:'🎵', color:'#b07a00' },
+                { label:'Téléchargements', value:stats.downloads||0, color:'#1a6bff' },
+                { label:'Streams', value:stats.streams||0, color:'#1a6bff' },
               ].map((s,i) => (
                 <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
-                  <p style={{ fontSize:28, marginBottom:6 }}>{s.icon}</p>
-                  <p style={{ fontSize:26, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ fontSize:28, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
                   <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
                 </div>
               ))}
             </div>
             <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#eef4ff,#dce8ff)' }}>
-              <p style={{ fontSize:32, marginBottom:6 }}>💰</p>
               <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{((stats.streams||0)*0.45).toFixed(0)} FCFA</p>
               <p style={{ color:'#8098b8', fontSize:11 }}>Revenu estimé · 0,10 – 0,80 FCFA / écoute</p>
             </div>
@@ -2486,7 +2482,7 @@ function ArtistPage() {
             {/* LIENS PUBLICS */}
             {stats.publicLinks && stats.publicLinks.length > 0 && (
               <div style={{ marginBottom:20 }}>
-                <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>🔗 Mes liens de streaming</h3>
+                <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>Mes liens de streaming</h3>
                 {stats.publicLinks.map((link:any) => (
                   <div key={link.id} style={{ ...S.card, marginBottom:8 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
@@ -2527,7 +2523,7 @@ function ArtistPage() {
 
             {/* RÉMUNÉRATION STREAMING */}
             <div style={{ background:'#ffffff', border:'1px solid #dce6f7', borderRadius:16, padding:24, marginBottom:20, boxShadow:'0 2px 12px rgba(26,107,255,0.08)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>💰 RÉMUNÉRATION STREAMING</p>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>RÉMUNÉRATION STREAMING</p>
               <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800, marginBottom:12 }}>Ce que vous gagnez</h3>
               <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.8, marginBottom:16 }}>
                 Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
@@ -2588,7 +2584,7 @@ function ArtistPage() {
           <div style={{ animation:'fadeUp .3s ease' }}>
             {!chatVenteId ? (
               <>
-                <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>💰 Demandes d'achat</h2>
+                <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Demandes d'achat</h2>
                 <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
                   Les mélomanes qui veulent acheter votre musique apparaissent ici. Discutez, envoyez votre lien de paiement, puis validez.
                 </p>
@@ -2671,7 +2667,7 @@ function ArtistPage() {
                     {/* Instruction lien de paiement */}
                     {lienPaiement && (
                       <div style={{ background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:10, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:18 }}>🔗</span>
+                        
                         <div style={{ flex:1 }}>
                           <p style={{ fontWeight:700, fontSize:12, margin:'0 0 2px' }}>Votre lien de paiement</p>
                           <p style={{ color:'#5a7090', fontSize:11, margin:0, wordBreak:'break-all' }}>{lienPaiement}</p>
@@ -3918,9 +3914,11 @@ function AnnonceursPage() {
   const [msg, setMsg] = useState('');
   const set = (k:string, v:string) => setForm(f => ({...f,[k]:v}));
 
-  // Calcul dynamique selon les vues choisies
+  // Calcul dynamique selon les vues choisies — 1 000 FCFA = 700 à 2 000 vues
   const vuesNum = parseInt(form.vues || '0') || 0;
-  const coutFCFA = vuesNum; // 1 FCFA par vue = 1 000 FCFA / 1 000 vues
+  const vuesMin = Math.round(vuesNum * 0.7);
+  const vuesMax = Math.round(vuesNum * 2.0);
+  const coutFCFA = vuesNum;
   const clicsMin = Math.round(vuesNum * 0.10);
   const clicsMax = Math.round(vuesNum * 0.30);
 
@@ -3988,7 +3986,7 @@ function AnnonceursPage() {
             <span style={{ fontFamily:"'Playfair Display',serif", fontSize:42, fontWeight:900, color:'#1a2340' }}>1 000</span>
             <div style={{ textAlign:'left' }}>
               <p style={{ color:'#1a6bff', fontWeight:800, fontSize:16, margin:0 }}>FCFA</p>
-              <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>= 1 000 vues</p>
+              <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>= 700 à 2 000 vues</p>
             </div>
           </div>
           <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:8 }}>
@@ -4059,32 +4057,32 @@ function AnnonceursPage() {
             {/* SIMULATEUR DE VUES */}
             <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
               <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:6 }}>SIMULATEUR DE CAMPAGNE</p>
-              <p style={{ color:'#8098b8', fontSize:11, marginBottom:14 }}>Combien de vues voulez-vous ?</p>
+              <p style={{ color:'#8098b8', fontSize:11, marginBottom:14 }}>Quel est votre budget ?</p>
               <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
-                {[1000,5000,10000,50000].map(v => (
+                {[1000,5000,10000,50000,500000,1000000].map(v => (
                   <button key={v} onClick={() => set('vues', String(v))}
                     style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${form.vues===String(v)?'#1a6bff':'#dce6f7'}`, background: form.vues===String(v)?'#eaf1ff':'#fff', color: form.vues===String(v)?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600 }}>
-                    {v.toLocaleString()}
+                    {v >= 1000000 ? '1M F' : v >= 500000 ? '500K F' : v.toLocaleString()+' F'}
                   </button>
                 ))}
               </div>
-              <input className="ann-inp" type="number" value={form.vues} onChange={e => set('vues',e.target.value)} placeholder="Ou entrez un nombre de vues..." style={{ marginBottom:0 }} />
+              <input className="ann-inp" type="number" value={form.vues} onChange={e => set('vues',e.target.value)} placeholder="Entrez votre budget en FCFA..." style={{ marginBottom:0 }} />
               {vuesNum > 0 && (
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:14 }}>
                   <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:16, margin:0 }}>{vuesNum.toLocaleString()}</p>
-                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>VUES</p>
+                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:14, margin:0 }}>{vuesMin.toLocaleString()}–{vuesMax.toLocaleString()}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>VUES EST.</p>
                   </div>
                   <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
                     <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{clicsMin.toLocaleString()}–{clicsMax.toLocaleString()}</p>
                     <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>CLICS EST.</p>
                   </div>
                   <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{Math.round(vuesNum*0.04).toLocaleString()}–{Math.round(vuesNum*0.2).toLocaleString()}</p>
+                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{Math.round(vuesMin*0.04).toLocaleString()}–{Math.round(vuesMax*0.2).toLocaleString()}</p>
                     <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>DISCUSSIONS EST.</p>
                   </div>
-                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
+                  <div style={{ background:'#eaf1ff', border:'1px solid #1a6bff', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
                     <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>FCFA</p>
                   </div>
                 </div>
