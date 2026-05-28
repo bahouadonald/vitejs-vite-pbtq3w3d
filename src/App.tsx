@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Target, MapPin, BarChart2, Eye, MessageCircle, Globe, Phone, ChevronRight } from 'lucide-react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
@@ -1206,8 +1207,8 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
         )}
 
         {/* Badge PUB */}
-        <div style={{ position:'absolute', top:10, left:12, background:'rgba(0,0,0,0.65)', borderRadius:4, padding:'2px 8px', display:'flex', gap:6, alignItems:'center' }}>
-          <span style={{ color:'#fff', fontSize:9, fontWeight:700, letterSpacing:1 }}>PUB</span>
+        <div style={{ position:'absolute', top:10, left:12, background:'transparent', border:'1px solid rgba(255,255,255,0.4)', borderRadius:4, padding:'2px 8px', display:'flex', gap:6, alignItems:'center' }}>
+          <span style={{ color:'rgba(255,255,255,0.8)', fontSize:9, fontWeight:700, letterSpacing:1 }}>PUB</span>
           {pubs.length > 1 && <span style={{ color:'rgba(255,255,255,0.5)', fontSize:9 }}>{pubIndex+1}/{pubs.length}</span>}
         </div>
 
@@ -3969,39 +3970,39 @@ function AnnonceursPage() {
 
         {/* HERO */}
         <div style={{ textAlign:'center', marginBottom:32 }}>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,200,0,0.1)', border:'1px solid rgba(255,200,0,0.3)', borderRadius:99, padding:'5px 14px', marginBottom:16 }}>
-            <span style={{ width:7, height:7, borderRadius:99, background:'#ffd700', display:'inline-block' }} />
-            <span style={{ color:'#ffd700', fontSize:11, fontWeight:700, letterSpacing:1 }}>PUBLICITÉ · DONIEL ZIK</span>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:99, padding:'5px 14px', marginBottom:16 }}>
+            <span style={{ width:7, height:7, borderRadius:99, background:'#1a6bff', display:'inline-block' }} />
+            <span style={{ color:'#1a6bff', fontSize:11, fontWeight:700, letterSpacing:1 }}>PUBLICITÉ · DONIEL ZIK</span>
           </div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:900, color:'#fff', marginBottom:10, lineHeight:1.15 }}>
-            Touchez vos clients<br/><span style={{ color:'#ffd700' }}>pendant qu'ils écoutent</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:900, color:'#1a2340', marginBottom:10, lineHeight:1.15 }}>
+            Touchez vos clients<br/><span style={{ color:'#1a6bff' }}>pendant qu'ils écoutent</span>
           </h1>
-          <p style={{ color:'#6a88aa', fontSize:14, lineHeight:1.8 }}>
+          <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.8 }}>
             Votre publicité diffusée avant chaque écoute sur Doniel Zik.<br/>Audience captive. Ciblage local. Stats réelles.
           </p>
         </div>
 
         {/* TARIF UNIQUE — mise en avant */}
-        <div style={{ background:'linear-gradient(135deg,rgba(255,200,0,0.1),rgba(255,150,0,0.06))', border:'1px solid rgba(255,200,0,0.35)', borderRadius:18, padding:'24px 20px', marginBottom:28, textAlign:'center' }}>
-          <p style={{ color:'#ffd700', fontSize:10, fontWeight:700, letterSpacing:3, marginBottom:12 }}>💰 TARIFICATION SIMPLE</p>
+        <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:18, padding:'24px 20px', marginBottom:28, textAlign:'center', boxShadow:'0 2px 12px rgba(30,111,255,0.08)' }}>
+          <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:3, marginBottom:12 }}>TARIFICATION SIMPLE</p>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}>
-            <span style={{ fontFamily:"'Playfair Display',serif", fontSize:42, fontWeight:900, color:'#fff' }}>1 000</span>
+            <span style={{ fontFamily:"'Playfair Display',serif", fontSize:42, fontWeight:900, color:'#1a2340' }}>1 000</span>
             <div style={{ textAlign:'left' }}>
-              <p style={{ color:'#ffd700', fontWeight:800, fontSize:16, margin:0 }}>FCFA</p>
-              <p style={{ color:'#6a88aa', fontSize:12, margin:0 }}>= 1 000 vues</p>
+              <p style={{ color:'#1a6bff', fontWeight:800, fontSize:16, margin:0 }}>FCFA</p>
+              <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>= 1 000 vues</p>
             </div>
           </div>
           <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:8 }}>
-            <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
-              <p style={{ color:'#4da6ff', fontWeight:800, fontSize:15, margin:0 }}>100 – 300</p>
-              <p style={{ color:'#6a88aa', fontSize:10, margin:'2px 0 0' }}>clics garantis / 1 000 vues</p>
+            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
+              <p style={{ color:'#1a6bff', fontWeight:800, fontSize:15, margin:0 }}>100 – 300</p>
+              <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>clics garantis / 1 000 vues</p>
             </div>
-            <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
-              <p style={{ color:'#4dff9a', fontWeight:800, fontSize:15, margin:0 }}>100%</p>
-              <p style={{ color:'#6a88aa', fontSize:10, margin:'2px 0 0' }}>visibilité captive</p>
+            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
+              <p style={{ color:'#00a040', fontWeight:800, fontSize:15, margin:0 }}>100%</p>
+              <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>visibilité captive</p>
             </div>
           </div>
-          <p style={{ color:'rgba(255,200,0,0.5)', fontSize:10, marginTop:14 }}>
+          <p style={{ color:'#8098b8', fontSize:10, marginTop:14 }}>
             Paiement via Orange Money · Wave · MTN MoMo
           </p>
         </div>
@@ -4009,14 +4010,14 @@ function AnnonceursPage() {
         {/* AVANTAGES */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:28 }}>
           {[
-            { icon:'🎯', title:'Captive', desc:'Pub avant la musique' },
-            { icon:'📍', title:'Local CI', desc:"Fans d'artistes locaux" },
-            { icon:'📊', title:'Stats live', desc:'Vues, clics, leads' },
+            { icon:<Target size={22} color="#1a6bff" />, title:'Captive', desc:'Pub avant la musique' },
+            { icon:<MapPin size={22} color="#1a6bff" />, title:'Local CI', desc:"Fans d'artistes locaux" },
+            { icon:<BarChart2 size={22} color="#1a6bff" />, title:'Stats live', desc:'Vues, clics, leads' },
           ].map((c,i) => (
-            <div key={i} className="ann-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'14px 10px', textAlign:'center', transition:'all .2s' }}>
-              <p style={{ fontSize:24, marginBottom:6 }}>{c.icon}</p>
-              <p style={{ fontWeight:700, fontSize:12, color:'#dde4f5', marginBottom:3 }}>{c.title}</p>
-              <p style={{ color:'#4a5878', fontSize:10, lineHeight:1.5 }}>{c.desc}</p>
+            <div key={i} className="ann-card" style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:14, padding:'14px 10px', textAlign:'center', transition:'all .2s', boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
+              <div style={{ display:'flex', justifyContent:'center', marginBottom:6 }}>{c.icon}</div>
+              <p style={{ fontWeight:700, fontSize:12, color:'#1a2340', marginBottom:3 }}>{c.title}</p>
+              <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.5 }}>{c.desc}</p>
             </div>
           ))}
         </div>
