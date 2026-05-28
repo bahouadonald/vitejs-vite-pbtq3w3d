@@ -117,12 +117,9 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const streamStart = useRef<number>(0);
   const cur = files[idx];
 
-  // Pub avant play
-  const [showPubPlay, setShowPubPlay] = useState(false);
-  const [pendingPlay, setPendingPlay] = useState(false);
-  // Pub entre pistes
-  const [showPubTrack, setShowPubTrack] = useState(false);
-  const [pendingTrackIdx, setPendingTrackIdx] = useState<number|null>(null);
+  // Pub après arrêt ou fin de piste
+  const [showPubAfter, setShowPubAfter] = useState(false);
+  const [pendingNext, setPendingNext] = useState(false);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -138,47 +135,34 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause();
       setPlaying(false);
+      // Pub après arrêt
+      setPendingNext(false);
+      setShowPubAfter(true);
     } else {
-      // Montrer pub avant de jouer
-      setPendingPlay(true);
-      setShowPubPlay(true);
-    }
-  };
-
-  const prev = () => {
-    if (idx > 0) {
-      setPendingTrackIdx(idx - 1);
-      setShowPubTrack(true);
-    }
-  };
-
-  const next = () => {
-    if (idx < files.length - 1) {
-      setPendingTrackIdx(idx + 1);
-      setShowPubTrack(true);
-    }
-  };
-
-  // Après pub play → lancer la lecture
-  const afterPubPlay = () => {
-    setShowPubPlay(false);
-    if (pendingPlay && ref.current) {
+      // Lecture directe — pas de pub avant
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
-    setPendingPlay(false);
   };
 
-  // Après pub entre pistes → changer de piste
-  const afterPubTrack = () => {
-    setShowPubTrack(false);
-    if (pendingTrackIdx !== null) {
-      setIdx(pendingTrackIdx);
+  const prev = () => {
+    if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
+  };
+
+  const next = () => {
+    if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
+  };
+
+  // Après pub → passer à la piste suivante ou rester
+  const afterPub = () => {
+    setShowPubAfter(false);
+    if (pendingNext && idx < files.length - 1) {
+      setIdx(i => i + 1);
       setPlaying(true);
       streamStart.current = Date.now() / 1000;
     }
-    setPendingTrackIdx(null);
+    setPendingNext(false);
   };
 
   if (!files || files.length === 0) return null;
@@ -186,10 +170,8 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   return (
     <div style={{ background: 'rgba(15,20,40,0.95)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(30,111,255,0.18)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
 
-      {/* PUB avant play */}
-      {showPubPlay && <PubOverlay trigger="play" onDone={afterPubPlay} />}
-      {/* PUB entre pistes */}
-      {showPubTrack && <PubOverlay trigger="track" onDone={afterPubTrack} />}
+      {/* PUB après arrêt ou fin de piste */}
+      {showPubAfter && <PubOverlay trigger="track" onDone={afterPub} />}
 
       <audio ref={ref} src={cur?.url}
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
@@ -197,10 +179,10 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
         onEnded={() => {
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) {
-            // Pub entre pistes automatique
-            setPendingTrackIdx(idx + 1);
-            setShowPubTrack(true);
+            // Pub après fin de piste
             setPlaying(false);
+            setPendingNext(true);
+            setShowPubAfter(true);
           } else { setPlaying(false); }
         }}
         preload="metadata" />
@@ -3188,12 +3170,11 @@ function ZikothequePage({ user }: { user: any }) {
   }, [currentTrackIdx, currentAlbum]);
 
   const [showPubZiko, setShowPubZiko] = useState(false);
-  const [pendingAlbum, setPendingAlbum] = useState<{item:any, trackIdx:number}|null>(null);
+  const [pendingNextZiko, setPendingNextZiko] = useState(false);
 
   const playAlbum = (item: any, trackIdx = 0) => {
-    // Montrer pub avant lecture
-    setPendingAlbum({ item, trackIdx });
-    setShowPubZiko(true);
+    // Lecture directe sans pub avant
+    doPlayAlbum(item, trackIdx);
   };
 
   const doPlayAlbum = (item: any, trackIdx = 0) => {
@@ -3204,18 +3185,24 @@ function ZikothequePage({ user }: { user: any }) {
 
   const togglePlay = () => {
     if (!audioRef.current) return;
-    if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else {
-      // Pub avant reprise lecture
-      setPendingAlbum(null);
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+      // Pub après arrêt
+      setPendingNextZiko(false);
       setShowPubZiko(true);
+    } else {
+      // Lecture directe
+      audioRef.current.play().catch(() => setPlaying(false));
+      setPlaying(true);
     }
   };
 
   const onEnded = () => {
     if (currentTrackIdx < currentFiles.length - 1) {
-      // Pub entre pistes
-      setPendingAlbum(null);
+      // Pub après fin de piste
+      setPlaying(false);
+      setPendingNextZiko(true);
       setShowPubZiko(true);
     } else { setPlaying(false); }
   };
@@ -3235,22 +3222,15 @@ function ZikothequePage({ user }: { user: any }) {
       {/* PUB */}
       <PubBanner />
 
-      {/* PUB avant/entre lectures */}
+      {/* PUB après arrêt ou fin de piste */}
       {showPubZiko && (
-        <PubOverlay trigger="play" onDone={() => {
+        <PubOverlay trigger="track" onDone={() => {
           setShowPubZiko(false);
-          if (pendingAlbum) {
-            // Play album demandé
-            doPlayAlbum(pendingAlbum.item, pendingAlbum.trackIdx);
-            setPendingAlbum(null);
-          } else if (currentTrackIdx < currentFiles.length - 1) {
-            // Piste suivante
+          if (pendingNextZiko && currentTrackIdx < currentFiles.length - 1) {
             setCurrentTrackIdx(i => i + 1);
-          } else {
-            // Reprendre lecture
-            audioRef.current?.play().catch(() => setPlaying(false));
             setPlaying(true);
           }
+          setPendingNextZiko(false);
         }} />
       )}
 
@@ -3442,6 +3422,211 @@ function ZikothequePage({ user }: { user: any }) {
 // DASHBOARD COMMERCIAL — /commercial
 // Suivi artistes recrutés, marchands, commissions
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// DASHBOARD RESPONSABLE COMMERCIAL — /responsable
+// Vue équipe commerciaux + commissions 1/10
+// ─────────────────────────────────────────────
+function ResponsablePage() {
+  const [view, setView] = useState<'login'|'dashboard'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [user, setUser] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<'stats'|'equipe'>('stats');
+  const [commerciaux, setCommerciaux] = useState<any[]>([]);
+  const [allArtistes, setAllArtistes] = useState<any[]>([]);
+  const [allMarchands, setAllMarchands] = useState<any[]>([]);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      if (u) { setUser(u); setView('dashboard'); }
+      else { setUser(null); setView('login'); }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    // Commerciaux de ce responsable
+    const u1 = onSnapshot(
+      query(collection(db, 'commerciaux'), where('responsableEmail','==', user.email)),
+      snap => setCommerciaux(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    // Artistes liés aux commerciaux de ce responsable
+    const u2 = onSnapshot(
+      query(collection(db, 'artists'), where('responsableEmail','==', user.email)),
+      snap => setAllArtistes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    // Marchands liés aux commerciaux de ce responsable
+    const u3 = onSnapshot(
+      query(collection(db, 'annonceurs'), where('responsableEmail','==', user.email), orderBy('createdAt','desc')),
+      snap => setAllMarchands(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { u1(); u2(); u3(); };
+  }, [user]);
+
+  const login = async () => {
+    setLoading(true); setMsg('');
+    try { await signInWithEmailAndPassword(auth, email, password); }
+    catch { setMsg('Email ou mot de passe incorrect'); }
+    setLoading(false);
+  };
+
+  // Calcul commissions responsable = 1/10 de chaque commercial
+  const commInscriptions = Math.round(allArtistes.length * 1000 * 0.1);
+  const commPochettes = Math.round(allArtistes.reduce((s,a) => s + ((a.pochettes||0) * 100 * 0.1), 0));
+  const commDL = Math.round(allArtistes.reduce((s,a) => s + ((a.downloads||0) * (a.prixDL||1000) * 0.01), 0));
+  const commPub = Math.round(allMarchands.reduce((s,m) => s + ((m.cout||0) * 0.01), 0));
+  const totalCommissions = commInscriptions + commPochettes + commDL + commPub;
+
+  if (view === 'login') return (
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ width:'100%', maxWidth:380 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <Logo size="lg" />
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>📋 Espace Responsable Commercial</p>
+        </div>
+        <div style={S.card}>
+          <label style={S.lbl}>Email</label>
+          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
+          <label style={S.lbl}>Mot de passe</label>
+          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
+            {loading ? '⏳...' : 'Se connecter'}
+          </button>
+          <button onClick={async () => {
+            if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+            try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+            catch { setMsg('Email introuvable'); }
+          }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+            Mot de passe oublié ?
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ ...S.bg, minHeight:'100vh' }}>
+      {/* HEADER */}
+      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Logo size="sm" />
+          <div>
+            <p style={{ fontWeight:700, fontSize:13, color:'#1a6bff', margin:0 }}>📋 Responsable Commercial</p>
+            <p style={{ color:'#8098b8', fontSize:10, margin:0 }}>{user?.email}</p>
+          </div>
+        </div>
+        <button style={S.btn2} onClick={() => signOut(auth)}>Déco</button>
+      </div>
+
+      {/* TABS */}
+      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', background:'#fff' }}>
+        {[['stats','📊 Stats'],['equipe',`👥 Mon équipe (${commerciaux.length})`]].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t as any)}
+            style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:13, fontWeight: tab===t?700:400, borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}` }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* STATS */}
+        {tab === 'stats' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Mes commissions</h2>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
+              {[
+                { label:'Inscriptions artistes', val: commInscriptions.toLocaleString()+' F', detail: allArtistes.length+' artistes × 100 F', color:'#1a6bff' },
+                { label:'Pochettes dupliquées', val: commPochettes.toLocaleString()+' F', detail: '× 10 F/pochette', color:'#1a6bff' },
+                { label:'Téléchargements', val: commDL.toLocaleString()+' F', detail: '1% par DL', color:'#b07a00' },
+                { label:'Campagnes pub', val: commPub.toLocaleString()+' F', detail: '1% par campagne', color:'#b07a00' },
+              ].map((s,i) => (
+                <div key={i} style={S.card}>
+                  <p style={{ color:s.color, fontWeight:900, fontSize:20, margin:'0 0 4px' }}>{s.val}</p>
+                  <p style={{ fontWeight:700, fontSize:12, marginBottom:2 }}>{s.label}</p>
+                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.detail}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ ...S.card, textAlign:'center', background:'linear-gradient(135deg,#eef4ff,#dce8ff)', padding:24, marginBottom:16 }}>
+              <p style={{ color:'#8098b8', fontSize:12, marginBottom:4 }}>Total commissions estimées</p>
+              <p style={{ color:'#1a6bff', fontWeight:900, fontSize:32, margin:0 }}>{totalCommissions.toLocaleString()} FCFA</p>
+            </div>
+
+            <div style={S.card}>
+              <p style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>Objectif recommandé</p>
+              <div style={{ marginBottom:14 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                  <p style={{ fontSize:13, fontWeight:600 }}>Commerciaux actifs</p>
+                  <p style={{ fontSize:13, color:'#1a6bff', fontWeight:700 }}>{commerciaux.length}/50</p>
+                </div>
+                <div style={{ height:8, background:'#dce6f7', borderRadius:99 }}>
+                  <div style={{ height:'100%', width: Math.min((commerciaux.length/50)*100, 100)+'%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99, transition:'width .3s' }} />
+                </div>
+              </div>
+              <p style={{ color:'#8098b8', fontSize:12 }}>
+                Avec 50 commerciaux actifs qui atteignent leurs objectifs, vous pouvez générer <strong style={{ color:'#1a6bff' }}>1 550 000 FCFA/mois</strong>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ÉQUIPE */}
+        {tab === 'equipe' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Mon équipe</h2>
+            <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
+              Commerciaux enregistrés sous votre supervision.
+            </p>
+            {commerciaux.length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>👥</p>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucun commercial dans votre équipe pour l'instant</p>
+              </div>
+            ) : commerciaux.map(c => {
+              const artistes = allArtistes.filter(a => a.commercialEmail === c.email);
+              const marchands = allMarchands.filter(m => m.commercialEmail === c.email);
+              const commC = (artistes.length * 1000) +
+                (artistes.reduce((s,a) => s + ((a.pochettes||0)*100), 0)) +
+                (allMarchands.filter(m=>m.commercialEmail===c.email).reduce((s,m)=>s+(m.cout||0)*0.1,0));
+              return (
+                <div key={c.id} style={{ ...S.card, marginBottom:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div style={{ width:40, height:40, borderRadius:99, background:'linear-gradient(135deg,#eaf1ff,#c8d8ef)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>👤</div>
+                    <div style={{ flex:1 }}>
+                      <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.name || c.email}</p>
+                      <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{c.email}</p>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, margin:0 }}>+{Math.round(commC*0.1).toLocaleString()} F</p>
+                      <p style={{ color:'#8098b8', fontSize:10 }}>votre commission</p>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {[
+                      { label:'Artistes recrutés', val: artistes.length, color:'#1a6bff' },
+                      { label:'Marchands recrutés', val: marchands.length, color:'#b07a00' },
+                    ].map((s,i) => (
+                      <div key={i} style={{ background:'#f5f8ff', borderRadius:8, padding:'8px', textAlign:'center' }}>
+                        <p style={{ fontWeight:800, fontSize:18, color:s.color, margin:0 }}>{s.val}</p>
+                        <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CommercialPage() {
   const [view, setView] = useState<'login'|'dashboard'>('login');
   const [email, setEmail] = useState('');
@@ -3757,25 +3942,25 @@ function AnnonceursPage() {
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', color:'#1a2340', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-        .ann-card:hover{border-color:rgba(255,200,0,0.4)!important;transform:translateY(-2px)}
-        .ann-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
-        .ann-inp::placeholder{color:rgba(255,255,255,0.3)}
-        .ann-inp:focus{border-color:rgba(255,200,0,0.5)}
-        .obj-btn{flex:1;padding:14px 8px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#8098b8;cursor:pointer;font-weight:600;font-size:13px;text-align:center;transition:all .2s}
-        .obj-btn.active{background:rgba(255,200,0,0.12);border-color:rgba(255,200,0,0.5);color:#ffd700}
-        .fmt-btn{flex:1;padding:16px 8px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#8098b8;cursor:pointer;text-align:center;transition:all .2s}
-        .fmt-btn.active{background:rgba(30,111,255,0.15);border-color:rgba(30,111,255,0.5);color:#4da6ff}
+        .ann-card:hover{border-color:#1a6bff!important;transform:translateY(-2px)}
+        .ann-inp{width:100%;background:#fff;border:1px solid #dce6f7;border-radius:10px;padding:12px 14px;color:#1a2340;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
+        .ann-inp::placeholder{color:#8098b8}
+        .ann-inp:focus{border-color:#1a6bff}
+        .obj-btn{flex:1;padding:14px 8px;border-radius:12px;border:1px solid #dce6f7;background:#fff;color:#8098b8;cursor:pointer;font-weight:600;font-size:13px;text-align:center;transition:all .2s}
+        .obj-btn.active{background:#eaf1ff;border-color:#1a6bff;color:#1a6bff}
+        .fmt-btn{flex:1;padding:16px 8px;border-radius:12px;border:1px solid #dce6f7;background:#fff;color:#8098b8;cursor:pointer;text-align:center;transition:all .2s}
+        .fmt-btn.active{background:#eaf1ff;border-color:#1a6bff;color:#1a6bff}
       `}</style>
 
       {/* HEADER */}
-      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
         <div style={{ display:'flex', gap:8 }}>
-          <a href="/studio" style={{ background:'rgba(255,200,0,0.1)', border:'1px solid rgba(255,200,0,0.3)', borderRadius:8, padding:'6px 12px', color:'#ffd700', fontSize:12, fontWeight:700, textDecoration:'none' }}>🎬 DZ Studio</a>
+          <a href="/studio" style={{ background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:8, padding:'6px 12px', color:'#1a6bff', fontSize:12, fontWeight:700, textDecoration:'none' }}>DZ Studio</a>
           <a href="/" style={{ color:'#8098b8', fontSize:13, textDecoration:'none', padding:'6px 10px' }}>← Accueil</a>
         </div>
       </div>
@@ -5093,6 +5278,7 @@ export default function App() {
         <Route path="/annonceurs" element={<AnnonceursPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
         <Route path="/commercial" element={<CommercialPage />} />
+        <Route path="/responsable" element={<ResponsablePage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
