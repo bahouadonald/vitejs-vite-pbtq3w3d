@@ -4025,8 +4025,8 @@ function AnnonceursPage() {
         {!sent ? (
           <>
             {/* OBJECTIF */}
-            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
-              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>🎯 VOTRE OBJECTIF</p>
+            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>VOTRE OBJECTIF</p>
               <div style={{ display:'flex', gap:10 }}>
                 <button className={'obj-btn' + (form.objectif==='visibilite'?' active':'')} onClick={() => set('objectif','visibilite')}>
                   <p style={{ fontSize:22, marginBottom:4 }}>👁️</p>
@@ -4042,8 +4042,8 @@ function AnnonceursPage() {
             </div>
 
             {/* FORMAT */}
-            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
-              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>📢 FORMAT</p>
+            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>FORMAT</p>
               <div style={{ display:'flex', gap:10 }}>
                 <button className={'fmt-btn' + (form.format==='image'?' active':'')} onClick={() => set('format','image')}>
                   <p style={{ fontSize:28, marginBottom:6 }}>🖼️</p>
@@ -4059,39 +4059,43 @@ function AnnonceursPage() {
             </div>
 
             {/* SIMULATEUR DE VUES */}
-            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
-              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:6 }}>📈 SIMULATEUR DE CAMPAGNE</p>
-              <p style={{ color:'#4a5878', fontSize:11, marginBottom:14 }}>Combien de vues voulez-vous ?</p>
+            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:6 }}>SIMULATEUR DE CAMPAGNE</p>
+              <p style={{ color:'#8098b8', fontSize:11, marginBottom:14 }}>Combien de vues voulez-vous ?</p>
               <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
                 {[1000,5000,10000,50000].map(v => (
                   <button key={v} onClick={() => set('vues', String(v))}
-                    style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${form.vues===String(v)?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.1)'}`, background: form.vues===String(v)?'rgba(255,200,0,0.12)':'rgba(255,255,255,0.04)', color: form.vues===String(v)?'#ffd700':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                    style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${form.vues===String(v)?'#1a6bff':'#dce6f7'}`, background: form.vues===String(v)?'#eaf1ff':'#fff', color: form.vues===String(v)?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600 }}>
                     {v.toLocaleString()}
                   </button>
                 ))}
               </div>
               <input className="ann-inp" type="number" value={form.vues} onChange={e => set('vues',e.target.value)} placeholder="Ou entrez un nombre de vues..." style={{ marginBottom:0 }} />
               {vuesNum > 0 && (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:14 }}>
-                  <div style={{ background:'rgba(255,200,0,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:16, margin:0 }}>{vuesNum.toLocaleString()}</p>
-                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>VUES</p>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:14 }}>
+                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:16, margin:0 }}>{vuesNum.toLocaleString()}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>VUES</p>
                   </div>
-                  <div style={{ background:'rgba(30,111,255,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#4da6ff', fontWeight:800, fontSize:14, margin:0 }}>{clicsMin.toLocaleString()}–{clicsMax.toLocaleString()}</p>
-                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>CLICS EST.</p>
+                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{clicsMin.toLocaleString()}–{clicsMax.toLocaleString()}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>CLICS EST.</p>
                   </div>
-                  <div style={{ background:'rgba(77,255,154,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#4dff9a', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
-                    <p style={{ color:'#6a88aa', fontSize:9, margin:'3px 0 0' }}>FCFA</p>
+                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{Math.round(vuesNum*0.04).toLocaleString()}–{Math.round(vuesNum*0.2).toLocaleString()}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>DISCUSSIONS EST.</p>
+                  </div>
+                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
+                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>FCFA</p>
                   </div>
                 </div>
               )}
             </div>
 
             {/* FORMULAIRE */}
-            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'20px 16px', marginBottom:16 }}>
-              <p style={{ color:'#6a88aa', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:16 }}>📝 VOS INFORMATIONS</p>
+            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
+              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:16 }}>VOS INFORMATIONS</p>
               <input className="ann-inp" value={form.nom} onChange={e => set('nom',e.target.value)} placeholder="Nom & Prénom *" />
               <input className="ann-inp" value={form.entreprise} onChange={e => set('entreprise',e.target.value)} placeholder="Entreprise / Marque (optionnel)" />
               <input className="ann-inp" value={form.telephone} onChange={e => set('telephone',e.target.value)} placeholder="Téléphone WhatsApp * (+225...)" type="tel" />
