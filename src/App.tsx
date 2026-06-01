@@ -105,7 +105,7 @@ function Spectrogram({ playing }: { playing: boolean }) {
 }
 
 // ─────────────────────────────────────────────
-// AUDIO PLAYER — simplifié, robuste, CSS spectro
+// AUDIO PLAYER — bannière pub pendant lecture + pub plein écran après arrêt 7s
 // ─────────────────────────────────────────────
 function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: string, duration: number) => void }) {
   const [idx, setIdx] = useState(0);
@@ -115,18 +115,24 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [ct, setCt] = useState(0);
   const ref = useRef<HTMLAudioElement>(null);
   const streamStart = useRef<number>(0);
+  const stopTimer = useRef<any>(null);
   const cur = files[idx];
 
-  // Pub après arrêt ou fin de piste
+  // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [pendingNext, setPendingNext] = useState(false);
 
+  // Pub plein écran pendant lecture — musique continue
+  const [showPubDuringPlay, setShowPubDuringPlay] = useState(false);
+
+  // Afficher pub plein écran 10 secondes après début lecture
   useEffect(() => {
-    if (!ref.current) return;
-    ref.current.pause();
-    ref.current.load();
-    if (playing) ref.current.play().catch(() => setPlaying(false));
-  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!playing) return;
+    const t = setTimeout(() => {
+      if (playing) setShowPubDuringPlay(true);
+    }, 10000); // 10s après le début
+    return () => clearTimeout(t);
+  }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = () => {
     if (!ref.current) return;
@@ -135,16 +141,20 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause();
       setPlaying(false);
-      // Pub après arrêt
-      setPendingNext(false);
-      setShowPubAfter(true);
+      // Timer 7s — si pas de reprise → pub plein écran
+      stopTimer.current = setTimeout(() => {
+        setPendingNext(false);
+        setShowPubAfter(true);
+      }, 7000);
     } else {
-      // Lecture directe — pas de pub avant
+      if (stopTimer.current) clearTimeout(stopTimer.current);
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
   };
+
+  useEffect(() => () => { if (stopTimer.current) clearTimeout(stopTimer.current); }, []);
 
   const prev = () => {
     if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
@@ -154,7 +164,6 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
     if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
   };
 
-  // Après pub → passer à la piste suivante ou rester
   const afterPub = () => {
     setShowPubAfter(false);
     if (pendingNext && idx < files.length - 1) {
@@ -170,8 +179,13 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   return (
     <div style={{ background: 'rgba(15,20,40,0.95)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(30,111,255,0.18)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
 
-      {/* PUB après arrêt ou fin de piste */}
+      {/* PUB plein écran après arrêt/fin */}
       {showPubAfter && <PubOverlay trigger="track" onDone={afterPub} />}
+
+      {/* PUB plein écran pendant lecture — musique continue en arrière-plan */}
+      {showPubDuringPlay && (
+        <PubOverlay trigger="play" onDone={() => setShowPubDuringPlay(false)} />
+      )}
 
       <audio ref={ref} src={cur?.url}
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
@@ -179,7 +193,6 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
         onEnded={() => {
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) {
-            // Pub après fin de piste
             setPlaying(false);
             setPendingNext(true);
             setShowPubAfter(true);
@@ -246,16 +259,37 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
 // ─────────────────────────────────────────────
 
 // ─────────────────────────────────────────────
-// VIDEO PLAYER
+// VIDEO PLAYER — pub avant/après comme YouTube
 // ─────────────────────────────────────────────
 function VideoPlayer({ files }: { files: any[] }) {
   const [idx, setIdx] = useState(0);
+  const [showPubBefore, setShowPubBefore] = useState(true); // pub avant la première vidéo
+  const [showPubAfter, setShowPubAfter] = useState(false);
+  const [pendingIdx, setPendingIdx] = useState<number|null>(null);
   const ref = useRef<HTMLVideoElement>(null);
   if (!files || files.length === 0) return null;
   const cur = files[idx];
 
   return (
-    <div style={{ background: '#f5f8ff', borderRadius: 14, overflow: 'hidden', marginBottom: 16, border: '1px solid #dce6f7' }}>
+    <div style={{ background: '#000', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+
+      {/* Pub avant lecture vidéo */}
+      {showPubBefore && (
+        <PubOverlay trigger="play" onDone={() => setShowPubBefore(false)} />
+      )}
+
+      {/* Pub après fin vidéo */}
+      {showPubAfter && (
+        <PubOverlay trigger="track" onDone={() => {
+          setShowPubAfter(false);
+          if (pendingIdx !== null) {
+            setIdx(pendingIdx);
+            setPendingIdx(null);
+            setShowPubBefore(true); // pub avant la prochaine vidéo
+          }
+        }} />
+      )}
+
       {/* Lecteur vidéo */}
       <video
         ref={ref}
@@ -264,24 +298,37 @@ function VideoPlayer({ files }: { files: any[] }) {
         controls
         controlsList="nodownload"
         style={{ width: '100%', maxHeight: 280, background: '#000', display: 'block' }}
-        onEnded={() => { if (idx < files.length - 1) setIdx(i => i + 1); }}
+        onEnded={() => {
+          if (idx < files.length - 1) {
+            // Pub après fin + avant prochaine
+            setPendingIdx(idx + 1);
+            setShowPubAfter(true);
+          }
+        }}
       />
+
       {/* Titre */}
-      <div style={{ padding: '12px 16px', borderBottom: files.length > 1 ? '1px solid #dce6f7' : 'none' }}>
-        <p style={{ fontWeight: 700, fontSize: 13 }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (idx + 1)}</p>
-        <p style={{ color: '#8098b8', fontSize: 11, marginTop: 2 }}>{idx + 1} / {files.length}</p>
+      <div style={{ padding: '12px 16px', borderBottom: files.length > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', background:'rgba(0,0,0,0.8)' }}>
+        <p style={{ fontWeight: 700, fontSize: 13, color:'#fff' }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (idx + 1)}</p>
+        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>{idx + 1} / {files.length}</p>
       </div>
+
       {/* Liste clips */}
       {files.length > 1 && (
-        <div style={{ padding: '8px 0' }}>
+        <div style={{ padding: '8px 0', background:'rgba(0,0,0,0.6)' }}>
           {files.map((f, i) => (
-            <div key={i} onClick={() => { setIdx(i); setTimeout(() => ref.current?.play(), 100); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', background: i === idx ? '#eaf1ff' : 'transparent' }}>
-              <span style={{ color: i === idx ? '#1a6bff' : '#8098b8', fontSize: 14 }}>{i === idx ? '▶' : '○'}</span>
-              <span style={{ fontSize: 12, color: i === idx ? '#1a6bff' : '#5a7090', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div key={i} onClick={() => {
+              if (i !== idx) {
+                // Pub avant chaque changement de vidéo
+                setPendingIdx(i);
+                setShowPubAfter(true);
+              }
+            }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', background: i === idx ? 'rgba(30,111,255,0.2)' : 'transparent' }}>
+              <span style={{ color: i === idx ? '#4da6ff' : 'rgba(255,255,255,0.4)', fontSize: 14 }}>{i === idx ? '▶' : '○'}</span>
+              <span style={{ fontSize: 12, color: i === idx ? '#fff' : 'rgba(255,255,255,0.6)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {f.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (i + 1)}
               </span>
-              <span style={{ fontSize: 10, color: '#2a3a60' }}>🎬</span>
             </div>
           ))}
         </div>
@@ -850,6 +897,116 @@ function FanPage() {
 // ─────────────────────────────────────────────
 // ARTISTES TAB — Liste des artistes enregistrés
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// COMMERCIAUX TAB — validation des demandes
+// ─────────────────────────────────────────────
+function CommerciauxtTab({ db }: { db: any }) {
+  const [commerciaux, setCommerciaux] = useState<any[]>([]);
+  const [responsableEmail, setResponsableEmail] = useState('');
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'commerciaux'), orderBy('createdAt', 'desc')),
+      snap => setCommerciaux(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [db]);
+
+  const valider = async (c: any) => {
+    await updateDoc(doc(db, 'commerciaux', c.id), {
+      status: 'valide',
+      responsableEmail: responsableEmail || '',
+      validatedAt: new Date().toISOString(),
+    });
+    setMsg('✅ ' + c.nom + ' validé !');
+  };
+
+  const refuser = async (c: any) => {
+    await updateDoc(doc(db, 'commerciaux', c.id), { status: 'refuse' });
+  };
+
+  const enAttente = commerciaux.filter(c => c.status === 'en_attente');
+  const valides = commerciaux.filter(c => c.status === 'valide');
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+        <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800 }}>👔 Commerciaux</h2>
+        <div style={{ display:'flex', gap:8 }}>
+          <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'3px 12px', fontSize:12, color:'#b07a00', fontWeight:700 }}>
+            {enAttente.length} en attente
+          </span>
+          <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:12, color:'#00a040', fontWeight:700 }}>
+            {valides.length} validés
+          </span>
+        </div>
+      </div>
+
+      {msg && <p style={{ color:'#1a6bff', fontSize:13, marginBottom:12 }}>{msg}</p>}
+
+      {/* Email responsable optionnel */}
+      <div style={{ ...S.card, background:'#f5f8ff', marginBottom:20 }}>
+        <label style={S.lbl}>Email du responsable commercial (optionnel)</label>
+        <input style={S.inp} type="email" value={responsableEmail} onChange={e => setResponsableEmail(e.target.value)}
+          placeholder="responsable@email.com" />
+        <p style={{ color:'#8098b8', fontSize:11 }}>Si renseigné, le commercial sera lié à ce responsable</p>
+      </div>
+
+      {/* EN ATTENTE */}
+      {enAttente.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <p style={{ fontWeight:700, fontSize:13, color:'#b07a00', marginBottom:12 }}>En attente de validation</p>
+          {enAttente.map(c => (
+            <div key={c.id} style={{ ...S.card, marginBottom:10, borderLeft:'3px solid #f0b84a' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.nom}</p>
+                  <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
+                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>
+                  <p style={{ color:'#b0c4d8', fontSize:10, marginTop:4 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => valider(c)} style={{ ...S.btn, fontSize:12, padding:'6px 14px' }}>✅ Valider</button>
+                  <button onClick={() => refuser(c)} style={{ ...S.btnRed, fontSize:12, padding:'6px 14px' }}>✕ Refuser</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* VALIDÉS */}
+      {valides.length > 0 && (
+        <div>
+          <p style={{ fontWeight:700, fontSize:13, color:'#00a040', marginBottom:12 }}>Commerciaux validés</p>
+          {valides.map(c => (
+            <div key={c.id} style={{ ...S.card, marginBottom:10, borderLeft:'3px solid #4dff9a' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.nom}</p>
+                  <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
+                  {c.responsableEmail && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Responsable : {c.responsableEmail}</p>}
+                </div>
+                <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:11, color:'#00a040', fontWeight:700 }}>
+                  ✅ Validé
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {commerciaux.length === 0 && (
+        <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+          <p style={{ fontSize:36, marginBottom:10 }}>👔</p>
+          <p style={{ color:'#5a7090', fontSize:14 }}>Aucune demande pour l'instant</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ArtistesTab({ db, qrcodes }: { db: any, qrcodes: any[] }) {
   const [artistes, setArtistes] = useState<any[]>([]);
   const [nom, setNom] = useState('');
@@ -1220,6 +1377,16 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
         )}
       </div>
 
+      {/* Grand bouton d'action — apparaît à la fin des 30 secondes */}
+      {elapsed >= PUB_DURATION && pub.lien && (
+        <div style={{ width:'100%', maxWidth:500, marginTop:12 }}>
+          <button onClick={handleClick}
+            style={{ width:'100%', padding:'18px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, cursor:'pointer', letterSpacing:0.5, boxShadow:'0 4px 20px rgba(30,111,255,0.5)', animation:'pubIn .4s ease' }}>
+            {pub.btnLabel || (pub.lienType==='tel' ? 'Appeler maintenant' : pub.lienType==='whatsapp' ? 'Discuter maintenant' : 'Plus d\'infos')}
+          </button>
+        </div>
+      )}
+
       {/* Bouton Passer / compteur */}
       <div style={{ marginTop:14, display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', maxWidth:500 }}>
         <span style={{ color:'rgba(255,255,255,0.35)', fontSize:11 }}>{remaining}s</span>
@@ -1334,7 +1501,7 @@ function AdminPage() {
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
   const [pubs, setPubs] = useState<any[]>([]);
   const [pubModal, setPubModal] = useState(false);
-  const [pubForm, setPubForm] = useState({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+  const [pubForm, setPubForm] = useState({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', active:true });
   const [pubUploading, setPubUploading] = useState(false);
   const [adminChatId, setAdminChatId] = useState<string|null>(null);
   const [adminChatMsgs, setAdminChatMsgs] = useState<any[]>([]);
@@ -1789,6 +1956,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff', overflowX:'auto' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>🎤 Artistes</button>
+        <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>👔 Commerciaux</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
           📢 Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
@@ -1898,6 +2066,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
           </>
         )}
 
+        {tab === 'commerciaux' && <CommerciauxtTab db={db} />}
+
         {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} />}
 
         {tab === 'pubs' && (
@@ -1922,6 +2092,22 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
                   <label style={S.lbl}>Sous-titre</label>
                   <input style={S.inp} value={pubForm.sousTitre} onChange={e => setPubForm(f => ({...f, sousTitre:e.target.value}))} placeholder="Ex: Contactez-nous pour diffuser votre pub" />
+
+                  <label style={S.lbl}>Texte du bouton d'action</label>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                    {[
+                      ['Acheter maintenant','#1a6bff'],
+                      ['Souscrire maintenant','#1a6bff'],
+                      ['Appeler maintenant','#00a040'],
+                      ['Discuter maintenant','#1a6bff'],
+                      ['Plus d\'infos','#5a7090'],
+                    ].map(([label, color]) => (
+                      <button key={label} onClick={() => setPubForm(f => ({...f, btnLabel:label}))}
+                        style={{ padding:'7px 12px', borderRadius:8, border:`1px solid ${pubForm.btnLabel===label?'#1a6bff':'#c8d8ef'}`, background: pubForm.btnLabel===label?'#eaf1ff':'#fff', color: pubForm.btnLabel===label?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
 
                   <label style={S.lbl}>Type d'action au clic</label>
                   <div style={{ display:'flex', gap:8, marginBottom:12 }}>
@@ -2490,8 +2676,19 @@ function ArtistPage() {
                         <p style={{ fontWeight:700, fontSize:14 }}>{link.label}</p>
                         <p style={{ color:'#8098b8', fontSize:12 }}>Streaming illimité · Sans scan limité</p>
                       </div>
-                      <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
-                        style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>📋 Copier</button>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
+                          style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>Copier</button>
+                        <button onClick={() => {
+                          const url = BASE_URL+'/ecoute/'+link.publicLinkId;
+                          const msg = `🎵 ${link.label} — Écoutez et téléchargez mon tout nouveau contenu !\n\nCliquez sur le lien pour écouter 👉 ${url}`;
+                          if (navigator.share) {
+                            navigator.share({ title: link.label, text: msg, url });
+                          } else {
+                            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                          }
+                        }} style={{ ...S.btn2, padding:'8px 14px', fontSize:12 }}>Partager</button>
+                      </div>
                     </div>
                     <p style={{ color:'#8098b8', fontSize:10, marginTop:8, marginBottom:12, wordBreak:'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
                     {/* QR CODE DU LIEN PUBLIC */}
@@ -3040,6 +3237,7 @@ function UserAuthPage() {
         <div style={{ display: 'flex', gap: 6 }}>
           <a href="/artiste" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
           <a href="/annonceurs" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
+          <a href="/commercial" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>👔 Commercial</a>
           <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'transparent', fontSize: 6, fontWeight: 600, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
         </div>
       </div>
@@ -3250,6 +3448,7 @@ function ZikothequePage({ user }: { user: any }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
           <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
+          <a href="/commercial" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>👔 Commercial</a>
           {user.email === ADMIN_EMAIL && (
             <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
           )}
@@ -3623,6 +3822,9 @@ function ResponsablePage() {
   );
 }
 
+// ─────────────────────────────────────────────
+// PAGE INSCRIPTION COMMERCIAL — /commercial/inscription
+// ─────────────────────────────────────────────
 function CommercialPage() {
   const [view, setView] = useState<'login'|'dashboard'>('login');
   const [email, setEmail] = useState('');
@@ -3658,8 +3860,14 @@ function CommercialPage() {
 
   const login = async () => {
     setLoading(true); setMsg('');
-    try { await signInWithEmailAndPassword(auth, email, password); }
-    catch { setMsg('Email ou mot de passe incorrect'); }
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDocs(query(collection(db, 'commerciaux'), where('email','==', cred.user.email), where('status','==','valide')));
+      if (snap.empty) {
+        await signOut(auth);
+        setMsg('Cet email n\'est pas enregistré comme commercial Doniel Zik. Contactez-nous.');
+      }
+    } catch { setMsg('Email ou mot de passe incorrect'); }
     setLoading(false);
   };
 
@@ -3682,10 +3890,15 @@ function CommercialPage() {
           <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
           <label style={S.lbl}>Mot de passe</label>
           <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
-          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
           <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
             {loading ? '⏳...' : 'Se connecter'}
           </button>
+          <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', marginTop:14 }}>
+            <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.7, margin:0 }}>
+              ⚠️ Seuls les commerciaux enregistrés par Doniel Zik peuvent accéder à cet espace.
+            </p>
+          </div>
           <button onClick={async () => {
             if (!email) { setMsg('Entrez votre email d\'abord'); return; }
             try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
