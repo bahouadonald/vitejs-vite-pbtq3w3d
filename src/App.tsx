@@ -2202,7 +2202,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                     try {
                       await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
                       setPubModal(false);
-                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
                       setMsg('✅ Pub publiée !');
                     } catch(e:any) {
                       setMsg('Erreur: ' + e.message);
