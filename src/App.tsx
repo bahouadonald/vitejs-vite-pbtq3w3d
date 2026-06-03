@@ -712,7 +712,9 @@ function FanPage() {
   const [downloaded, setDownloaded] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
-  const [showZikoTuto, setShowZikoTuto] = useState(false); // tuto après écoute/DL
+  const [showZikoTuto, setShowZikoTuto] = useState(false);
+  const [tutoStep, setTutoStep] = useState(0); // 0=inactif, 1=play, 2=dl, 3=like, 4=cadeau, 5=ziko, 6=pwa
+  const [tutoSeen, setTutoSeen] = useState(false);
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -731,6 +733,10 @@ function FanPage() {
       } catch (e) { console.error('visit', e); }
       // Plus de mode locked — toujours ready, le DL épuisé est géré dans le JSX
       setStep('ready');
+      // Démarrer tuto si première visite
+      if (!localStorage.getItem('dz_tuto_seen')) {
+        setTimeout(() => setTutoStep(1), 1500);
+      }
     };
     load();
   }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -879,12 +885,52 @@ function FanPage() {
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
           {/* PUB après téléchargement gratuit */}
+      {/* ── SÉQUENCE TUTOS — première visite ── */}
+      {tutoStep > 0 && tutoStep <= 6 && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} />
+          <div style={{ position:'absolute', bottom: tutoStep === 6 ? 0 : 180, left:0, right:0, padding:'0 20px', pointerEvents:'auto' }}>
+            <div style={{ background:'#fff', borderRadius:16, padding:'18px 20px', maxWidth:500, margin:'0 auto', boxShadow:'0 8px 32px rgba(0,0,0,0.4)', animation:'pubIn .3s ease' }}>
+              {tutoStep === 1 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Écoutez la musique</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Appuyez sur le bouton Play pour écouter le contenu de votre artiste préféré.</p></>}
+              {tutoStep === 2 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Téléchargez le contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Téléchargez ce contenu sur votre téléphone pour l'écouter hors ligne.</p></>}
+              {tutoStep === 3 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Aimez ce contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Montrez votre soutien à votre artiste en aimant son contenu.</p></>}
+              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Offrez un cadeau à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un cadeau virtuel.</p></>}
+              {tutoStep === 5 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Ajoutez à votre Zikothèque</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Sauvegardez ce contenu. Même si vous changez de téléphone, vous le retrouverez toujours.</p></>}
+              {tutoStep === 6 && <>
+                <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
+                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
+                  Télécharger l'application maintenant
+                </button>
+                <button onClick={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  Plus tard
+                </button>
+              </>}
+              {tutoStep < 6 && (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', gap:4 }}>
+                    {[1,2,3,4,5,6].map(i => (
+                      <div key={i} style={{ width:i===tutoStep?16:6, height:6, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
+                    ))}
+                  </div>
+                  <button onClick={() => setTutoStep(s => s + 1)}
+                    style={{ padding:'8px 20px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Suivant →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
       )}
 
-      {/* PUB MAISON — avant tout le contenu */}
-          <PubBanner />
+      {/* PUB MAISON — supprimée sur FanPage, remplacée par tuto */}
 
           {/* POCHETTE — grande, visible, centrée en haut */}
           <div style={{ position:'relative', width:'100%', background:'#0a0c14' }}>
@@ -1680,7 +1726,8 @@ function PubBanner() {
   const [showInactive, setShowInactive] = useState(false);
   const [inactiveDone, setInactiveDone] = useState(false);
   const inactiveTimer = useRef<any>(null);
-  const INACTIVE_DELAY = 5 * 60 * 1000; // 5 minutes
+  // Délai aléatoire entre 45 et 60 secondes
+  const getInactiveDelay = () => (45 + Math.random() * 15) * 1000;
 
   // Pub d'ouverture de page
   useEffect(() => {
@@ -1694,7 +1741,7 @@ function PubBanner() {
     inactiveTimer.current = setTimeout(() => {
       setInactiveDone(false);
       setShowInactive(true);
-    }, INACTIVE_DELAY);
+    }, getInactiveDelay());
   };
 
   useEffect(() => {
@@ -3478,6 +3525,51 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
 // ─────────────────────────────────────────────
 // USER AUTH PAGE — Connexion utilisateur
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// LANDING PAGE — page d'accueil professionnelle
+// ─────────────────────────────────────────────
+function LandingPage() {
+  return (
+    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#060d2a 0%,#091840 40%,#040e28 100%)', color:'#fff', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 24px', textAlign:'center' }}>
+      <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
+
+      {/* Logo animé */}
+      <div style={{ animation:'float 3s ease infinite', marginBottom:24 }}>
+        <Logo size="lg" />
+      </div>
+
+      <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, letterSpacing:3, fontWeight:600, marginBottom:40, textTransform:'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
+
+      {/* Bouton principal */}
+      <a href="/ziko" style={{ display:'block', width:'100%', maxWidth:360, padding:'18px', borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:16, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
+        Accéder à ma Zikothèque
+      </a>
+
+      <a href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:'15px', borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
+        Découvrir des contenus
+      </a>
+
+      {/* Boutons secondaires */}
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center', marginBottom:32 }}>
+        <a href="/artiste" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
+          Artiste
+        </a>
+        <a href="/annonceurs" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
+          Annonceurs
+        </a>
+        <a href="/commercial" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
+          Commercial
+        </a>
+      </div>
+
+      {/* Admin caché */}
+      <a href="/admin" style={{ color:'rgba(255,255,255,0.15)', fontSize:10, textDecoration:'none' }}>
+        ·
+      </a>
+    </div>
+  );
+}
+
 function UserAuthPage() {
   const [mode, setMode] = useState<'choose' | 'email' | 'phone' | 'register'>('choose');
   const [email, setEmail] = useState('');
@@ -3966,14 +4058,14 @@ function ZikothequePage({ user }: { user: any }) {
       {/* BARRE NAVIGATION FIXE EN BAS */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:currentAlbum ? 98 : 99 }}>
         {[
-          { icon:'🏠', label:'Accueil', path:'/' },
-          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
-          { icon:'🔔', label:'Notifs', path:'/notifications' },
-          { icon:'👤', label:'Profil', path:'/profil' },
+          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
+          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ fontSize:22 }}>{item.icon}</span>
+            {item.svg}
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -4143,14 +4235,14 @@ function DecouvrirPage() {
       {/* BARRE NAVIGATION */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
-          { icon:'🏠', label:'Accueil', path:'/' },
-          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
-          { icon:'🔔', label:'Notifs', path:'/notifications' },
-          { icon:'👤', label:'Profil', path:'/profil' },
+          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
+          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ fontSize:22 }}>{item.icon}</span>
+            {item.svg}
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -4227,14 +4319,14 @@ function ProfilPage() {
       {/* BARRE NAVIGATION */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
-          { icon:'🏠', label:'Accueil', path:'/' },
-          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
-          { icon:'🔔', label:'Notifs', path:'/notifications' },
-          { icon:'👤', label:'Profil', path:'/profil' },
+          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
+          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ fontSize:22 }}>{item.icon}</span>
+            {item.svg}
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -6247,7 +6339,7 @@ export default function App() {
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
-          authLoading ? null : user ? <ZikothequePage user={user} /> : <UserAuthPage />
+          authLoading ? null : user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
       </Routes>
     </BrowserRouter>
