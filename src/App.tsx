@@ -108,32 +108,32 @@ function Spectrogram({ playing }: { playing: boolean }) {
 // ─────────────────────────────────────────────
 // CADEAUX VIRTUELS — style TikTok
 // ─────────────────────────────────────────────
-const CADEAUX = [
-  { id:'note', icon:'🎵', label:'Note musicale', prix:100, partArtiste:70 },
-  { id:'micro', icon:'🎤', label:'Micro', prix:500, partArtiste:350 },
-  { id:'trophee', icon:'🏆', label:'Trophée', prix:1000, partArtiste:700 },
-  { id:'couronne', icon:'👑', label:'Couronne', prix:5000, partArtiste:3500 },
+const KIFFEMENTS = [
+  { id:'note', icon:'🎵', label:'Note', prix:100, partArtiste:70, coins:1 },
+  { id:'micro', icon:'🎤', label:'Micro', prix:500, partArtiste:350, coins:5 },
+  { id:'trophee', icon:'🏆', label:'Trophée', prix:1000, partArtiste:700, coins:10 },
+  { id:'couronne', icon:'👑', label:'Couronne', prix:5000, partArtiste:3500, coins:50 },
 ];
 
-function CadeauxSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState<string|null>(null);
   const [msg, setMsg] = useState('');
   const user = auth.currentUser;
 
-  const envoyer = async (cadeau: typeof CADEAUX[0]) => {
-    if (!user) { alert('Connectez-vous pour envoyer un cadeau'); return; }
-    setSending(cadeau.id);
+  const envoyer = async (kiffement: typeof CADEAUX[0]) => {
+    if (!user) { alert('Connectez-vous pour envoyer un kiffement'); return; }
+    setSending(kiffement.id);
     try {
-      // Créer la transaction cadeau (paiement Wave à intégrer)
-      await addDoc(collection(db, 'cadeaux'), {
+      // Créer la transaction kiffement (paiement Wave à intégrer)
+      await addDoc(collection(db, 'kiffementx'), {
         qrId, artistEmail,
-        cadeauId: cadeau.id,
-        cadeauLabel: cadeau.label,
-        cadeauIcon: cadeau.icon,
-        montant: cadeau.prix,
-        partArtiste: cadeau.partArtiste,
-        partPlateforme: cadeau.prix - cadeau.partArtiste,
+        kiffementId: kiffement.id,
+        kiffementLabel: kiffement.label,
+        kiffementIcon: kiffement.icon,
+        montant: kiffement.prix,
+        partArtiste: kiffement.partArtiste,
+        partPlateforme: kiffement.prix - kiffement.partArtiste,
         userId: user.uid,
         userName: user.displayName || user.email?.split('@')[0],
         status: 'pending', // sera 'paid' après confirmation Wave
@@ -143,14 +143,14 @@ function CadeauxSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
       if (artistEmail) {
         await addDoc(collection(db, 'notifications'), {
           to: artistEmail,
-          type: 'cadeau',
-          text: `${user.displayName || 'Un fan'} vous a envoyé ${cadeau.icon} ${cadeau.label}`,
+          type: 'kiffement',
+          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.icon} ${kiffement.label}`,
           qrId, from: user.displayName || user.email,
           createdAt: new Date().toISOString(),
           lu: false,
         });
       }
-      setMsg(`${cadeau.icon} Cadeau envoyé ! Paiement Wave à confirmer.`);
+      setMsg(`${kiffement.icon} Kiffement envoyé ! Paiement Wave à confirmer.`);
       setTimeout(() => setMsg(''), 3000);
     } catch(e) { console.error(e); }
     setSending(null);
@@ -160,15 +160,15 @@ function CadeauxSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
     <div style={{ marginBottom:16 }}>
       <button onClick={() => setOpen(!open)}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
-        🎁 Cadeau
+        🎁 Kiffement
       </button>
 
       {open && (
         <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
-          <p style={{ color:'#8098b8', fontSize:12, marginBottom:12 }}>Offrez un cadeau à cet artiste</p>
+          <p style={{ color:'#8098b8', fontSize:12, marginBottom:12 }}>Envoyez un kiffement à cet artiste</p>
           {msg && <p style={{ color:'#ffd700', fontSize:13, marginBottom:10 }}>{msg}</p>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-            {CADEAUX.map(c => (
+            {KIFFEMENTS.map(k => (
               <button key={c.id} onClick={() => envoyer(c)} disabled={sending === c.id}
                 style={{ padding:'12px 8px', borderRadius:12, border:'1px solid rgba(255,200,0,0.2)', background:'rgba(255,200,0,0.05)', cursor:'pointer', textAlign:'center', transition:'all .2s' }}>
                 <p style={{ fontSize:24, margin:'0 0 4px' }}>{c.icon}</p>
@@ -271,6 +271,219 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// TRAVAILLEURS — classement des donateurs + messages honorifiques
+// ─────────────────────────────────────────────
+const MESSAGES_HONORIFIQUES = [
+  "Merci infiniment pour ton soutien, tu es un vrai Travailleur !",
+  "Ton kiffement me touche profondément, que Dieu te bénisse !",
+  "Tu es la raison pour laquelle je continue à créer. Merci !",
+  "Un grand merci à toi, mon fidèle Travailleur !",
+  "Ton soutien me donne de l'énergie. Je te dédie cette musique !",
+];
+
+function Travailleurs({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+  const [travailleurs, setTravailleurs] = useState<any[]>([]);
+  const [showReply, setShowReply] = useState<string|null>(null);
+  const [replyMsg, setReplyMsg] = useState('');
+  const user = auth.currentUser;
+  const isArtist = user?.email === artistEmail;
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db,'cadeaux'), where('qrId','==',qrId)),
+      snap => {
+        const map: Record<string, any> = {};
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const uid = data.userId;
+          if (!map[uid]) map[uid] = { userId:uid, userName:data.userName, coins:0, count:0 };
+          map[uid].coins += data.coins || 0;
+          map[uid].count += 1;
+        });
+        const sorted = Object.values(map).sort((a:any,b:any) => b.coins - a.coins);
+        setTravailleurs(sorted);
+      }
+    );
+    return unsub;
+  }, [qrId]);
+
+  const getTitre = (coins: number) => {
+    if (coins >= 50) return { titre:'Travailleur Elite', color:'#ffd700' };
+    if (coins >= 20) return { titre:'Grand Travailleur', color:'#c0c0c0' };
+    if (coins >= 10) return { titre:'Travailleur', color:'#cd7f32' };
+    return { titre:'Supporter', color:'#8098b8' };
+  };
+
+  const sendReply = async (travailleur: any) => {
+    if (!replyMsg) return;
+    await addDoc(collection(db,'notifications'), {
+      to: travailleur.userId,
+      type: 'remerciement',
+      text: replyMsg,
+      from: user?.displayName || artistEmail,
+      qrId,
+      createdAt: new Date().toISOString(),
+      lu: false,
+    });
+    setShowReply(null);
+    setReplyMsg('');
+    alert('Message envoyé !');
+  };
+
+  if (travailleurs.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <p style={{ fontSize:11, fontWeight:700, color:'#ffd700', letterSpacing:1, marginBottom:8, textTransform:'uppercase' }}>
+        Travailleurs
+      </p>
+      {travailleurs.slice(0,5).map((t,i) => {
+        const { titre, color } = getTitre(t.coins);
+        return (
+          <div key={t.userId} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.15)', borderRadius:10, marginBottom:6 }}>
+            <span style={{ fontSize:16, fontWeight:900, color:'#ffd700', minWidth:20 }}>#{i+1}</span>
+            <div style={{ flex:1 }}>
+              <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>{t.userName}</p>
+              <p style={{ fontSize:10, color, margin:0 }}>{titre} · {t.coins} coins · {t.count} kiffements</p>
+            </div>
+            {isArtist && (
+              <button onClick={() => setShowReply(showReply === t.userId ? null : t.userId)}
+                style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,215,0,0.3)', background:'transparent', color:'#ffd700', fontSize:11, cursor:'pointer' }}>
+                Remercier
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Panel remerciement */}
+      {showReply && isArtist && (
+        <div style={{ background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:12, padding:14, marginTop:8 }}>
+          <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:8 }}>Message honorifique</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
+            {MESSAGES_HONORIFIQUES.map((m,i) => (
+              <button key={i} onClick={() => setReplyMsg(m)}
+                style={{ padding:'8px 12px', borderRadius:8, border:`1px solid ${replyMsg===m?'#ffd700':'rgba(255,215,0,0.2)'}`, background: replyMsg===m?'rgba(255,215,0,0.1)':'transparent', color:'#dde4f5', fontSize:12, cursor:'pointer', textAlign:'left' }}>
+                {m}
+              </button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => sendReply(travailleurs.find(t => t.userId === showReply))}
+              style={{ flex:1, padding:10, borderRadius:10, border:'none', background:'#ffd700', color:'#1a2340', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              Envoyer
+            </button>
+            <button onClick={() => setShowReply(null)}
+              style={{ padding:10, borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ACTION BAR — barre horizontale Kiff · Commenter · Kiffement · Buzz
+// ─────────────────────────────────────────────
+function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
+  qrId: string, artistEmail?: string, buzz: number, tutoStep: number, onTutoNext: () => void
+}) {
+  const [kiffs, setKiffs] = useState(0);
+  const [kiffed, setKiffed] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showKiffements, setShowKiffements] = useState(false);
+  const [totalCoins, setTotalCoins] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    const unsub1 = onSnapshot(query(collection(db,'likes'),where('qrId','==',qrId)), snap => {
+      setKiffs(snap.size);
+      if (user) setKiffed(snap.docs.some(d => d.data().userId === user.uid));
+    });
+    const unsub2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), snap => setCommentCount(snap.size));
+    const unsub3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), snap => {
+      const coins = snap.docs.reduce((s,d) => s + (d.data().coins||0), 0);
+      setTotalCoins(coins);
+    });
+    return () => { unsub1(); unsub2(); unsub3(); };
+  }, [qrId, user]);
+
+  const toggleKiff = async () => {
+    if (!user) { alert('Connectez-vous pour kiffer'); return; }
+    if (kiffed) {
+      const snap = await getDocs(query(collection(db,'likes'),where('qrId','==',qrId),where('userId','==',user.uid)));
+      for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
+    } else {
+      await addDoc(collection(db,'likes'),{ qrId, userId:user.uid, createdAt:new Date().toISOString() });
+    }
+    if (tutoStep === 3) onTutoNext();
+  };
+
+  const btnStyle = (active?: boolean, color?: string) => ({
+    flex:1,
+    display:'flex',
+    flexDirection:'column' as const,
+    alignItems:'center',
+    gap:3,
+    padding:'10px 4px',
+    border:'none',
+    background: active ? `rgba(${color||'30,111,255'},0.12)` : 'rgba(255,255,255,0.04)',
+    borderRadius:12,
+    cursor:'pointer',
+    color: active ? (color ? `rgb(${color})` : '#1a6bff') : '#8098b8',
+    transition:'all .2s',
+  });
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      {/* Barre principale */}
+      <div id="action-bar" style={{ display:'flex', gap:6, marginBottom:8 }}>
+        {/* KIFF */}
+        <button id="btn-like" onClick={toggleKiff} style={btnStyle(kiffed, '240,74,106')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={kiffed?'#f04a6a':'none'} stroke={kiffed?'#f04a6a':'#8098b8'} strokeWidth="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span style={{ fontSize:10, fontWeight:700 }}>Kiff {kiffs > 0 ? kiffs : ''}</span>
+        </button>
+
+        {/* COMMENTER */}
+        <button id="btn-comment" onClick={() => { setShowComments(!showComments); if (tutoStep === 4) onTutoNext(); }} style={btnStyle(showComments)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span style={{ fontSize:10, fontWeight:700 }}>Commenter {commentCount > 0 ? commentCount : ''}</span>
+        </button>
+
+        {/* KIFFEMENT */}
+        <button id="btn-kiffement" onClick={() => { setShowKiffements(!showKiffements); if (tutoStep === 5) onTutoNext(); }} style={btnStyle(showKiffements, '255,215,0')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span style={{ fontSize:10, fontWeight:700 }}>Kiffement {totalCoins > 0 ? totalCoins+'c' : ''}</span>
+        </button>
+
+        {/* BUZZ */}
+        <div style={{ ...btnStyle(), cursor:'default' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span style={{ fontSize:10, fontWeight:700 }}>Buzz {buzz > 0 ? buzz : ''}</span>
+        </div>
+      </div>
+
+      {/* Section commentaires dépliable */}
+      {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} />}
+
+      {/* Section kiffements dépliable */}
+      {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} />}
     </div>
   );
 }
@@ -625,7 +838,7 @@ function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => vo
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       onSuccess(result.user.uid);
-    } catch (e: any) { setMsg('Erreur Google: ' + e.message); setLoading(false); }
+    } catch (e: any) { setMsg(e.code === 'auth/popup-closed-by-user' ? 'Connexion annulée. Veuillez réessayer.' : 'Erreur Google: ' + e.message); setLoading(false); }
   };
 
   const loginEmail = async () => {
@@ -893,44 +1106,102 @@ function FanPage() {
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
           {/* PUB après téléchargement gratuit */}
-      {/* ── SÉQUENCE TUTOS — première visite ── */}
+      {/* ── SÉQUENCE TUTOS INDICATEUR — flèche animée sur chaque bouton ── */}
       {tutoStep > 0 && tutoStep <= 6 && (
         <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
-          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} />
-          <div style={{ position:'absolute', bottom: tutoStep === 6 ? 0 : 180, left:0, right:0, padding:'0 20px', pointerEvents:'auto' }}>
-            <div style={{ background:'#fff', borderRadius:16, padding:'18px 20px', maxWidth:500, margin:'0 auto', boxShadow:'0 8px 32px rgba(0,0,0,0.4)', animation:'pubIn .3s ease' }}>
-              {tutoStep === 1 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Écoutez la musique</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Appuyez sur le bouton Play pour écouter le contenu de votre artiste préféré.</p></>}
-              {tutoStep === 2 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Téléchargez le contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Téléchargez ce contenu sur votre téléphone pour l'écouter hors ligne.</p></>}
-              {tutoStep === 3 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Aimez ce contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Montrez votre soutien à votre artiste en aimant son contenu.</p></>}
-              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Offrez un cadeau à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un cadeau virtuel.</p></>}
-              {tutoStep === 5 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Ajoutez à votre Zikothèque</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Sauvegardez ce contenu. Même si vous changez de téléphone, vous le retrouverez toujours.</p></>}
+          {/* Overlay semi transparent */}
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.55)' }} />
+
+          {/* Flèche animée + bulle texte */}
+          <style>{`
+            @keyframes arrowBounce { 0%,100%{transform:translateY(0) rotate(180deg)} 50%{transform:translateY(-10px) rotate(180deg)} }
+            @keyframes arrowBounceUp { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+            @keyframes tutoSlideIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+          `}</style>
+
+          {/* Bulle en bas — texte + indicateur étapes */}
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, pointerEvents:'auto', animation:'tutoSlideIn .3s ease' }}>
+            <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'20px 24px 32px', maxWidth:500, margin:'0 auto', boxShadow:'0 -8px 32px rgba(0,0,0,0.3)' }}>
+              {/* Indicateur étapes */}
+              <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:16 }}>
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} style={{ width:i===tutoStep?24:8, height:8, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
+                ))}
+              </div>
+
+              {tutoStep === 1 && <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Appuyez sur Play</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Écoutez la musique de votre artiste préféré</p>
+                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Play ci-dessus pour continuer</p>
+              </>}
+              {tutoStep === 2 && <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Téléchargez le contenu</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Gardez cette musique sur votre téléphone — même sans connexion</p>
+                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Télécharger ci-dessus</p>
+              </>}
+              {tutoStep === 3 && <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Aimez ce contenu</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Montrez votre soutien à votre artiste</p>
+                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Kiff ci-dessus</p>
+              </>}
+              {tutoStep === 4 && <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Envoyez un kiffement</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Soutenez directement votre artiste — 70% lui revient</p>
+                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Kiffement ci-dessus</p>
+              </>}
+              {tutoStep === 5 && <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Ne perdez jamais cette musique</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Ajoutez à votre Zikothèque — retrouvez-la même si vous changez de téléphone</p>
+                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur Ajouter à ma Zikothèque ci-dessus</p>
+              </>}
               {tutoStep === 6 && <>
-                <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Installez l'application</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Pour liker, commenter, offrir des kiffementx et retrouver votre musique partout</p>
                 <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
-                  Télécharger l'application maintenant
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                  Installer Doniel Zik
                 </button>
                 <button onClick={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
                   style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                   Plus tard
                 </button>
               </>}
+
               {tutoStep < 6 && (
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div style={{ display:'flex', gap:4 }}>
-                    {[1,2,3,4,5,6].map(i => (
-                      <div key={i} style={{ width:i===tutoStep?16:6, height:6, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
-                    ))}
-                  </div>
-                  <button onClick={() => setTutoStep(s => s + 1)}
-                    style={{ padding:'8px 20px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                    Suivant →
-                  </button>
-                </div>
+                <button onClick={() => setTutoStep(s => s + 1)}
+                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer', marginTop:8, pointerEvents:'auto' }}>
+                  Passer
+                </button>
               )}
             </div>
           </div>
+
+          {/* Flèche animée qui pointe vers le bon bouton */}
+          {tutoStep === 1 && (
+            <div style={{ position:'absolute', top:'55%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
+              <div style={{ fontSize:36, color:'#1a6bff', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
+            </div>
+          )}
+          {tutoStep === 2 && (
+            <div style={{ position:'absolute', top:'45%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
+              <div style={{ fontSize:36, color:'#1a6bff', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
+            </div>
+          )}
+          {tutoStep === 3 && (
+            <div style={{ position:'absolute', top:'62%', left:'25%', textAlign:'center' }}>
+              <div style={{ fontSize:36, color:'#f04a6a', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
+            </div>
+          )}
+          {tutoStep === 4 && (
+            <div style={{ position:'absolute', top:'62%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
+              <div style={{ fontSize:36, color:'#ffd700', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
+            </div>
+          )}
+          {tutoStep === 5 && (
+            <div style={{ position:'absolute', top:'62%', right:'20%', textAlign:'center' }}>
+              <div style={{ fontSize:36, color:'#7c3aed', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1048,14 +1319,11 @@ function FanPage() {
               </div>
             )}
 
-            {/* ── LIKES ── */}
-            {qrId && <LikeButton qrId={qrId} />}
+            {/* ── BARRE ACTIONS HORIZONTALE — Kiff · Commenter · Kiffement · Buzz ── */}
+            {qrId && <ActionBar qrId={qrId} artistEmail={qrData?.artistEmail} buzz={(qrData?.visits||0)+(qrData?.streams||0)} tutoStep={tutoStep} onTutoNext={() => setTutoStep(s => s+1)} />}
 
-            {/* ── COMMENTAIRES ── */}
-            {qrId && <CommentSection qrId={qrId} artistEmail={qrData?.artistEmail} />}
-
-            {/* ── CADEAUX ── */}
-            {qrId && <CadeauxSection qrId={qrId} artistEmail={qrData?.artistEmail} />}
+            {/* ── TRAVAILLEURS — classement donateurs ── */}
+            {qrId && <Travailleurs qrId={qrId} artistEmail={qrData?.artistEmail} />}
 
             {/* ── VIDÉOS ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
@@ -1307,7 +1575,12 @@ function CommerciauxtTab({ db }: { db: any }) {
                     if (window.confirm(`Supprimer ${c.nom} ? Cette action est irréversible.`)) {
                       await deleteDoc(doc(db, 'commerciaux', c.id));
                     }
-                  }} style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>🗑️ Supprimer</button>
+                  }} style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Supprimer</button>
+                  <button onClick={async () => {
+                    await updateDoc(doc(db,'commerciaux',c.id),{ status:'suspendu' });
+                  }} style={{ padding:'4px 8px', borderRadius:6, border:'1px solid #f0b84a', background:'rgba(240,184,74,0.1)', color:'#b07a00', fontSize:11, cursor:'pointer' }}>
+                    Suspendre
+                  </button>
                 </div>
               </div>
             </div>
@@ -3365,7 +3638,7 @@ function ArtistPage() {
       <div style={{ width:'100%', maxWidth:380 }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
           <Logo size="lg" />
-          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, marginTop:8 }}>🎤 Espace Artiste</p>
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, marginTop:8 }}>Espace Artiste</p>
         </div>
 
         <div style={S.card}>
@@ -3538,42 +3811,46 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
 // ─────────────────────────────────────────────
 function LandingPage() {
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#060d2a 0%,#091840 40%,#040e28 100%)', color:'#fff', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 24px', textAlign:'center' }}>
+    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#060d2a 0%,#091840 40%,#040e28 100%)', color:'#fff', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
 
-      {/* Logo animé */}
-      <div style={{ animation:'float 3s ease infinite', marginBottom:24 }}>
-        <Logo size="lg" />
-      </div>
+      {/* HERO */}
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 24px 40px', textAlign:'center' }}>
+        <div style={{ animation:'float 3s ease infinite', marginBottom:24 }}>
+          <Logo size="lg" />
+        </div>
+        <p style={{ color:'rgba(255,255,255,0.5)', fontSize:12, letterSpacing:3, fontWeight:600, marginBottom:32, textTransform:'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
 
-      <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, letterSpacing:3, fontWeight:600, marginBottom:40, textTransform:'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
-
-      {/* Bouton principal */}
-      <a href="/ziko" style={{ display:'block', width:'100%', maxWidth:360, padding:'18px', borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:16, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
-        Accéder à ma Zikothèque
-      </a>
-
-      <a href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:'15px', borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
-        Découvrir des contenus
-      </a>
-
-      {/* Boutons secondaires */}
-      <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center', marginBottom:32 }}>
-        <a href="/artiste" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
-          Artiste
+        <a href="/ziko" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
+          Accéder à ma Zikothèque
         </a>
-        <a href="/annonceurs" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
-          Annonceurs
-        </a>
-        <a href="/commercial" style={{ padding:'10px 18px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.7)', fontSize:13, fontWeight:600, textDecoration:'none' }}>
-          Commercial
+        <a href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:15, borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
+          Découvrir des contenus
         </a>
       </div>
 
-      {/* Admin caché */}
-      <a href="/admin" style={{ color:'rgba(255,255,255,0.15)', fontSize:10, textDecoration:'none' }}>
-        ·
-      </a>
+      {/* SERVICES */}
+      <div style={{ padding:'0 20px 40px', maxWidth:500, margin:'0 auto' }}>
+        <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, letterSpacing:2, textAlign:'center', marginBottom:20, textTransform:'uppercase' }}>Nos services</p>
+        {[
+          { titre:'Pour les Artistes', desc:'Monétisez votre musique, humour ou cinéma via QR code, liens publics et kiffements. Soyez payé à chaque écoute et téléchargement.', lien:'/artiste', btn:'Espace Artiste' },
+          { titre:'Pour les Annonceurs', desc:'Diffusez votre publicité auprès de milliers de mélomanes ivoiriens actifs. À partir de 1 000 FCFA.', lien:'/annonceurs', btn:'Espace Annonceur' },
+          { titre:'Devenir Commercial', desc:'Rejoignez notre réseau terrain. Recrutez des artistes et annonceurs. Gagnez des commissions sur chaque inscription.', lien:'/commercial', btn:'Espace Commercial' },
+        ].map((s,i) => (
+          <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+            <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', marginBottom:6 }}>{s.titre}</p>
+            <p style={{ color:'rgba(255,255,255,0.45)', fontSize:12, lineHeight:1.6, marginBottom:12 }}>{s.desc}</p>
+            <a href={s.lien} style={{ display:'inline-block', padding:'8px 18px', borderRadius:99, background:'rgba(30,111,255,0.2)', border:'1px solid rgba(30,111,255,0.3)', color:'#4da6ff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
+              {s.btn}
+            </a>
+          </div>
+        ))}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ textAlign:'center', padding:'20px 0 40px' }}>
+        <a href="/admin" style={{ color:'rgba(255,255,255,0.08)', fontSize:10, textDecoration:'none' }}>·</a>
+      </div>
     </div>
   );
 }
@@ -3602,7 +3879,7 @@ function UserAuthPage() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (e: any) { setMsg('Erreur Google: ' + e.message); }
+    } catch (e: any) { setMsg(e.code === 'auth/popup-closed-by-user' ? 'Connexion annulée. Veuillez réessayer.' : 'Erreur Google: ' + e.message); }
     setLoading(false);
   };
 
@@ -4113,7 +4390,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
 
   const getIcon = (type: string) => {
     if (type === 'commentaire') return '💬';
-    if (type === 'cadeau') return '🎁';
+    if (type === 'kiffement') return '🎁';
     if (type === 'like') return '❤️';
     return '🔔';
   };
@@ -4141,6 +4418,37 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
       ))}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────
+// DECOUVRIR STAT — stats sous chaque contenu
+// ─────────────────────────────────────────────
+function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
+  const [kiffs, setKiffs] = useState(0);
+  const [comments, setComments] = useState(0);
+  const [coins, setCoins] = useState(0);
+
+  useEffect(() => {
+    const u1 = onSnapshot(query(collection(db,'likes'),where('qrId','==',qrId)), s => setKiffs(s.size));
+    const u2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), s => setComments(s.size));
+    const u3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), s => {
+      setCoins(s.docs.reduce((t,d) => t+(d.data().coins||0),0));
+    });
+    return () => { u1(); u2(); u3(); };
+  }, [qrId]);
+
+  const stat = (label: string, val: number) => (
+    <span style={{ color:'#4a5878', fontSize:11, display:'flex', alignItems:'center', gap:3 }}>
+      <span style={{ fontWeight:700, color:'#8098b8' }}>{val.toLocaleString()}</span> {label}
+    </span>
+  );
+
+  return <>
+    {stat('Kiffs', kiffs)}
+    {stat('Commentaires', comments)}
+    {coins > 0 && stat('Coins', coins)}
+    {stat('Buzz', buzz)}
+  </>;
 }
 
 // ─────────────────────────────────────────────
@@ -4221,14 +4529,18 @@ function DecouvrirPage() {
             </a>
             <div style={{ padding:'12px 14px' }}>
               <p style={{ fontWeight:700, fontSize:15, marginBottom:2 }}>{c.label}</p>
-              <p style={{ color:'#4da6ff', fontSize:13, marginBottom:10 }}>{c.artist}</p>
+              <p style={{ color:'#4da6ff', fontSize:13, marginBottom:8 }}>{c.artist}</p>
+              {/* Stats Buzz */}
+              <div style={{ display:'flex', gap:14, marginBottom:10 }}>
+                <DiscouvrirStat qrId={c.publicLinkId} buzz={c.buzz||0} />
+              </div>
               {/* Actions */}
-              <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
                 <LikeButton qrId={c.publicLinkId} />
                 <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <a href={`/ecoute/${c.publicLinkId}`}
                   style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600 }}>
-                  ▶ Écouter
+                  Écouter
                 </a>
               </div>
             </div>
@@ -4309,7 +4621,7 @@ function ProfilPage() {
           </div>
           <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'16px', textAlign:'center' }}>
             <p style={{ fontWeight:900, fontSize:24, color:'#4da6ff', marginBottom:4 }}>0</p>
-            <p style={{ color:'#4a5878', fontSize:12 }}>Cadeaux envoyés</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffementx envoyés</p>
           </div>
         </div>
 
@@ -4964,218 +5276,282 @@ function ConditionsPage() {
 // PAGE ANNONCEURS — nouvelle version
 // Tarif unique : 1 000 FCFA = 1 000 vues
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ANNONCEURS PAGE — inscription + dashboard
+// ─────────────────────────────────────────────
 function AnnonceursPage() {
-  const [form, setForm] = useState({ nom:'', entreprise:'', telephone:'', email:'', objectif:'', format:'', vues:'', message:'' });
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [annonceur, setAnnonceur] = useState<any>(null);
+  const [view, setView] = useState<'login'|'register'|'dashboard'>('login');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        setUser(u);
+        // Vérifier si annonceur validé
+        const snap = await getDocs(query(collection(db,'annonceurs'), where('email','==',u.email), where('status','==','valide')));
+        if (!snap.empty) { setAnnonceur({id:snap.docs[0].id,...snap.docs[0].data()}); setView('dashboard'); }
+        else setView('login');
+      } else setView('login');
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center' }}><p>Chargement...</p></div>;
+
+  if (view === 'register') return <AnnonceurRegister onBack={() => setView('login')} />;
+  if (view === 'dashboard' && annonceur) return <AnnonceurDashboard annonceur={annonceur} user={user} />;
+  return <AnnonceurLogin onRegister={() => setView('register')} />;
+}
+
+function AnnonceurLogin({ onRegister }: { onRegister: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [msg, setMsg] = useState('');
-  const set = (k:string, v:string) => setForm(f => ({...f,[k]:v}));
+  const [loading, setLoading] = useState(false);
 
-  // Calcul dynamique selon les vues choisies — 1 000 FCFA = 700 à 2 000 vues
-  const vuesNum = parseInt(form.vues || '0') || 0;
-  const vuesMin = Math.round(vuesNum * 0.7);
-  const vuesMax = Math.round(vuesNum * 2.0);
-  const coutFCFA = vuesNum;
-  const clicsMin = Math.round(vuesNum * 0.10);
-  const clicsMax = Math.round(vuesNum * 0.30);
-
-  const submit = async () => {
-    if (!form.nom || !form.telephone || !form.objectif || !form.format) {
-      setMsg('Remplissez votre nom, téléphone, objectif et format'); return;
-    }
-    setLoading(true);
+  const login = async () => {
+    setLoading(true); setMsg('');
     try {
-      const currentUser = auth.currentUser;
-      await addDoc(collection(db, 'annonceurs'), {
-        ...form, vues: vuesNum, cout: coutFCFA,
-        uid: currentUser?.uid || '',
-        status: 'pending', createdAt: new Date().toISOString()
-      });
-      setSent(true);
-    } catch (e:any) { setMsg('Erreur : ' + e.message); }
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDocs(query(collection(db,'annonceurs'), where('email','==',cred.user.email), where('status','==','valide')));
+      if (snap.empty) { await signOut(auth); setMsg('Compte non validé. Contactez-nous.'); }
+    } catch { setMsg('Email ou mot de passe incorrect'); }
     setLoading(false);
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#f0f4fb', color:'#1a2340', fontFamily:"'DM Sans',sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
-        @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-        .ann-card:hover{border-color:#1a6bff!important;transform:translateY(-2px)}
-        .ann-inp{width:100%;background:#fff;border:1px solid #dce6f7;border-radius:10px;padding:12px 14px;color:#1a2340;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
-        .ann-inp::placeholder{color:#8098b8}
-        .ann-inp:focus{border-color:#1a6bff}
-        .obj-btn{flex:1;padding:14px 8px;border-radius:12px;border:1px solid #dce6f7;background:#fff;color:#8098b8;cursor:pointer;font-weight:600;font-size:13px;text-align:center;transition:all .2s}
-        .obj-btn.active{background:#eaf1ff;border-color:#1a6bff;color:#1a6bff}
-        .fmt-btn{flex:1;padding:16px 8px;border-radius:12px;border:1px solid #dce6f7;background:#fff;color:#8098b8;cursor:pointer;text-align:center;transition:all .2s}
-        .fmt-btn.active{background:#eaf1ff;border-color:#1a6bff;color:#1a6bff}
-      `}</style>
-
-      {/* HEADER */}
-      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
-        <Logo size="sm" />
-        <div style={{ display:'flex', gap:8 }}>
-          <a href="/studio" style={{ background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:8, padding:'6px 12px', color:'#1a6bff', fontSize:12, fontWeight:700, textDecoration:'none' }}>DZ Studio</a>
-          <a href="/" style={{ color:'#8098b8', fontSize:13, textDecoration:'none', padding:'6px 10px' }}>← Accueil</a>
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ width:'100%', maxWidth:380 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}><Logo size="lg" />
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>Espace Annonceur</p>
+        </div>
+        <div style={S.card}>
+          <label style={S.lbl}>Email</label>
+          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
+          <label style={S.lbl}>Mot de passe</label>
+          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>{loading ? '⏳...' : 'Se connecter'}</button>
+          <button onClick={onRegister} style={{ width:'100%', padding:12, marginTop:10, borderRadius:10, border:'1px solid #dce6f7', background:'transparent', color:'#1a6bff', fontWeight:600, fontSize:14, cursor:'pointer' }}>
+            Créer mon espace annonceur
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div style={{ maxWidth:540, margin:'0 auto', padding:'32px 16px 60px', animation:'fadeUp .35s ease' }}>
+function AnnonceurRegister({ onBack }: { onBack: () => void }) {
+  const [nomCommercial, setNomCommercial] = useState('');
+  const [email, setEmail] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [password, setPassword] = useState('');
+  const [typePub, setTypePub] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
 
-        {/* HERO */}
-        <div style={{ textAlign:'center', marginBottom:32 }}>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#eaf1ff', border:'1px solid #c8d8ef', borderRadius:99, padding:'5px 14px', marginBottom:16 }}>
-            <span style={{ width:7, height:7, borderRadius:99, background:'#1a6bff', display:'inline-block' }} />
-            <span style={{ color:'#1a6bff', fontSize:11, fontWeight:700, letterSpacing:1 }}>PUBLICITÉ · DONIEL ZIK</span>
-          </div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:900, color:'#1a2340', marginBottom:10, lineHeight:1.15 }}>
-            Touchez vos clients<br/><span style={{ color:'#1a6bff' }}>pendant qu'ils écoutent</span>
-          </h1>
-          <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.8 }}>
-            Votre publicité diffusée avant chaque écoute sur Doniel Zik.<br/>Audience captive. Ciblage local. Stats réelles.
-          </p>
+  const submit = async () => {
+    if (!nomCommercial || !email || !telephone || !password || !typePub) { setMsg('Tous les champs sont requis'); return; }
+    setLoading(true); setMsg('');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      await addDoc(collection(db,'annonceurs'), {
+        nomCommercial, email: email.trim().toLowerCase(), telephone, typePub,
+        status: 'en_attente', createdAt: new Date().toISOString(),
+      });
+      setDone(true);
+    } catch(e:any) { setMsg('Erreur: ' + e.message); }
+    setLoading(false);
+  };
+
+  if (done) return (
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ ...S.card, maxWidth:380, textAlign:'center' }}>
+        <p style={{ fontSize:40, marginBottom:12 }}>✅</p>
+        <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:8 }}>Demande envoyée !</h2>
+        <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.7 }}>Votre espace sera activé après validation. Vous serez contacté au {telephone}.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ width:'100%', maxWidth:380 }}>
+        <div style={{ textAlign:'center', marginBottom:28 }}><Logo size="lg" />
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>Créer mon espace annonceur</p>
         </div>
-
-        {/* TARIF UNIQUE — mise en avant */}
-        <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:18, padding:'24px 20px', marginBottom:28, textAlign:'center', boxShadow:'0 2px 12px rgba(30,111,255,0.08)' }}>
-          <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:3, marginBottom:12 }}>TARIFICATION SIMPLE</p>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}>
-            <span style={{ fontFamily:"'Playfair Display',serif", fontSize:42, fontWeight:900, color:'#1a2340' }}>1 000</span>
-            <div style={{ textAlign:'left' }}>
-              <p style={{ color:'#1a6bff', fontWeight:800, fontSize:16, margin:0 }}>FCFA</p>
-              <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>= 700 à 2 000 vues</p>
-            </div>
+        <div style={S.card}>
+          <label style={S.lbl}>Nom commercial *</label>
+          <input style={S.inp} value={nomCommercial} onChange={e => setNomCommercial(e.target.value)} placeholder="Nom de votre entreprise ou activité" />
+          <label style={S.lbl}>Email *</label>
+          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
+          <label style={S.lbl}>Téléphone *</label>
+          <input style={S.inp} type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+225 07 00 00 00 00" />
+          <label style={S.lbl}>Mot de passe *</label>
+          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Choisissez un mot de passe" />
+          <label style={S.lbl}>Type de publicité souhaitée *</label>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+            {['Image', 'Vidéo', 'Événement', 'Promotion'].map(t => (
+              <button key={t} onClick={() => setTypePub(t)}
+                style={{ padding:'10px 8px', borderRadius:10, border:`2px solid ${typePub===t?'#1a6bff':'#dce6f7'}`, background:typePub===t?'#eaf1ff':'#fff', color:typePub===t?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:13, fontWeight:600 }}>
+                {t}
+              </button>
+            ))}
           </div>
-          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:8 }}>
-            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
-              <p style={{ color:'#1a6bff', fontWeight:800, fontSize:15, margin:0 }}>100 – 300</p>
-              <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>clics garantis / 1 000 vues</p>
-            </div>
-            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'8px 14px', textAlign:'center' }}>
-              <p style={{ color:'#00a040', fontWeight:800, fontSize:15, margin:0 }}>100%</p>
-              <p style={{ color:'#8098b8', fontSize:10, margin:'2px 0 0' }}>visibilité captive</p>
-            </div>
-          </div>
-          <p style={{ color:'#8098b8', fontSize:10, marginTop:14 }}>
-            Paiement via Orange Money · Wave · MTN MoMo
-          </p>
+          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={submit} disabled={loading}>{loading ? '⏳...' : 'Créer mon espace'}</button>
+          <button onClick={onBack} style={{ width:'100%', padding:10, marginTop:8, borderRadius:10, border:'none', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>Retour</button>
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* AVANTAGES */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:28 }}>
-          {[
-            { title:'Captive', desc:'Pub avant la musique' },
-            { title:'Local CI', desc:"Fans d'artistes locaux" },
-            { title:'Stats live', desc:'Vues, clics, leads' },
-          ].map((c,i) => (
-            <div key={i} className="ann-card" style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:14, padding:'14px 10px', textAlign:'center', transition:'all .2s', boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <p style={{ fontWeight:700, fontSize:12, color:'#1a2340', marginBottom:3 }}>{c.title}</p>
-              <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.5 }}>{c.desc}</p>
-            </div>
-          ))}
-        </div>
+function AnnonceurDashboard({ annonceur, user }: { annonceur: any, user: any }) {
+  const [tab, setTab] = useState<'campagnes'|'nouvelle'>('campagnes');
+  const [campagnes, setCampagnes] = useState<any[]>([]);
+  const [form, setForm] = useState({ budget:'', typePub:'image', description:'' });
+  const [imageUrl, setImageUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState('');
 
-        {!sent ? (
-          <>
-            {/* OBJECTIF */}
-            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>VOTRE OBJECTIF</p>
-              <div style={{ display:'flex', gap:10 }}>
-                <button className={'obj-btn' + (form.objectif==='visibilite'?' active':'')} onClick={() => set('objectif','visibilite')}>
-                  <p style={{ fontSize:22, marginBottom:4 }}>👁️</p>
-                  <p style={{ fontWeight:700, margin:'0 0 3px' }}>Visibilité</p>
-                  <p style={{ fontSize:10, opacity:0.7 }}>Max de vues</p>
-                </button>
-                <button className={'obj-btn' + (form.objectif==='leads'?' active':'')} onClick={() => set('objectif','leads')}>
-                  <p style={{ fontSize:22, marginBottom:4 }}>💬</p>
-                  <p style={{ fontWeight:700, margin:'0 0 3px' }}>Leads / Clics</p>
-                  <p style={{ fontSize:10, opacity:0.7 }}>Contacts clients</p>
-                </button>
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db,'pubs'), where('annonceurEmail','==',user.email), orderBy('createdAt','desc')),
+      snap => setCampagnes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [user.email]);
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    fd.append('resource_type', 'auto');
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method:'POST', body:fd });
+    const d = await r.json();
+    setImageUrl(d.secure_url || '');
+    setUploading(false);
+  };
+
+  const soumettre = async () => {
+    if (!form.budget || !imageUrl) { setMsg('Ajoutez votre visuel et votre budget'); return; }
+    try {
+      await addDoc(collection(db,'pubs'), {
+        titre: annonceur.nomCommercial,
+        sousTitre: form.description,
+        imageUrl,
+        mediaType: form.typePub,
+        lien: annonceur.telephone,
+        lienType: 'tel',
+        btnLabel: 'Contacter',
+        active: false, // activé après validation + paiement
+        annonceurEmail: user.email,
+        budget: parseInt(form.budget),
+        vues: 0, clics: 0,
+        status: 'en_attente_paiement',
+        createdAt: new Date().toISOString(),
+      });
+      setMsg('✅ Campagne soumise ! Effectuez votre paiement pour activation.');
+      setForm({ budget:'', typePub:'image', description:'' });
+      setImageUrl('');
+      setTab('campagnes');
+    } catch(e:any) { setMsg('Erreur: ' + e.message); }
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#f0f4fb', fontFamily:"'DM Sans',sans-serif" }}>
+      {/* Header */}
+      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
+        <Logo size="sm" />
+        <p style={{ fontWeight:700, fontSize:14, color:'#1a2340' }}>{annonceur.nomCommercial}</p>
+        <button onClick={() => signOut(auth)} style={{ background:'none', border:'none', color:'#8098b8', cursor:'pointer', fontSize:13 }}>Déconnexion</button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ borderBottom:'1px solid #dce6f7', background:'#fff', display:'flex' }}>
+        {[['campagnes','Mes campagnes'],['nouvelle','Nouvelle campagne']].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t as any)}
+            style={{ padding:'12px 20px', border:'none', background:'transparent', color:tab===t?'#1a6bff':'#8098b8', fontWeight:tab===t?700:400, fontSize:13, cursor:'pointer', borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}` }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxWidth:600, margin:'0 auto', padding:'20px 16px' }}>
+        {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:13, marginBottom:12 }}>{msg}</p>}
+
+        {/* Campagnes */}
+        {tab === 'campagnes' && (
+          <div>
+            {campagnes.length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucune campagne pour l'instant</p>
+                <button onClick={() => setTab('nouvelle')} style={{ ...S.btn, marginTop:12, padding:'10px 24px' }}>Créer ma première campagne</button>
               </div>
-            </div>
-
-            {/* FORMAT */}
-            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:14 }}>FORMAT</p>
-              <div style={{ display:'flex', gap:10 }}>
-                <button className={'fmt-btn' + (form.format==='image'?' active':'')} onClick={() => set('format','image')}>
-                  <p style={{ fontSize:28, marginBottom:6 }}>🖼️</p>
-                  <p style={{ fontWeight:700, fontSize:13, margin:'0 0 3px' }}>Image</p>
-                  <p style={{ fontSize:10, opacity:0.6 }}>Bannière cliquable</p>
-                </button>
-                <button className={'fmt-btn' + (form.format==='video'?' active':'')} onClick={() => set('format','video')}>
-                  <p style={{ fontSize:28, marginBottom:6 }}>🎬</p>
-                  <p style={{ fontWeight:700, fontSize:13, margin:'0 0 3px' }}>Vidéo</p>
-                  <p style={{ fontSize:10, opacity:0.6 }}>Courte, avant écoute</p>
-                </button>
-              </div>
-            </div>
-
-            {/* SIMULATEUR DE VUES */}
-            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:6 }}>SIMULATEUR DE CAMPAGNE</p>
-              <p style={{ color:'#8098b8', fontSize:11, marginBottom:14 }}>Quel est votre budget ?</p>
-              <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
-                {[1000,5000,10000,50000,500000,1000000].map(v => (
-                  <button key={v} onClick={() => set('vues', String(v))}
-                    style={{ padding:'8px 14px', borderRadius:10, border:`1px solid ${form.vues===String(v)?'#1a6bff':'#dce6f7'}`, background: form.vues===String(v)?'#eaf1ff':'#fff', color: form.vues===String(v)?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600 }}>
-                    {v >= 1000000 ? '1M F' : v >= 500000 ? '500K F' : v.toLocaleString()+' F'}
-                  </button>
-                ))}
-              </div>
-              <input className="ann-inp" type="number" value={form.vues} onChange={e => set('vues',e.target.value)} placeholder="Entrez votre budget en FCFA..." style={{ marginBottom:0 }} />
-              {vuesNum > 0 && (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:14 }}>
-                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a2340', fontWeight:800, fontSize:14, margin:0 }}>{vuesMin.toLocaleString()}–{vuesMax.toLocaleString()}</p>
-                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>VUES EST.</p>
-                  </div>
-                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{clicsMin.toLocaleString()}–{clicsMax.toLocaleString()}</p>
-                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>CLICS EST.</p>
-                  </div>
-                  <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{Math.round(vuesMin*0.04).toLocaleString()}–{Math.round(vuesMax*0.2).toLocaleString()}</p>
-                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>DISCUSSIONS EST.</p>
-                  </div>
-                  <div style={{ background:'#eaf1ff', border:'1px solid #1a6bff', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                    <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{coutFCFA.toLocaleString()}</p>
-                    <p style={{ color:'#8098b8', fontSize:9, margin:'3px 0 0' }}>FCFA</p>
+            ) : campagnes.map(c => (
+              <div key={c.id} style={{ ...S.card, marginBottom:12 }}>
+                <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                  {c.imageUrl && <img src={c.imageUrl} style={{ width:60, height:60, borderRadius:8, objectFit:'cover' }} alt="" />}
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontWeight:700, fontSize:14, margin:'0 0 4px' }}>{c.titre}</p>
+                    <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
+                      <span style={{ background: c.active?'#eaffea':'#fff8e6', border:`1px solid ${c.active?'#4dff9a':'#f0b84a'}`, borderRadius:99, padding:'2px 10px', fontSize:11, color:c.active?'#00a040':'#b07a00', fontWeight:700 }}>
+                        {c.active ? 'Active' : c.status === 'en_attente_paiement' ? 'En attente paiement' : 'En attente validation'}
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', gap:16 }}>
+                      <span style={{ color:'#5a7090', fontSize:12 }}>{(c.vues||0).toLocaleString()} vues</span>
+                      <span style={{ color:'#5a7090', fontSize:12 }}>{(c.clics||0).toLocaleString()} clics</span>
+                      <span style={{ color:'#5a7090', fontSize:12 }}>{(c.budget||0).toLocaleString()} FCFA</span>
+                    </div>
+                    {c.status === 'en_attente_paiement' && (
+                      <p style={{ color:'#1a6bff', fontSize:11, marginTop:6 }}>
+                        Payez {(c.budget||0).toLocaleString()} FCFA sur Wave/Orange au +225 05 02 10 14 52 pour activer
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Nouvelle campagne */}
+        {tab === 'nouvelle' && (
+          <div style={S.card}>
+            <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:16 }}>Nouvelle campagne</h2>
+
+            <label style={S.lbl}>Visuel publicitaire *</label>
+            <input type="file" accept="image/*,video/*" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])}
+              style={{ marginBottom:12 }} />
+            {uploading && <p style={{ color:'#1a6bff', fontSize:12, marginBottom:8 }}>Upload en cours...</p>}
+            {imageUrl && <img src={imageUrl} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, marginBottom:12 }} />}
+
+            <label style={S.lbl}>Budget (FCFA) *</label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:12 }}>
+              {['1000','5000','10000','50000'].map(b => (
+                <button key={b} onClick={() => setForm(f => ({...f,budget:b}))}
+                  style={{ padding:'8px 4px', borderRadius:8, border:`2px solid ${form.budget===b?'#1a6bff':'#dce6f7'}`, background:form.budget===b?'#eaf1ff':'#fff', color:form.budget===b?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:11, fontWeight:700 }}>
+                  {parseInt(b).toLocaleString()}F
+                </button>
+              ))}
             </div>
 
-            {/* FORMULAIRE */}
-            <div style={{ background:'#fff', border:'1px solid #dce6f7', borderRadius:16, padding:'20px 16px', marginBottom:16, boxShadow:'0 1px 6px rgba(0,0,0,0.04)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:16 }}>VOS INFORMATIONS</p>
-              <input className="ann-inp" value={form.nom} onChange={e => set('nom',e.target.value)} placeholder="Nom & Prénom *" />
-              <input className="ann-inp" value={form.entreprise} onChange={e => set('entreprise',e.target.value)} placeholder="Entreprise / Marque (optionnel)" />
-              <input className="ann-inp" value={form.telephone} onChange={e => set('telephone',e.target.value)} placeholder="Téléphone WhatsApp * (+225...)" type="tel" />
-              <input className="ann-inp" value={form.email} onChange={e => set('email',e.target.value)} placeholder="Email (optionnel)" type="email" />
-              <input className="ann-inp" value={(form as any).commercialEmail||''} onChange={e => set('commercialEmail',e.target.value)} placeholder="Email du commercial (si applicable)" type="email" style={{ marginBottom:0 }} />
+            <label style={S.lbl}>Description (optionnel)</label>
+            <input style={S.inp} value={form.description} onChange={e => setForm(f => ({...f,description:e.target.value}))} placeholder="Décrivez votre offre" />
+
+            <button onClick={soumettre} style={{ ...S.btn, width:'100%', padding:14 }}>Soumettre ma campagne</button>
+
+            <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'10px 14px', marginTop:12 }}>
+              <p style={{ color:'#b07a00', fontSize:11, lineHeight:1.7, margin:0 }}>
+                Après soumission, effectuez votre paiement sur Wave/Orange Money au +225 05 02 10 14 52. Votre campagne sera activée après confirmation.
+              </p>
             </div>
-
-            {msg && <p style={{ color:'#f04a6a', fontSize:13, marginBottom:12, padding:'10px 14px', background:'rgba(240,74,106,0.1)', borderRadius:10 }}>{msg}</p>}
-
-            <button onClick={submit} disabled={loading}
-              style={{ width:'100%', padding:'16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 4px 24px rgba(255,200,0,0.35)' }}>
-              {loading ? '⏳ Envoi...' : '📤 Lancer ma campagne'}
-            </button>
-            <p style={{ color:'#4a5878', fontSize:11, textAlign:'center', marginTop:10 }}>Réponse sous 24h · WhatsApp ou email</p>
-          </>
-        ) : (
-          <div style={{ background:'rgba(77,255,154,0.08)', border:'1px solid rgba(77,255,154,0.3)', borderRadius:18, padding:36, textAlign:'center', animation:'fadeUp .4s ease' }}>
-            <p style={{ fontSize:48, marginBottom:16 }}>✅</p>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:900, color:'#fff', marginBottom:8 }}>Demande envoyée !</h2>
-            <p style={{ color:'#6a88aa', fontSize:14, lineHeight:1.8, marginBottom:24 }}>
-              Notre équipe vous contacte sous 24h.<br/>Préparez votre visuel (image ou vidéo).
-            </p>
-            <a href="/studio" style={{ display:'inline-block', padding:'13px 28px', borderRadius:12, background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:14, textDecoration:'none', marginBottom:12 }}>
-              🎬 Accéder à DZ Studio
-            </a>
-            <br/>
-            <a href="/" style={{ color:'#4a5878', fontSize:13, textDecoration:'none' }}>← Retour à l'accueil</a>
           </div>
         )}
       </div>
@@ -5183,11 +5559,6 @@ function AnnonceursPage() {
   );
 }
 
-// ─────────────────────────────────────────────
-// DZ STUDIO — Dashboard Annonceur complet
-// Flux 1 : annonceur ↔ admin (validation campagne + chat)
-// Flux 2 : annonceur ↔ leads (prospects)
-// ─────────────────────────────────────────────
 function DzStudioPage() {
   const [view, setView] = useState<'login'|'register'|'dashboard'>('login');
   const [user, setUser] = useState<any>(null);
@@ -6197,7 +6568,7 @@ function PublicStreamPage() {
               {tutoStep === 1 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Écoutez la musique</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Appuyez sur le bouton Play pour écouter le contenu de votre artiste préféré.</p></>}
               {tutoStep === 2 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Téléchargez le contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Téléchargez ce contenu sur votre téléphone pour l'écouter hors ligne.</p></>}
               {tutoStep === 3 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Aimez ce contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Montrez votre soutien à votre artiste en aimant son contenu.</p></>}
-              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Offrez un cadeau à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un cadeau virtuel.</p></>}
+              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Envoyez un kiffement à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un kiffement.</p></>}
               {tutoStep === 5 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Ajoutez à votre Zikothèque</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Sauvegardez ce contenu. Même si vous changez de téléphone, vous le retrouverez toujours.</p></>}
               {tutoStep === 6 && <>
                 <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
@@ -6371,7 +6742,12 @@ export default function App() {
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
-          authLoading ? null : user ? <ZikothequePage user={user} /> : <UserAuthPage />
+          authLoading ? (
+            <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          ) : user ? <ZikothequePage user={user} /> : <UserAuthPage />
         } />
         <Route path="/ziko/login" element={<UserAuthPage />} />
         <Route path="/artiste" element={<ArtistPage />} />
