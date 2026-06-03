@@ -1767,7 +1767,7 @@ function AdminPage() {
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
   const [pubs, setPubs] = useState<any[]>([]);
   const [pubModal, setPubModal] = useState(false);
-  const [pubForm, setPubForm] = useState<{ titre:string; sousTitre:string; lien:string; lienType:string; btnLabel:string; imageUrl:string; mediaType?:string; active:boolean }>({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
+  const [pubForm, setPubForm] = useState<{ titre:string; sousTitre:string; lien:string; lienType:string; btnLabel:string; imageUrl:string; mediaType:string; active:boolean }>({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
   const [pubUploading, setPubUploading] = useState(false);
   const [adminChatId, setAdminChatId] = useState<string|null>(null);
   const [adminChatMsgs, setAdminChatMsgs] = useState<any[]>([]);
@@ -2439,7 +2439,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                         vues:0, clics:0, createdAt:new Date().toISOString()
                       });
                       setPubModal(false);
-                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
+                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
                       setMsg('✅ Pub publiée !');
                     } catch(e:any) {
                       setMsg('Erreur: ' + e.message);
