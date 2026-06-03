@@ -995,13 +995,13 @@ function FanPage() {
             )}
 
             {/* ── LIKES ── */}
-            <LikeButton qrId={qrId} />
+            {qrId && <LikeButton qrId={qrId} />}
 
             {/* ── COMMENTAIRES ── */}
-            <CommentSection qrId={qrId} artistEmail={qrData?.artistEmail} />
+            {qrId && <CommentSection qrId={qrId} artistEmail={qrData?.artistEmail} />}
 
             {/* ── CADEAUX ── */}
-            <CadeauxSection qrId={qrId} artistEmail={qrData?.artistEmail} />
+            {qrId && <CadeauxSection qrId={qrId} artistEmail={qrData?.artistEmail} />}
 
             {/* ── VIDÉOS ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
@@ -2427,7 +2427,17 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   <button onClick={async () => {
                     if (!pubForm.titre || !pubForm.lien) { setMsg('Titre et lien requis'); return; }
                     try {
-                      await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
+                      await addDoc(collection(db, 'pubs'), { 
+                        titre: pubForm.titre,
+                        sousTitre: pubForm.sousTitre,
+                        lien: pubForm.lien,
+                        lienType: pubForm.lienType,
+                        btnLabel: pubForm.btnLabel || '',
+                        imageUrl: pubForm.imageUrl,
+                        mediaType: pubForm.mediaType || 'image',
+                        active: pubForm.active,
+                        vues:0, clics:0, createdAt:new Date().toISOString()
+                      });
                       setPubModal(false);
                       setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
                       setMsg('✅ Pub publiée !');
