@@ -105,7 +105,225 @@ function Spectrogram({ playing }: { playing: boolean }) {
 }
 
 // ─────────────────────────────────────────────
-// AUDIO PLAYER — bannière pub pendant lecture + pub plein écran après arrêt 7s
+// ─────────────────────────────────────────────
+// CADEAUX VIRTUELS — style TikTok
+// ─────────────────────────────────────────────
+const CADEAUX = [
+  { id:'note', icon:'🎵', label:'Note musicale', prix:100, partArtiste:70 },
+  { id:'micro', icon:'🎤', label:'Micro', prix:500, partArtiste:350 },
+  { id:'trophee', icon:'🏆', label:'Trophée', prix:1000, partArtiste:700 },
+  { id:'couronne', icon:'👑', label:'Couronne', prix:5000, partArtiste:3500 },
+];
+
+function CadeauxSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+  const [open, setOpen] = useState(false);
+  const [sending, setSending] = useState<string|null>(null);
+  const [msg, setMsg] = useState('');
+  const user = auth.currentUser;
+
+  const envoyer = async (cadeau: typeof CADEAUX[0]) => {
+    if (!user) { alert('Connectez-vous pour envoyer un cadeau'); return; }
+    setSending(cadeau.id);
+    try {
+      // Créer la transaction cadeau (paiement Wave à intégrer)
+      await addDoc(collection(db, 'cadeaux'), {
+        qrId, artistEmail,
+        cadeauId: cadeau.id,
+        cadeauLabel: cadeau.label,
+        cadeauIcon: cadeau.icon,
+        montant: cadeau.prix,
+        partArtiste: cadeau.partArtiste,
+        partPlateforme: cadeau.prix - cadeau.partArtiste,
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0],
+        status: 'pending', // sera 'paid' après confirmation Wave
+        createdAt: new Date().toISOString(),
+      });
+      // Notification artiste
+      if (artistEmail) {
+        await addDoc(collection(db, 'notifications'), {
+          to: artistEmail,
+          type: 'cadeau',
+          text: `${user.displayName || 'Un fan'} vous a envoyé ${cadeau.icon} ${cadeau.label}`,
+          qrId, from: user.displayName || user.email,
+          createdAt: new Date().toISOString(),
+          lu: false,
+        });
+      }
+      setMsg(`${cadeau.icon} Cadeau envoyé ! Paiement Wave à confirmer.`);
+      setTimeout(() => setMsg(''), 3000);
+    } catch(e) { console.error(e); }
+    setSending(null);
+  };
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+        🎁 Cadeau
+      </button>
+
+      {open && (
+        <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
+          <p style={{ color:'#8098b8', fontSize:12, marginBottom:12 }}>Offrez un cadeau à cet artiste</p>
+          {msg && <p style={{ color:'#ffd700', fontSize:13, marginBottom:10 }}>{msg}</p>}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {CADEAUX.map(c => (
+              <button key={c.id} onClick={() => envoyer(c)} disabled={sending === c.id}
+                style={{ padding:'12px 8px', borderRadius:12, border:'1px solid rgba(255,200,0,0.2)', background:'rgba(255,200,0,0.05)', cursor:'pointer', textAlign:'center', transition:'all .2s' }}>
+                <p style={{ fontSize:24, margin:'0 0 4px' }}>{c.icon}</p>
+                <p style={{ color:'#dde4f5', fontSize:12, fontWeight:600, margin:'0 0 2px' }}>{c.label}</p>
+                <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{c.prix.toLocaleString()} F</p>
+              </button>
+            ))}
+          </div>
+          <p style={{ color:'#4a5878', fontSize:10, marginTop:10, textAlign:'center' }}>70% reversé à l'artiste · Paiement via Wave</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// SECTION COMMENTAIRES — style TikTok
+// ─────────────────────────────────────────────
+function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+  const [comments, setComments] = useState<any[]>([]);
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    if (!open) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'commentaires'), where('qrId','==',qrId), orderBy('createdAt','desc')),
+      snap => setComments(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [qrId, open]);
+
+  const submit = async () => {
+    if (!user) { alert('Connectez-vous pour commenter'); return; }
+    if (!text.trim()) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'commentaires'), {
+        qrId, text: text.trim(),
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
+        userPhoto: user.photoURL || '',
+        createdAt: new Date().toISOString(),
+      });
+      // Notification à l'artiste
+      if (artistEmail) {
+        await addDoc(collection(db, 'notifications'), {
+          to: artistEmail,
+          type: 'commentaire',
+          text: `Nouveau commentaire sur votre contenu`,
+          qrId,
+          from: user.displayName || user.email,
+          createdAt: new Date().toISOString(),
+          lu: false,
+        });
+      }
+      setText('');
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const count = comments.length;
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+        💬 {count > 0 ? count : ''} Commenter
+      </button>
+
+      {open && (
+        <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:14 }}>
+          {/* Saisie commentaire */}
+          <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+            <input value={text} onChange={e => setText(e.target.value)}
+              onKeyDown={e => e.key==='Enter' && submit()}
+              placeholder="Écrivez un commentaire..."
+              style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:99, padding:'8px 14px', color:'#fff', fontSize:13, outline:'none' }} />
+            <button onClick={submit} disabled={loading || !text.trim()}
+              style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              {loading ? '...' : 'Envoyer'}
+            </button>
+          </div>
+          {/* Liste commentaires */}
+          {comments.length === 0 ? (
+            <p style={{ color:'#4a5878', fontSize:12, textAlign:'center' }}>Soyez le premier à commenter</p>
+          ) : comments.map(c => (
+            <div key={c.id} style={{ display:'flex', gap:10, marginBottom:12 }}>
+              <div style={{ width:32, height:32, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
+                {c.userPhoto ? <img src={c.userPhoto} style={{ width:32, height:32, borderRadius:99 }} alt="" /> : c.userName?.[0]?.toUpperCase()}
+              </div>
+              <div style={{ flex:1 }}>
+                <p style={{ fontWeight:700, fontSize:12, color:'#4da6ff', marginBottom:2 }}>{c.userName}</p>
+                <p style={{ fontSize:13, color:'#dde4f5', lineHeight:1.5 }}>{c.text}</p>
+                <p style={{ fontSize:10, color:'#4a5878', marginTop:2 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// LIKE BUTTON — like sur un contenu
+// ─────────────────────────────────────────────
+function LikeButton({ qrId }: { qrId: string }) {
+  const [liked, setLiked] = useState(false);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    if (!qrId) return;
+    // Charger le nombre de likes
+    const unsub = onSnapshot(
+      query(collection(db, 'likes'), where('qrId','==', qrId)),
+      snap => {
+        setCount(snap.size);
+        if (user) setLiked(snap.docs.some(d => d.data().userId === user.uid));
+      }
+    );
+    return unsub;
+  }, [qrId, user]);
+
+  const toggle = async () => {
+    if (!user) { alert('Connectez-vous pour liker ce contenu'); return; }
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (liked) {
+        const snap = await getDocs(query(collection(db, 'likes'), where('qrId','==',qrId), where('userId','==',user.uid)));
+        for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
+      } else {
+        await addDoc(collection(db, 'likes'), { qrId, userId: user.uid, createdAt: new Date().toISOString() });
+      }
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+      <button onClick={toggle}
+        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' }}>
+        {liked ? '❤️' : '🤍'} {count > 0 ? count.toLocaleString() : ''} {liked ? 'J\'aime' : 'J\'aime'}
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
 function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: string, duration: number) => void }) {
   const [idx, setIdx] = useState(0);
@@ -775,6 +993,15 @@ function FanPage() {
                 />
               </div>
             )}
+
+            {/* ── LIKES ── */}
+            <LikeButton qrId={qrId} />
+
+            {/* ── COMMENTAIRES ── */}
+            <CommentSection qrId={qrId} artistEmail={qrData?.artistEmail} />
+
+            {/* ── CADEAUX ── */}
+            <CadeauxSection qrId={qrId} artistEmail={qrData?.artistEmail} />
 
             {/* ── VIDÉOS ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
@@ -2202,7 +2429,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                     try {
                       await addDoc(collection(db, 'pubs'), { ...pubForm, vues:0, clics:0, createdAt:new Date().toISOString() });
                       setPubModal(false);
-                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
+                      setPubForm({ titre:'', sousTitre:'', lien:'', lienType:'url', imageUrl:'', active:true });
                       setMsg('✅ Pub publiée !');
                     } catch(e:any) {
                       setMsg('Erreur: ' + e.message);
@@ -2437,7 +2664,7 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'ventes'|'options'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'ventes'|'notifs'|'options'>('stats');
 
   // Ventes / chat mélomane
   const [ventes, setVentes] = useState<any[]>([]);
@@ -2666,6 +2893,7 @@ function ArtistPage() {
           Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
           {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
         </button>
+        <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>🔔 Notifs</button>
         <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>⚙️ Options</button>
       </div>
 
@@ -2739,7 +2967,7 @@ function ArtistPage() {
                         <p style={{ fontWeight:700, fontSize:14 }}>{link.label}</p>
                         <p style={{ color:'#8098b8', fontSize:12 }}>Streaming illimité · Sans scan limité</p>
                       </div>
-                      <div style={{ display:'flex', gap:8 }}>
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                         <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
                           style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>Copier</button>
                         <button onClick={() => {
@@ -2751,6 +2979,25 @@ function ArtistPage() {
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }
                         }} style={{ ...S.btn2, padding:'8px 14px', fontSize:12 }}>Partager</button>
+                        <button onClick={async () => {
+                          // Publier sur la page Découvrir
+                          const snap = await getDocs(query(collection(db, 'decouvrir'), where('publicLinkId','==', link.publicLinkId)));
+                          if (!snap.empty) { alert('Ce contenu est déjà publié sur Découvrir !'); return; }
+                          await addDoc(collection(db, 'decouvrir'), {
+                            publicLinkId: link.publicLinkId,
+                            label: link.label,
+                            artist: link.artist || '',
+                            coverUrl: link.coverUrl || '',
+                            type: link.type || 'single',
+                            artistEmail: user.email,
+                            publishedAt: new Date().toISOString(),
+                            likes: 0,
+                            streams: 0,
+                          });
+                          alert('✅ Contenu publié sur la page Découvrir !');
+                        }} style={{ ...S.btn, padding:'8px 14px', fontSize:12, background:'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                          Publier
+                        </button>
                       </div>
                     </div>
                     <p style={{ color:'#8098b8', fontSize:10, marginTop:8, marginBottom:12, wordBreak:'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
@@ -2978,6 +3225,8 @@ function ArtistPage() {
         )}
 
         {/* ────────── ONGLET OPTIONS ────────── */}
+        {dashTab === 'notifs' && <NotificationsTab userEmail={user.email} />}
+
         {dashTab === 'options' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>⚙️ Options de paiement</h2>
@@ -3373,6 +3622,7 @@ function ZikothequePage({ user }: { user: any }) {
   const [currentAlbum, setCurrentAlbum] = useState<any>(null);
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string|null>(null);
   const [progress, setProgress] = useState(0);
   const [dur, setDur] = useState(0);
   const [ct, setCt] = useState(0);
@@ -3583,16 +3833,40 @@ function ZikothequePage({ user }: { user: any }) {
                     style={{ width: 40, height: 40, borderRadius: 99, border: 'none', background: isActive ? 'linear-gradient(135deg, #1e6fff, #0050d0)' : 'rgba(30,111,255,0.15)', color: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s' }}>
                     {isActive && playing ? '⏸' : '▶'}
                   </button>
-                  {/* Bouton supprimer de la Zikothèque */}
-                  <button onClick={async (e) => {
-                    e.stopPropagation();
-                    if (window.confirm('Retirer ce contenu de votre Zikothèque ?')) {
-                      await deleteDoc(doc(db, 'zikotheque', item.id));
-                    }
-                  }}
-                    style={{ position:'absolute', top:6, right:6, width:22, height:22, borderRadius:99, border:'none', background:'rgba(240,74,106,0.15)', color:'rgba(240,74,106,0.8)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>
-                    ✕
-                  </button>
+                  {/* Menu ... */}
+                  <div style={{ position:'relative' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === item.id ? null : item.id); }}
+                      style={{ width:32, height:32, borderRadius:99, border:'none', background:'transparent', color:'rgba(255,255,255,0.4)', cursor:'pointer', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      ···
+                    </button>
+                    {menuOpenId === item.id && (
+                      <div style={{ position:'absolute', right:0, top:36, background:'#0d1535', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'6px 0', zIndex:100, minWidth:180, boxShadow:'0 8px 24px rgba(0,0,0,0.5)' }}
+                        onClick={e => e.stopPropagation()}>
+                        <button onClick={() => { playAlbum(item); setMenuOpenId(null); }}
+                          style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 16px', background:'transparent', border:'none', color:'#dde4f5', cursor:'pointer', fontSize:13, textAlign:'left' }}>
+                          ▶ Lire
+                        </button>
+                        <button onClick={() => {
+                          const url = `${BASE_URL}/ecoute/${item.publicLinkId || item.qrId}`;
+                          const msg = `🎵 ${item.label} — Écoutez ce contenu sur Doniel Zik !\n👉 ${url}`;
+                          if (navigator.share) navigator.share({ title: item.label, text: msg, url });
+                          else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                          setMenuOpenId(null);
+                        }}
+                          style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 16px', background:'transparent', border:'none', color:'#dde4f5', cursor:'pointer', fontSize:13, textAlign:'left' }}>
+                          Partager
+                        </button>
+                        <div style={{ height:1, background:'rgba(255,255,255,0.06)', margin:'4px 0' }} />
+                        <button onClick={async () => {
+                          await deleteDoc(doc(db, 'zikotheque', item.id));
+                          setMenuOpenId(null);
+                        }}
+                          style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 16px', background:'transparent', border:'none', color:'#f04a6a', cursor:'pointer', fontSize:13, textAlign:'left' }}>
+                          Retirer de ma Zikothèque
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -3678,6 +3952,22 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         </div>
       )}
+
+      {/* BARRE NAVIGATION FIXE EN BAS */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:currentAlbum ? 98 : 99 }}>
+        {[
+          { icon:'🏠', label:'Accueil', path:'/' },
+          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
+          { icon:'🔔', label:'Notifs', path:'/notifications' },
+          { icon:'👤', label:'Profil', path:'/profil' },
+        ].map((item) => (
+          <a key={item.path} href={item.path}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
+            <span style={{ fontSize:22 }}>{item.icon}</span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
@@ -3694,6 +3984,255 @@ function ZikothequePage({ user }: { user: any }) {
 // DASHBOARD RESPONSABLE COMMERCIAL — /responsable
 // Vue équipe commerciaux + commissions 1/10
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// NOTIFICATIONS TAB — pour artiste et mélomane
+// ─────────────────────────────────────────────
+function NotificationsTab({ userEmail }: { userEmail: string }) {
+  const [notifs, setNotifs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'notifications'), where('to','==', userEmail), orderBy('createdAt','desc')),
+      async snap => {
+        setNotifs(snap.docs.map(d => ({id:d.id,...d.data()})));
+        // Marquer comme lus
+        for (const d of snap.docs) {
+          if (!d.data().lu) await updateDoc(doc(db,'notifications',d.id),{lu:true});
+        }
+      }
+    );
+    return unsub;
+  }, [userEmail]);
+
+  const getIcon = (type: string) => {
+    if (type === 'commentaire') return '💬';
+    if (type === 'cadeau') return '🎁';
+    if (type === 'like') return '❤️';
+    return '🔔';
+  };
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>🔔 Notifications</h2>
+      {notifs.length === 0 ? (
+        <div style={{ textAlign:'center', padding:40 }}>
+          <p style={{ fontSize:36, marginBottom:10 }}>🔔</p>
+          <p style={{ color:'#8098b8', fontSize:14 }}>Aucune notification pour l'instant</p>
+        </div>
+      ) : notifs.map(n => (
+        <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':'#1a6bff'}`, opacity: n.lu ? 0.7 : 1 }}>
+          <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+            <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
+            <div style={{ flex:1 }}>
+              <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px' }}>{n.text}</p>
+              {n.from && <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
+              <p style={{ color:'#b0c4d8', fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+            </div>
+            {!n.lu && <span style={{ width:8, height:8, borderRadius:99, background:'#1a6bff', flexShrink:0, marginTop:4 }} />}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE DÉCOUVRIR — /decouvrir — style Suno/TikTok
+// ─────────────────────────────────────────────
+function DecouvrirPage() {
+  const [contenus, setContenus] = useState<any[]>([]);
+  const [filtre, setFiltre] = useState<'tous'|'musique'|'humour'|'video'>('tous');
+  const [loading, setLoading] = useState(true);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
+      snap => {
+        setContenus(snap.docs.map(d => ({id:d.id,...d.data()})));
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, []);
+
+  const filtres = [
+    { key:'tous', label:'Tous' },
+    { key:'musique', label:'Musique' },
+    { key:'humour', label:'Humour' },
+    { key:'video', label:'Vidéo' },
+  ];
+
+  const contenusFiltres = contenus.filter(c => {
+    if (filtre === 'tous') return true;
+    if (filtre === 'musique') return ['single','album'].includes(c.type);
+    if (filtre === 'humour') return c.type === 'contenu-humoristique';
+    if (filtre === 'video') return ['video','court-metrage','saison'].includes(c.type);
+    return true;
+  });
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+      <PubBanner />
+
+      {/* HEADER */}
+      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+        <Logo size="sm" />
+        <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
+      </div>
+
+      {/* FILTRES */}
+      <div style={{ display:'flex', gap:8, padding:'12px 16px', overflowX:'auto' }}>
+        {filtres.map(f => (
+          <button key={f.key} onClick={() => setFiltre(f.key as any)}
+            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${filtre===f.key?'#1a6bff':'rgba(255,255,255,0.1)'}`, background: filtre===f.key?'#1a6bff':'transparent', color: filtre===f.key?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap' }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* CONTENUS */}
+      <div style={{ padding:'0 16px' }}>
+        {loading ? (
+          <div style={{ textAlign:'center', padding:40, color:'#4a5878' }}>Chargement...</div>
+        ) : contenusFiltres.length === 0 ? (
+          <div style={{ textAlign:'center', padding:40 }}>
+            <p style={{ fontSize:36, marginBottom:10 }}>🎵</p>
+            <p style={{ color:'#4a5878', fontSize:14 }}>Aucun contenu publié pour l'instant</p>
+            <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Les artistes peuvent publier depuis leur dashboard</p>
+          </div>
+        ) : contenusFiltres.map(c => (
+          <div key={c.id} style={{ marginBottom:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, overflow:'hidden' }}>
+            {/* Pochette */}
+            <a href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
+              {c.coverUrl ? (
+                <img src={c.coverUrl} alt={c.label} style={{ width:'100%', height:200, objectFit:'cover', display:'block' }} />
+              ) : (
+                <div style={{ width:'100%', height:200, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:48 }}>
+                  {c.type === 'video' || c.type === 'court-metrage' ? '🎬' : c.type === 'contenu-humoristique' ? '😄' : '🎵'}
+                </div>
+              )}
+            </a>
+            <div style={{ padding:'12px 14px' }}>
+              <p style={{ fontWeight:700, fontSize:15, marginBottom:2 }}>{c.label}</p>
+              <p style={{ color:'#4da6ff', fontSize:13, marginBottom:10 }}>{c.artist}</p>
+              {/* Actions */}
+              <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                <LikeButton qrId={c.publicLinkId} />
+                <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
+                <a href={`/ecoute/${c.publicLinkId}`}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600 }}>
+                  ▶ Écouter
+                </a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* BARRE NAVIGATION */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+        {[
+          { icon:'🏠', label:'Accueil', path:'/' },
+          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
+          { icon:'🔔', label:'Notifs', path:'/notifications' },
+          { icon:'👤', label:'Profil', path:'/profil' },
+        ].map((item) => (
+          <a key={item.path} href={item.path}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
+            <span style={{ fontSize:22 }}>{item.icon}</span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE PROFIL MÉLOMANE — /profil
+// ─────────────────────────────────────────────
+function ProfilPage() {
+  const [user, setUser] = useState<any>(null);
+  const [likes, setLikes] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, async (u) => {
+      if (!u) { window.location.href = '/ziko'; return; }
+      setUser(u);
+      // Compter les likes
+      const snap = await getDocs(query(collection(db, 'likes'), where('userId','==', u.uid)));
+      setLikes(snap.size);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return (
+    <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <p style={{ color:'#4a5878' }}>Chargement...</p>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+      {/* HEADER */}
+      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
+        <Logo size="sm" />
+      </div>
+
+      <div style={{ maxWidth:500, margin:'0 auto', padding:'24px 16px' }}>
+        {/* Avatar + infos */}
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          {user?.photoURL ? (
+            <img src={user.photoURL} alt="Avatar" style={{ width:80, height:80, borderRadius:99, border:'3px solid #1a6bff', marginBottom:12 }} />
+          ) : (
+            <div style={{ width:80, height:80, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, margin:'0 auto 12px' }}>
+              {user?.displayName?.[0] || user?.email?.[0] || '?'}
+            </div>
+          )}
+          <p style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{user?.displayName || 'Mélomane'}</p>
+          <p style={{ color:'#4a5878', fontSize:13 }}>{user?.email}</p>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'16px', textAlign:'center' }}>
+            <p style={{ fontWeight:900, fontSize:24, color:'#f04a6a', marginBottom:4 }}>{likes}</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Contenus likés</p>
+          </div>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'16px', textAlign:'center' }}>
+            <p style={{ fontWeight:900, fontSize:24, color:'#4da6ff', marginBottom:4 }}>0</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Cadeaux envoyés</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <button onClick={() => signOut(auth).then(() => window.location.href = '/')}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid rgba(240,74,106,0.3)', background:'rgba(240,74,106,0.08)', color:'#f04a6a', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+          Se déconnecter
+        </button>
+      </div>
+
+      {/* BARRE NAVIGATION */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+        {[
+          { icon:'🏠', label:'Accueil', path:'/' },
+          { icon:'🔍', label:'Découvrir', path:'/decouvrir' },
+          { icon:'🔔', label:'Notifs', path:'/notifications' },
+          { icon:'👤', label:'Profil', path:'/profil' },
+        ].map((item) => (
+          <a key={item.path} href={item.path}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
+            <span style={{ fontSize:22 }}>{item.icon}</span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ResponsablePage() {
   const [view, setView] = useState<'login'|'dashboard'>('login');
   const [email, setEmail] = useState('');
@@ -5689,6 +6228,9 @@ export default function App() {
         <Route path="/artiste" element={<ArtistPage />} />
         <Route path="/artiste/login" element={<ArtistPage />} />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/decouvrir" element={<DecouvrirPage />} />
+        <Route path="/profil" element={<ProfilPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
         <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/responsable" element={<ResponsablePage />} />
