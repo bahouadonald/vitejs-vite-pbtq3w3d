@@ -121,7 +121,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
   const [msg, setMsg] = useState('');
   const user = auth.currentUser;
 
-  const envoyer = async (kiffement: typeof CADEAUX[0]) => {
+  const envoyer = async (kiffement: typeof KIFFEMENTS[0]) => {
     if (!user) { alert('Connectez-vous pour envoyer un kiffement'); return; }
     setSending(kiffement.id);
     try {
