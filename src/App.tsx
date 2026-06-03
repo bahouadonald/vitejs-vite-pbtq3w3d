@@ -340,16 +340,20 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [pendingNext, setPendingNext] = useState(false);
 
-  // Pub plein écran pendant lecture — musique continue
+  // Pub toutes les 60 secondes pendant lecture audio
   const [showPubDuringPlay, setShowPubDuringPlay] = useState(false);
+  const pubIntervalRef = useRef<any>(null);
 
-  // Afficher pub plein écran 10 secondes après début lecture
   useEffect(() => {
-    if (!playing) return;
-    const t = setTimeout(() => {
-      if (playing) setShowPubDuringPlay(true);
-    }, 10000); // 10s après le début
-    return () => clearTimeout(t);
+    if (playing) {
+      // Première pub après 60s, puis toutes les 60s
+      pubIntervalRef.current = setInterval(() => {
+        if (playing) setShowPubDuringPlay(true);
+      }, 60000);
+    } else {
+      if (pubIntervalRef.current) clearInterval(pubIntervalRef.current);
+    }
+    return () => { if (pubIntervalRef.current) clearInterval(pubIntervalRef.current); };
   }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = () => {
@@ -713,8 +717,16 @@ function FanPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
-  const [tutoStep, setTutoStep] = useState(0); // 0=inactif, 1=play, 2=dl, 3=like, 4=cadeau, 5=ziko, 6=pwa
+  const [tutoStep, setTutoStep] = useState(0);
   const [tutoSeen, setTutoSeen] = useState(false);
+
+  // Démarrer tuto dès l'ouverture si pas encore vu
+  useEffect(() => {
+    const seen = localStorage.getItem('dz_tuto_seen');
+    if (!seen) {
+      setTimeout(() => setTutoStep(1), 2000);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -733,10 +745,6 @@ function FanPage() {
       } catch (e) { console.error('visit', e); }
       // Plus de mode locked — toujours ready, le DL épuisé est géré dans le JSX
       setStep('ready');
-      // Démarrer tuto si première visite
-      if (!localStorage.getItem('dz_tuto_seen')) {
-        setTimeout(() => setTutoStep(1), 1500);
-      }
     };
     load();
   }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1648,14 +1656,14 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
               autoPlay
               muted={false}
               playsInline
-              style={{ width:'100%', height:'100%', maxHeight:'70vh', display:'block', borderRadius:12, background:'#000', objectFit:'contain' }}
+              style={{ width:'100%', height:'75vh', display:'block', borderRadius:12, background:'#000', objectFit:'contain' }}
               onEnded={() => {
                 if (pubIndex < pubs.length - 1) setPubIndex(i => i + 1);
                 else onDone();
               }}
             />
           ) : (
-            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', maxHeight:'70vh', objectFit:'contain', display:'block', borderRadius:12 }}
+            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', height:'75vh', objectFit:'cover', display:'block', borderRadius:12 }}
               onContextMenu={e => e.preventDefault()}
               draggable={false} />
           )
@@ -3828,9 +3836,6 @@ function ZikothequePage({ user }: { user: any }) {
         .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.2) !important; }
       `}</style>
 
-      {/* PUB */}
-      <PubBanner />
-
       {/* PUB après arrêt ou fin de piste */}
       {showPubZiko && (
         <PubOverlay trigger="track" onDone={() => {
@@ -4175,7 +4180,6 @@ function DecouvrirPage() {
 
   return (
     <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
-      <PubBanner />
 
       {/* HEADER */}
       <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
@@ -6089,6 +6093,14 @@ function PublicStreamPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
+  const [tutoStep, setTutoStep] = useState(0);
+
+  // Démarrer tuto dès l'ouverture si pas encore vu
+  useEffect(() => {
+    if (!localStorage.getItem('dz_tuto_seen')) {
+      setTimeout(() => setTutoStep(1), 2000);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recordPublicStream = async (track: string, duration: number) => {
     if (!data) return;
@@ -6175,7 +6187,47 @@ function PublicStreamPage() {
       `}</style>
 
       {/* PUB MAISON */}
-      <PubBanner />
+
+      {/* ── SÉQUENCE TUTOS ── */}
+      {tutoStep > 0 && tutoStep <= 6 && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} />
+          <div style={{ position:'absolute', bottom: tutoStep === 6 ? 0 : 180, left:0, right:0, padding:'0 20px', pointerEvents:'auto' }}>
+            <div style={{ background:'#fff', borderRadius:16, padding:'18px 20px', maxWidth:500, margin:'0 auto', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' }}>
+              {tutoStep === 1 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Écoutez la musique</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Appuyez sur le bouton Play pour écouter le contenu de votre artiste préféré.</p></>}
+              {tutoStep === 2 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Téléchargez le contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Téléchargez ce contenu sur votre téléphone pour l'écouter hors ligne.</p></>}
+              {tutoStep === 3 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Aimez ce contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Montrez votre soutien à votre artiste en aimant son contenu.</p></>}
+              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Offrez un cadeau à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un cadeau virtuel.</p></>}
+              {tutoStep === 5 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Ajoutez à votre Zikothèque</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Sauvegardez ce contenu. Même si vous changez de téléphone, vous le retrouverez toujours.</p></>}
+              {tutoStep === 6 && <>
+                <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
+                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
+                  Télécharger l'application maintenant
+                </button>
+                <button onClick={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  Plus tard
+                </button>
+              </>}
+              {tutoStep < 6 && (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', gap:4 }}>
+                    {[1,2,3,4,5,6].map(i => (
+                      <div key={i} style={{ width:i===tutoStep?16:6, height:6, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
+                    ))}
+                  </div>
+                  <button onClick={() => setTutoStep(s => s + 1)}
+                    style={{ padding:'8px 20px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Suivant →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── POCHETTE — grande, visible, pleine largeur ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease' }}>
@@ -6308,18 +6360,13 @@ export default function App() {
     <BrowserRouter>
       <PWAInstallBanner />
       <Routes>
-        {/* Zikothèque = Page d'accueil */}
         <Route path="/" element={
           authLoading ? (
-            <div style={{ minHeight: '100vh', background: '#06080f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 48, height: 48, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
+            <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
-          ) : user ? (
-            <ZikothequePage user={user} />
-          ) : (
-            <UserAuthPage />
-          )
+          ) : user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
