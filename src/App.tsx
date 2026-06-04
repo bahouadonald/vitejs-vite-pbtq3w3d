@@ -1752,6 +1752,94 @@ function FanPage() {
 // ARTISTES TAB — Liste des artistes enregistrés
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// RESPONSABLES TAB — créer comptes responsables commerciaux
+// ─────────────────────────────────────────────
+function ResponsablesTab() {
+  const [responsables, setResponsables] = useState<any[]>([]);
+  const [nom, setNom] = useState('');
+  const [email, setEmail] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [password, setPassword] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'responsables'), orderBy('createdAt', 'desc')),
+      snap => setResponsables(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, []);
+
+  const creerCompte = async () => {
+    if (!nom || !email || !password) { setMsg('Nom, email et mot de passe requis'); return; }
+    setLoading(true); setMsg('');
+    try {
+      // Créer compte Firebase Auth
+      await createUserWithEmailAndPassword(auth, email, password);
+      // Enregistrer dans Firestore
+      await addDoc(collection(db, 'responsables'), {
+        nom, email: email.trim().toLowerCase(), telephone,
+        status: 'actif', createdAt: new Date().toISOString(),
+        commerciauxCount: 0,
+      });
+      setMsg('Compte créé avec succès !');
+      setNom(''); setEmail(''); setTelephone(''); setPassword('');
+    } catch(e: any) {
+      setMsg('Erreur : ' + e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Responsables commerciaux</h2>
+
+      {/* Formulaire création */}
+      <div style={{ ...S.card, marginBottom:24 }}>
+        <p style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>Créer un compte responsable</p>
+        <label style={S.lbl}>Nom complet *</label>
+        <input style={S.inp} value={nom} onChange={e => setNom(e.target.value)} placeholder="Prénom Nom" />
+        <label style={S.lbl}>Email *</label>
+        <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemple.com" />
+        <label style={S.lbl}>Téléphone</label>
+        <input style={S.inp} type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+225 07 00 00 00 00" />
+        <label style={S.lbl}>Mot de passe *</label>
+        <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 caractères" />
+        {msg && <p style={{ color: msg.includes('succès') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+        <button style={{ ...S.btn, width:'100%', padding:12 }} onClick={creerCompte} disabled={loading}>
+          {loading ? 'Création...' : 'Créer le compte'}
+        </button>
+      </div>
+
+      {/* Liste responsables */}
+      {responsables.length === 0 ? (
+        <p style={{ color:'#8098b8', fontSize:13 }}>Aucun responsable commercial créé.</p>
+      ) : responsables.map(r => (
+        <div key={r.id} style={{ ...S.card, marginBottom:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{r.nom}</p>
+              <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{r.email}</p>
+              {r.telephone && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.telephone}</p>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:11, color:'#00a040', fontWeight:700 }}>
+                Actif
+              </span>
+              <button onClick={async () => { if (window.confirm('Supprimer ce responsable ?')) await deleteDoc(doc(db, 'responsables', r.id)); }}
+                style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // COMMERCIAUX TAB — validation des demandes
 // ─────────────────────────────────────────────
 function CommerciauxtTab({ db }: { db: any }) {
@@ -2833,14 +2921,15 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* TABS */}
       <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff', overflowX:'auto' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
-        <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>🎤 Artistes</button>
-        <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>👔 Commerciaux</button>
+        <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>Artistes</button>
+        <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>Commerciaux</button>
+        <button style={tabStyle(tab === 'responsables')} onClick={() => setTab('responsables')}>Responsables</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
-          📢 Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
+          Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
         </button>
         <button style={tabStyle(tab === 'pubs')} onClick={() => setTab('pubs')}>
-          🎬 Pubs {pubs.length > 0 ? `(${pubs.length})` : ''}
+          Pubs {pubs.length > 0 ? `(${pubs.length})` : ''}
         </button>
       </div>
 
@@ -2945,6 +3034,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         )}
 
         {tab === 'commerciaux' && <CommerciauxtTab db={db} />}
+
+        {tab === 'responsables' && <ResponsablesTab />}
 
         {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} />}
 
@@ -6751,23 +6842,10 @@ function PublicStreamPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
-  const [tutoStep, setTutoStep] = useState(0);
+  const [showTutoCascade, setShowTutoCascade] = useState(false);
 
-  // Démarrer tuto après chargement
-  useEffect(() => {
-    if (localStorage.getItem('dz_tuto_seen_v3')) return;
-    let attempts = 0;
-    const tryStart = () => {
-      attempts++;
-      const el = document.getElementById('btn-play') || document.getElementById('btn-download') || document.getElementById('btn-like');
-      if (el) {
-        setTutoStep(1);
-      } else if (attempts < 30) {
-        setTimeout(tryStart, 300);
-      }
-    };
-    setTimeout(tryStart, 800);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Déclencher tuto cascade après play
+  // (déclenché depuis recordPublicStream)
 
   const recordPublicStream = async (track: string, duration: number) => {
     if (!data) return;
@@ -6786,6 +6864,10 @@ function PublicStreamPage() {
         }
       }
     } catch(e) { console.error('pubStream', e); }
+    // Déclencher tuto cascade après premier play
+    if (!localStorage.getItem('dz_tuto_seen_v3')) {
+      setTimeout(() => setShowTutoCascade(true), 800);
+    }
   };
 
   useEffect(() => {
@@ -6865,46 +6947,8 @@ function PublicStreamPage() {
 
       {/* PUB MAISON */}
 
-      {/* ── SÉQUENCE TUTOS ── */}
-      {tutoStep > 0 && tutoStep <= 6 && (
-        <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
-          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} />
-          <div style={{ position:'absolute', bottom: tutoStep === 6 ? 0 : 180, left:0, right:0, padding:'0 20px', pointerEvents:'auto' }}>
-            <div style={{ background:'#fff', borderRadius:16, padding:'18px 20px', maxWidth:500, margin:'0 auto', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' }}>
-              {tutoStep === 1 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Écoutez la musique</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Appuyez sur le bouton Play pour écouter le contenu de votre artiste préféré.</p></>}
-              {tutoStep === 2 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Téléchargez le contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Téléchargez ce contenu sur votre téléphone pour l'écouter hors ligne.</p></>}
-              {tutoStep === 3 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Aimez ce contenu</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Montrez votre soutien à votre artiste en aimant son contenu.</p></>}
-              {tutoStep === 4 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Envoyez un kiffement à votre artiste</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Soutenez votre artiste en lui offrant un kiffement.</p></>}
-              {tutoStep === 5 && <><p style={{ fontWeight:800, fontSize:16, color:'#1a2340', marginBottom:6 }}>Ajoutez à votre Zikothèque</p><p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>Sauvegardez ce contenu. Même si vous changez de téléphone, vous le retrouverez toujours.</p></>}
-              {tutoStep === 6 && <>
-                <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
-                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen_v3','1'); setTutoStep(0); }}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
-                  Télécharger l'application maintenant
-                </button>
-                <button onClick={() => { localStorage.setItem('dz_tuto_seen_v3','1'); setTutoStep(0); }}
-                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
-                  Plus tard
-                </button>
-              </>}
-              {tutoStep < 6 && (
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div style={{ display:'flex', gap:4 }}>
-                    {[1,2,3,4,5,6].map(i => (
-                      <div key={i} style={{ width:i===tutoStep?16:6, height:6, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
-                    ))}
-                  </div>
-                  <button onClick={() => setTutoStep(s => s + 1)}
-                    style={{ padding:'8px 20px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                    Suivant →
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── TUTO CASCADE — bulles après Play ── */}
+      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v3','1'); }} />}
 
       {/* ── POCHETTE — grande, visible, pleine largeur ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease' }}>
