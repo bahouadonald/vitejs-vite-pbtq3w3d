@@ -106,6 +106,43 @@ function Spectrogram({ playing }: { playing: boolean }) {
 
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// LOGIN MODAL — connexion rapide depuis FanPage
+// ─────────────────────────────────────────────
+function LoginModal({ onClose, message }: { onClose: () => void, message: string }) {
+  const loginGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      onClose();
+    } catch(e:any) {
+      if (e.code !== 'auth/popup-closed-by-user') alert('Erreur connexion');
+    }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+      onClick={onClose}>
+      <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480, animation:'tutoSlide .3s ease' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
+        <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', textAlign:'center', marginBottom:8 }}>{message}</p>
+        <p style={{ color:'#8098b8', fontSize:13, textAlign:'center', marginBottom:24, lineHeight:1.6 }}>
+          Créez votre Zikothèque gratuite pour interagir avec vos artistes préférés.
+        </p>
+        <button onClick={loginGoogle}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid #dce6f7', background:'#fff', color:'#1a2340', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:12, boxShadow:'0 2px 8px rgba(0,0,0,0.08)' }}>
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
+        <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#1a6bff', fontWeight:600, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
+          Créer mon compte avec email
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // SYSTÈME COINS — recharge + kiffements
 // ─────────────────────────────────────────────
 const RECHARGES = [
@@ -128,6 +165,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
   const [soldeCoins, setSoldeCoins] = useState(0);
   const [sending, setSending] = useState<string|null>(null);
   const [msg, setMsg] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState('');
   const user = auth.currentUser;
 
   // Charger le solde coins de l'utilisateur
@@ -144,7 +182,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
   }, [user]);
 
   const envoyer = async (kiffement: typeof KIFFEMENTS[0]) => {
-    if (!user) { alert('Connectez-vous pour envoyer un kiffement'); return; }
+    if (!user) { setShowLoginModal('Connectez-vous pour envoyer un kiffement'); return; }
     if (soldeCoins < kiffement.coins) {
       setShowRecharge(true);
       return;
@@ -187,6 +225,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
 
   return (
     <div style={{ marginBottom:16 }}>
+      {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       <button onClick={() => setOpen(!open)}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
         Kiffement
@@ -282,7 +321,7 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
   }, [qrId, open]);
 
   const submit = async () => {
-    if (!user) { alert('Connectez-vous pour commenter'); return; }
+    if (!user) { setShowLoginModal('Connectez-vous pour commenter'); return; }
     if (!text.trim()) return;
     setLoading(true);
     try {
@@ -599,6 +638,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   const [showKiffements, setShowKiffements] = useState(false);
   const [totalCoins, setTotalCoins] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
+  const [showLoginModal, setShowLoginModal] = useState('');
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -615,7 +655,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   }, [qrId, user]);
 
   const toggleKiff = async () => {
-    if (!user) { alert('Connectez-vous pour kiffer'); return; }
+    if (!user) { setShowLoginModal('Connectez-vous pour kiffer votre artiste'); return; }
     if (kiffed) {
       const snap = await getDocs(query(collection(db,'likes'),where('qrId','==',qrId),where('userId','==',user.uid)));
       for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
@@ -642,6 +682,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 
   return (
     <div style={{ marginBottom:16 }}>
+      {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       {/* Barre principale */}
       <div id="action-bar" style={{ display:'flex', gap:6, marginBottom:8 }}>
         {/* KIFF */}
