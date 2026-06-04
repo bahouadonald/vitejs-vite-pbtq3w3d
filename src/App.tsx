@@ -779,7 +779,7 @@ function LikeButton({ qrId }: { qrId: string }) {
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: string, duration: number) => void }) {
+function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -833,6 +833,8 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       streamStart.current = Date.now() / 1000;
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
+      // Déclencher tuto cascade au premier play
+      if (onPlay) onPlay();
     }
   };
 
@@ -1145,7 +1147,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
       {audioFiles.length > 0 && (
         <div style={S.card}>
           <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>LECTEUR AUDIO</p>
-          <AudioPlayer files={audioFiles} onStream={onStream} />
+          <AudioPlayer files={audioFiles} onStream={onStream} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           {onSafari && !downloaded && (
             <div style={{ borderTop: '1px solid #dce6f7', paddingTop: 12 }}>
               <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
@@ -6979,7 +6981,7 @@ function PublicStreamPage() {
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Écouter en streaming</p>
-            <AudioPlayer files={audioFiles} onStream={recordPublicStream} />
+            <AudioPlayer files={audioFiles} onStream={recordPublicStream} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
 
