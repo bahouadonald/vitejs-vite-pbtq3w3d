@@ -106,52 +106,80 @@ function Spectrogram({ playing }: { playing: boolean }) {
 
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
-// CADEAUX VIRTUELS — style TikTok
+// SYSTÈME COINS — recharge + kiffements
 // ─────────────────────────────────────────────
+const RECHARGES = [
+  { coins:10, prix:100 },
+  { coins:50, prix:500 },
+  { coins:100, prix:1000 },
+  { coins:500, prix:5000 },
+];
+
 const KIFFEMENTS = [
-  { id:'note', icon:'🎵', label:'Note', prix:100, partArtiste:70, coins:1 },
-  { id:'micro', icon:'🎤', label:'Micro', prix:500, partArtiste:350, coins:5 },
-  { id:'trophee', icon:'🏆', label:'Trophée', prix:1000, partArtiste:700, coins:10 },
-  { id:'couronne', icon:'👑', label:'Couronne', prix:5000, partArtiste:3500, coins:50 },
+  { id:'note', label:'Note', coins:1, partArtiste:70 },
+  { id:'micro', label:'Micro', coins:5, partArtiste:350 },
+  { id:'trophee', label:'Trophée', coins:10, partArtiste:700 },
+  { id:'couronne', label:'Couronne', coins:50, partArtiste:3500 },
 ];
 
 function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
   const [open, setOpen] = useState(false);
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [soldeCoins, setSoldeCoins] = useState(0);
   const [sending, setSending] = useState<string|null>(null);
   const [msg, setMsg] = useState('');
   const user = auth.currentUser;
 
+  // Charger le solde coins de l'utilisateur
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(
+      query(collection(db,'coins_solde'), where('uid','==',user.uid)),
+      snap => {
+        if (!snap.empty) setSoldeCoins(snap.docs[0].data().solde || 0);
+        else setSoldeCoins(0);
+      }
+    );
+    return unsub;
+  }, [user]);
+
   const envoyer = async (kiffement: typeof KIFFEMENTS[0]) => {
     if (!user) { alert('Connectez-vous pour envoyer un kiffement'); return; }
+    if (soldeCoins < kiffement.coins) {
+      setShowRecharge(true);
+      return;
+    }
     setSending(kiffement.id);
     try {
-      // Créer la transaction kiffement (paiement Wave à intégrer)
-      await addDoc(collection(db, 'cadeaux'), {
+      // Débiter les coins
+      const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!snap.empty) {
+        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: soldeCoins - kiffement.coins });
+      }
+      // Enregistrer le kiffement
+      await addDoc(collection(db,'cadeaux'), {
         qrId, artistEmail,
         kiffementId: kiffement.id,
         kiffementLabel: kiffement.label,
-        kiffementIcon: kiffement.icon,
-        montant: kiffement.prix,
-        coins: kiffement.coins || 0,
+        coins: kiffement.coins,
         partArtiste: kiffement.partArtiste,
-        partPlateforme: kiffement.prix - kiffement.partArtiste,
         userId: user.uid,
         userName: user.displayName || user.email?.split('@')[0],
-        status: 'pending', // sera 'paid' après confirmation Wave
+        status: 'paid',
         createdAt: new Date().toISOString(),
       });
       // Notification artiste
       if (artistEmail) {
-        await addDoc(collection(db, 'notifications'), {
+        await addDoc(collection(db,'notifications'), {
           to: artistEmail,
           type: 'kiffement',
-          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.icon} ${kiffement.label}`,
+          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.coins} coins — ${kiffement.label}`,
           qrId, from: user.displayName || user.email,
           createdAt: new Date().toISOString(),
           lu: false,
         });
       }
-      setMsg(`${kiffement.icon} Kiffement envoyé ! Paiement Wave à confirmer.`);
+      setMsg(`Kiffement envoyé ! ${kiffement.coins} coins débités.`);
       setTimeout(() => setMsg(''), 3000);
     } catch(e) { console.error(e); }
     setSending(null);
@@ -161,24 +189,61 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
     <div style={{ marginBottom:16 }}>
       <button onClick={() => setOpen(!open)}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
-        🎁 Kiffement
+        Kiffement
       </button>
 
       {open && (
         <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
-          <p style={{ color:'#8098b8', fontSize:12, marginBottom:12 }}>Envoyez un kiffement à cet artiste</p>
-          {msg && <p style={{ color:'#ffd700', fontSize:13, marginBottom:10 }}>{msg}</p>}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-            {KIFFEMENTS.map(k => (
-              <button key={k.id} onClick={() => envoyer(k)} disabled={sending === k.id}
-                style={{ padding:'12px 8px', borderRadius:12, border:'1px solid rgba(255,200,0,0.2)', background:'rgba(255,200,0,0.05)', cursor:'pointer', textAlign:'center', transition:'all .2s' }}>
-                <p style={{ fontSize:24, margin:'0 0 4px' }}>{k.icon}</p>
-                <p style={{ color:'#dde4f5', fontSize:12, fontWeight:600, margin:'0 0 2px' }}>{k.label}</p>
-                <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{k.prix.toLocaleString()} F</p>
+
+          {/* Solde coins */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>Votre solde</p>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ color:'#ffd700', fontWeight:800, fontSize:14 }}>{soldeCoins} coins</span>
+              <button onClick={() => setShowRecharge(!showRecharge)}
+                style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                Recharger
               </button>
-            ))}
+            </div>
           </div>
-          <p style={{ color:'#4a5878', fontSize:10, marginTop:10, textAlign:'center' }}>70% reversé à l'artiste · Paiement via Wave</p>
+
+          {/* Panel recharge */}
+          {showRecharge && (
+            <div style={{ background:'rgba(0,0,0,0.3)', borderRadius:10, padding:12, marginBottom:12 }}>
+              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:8 }}>Recharger mes coins</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                {RECHARGES.map(r => (
+                  <button key={r.coins} onClick={() => {
+                    // En attendant API — afficher le numéro de paiement
+                    alert(`Envoyez ${r.prix} FCFA sur Wave au +225 05 02 10 14 52\nObjet : "${r.coins} coins - ${user?.email}"\nVos coins seront crédités sous 24h.`);
+                  }}
+                    style={{ padding:'10px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.2)', background:'rgba(255,215,0,0.06)', cursor:'pointer', textAlign:'center' }}>
+                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.coins} coins</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.prix.toLocaleString()} FCFA</p>
+                  </button>
+                ))}
+              </div>
+              <p style={{ color:'#4a5878', fontSize:10, textAlign:'center', margin:0 }}>Paiement via Wave · Orange Money · MTN MoMo</p>
+            </div>
+          )}
+
+          {msg && <p style={{ color:'#ffd700', fontSize:12, marginBottom:8 }}>{msg}</p>}
+
+          {/* Kiffements */}
+          <p style={{ color:'#8098b8', fontSize:11, marginBottom:8 }}>Choisissez un kiffement</p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {KIFFEMENTS.map(k => {
+              const canSend = soldeCoins >= k.coins;
+              return (
+                <button key={k.id} onClick={() => envoyer(k)} disabled={sending === k.id}
+                  style={{ padding:'12px 8px', borderRadius:12, border:`1px solid ${canSend?'rgba(255,200,0,0.3)':'rgba(255,255,255,0.05)'}`, background: canSend?'rgba(255,200,0,0.08)':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.5, transition:'all .2s' }}>
+                  <p style={{ color: canSend?'#dde4f5':'#4a5878', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>{k.label}</p>
+                  <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{k.coins} coins</p>
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ color:'#4a5878', fontSize:10, marginTop:10, textAlign:'center' }}>70% reversé à l'artiste</p>
         </div>
       )}
     </div>
@@ -239,7 +304,7 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
     <div style={{ marginBottom:16 }}>
       <button onClick={() => setOpen(!open)}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 }}>
-        💬 {count > 0 ? count : ''} Commenter
+        Commenter {count > 0 ? count : ''}
       </button>
 
       {open && (
@@ -530,7 +595,7 @@ function LikeButton({ qrId }: { qrId: string }) {
     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
       <button onClick={toggle}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' }}>
-        {liked ? '❤️' : '🤍'} {count > 0 ? count.toLocaleString() : ''} Kiff
+        Kiff {count > 0 ? count.toLocaleString() : ''}
       </button>
     </div>
   );
