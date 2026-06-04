@@ -1146,6 +1146,7 @@ function FanPage() {
     };
     setTimeout(tryStart, 800);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
   useEffect(() => {
