@@ -6988,8 +6988,8 @@ function PublicStreamPage() {
           qrId={data.publicLinkId || publicLinkId || ''}
           artistEmail={data.artistEmail || ''}
           buzz={(data.visits||0)+(data.streams||0)}
-          tutoStep={tutoStep}
-          onTutoNext={() => setTutoStep((s:number) => s+1)}
+          tutoStep={0}
+          onTutoNext={() => {}}
         />
         {(data.price > 0 || data.files?.length > 0) && (
           <AchatWidget
