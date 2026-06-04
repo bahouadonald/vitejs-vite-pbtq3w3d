@@ -4170,7 +4170,7 @@ function ZikothequePage({ user }: { user: any }) {
   const logout = async () => { await signOut(auth); };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f1117', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
+    <div style={{ minHeight: '100vh', background: '#161b27', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
@@ -4200,7 +4200,7 @@ function ZikothequePage({ user }: { user: any }) {
       )}
 
       {/* HEADER */}
-      <div style={{ background: 'rgba(15,17,23,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ background: 'rgba(22,27,39,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Logo size="sm" />
           <div>
@@ -4552,10 +4552,10 @@ function DecouvrirPage() {
   });
 
   return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
 
       {/* HEADER */}
-      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
         <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
       </div>
@@ -4599,13 +4599,13 @@ function DecouvrirPage() {
               <div style={{ display:'flex', gap:14, marginBottom:10 }}>
                 <DiscouvrirStat qrId={c.publicLinkId} buzz={c.buzz||0} />
               </div>
-              {/* Actions */}
-              <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+              {/* Actions — tout sur une ligne */}
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <LikeButton qrId={c.publicLinkId} />
                 <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <a href={`/ecoute/${c.publicLinkId}`}
-                  style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600 }}>
+                  style={{ display:'inline-flex', alignItems:'center', padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600, whiteSpace:'nowrap' }}>
                   Écouter
                 </a>
               </div>
@@ -4653,15 +4653,15 @@ function ProfilPage() {
   }, []);
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <p style={{ color:'#4a5878' }}>Chargement...</p>
     </div>
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
       {/* HEADER */}
-      <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
       </div>
 
@@ -5773,7 +5773,7 @@ function DzStudioPage() {
 
   // ── LOGIN ──
   if (view !== 'dashboard') return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
+    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
@@ -5827,7 +5827,7 @@ function DzStudioPage() {
 
   // ── DASHBOARD ──
   return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -6799,7 +6799,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
@@ -6809,7 +6809,7 @@ export default function App() {
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
