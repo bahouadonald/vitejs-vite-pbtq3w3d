@@ -456,6 +456,103 @@ function Travailleurs({ qrId, artistEmail }: { qrId: string, artistEmail?: strin
 }
 
 // ─────────────────────────────────────────────
+// TUTO POINTER — flèche qui pointe le vrai bouton via getBoundingClientRect
+// ─────────────────────────────────────────────
+const TUTO_STEPS = [
+  { id:'', label:'Écoutez', desc:'Appuyez sur Play pour écouter la musique de votre artiste', color:'#1a6bff' },
+  { id:'btn-download', label:'Téléchargez', desc:'Téléchargez ce contenu sur votre téléphone', color:'#1a6bff' },
+  { id:'btn-like', label:'Kiffez', desc:'Appuyez sur Kiff pour soutenir votre artiste', color:'#f04a6a' },
+  { id:'btn-kiffement', label:'Kiffement', desc:'Envoyez un kiffement — 70% va directement à l\'artiste', color:'#ffd700' },
+  { id:'btn-ziko', label:'Zikothèque', desc:'Ajoutez à votre Zikothèque pour retrouver ce contenu partout', color:'#7c3aed' },
+  { id:'pwa-install-btn', label:'Installer l\'app', desc:'Installez Doniel Zik pour accéder à votre musique partout', color:'#1a6bff' },
+];
+
+function TutoPointer({ step, onNext, onSkip }: { step: number, onNext: () => void, onSkip: () => void }) {
+  const [arrowPos, setArrowPos] = useState<{x:number,y:number}|null>(null);
+  const current = TUTO_STEPS[step - 1];
+
+  useEffect(() => {
+    if (!current?.id) { setArrowPos(null); return; }
+    const el = document.getElementById(current.id);
+    if (!el) { setArrowPos(null); return; }
+    const rect = el.getBoundingClientRect();
+    setArrowPos({ x: rect.left + rect.width/2, y: rect.top - 8 });
+    // Observer les changements de position (scroll)
+    const obs = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setArrowPos({ x: r.left + r.width/2, y: r.top - 8 });
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [step, current]);
+
+  const isLast = step === 6;
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
+      <style>{`
+        @keyframes tutoArrow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes tutoSlide { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes tutoPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.15)} }
+      `}</style>
+
+      {/* Overlay */}
+      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.5)' }} />
+
+      {/* Flèche pointante */}
+      {arrowPos && (
+        <div style={{ position:'absolute', left:arrowPos.x - 16, top:arrowPos.y - 44, pointerEvents:'none', animation:'tutoArrow 0.8s ease infinite', zIndex:9999 }}>
+          <svg width="32" height="40" viewBox="0 0 32 40">
+            <polygon points="16,40 0,0 32,0" fill={current.color} opacity="0.9"/>
+          </svg>
+          {/* Cercle pulsant sur le bouton */}
+          <div style={{ position:'absolute', top:32, left:-12, width:56, height:56, borderRadius:99, border:`3px solid ${current.color}`, animation:'tutoPulse 1s ease infinite', opacity:0.7 }} />
+        </div>
+      )}
+
+      {/* Bulle info en bas */}
+      <div style={{ position:'absolute', bottom:0, left:0, right:0, pointerEvents:'auto', animation:'tutoSlide .3s ease' }}>
+        <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'20px 24px 36px', maxWidth:500, margin:'0 auto', boxShadow:'0 -8px 32px rgba(0,0,0,0.3)' }}>
+          {/* Points de progression */}
+          <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:16 }}>
+            {TUTO_STEPS.map((_,i) => (
+              <div key={i} style={{ width:i+1===step?24:8, height:8, borderRadius:99, background:i+1===step?current.color:'#dce6f7', transition:'all .3s' }} />
+            ))}
+          </div>
+
+          <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', textAlign:'center', marginBottom:8 }}>{current.label}</p>
+          <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:20 }}>{current.desc}</p>
+
+          {isLast ? (
+            <>
+              <button onClick={() => { document.getElementById('pwa-install-btn')?.click(); onSkip(); }}
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                Installer Doniel Zik
+              </button>
+              <button onClick={onSkip}
+                style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Plus tard
+              </button>
+            </>
+          ) : (
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={onSkip}
+                style={{ flex:1, padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#b0c4d8', fontSize:13, cursor:'pointer' }}>
+                Passer
+              </button>
+              <button onClick={onNext}
+                style={{ flex:2, padding:12, borderRadius:12, border:'none', background:current.color, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Suivant →
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // ACTION BAR — barre horizontale Kiff · Commenter · Kiffement · Buzz
 // ─────────────────────────────────────────────
 function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
@@ -1172,104 +1269,8 @@ function FanPage() {
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
           {/* PUB après téléchargement gratuit */}
-      {/* ── SÉQUENCE TUTOS INDICATEUR — flèche animée sur chaque bouton ── */}
-      {tutoStep > 0 && tutoStep <= 6 && (
-        <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
-          {/* Overlay semi transparent */}
-          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.55)' }} />
-
-          {/* Flèche animée + bulle texte */}
-          <style>{`
-            @keyframes arrowBounce { 0%,100%{transform:translateY(0) rotate(180deg)} 50%{transform:translateY(-10px) rotate(180deg)} }
-            @keyframes arrowBounceUp { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-            @keyframes tutoSlideIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-          `}</style>
-
-          {/* Bulle en bas — texte + indicateur étapes */}
-          <div style={{ position:'absolute', bottom:0, left:0, right:0, pointerEvents:'auto', animation:'tutoSlideIn .3s ease' }}>
-            <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'20px 24px 32px', maxWidth:500, margin:'0 auto', boxShadow:'0 -8px 32px rgba(0,0,0,0.3)' }}>
-              {/* Indicateur étapes */}
-              <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:16 }}>
-                {[1,2,3,4,5,6].map(i => (
-                  <div key={i} style={{ width:i===tutoStep?24:8, height:8, borderRadius:99, background:i===tutoStep?'#1a6bff':'#dce6f7', transition:'all .3s' }} />
-                ))}
-              </div>
-
-              {tutoStep === 1 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Appuyez sur Play</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Écoutez la musique de votre artiste préféré</p>
-                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Play ci-dessus pour continuer</p>
-              </>}
-              {tutoStep === 2 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Téléchargez le contenu</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Gardez cette musique sur votre téléphone — même sans connexion</p>
-                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Télécharger ci-dessus</p>
-              </>}
-              {tutoStep === 3 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Aimez ce contenu</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Montrez votre soutien à votre artiste</p>
-                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Kiff ci-dessus</p>
-              </>}
-              {tutoStep === 4 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Envoyez un kiffement</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Soutenez directement votre artiste — 70% lui revient</p>
-                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur le bouton Kiffement ci-dessus</p>
-              </>}
-              {tutoStep === 5 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Ne perdez jamais cette musique</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Ajoutez à votre Zikothèque — retrouvez-la même si vous changez de téléphone</p>
-                <p style={{ color:'#b0c4d8', fontSize:11, textAlign:'center' }}>Appuyez sur Ajouter à ma Zikothèque ci-dessus</p>
-              </>}
-              {tutoStep === 6 && <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6, textAlign:'center' }}>Installez l'application</p>
-                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:16 }}>Pour liker, commenter, offrir des kiffementx et retrouver votre musique partout</p>
-                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
-                  Installer Doniel Zik
-                </button>
-                <button onClick={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
-                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
-                  Plus tard
-                </button>
-              </>}
-
-              {tutoStep < 6 && (
-                <button onClick={() => setTutoStep(s => s + 1)}
-                  style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer', marginTop:8, pointerEvents:'auto' }}>
-                  Passer
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Flèche animée qui pointe vers le bon bouton */}
-          {tutoStep === 1 && (
-            <div style={{ position:'absolute', top:'55%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
-              <div style={{ fontSize:36, color:'#1a6bff', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
-            </div>
-          )}
-          {tutoStep === 2 && (
-            <div style={{ position:'absolute', top:'45%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
-              <div style={{ fontSize:36, color:'#1a6bff', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
-            </div>
-          )}
-          {tutoStep === 3 && (
-            <div style={{ position:'absolute', top:'62%', left:'25%', textAlign:'center' }}>
-              <div style={{ fontSize:36, color:'#f04a6a', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
-            </div>
-          )}
-          {tutoStep === 4 && (
-            <div style={{ position:'absolute', top:'62%', left:'50%', transform:'translateX(-50%)', textAlign:'center' }}>
-              <div style={{ fontSize:36, color:'#ffd700', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
-            </div>
-          )}
-          {tutoStep === 5 && (
-            <div style={{ position:'absolute', top:'62%', right:'20%', textAlign:'center' }}>
-              <div style={{ fontSize:36, color:'#7c3aed', animation:'arrowBounce 1s ease infinite', display:'inline-block' }}>▼</div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── TUTO POINTEUR RÉEL — flèche sur le bouton exact ── */}
+      {tutoStep > 0 && tutoStep <= 6 && <TutoPointer step={tutoStep} onNext={() => setTutoStep(s => s+1)} onSkip={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }} />}
 
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -1386,7 +1387,7 @@ function FanPage() {
             )}
 
             {/* ── BARRE ACTIONS HORIZONTALE — Kiff · Commenter · Kiffement · Buzz ── */}
-            {qrId && <ActionBar qrId={qrId} artistEmail={qrData?.artistEmail} buzz={(qrData?.visits||0)+(qrData?.streams||0)} tutoStep={tutoStep} onTutoNext={() => setTutoStep(s => s+1)} />}
+            <ActionBar qrId={qrId || ''} artistEmail={qrData?.artistEmail} buzz={(qrData?.visits||0)+(qrData?.streams||0)} tutoStep={tutoStep} onTutoNext={() => setTutoStep(s => s+1)} />
 
             {/* ── TRAVAILLEURS — classement donateurs ── */}
             {qrId && <Travailleurs qrId={qrId} artistEmail={qrData?.artistEmail} />}
@@ -4609,7 +4610,7 @@ function DecouvrirPage() {
                 <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <a href={`/ecoute/${c.publicLinkId}`}
                   style={{ display:'inline-flex', alignItems:'center', padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600, whiteSpace:'nowrap' }}>
-                  Écouter
+                  Lire
                 </a>
               </div>
             </div>
@@ -6712,7 +6713,14 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── ACHETER ── */}
+        {/* ── BARRE ACTIONS — Kiff · Commenter · Kiffement · Buzz ── */}
+        <ActionBar
+          qrId={data.publicLinkId || publicLinkId || ''}
+          artistEmail={data.artistEmail || ''}
+          buzz={(data.visits||0)+(data.streams||0)}
+          tutoStep={tutoStep}
+          onTutoNext={() => setTutoStep((s:number) => s+1)}
+        />
         {(data.price > 0 || data.files?.length > 0) && (
           <AchatWidget
             qrId={data.publicLinkId || publicLinkId || ''}
