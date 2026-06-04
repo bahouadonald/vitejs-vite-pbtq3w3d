@@ -1296,7 +1296,7 @@ function FanPage() {
 
   // Démarrer tuto après chargement des données
   useEffect(() => {
-    if (localStorage.getItem('dz_tuto_seen_v2')) return;
+    if (localStorage.getItem('dz_tuto_seen_v3')) return;
     let attempts = 0;
     const tryStart = () => {
       attempts++;
@@ -1379,7 +1379,7 @@ function FanPage() {
       await updateDoc(doc(db, 'qrcodes', qrDocId.current), { streams: (qrData.streams || 0) + 1 });
       setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
       // Déclencher tuto cascade après la première écoute
-      if (!localStorage.getItem('dz_tuto_seen_v2')) {
+      if (!localStorage.getItem('dz_tuto_seen_v3')) {
         setTimeout(() => setShowTutoCascade(true), 500);
       }
       if (zikoState === 'idle') setShowZikoTuto(true);
@@ -1479,7 +1479,7 @@ function FanPage() {
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO CASCADE — bulles après Play ── */}
-      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v2','1'); }} />}
+      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v3','1'); }} />}
 
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -6755,7 +6755,7 @@ function PublicStreamPage() {
 
   // Démarrer tuto après chargement
   useEffect(() => {
-    if (localStorage.getItem('dz_tuto_seen_v2')) return;
+    if (localStorage.getItem('dz_tuto_seen_v3')) return;
     let attempts = 0;
     const tryStart = () => {
       attempts++;
@@ -6879,11 +6879,11 @@ function PublicStreamPage() {
               {tutoStep === 6 && <>
                 <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
                 <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
-                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }}
+                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen_v3','1'); setTutoStep(0); }}
                   style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
                   Télécharger l'application maintenant
                 </button>
-                <button onClick={() => { localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }}
+                <button onClick={() => { localStorage.setItem('dz_tuto_seen_v3','1'); setTutoStep(0); }}
                   style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                   Plus tard
                 </button>
