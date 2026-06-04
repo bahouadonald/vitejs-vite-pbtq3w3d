@@ -1937,7 +1937,7 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
               }}
             />
           ) : (
-            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', height:'75vh', objectFit:'cover', display:'block', borderRadius:12 }}
+            <img src={pub.imageUrl} alt={pub.titre||'Pub'} style={{ width:'100%', height:'75vh', objectFit:'contain', display:'block', borderRadius:12, background:'#000' }}
               onContextMenu={e => e.preventDefault()}
               draggable={false} />
           )
@@ -4105,13 +4105,13 @@ function ZikothequePage({ user }: { user: any }) {
   const logout = async () => { await signOut(auth); };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#06080f', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 90 : 0 }}>
+    <div style={{ minHeight: '100vh', background: '#0f1117', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
         .track-row:hover { background: rgba(30,111,255,0.08) !important; }
-        .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.2) !important; }
+        .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.15) !important; }
       `}</style>
 
       {/* PUB après arrêt ou fin de piste */}
@@ -4135,7 +4135,7 @@ function ZikothequePage({ user }: { user: any }) {
       )}
 
       {/* HEADER */}
-      <div style={{ background: 'rgba(6,8,15,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ background: 'rgba(15,17,23,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Logo size="sm" />
           <div>
@@ -4144,9 +4144,8 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
-          <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
-          <a href="/commercial" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>👔 Commercial</a>
+          <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>Artiste</a>
+          <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>Annonceurs</a>
           {user.email === ADMIN_EMAIL && (
             <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
           )}
@@ -4268,7 +4267,7 @@ function ZikothequePage({ user }: { user: any }) {
 
       {/* MINI LECTEUR EN BAS — style Spotify */}
       {currentAlbum && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, animation: 'slideUp .3s ease' }}>
+        <div style={{ position: 'fixed', bottom: 58, left: 0, right: 0, zIndex: 98, animation: 'slideUp .3s ease' }}>
           {/* PLAYLIST PANEL — slide up */}
           {showPlaylist && (
             <div style={{ background: '#0b0f1e', borderTop: '1px solid rgba(255,255,255,0.08)', maxHeight: '45vh', overflowY: 'auto', padding: '12px 0' }}>
@@ -4338,8 +4337,8 @@ function ZikothequePage({ user }: { user: any }) {
         </div>
       )}
 
-      {/* BARRE NAVIGATION FIXE EN BAS */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:currentAlbum ? 98 : 99 }}>
+      {/* BARRE NAVIGATION FIXE EN BAS — toujours visible */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
@@ -4488,7 +4487,7 @@ function DecouvrirPage() {
   });
 
   return (
-    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
 
       {/* HEADER */}
       <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
@@ -4589,13 +4588,13 @@ function ProfilPage() {
   }, []);
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <p style={{ color:'#4a5878' }}>Chargement...</p>
     </div>
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
       {/* HEADER */}
       <div style={{ background:'rgba(6,8,15,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
@@ -5709,7 +5708,7 @@ function DzStudioPage() {
 
   // ── LOGIN ──
   if (view !== 'dashboard') return (
-    <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
+    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
@@ -5763,7 +5762,7 @@ function DzStudioPage() {
 
   // ── DASHBOARD ──
   return (
-    <div style={{ minHeight:'100vh', background:'#06080f', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'#0f1117', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -6687,13 +6686,13 @@ function PublicStreamPage() {
             </div>
           </div>
         ) : (
-          <button onClick={handleAddToZiko} disabled={zikoState === 'adding'}
-            style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState === 'adding' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
+          <button onClick={handleAddToZiko} disabled={zikoState === 'adding' || zikoState === 'done'}
+            style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background: zikoState === 'done' ? 'linear-gradient(135deg,#00a040,#00c050)' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState !== 'idle' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
             <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>
-              {zikoState === 'adding' ? '⏳' : '➕'}
+              {zikoState === 'adding' ? '⏳' : zikoState === 'done' ? '✅' : '➕'}
             </span>
             <div style={{ textAlign:'left' }}>
-              <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : 'Ajouter à ma Zikothèque'}</p>
+              <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : zikoState === 'done' ? 'Déjà dans votre Zikothèque' : 'Ajouter à ma Zikothèque'}</p>
               <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Retrouvez cet album à tout moment</p>
             </div>
           </button>
@@ -6735,7 +6734,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
@@ -6745,7 +6744,7 @@ export default function App() {
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#06080f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
