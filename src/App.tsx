@@ -145,6 +145,13 @@ function LoginModal({ onClose, message }: { onClose: () => void, message: string
 // ─────────────────────────────────────────────
 // SYSTÈME COINS — recharge + kiffements
 // ─────────────────────────────────────────────
+
+// Helper Cloudinary — optimisation automatique
+const optimizeCloudinaryUrl = (url: string, opts = 'f_auto,q_auto,w_400') => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace('/upload/', '/upload/' + opts + '/');
+};
+
 const RECHARGES = [
   { coins:10, prix:100 },
   { coins:50, prix:500 },
@@ -811,7 +818,7 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
         } else {
           clearInterval(pubIntervalRef.current);
         }
-      }, 20000);
+      }, 60000);
     }
     return () => { if (pubIntervalRef.current) clearInterval(pubIntervalRef.current); };
   }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -942,81 +949,91 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
 // TUTO CASCADE — bulles qui apparaissent après Play
 // ─────────────────────────────────────────────
 const TUTO_BUBBLES = [
-  { id:'btn-like', text:'Kiffez la musique de votre artiste', color:'#f04a6a', side:'left' },
-  { id:'btn-comment', text:'Commentez', color:'#1a6bff', side:'right' },
-  { id:'btn-kiffement', text:'Faites un kiffement à votre artiste', color:'#ffd700', side:'left' },
-  { id:'btn-ziko', text:'Ajoutez à votre Zikothèque', color:'#7c3aed', side:'right' },
-  { id:'btn-download', text:'Téléchargez la musique', color:'#1a6bff', side:'left' },
+  { id:'btn-like', text:'Kiffez la musique\nde votre artiste', color:'#f04a6a', side:'right' },
+  { id:'btn-comment', text:'Commentez', color:'#1a6bff', side:'left' },
+  { id:'btn-kiffement', text:'Faites un kiffement\nà votre artiste', color:'#ffd700', side:'right' },
+  { id:'btn-ziko', text:'Ajoutez à votre\nZikothèque', color:'#7c3aed', side:'left' },
+  { id:'btn-download', text:'Téléchargez\nla musique', color:'#00c853', side:'right' },
 ];
 
 function TutoCascade({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
-  const [pos, setPos] = useState<{x:number,y:number,side:string}|null>(null);
+  const [pos, setPos] = useState<{x:number,y:number,w:number,h:number}|null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (step >= TUTO_BUBBLES.length) { onDone(); return; }
     const bubble = TUTO_BUBBLES[step];
-    const el = document.getElementById(bubble.id);
-    if (!el) { setStep(s => s+1); return; }
-    const rect = el.getBoundingClientRect();
-    setPos({ x: rect.left + rect.width/2, y: rect.top + rect.height/2, side: bubble.side });
-    setVisible(true);
+    const tryFind = (attempts = 0) => {
+      const el = document.getElementById(bubble.id);
+      if (!el && attempts < 10) { setTimeout(() => tryFind(attempts+1), 300); return; }
+      if (!el) { setStep(s => s+1); return; }
+      const rect = el.getBoundingClientRect();
+      setPos({ x: rect.left + rect.width/2, y: rect.top + rect.height/2, w: rect.width, h: rect.height });
+      setVisible(true);
+    };
+    tryFind();
     const t = setTimeout(() => {
       setVisible(false);
-      setTimeout(() => setStep(s => s+1), 300);
-    }, 2500);
+      setTimeout(() => setStep(s => s+1), 400);
+    }, 3000);
     return () => clearTimeout(t);
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (step >= TUTO_BUBBLES.length || !pos) return null;
   const bubble = TUTO_BUBBLES[step];
+  const isRight = bubble.side === 'right';
 
   return (
     <div style={{ position:'fixed', zIndex:9990, pointerEvents:'none', inset:0 }}>
-      {/* Cercle pulsant sur le bouton */}
+      {/* Overlay léger */}
+      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.3)' }} />
+
+      {/* Cercle pulsant autour du bouton */}
       <div style={{
         position:'absolute',
-        left: pos.x - 24,
-        top: pos.y - 24,
-        width: 48, height: 48,
+        left: pos.x - pos.w/2 - 6,
+        top: pos.y - pos.h/2 - 6,
+        width: pos.w + 12,
+        height: pos.h + 12,
         borderRadius: 99,
-        border: `2px solid ${bubble.color}`,
-        boxShadow: `0 0 0 4px ${bubble.color}33`,
-        opacity: visible ? 1 : 0,
-        transition: 'opacity .3s',
-        animation: visible ? 'tutoPulse 1s ease infinite' : 'none',
+        border: `3px solid ${bubble.color}`,
+        boxShadow: `0 0 0 6px ${bubble.color}44, 0 0 20px ${bubble.color}66`,
+        animation: 'tutoPulse 1s ease infinite',
+        zIndex: 9991,
       }} />
-      {/* Bulle texte */}
+
+      {/* Bulle texte — grande et lisible */}
       <div style={{
         position:'absolute',
-        left: bubble.side === 'left' ? pos.x - 180 : pos.x + 12,
-        top: pos.y - 20,
+        left: isRight ? Math.min(pos.x + pos.w/2 + 12, window.innerWidth - 190) : Math.max(pos.x - pos.w/2 - 192, 8),
+        top: Math.max(pos.y - 30, 8),
         background: bubble.color,
         color: '#fff',
-        fontWeight: 700,
-        fontSize: 12,
-        borderRadius: 10,
-        padding: '8px 14px',
-        maxWidth: 160,
-        lineHeight: 1.4,
+        fontWeight: 800,
+        fontSize: 15,
+        borderRadius: 14,
+        padding: '12px 18px',
+        width: 175,
+        lineHeight: 1.5,
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(8px)',
-        transition: 'all .3s ease',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+        transform: visible ? 'scale(1)' : 'scale(0.8)',
+        transition: 'all .35s ease',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.4)',
         whiteSpace: 'pre-wrap',
+        zIndex: 9992,
       }}>
         {bubble.text}
         {/* Flèche */}
         <div style={{
           position:'absolute',
           top: '50%',
-          [bubble.side === 'left' ? 'right' : 'left']: -6,
+          [isRight ? 'left' : 'right']: -10,
           transform: 'translateY(-50%)',
           width: 0, height: 0,
-          borderTop: '6px solid transparent',
-          borderBottom: '6px solid transparent',
-          [bubble.side === 'left' ? 'borderLeft' : 'borderRight']: `6px solid ${bubble.color}`,
+          borderTop: '8px solid transparent',
+          borderBottom: '8px solid transparent',
+          [isRight ? 'borderRight' : 'borderLeft']: `10px solid ${bubble.color}`,
         }} />
       </div>
     </div>
@@ -2231,8 +2248,13 @@ function PubOverlay({ trigger, onDone, silent }: { trigger: 'page'|'play'|'downl
   const pub = pubs[pubIndex];
 
   // Compter la vue
+  // Précharger l'image dès le montage
   useEffect(() => {
     if (!pub) return;
+    if (pub.imageUrl) {
+      const img = new Image();
+      img.src = pub.imageUrl;
+    }
     updateDoc(doc(db,'pubs',pub.id),{vues:(pub.vues||0)+1}).catch(()=>{});
     setElapsed(0); // reset chrono à chaque nouvelle pub
   }, [pub?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4809,12 +4831,13 @@ function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
   const [coins, setCoins] = useState(0);
 
   useEffect(() => {
-    const u1 = onSnapshot(query(collection(db,'likes'),where('qrId','==',qrId)), s => setKiffs(s.size));
-    const u2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), s => setComments(s.size));
-    const u3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), s => {
+    if (!qrId) return;
+    // getDocs au lieu de onSnapshot pour éviter les requêtes temps réel
+    getDocs(query(collection(db,'likes'),where('qrId','==',qrId))).then(s => setKiffs(s.size));
+    getDocs(query(collection(db,'commentaires'),where('qrId','==',qrId))).then(s => setComments(s.size));
+    getDocs(query(collection(db,'cadeaux'),where('qrId','==',qrId))).then(s => {
       setCoins(s.docs.reduce((t,d) => t+(d.data().coins||0),0));
     });
-    return () => { u1(); u2(); u3(); };
   }, [qrId]);
 
   const stat = (label: string, val: number) => (
