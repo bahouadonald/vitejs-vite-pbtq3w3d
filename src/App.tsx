@@ -4270,7 +4270,7 @@ function ZikothequePage({ user }: { user: any }) {
                     <img src={item.coverUrl} alt={item.label} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
                     <div style={{ width: 56, height: 56, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-                      {item.type === 'video' ? '''}
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -6727,8 +6727,8 @@ function PublicStreamPage() {
             <div style={{ background: '#0f1322', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
               {data.files.map((f: any, i: number) => (
                 <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < data.files.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background .15s' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>
-                    {f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '''}
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                   </div>
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
