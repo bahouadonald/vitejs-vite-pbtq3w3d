@@ -1030,7 +1030,7 @@ function TutoCascade({ onDone }: { onDone: () => void }) {
 // ─────────────────────────────────────────────
 // VIDEO PLAYER — pub avant/après comme YouTube
 // ─────────────────────────────────────────────
-function VideoPlayer({ files }: { files: any[] }) {
+function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
   const [idx, setIdx] = useState(0);
   const [showPubBefore, setShowPubBefore] = useState(true);
   const [showPubAfter, setShowPubAfter] = useState(false);
@@ -1072,7 +1072,7 @@ function VideoPlayer({ files }: { files: any[] }) {
 
       {/* Pub avant lecture vidéo */}
       {showPubBefore && countdown === 0 && (
-        <PubOverlay trigger="play" onDone={() => { setShowPubBefore(false); ref.current?.play(); }} />
+        <PubOverlay trigger="play" onDone={() => { setShowPubBefore(false); ref.current?.play(); if (onPlay) onPlay(); }} />
       )}
 
       {/* Pub après fin vidéo */}
@@ -1137,8 +1137,8 @@ function VideoPlayer({ files }: { files: any[] }) {
 // ─────────────────────────────────────────────
 // MEDIA PLAYERS — Audio + Video séparés
 // ─────────────────────────────────────────────
-function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded }:
-  { files: any[], onStream: (t: string, d: number) => void, onSafari: boolean, downloaded: boolean, onMarkDownloaded: () => void }) {
+function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded, onPlay }:
+  { files: any[], onStream: (t: string, d: number) => void, onSafari: boolean, downloaded: boolean, onMarkDownloaded: () => void, onPlay?: () => void }) {
   const isVideo = (f: any) => /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(f.name || '');
   const audioFiles = files.filter(f => !isVideo(f));
   const videoFiles = files.filter(f => isVideo(f));
@@ -1147,7 +1147,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
       {audioFiles.length > 0 && (
         <div style={S.card}>
           <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>LECTEUR AUDIO</p>
-          <AudioPlayer files={audioFiles} onStream={onStream} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
+          <AudioPlayer files={audioFiles} onStream={onStream} onPlay={onPlay} />
           {onSafari && !downloaded && (
             <div style={{ borderTop: '1px solid #dce6f7', paddingTop: 12 }}>
               <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 8, letterSpacing: 1 }}>APPUYEZ LONGUEMENT POUR TELECHARGER</p>
@@ -1167,7 +1167,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
       {videoFiles.length > 0 && (
         <div style={S.card}>
           <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
-          <VideoPlayer files={videoFiles} />
+          <VideoPlayer files={videoFiles} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
         </div>
       )}
     </>
@@ -1593,6 +1593,7 @@ function FanPage() {
                 <AudioPlayer
                   files={qrData.files.filter((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))}
                   onStream={recordStream}
+                  onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }}
                 />
               </div>
             )}
@@ -1607,7 +1608,7 @@ function FanPage() {
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
               <div style={{ marginBottom:20 }}>
                 <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Vidéos</p>
-                <VideoPlayer files={qrData.files.filter((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i))} />
+                <VideoPlayer files={qrData.files.filter((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i))} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
               </div>
             )}
 
@@ -7007,7 +7008,7 @@ function PublicStreamPage() {
         {videoFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Vidéos</p>
-            <VideoPlayer files={videoFiles} />
+            <VideoPlayer files={videoFiles} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
 
