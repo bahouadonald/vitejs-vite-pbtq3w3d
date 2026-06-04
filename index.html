@@ -106,7 +106,29 @@
   <body>
     <!-- Splash screen natif — visible AVANT que React charge -->
     <div id="splash">
-      <img id="splash-logo" src="/icon-192x192.png" alt="Doniel Zik" />
+      <!-- Logo DZ inline — pas besoin de fichier externe -->
+      <div style="margin-bottom:36px;animation:splashFadeIn 0.5s ease">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="80" height="80" rx="18" fill="url(#splashGrad)"/>
+          <defs>
+            <linearGradient id="splashGrad" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1a3a7e"/>
+              <stop offset="100%" stop-color="#0a1535"/>
+            </linearGradient>
+          </defs>
+          <!-- D -->
+          <text x="8" y="54" font-family="Arial Black,sans-serif" font-size="42" font-weight="900" fill="#1a6bff">D</text>
+          <!-- Z -->
+          <text x="38" y="54" font-family="Arial Black,sans-serif" font-size="42" font-weight="900" fill="#4da6ff">Z</text>
+          <!-- Barre onde -->
+          <rect x="8" y="60" width="64" height="3" rx="2" fill="rgba(77,166,255,0.4)"/>
+          <rect x="20" y="58" width="4" height="6" rx="2" fill="#4da6ff"/>
+          <rect x="28" y="56" width="4" height="10" rx="2" fill="#4da6ff"/>
+          <rect x="36" y="58" width="4" height="6" rx="2" fill="#4da6ff"/>
+          <rect x="44" y="55" width="4" height="12" rx="2" fill="#4da6ff"/>
+          <rect x="52" y="57" width="4" height="8" rx="2" fill="#4da6ff"/>
+        </svg>
+      </div>
       <div id="splash-bar-wrap">
         <div id="splash-bar-inner"></div>
       </div>
