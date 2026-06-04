@@ -1136,12 +1136,20 @@ function FanPage() {
   const [tutoStep, setTutoStep] = useState(0);
   const [tutoSeen, setTutoSeen] = useState(false);
 
-  // Démarrer tuto dès l'ouverture si pas encore vu
+  // Démarrer tuto après que les boutons soient dans le DOM
   useEffect(() => {
-    const seen = localStorage.getItem('dz_tuto_seen_v2');
-    if (!seen) {
-      setTimeout(() => setTutoStep(1), 2000);
-    }
+    if (localStorage.getItem('dz_tuto_seen_v2')) return;
+    let attempts = 0;
+    const tryStart = () => {
+      attempts++;
+      const playBtn = document.getElementById('btn-play');
+      if (playBtn && playBtn.getBoundingClientRect().width > 0) {
+        setTutoStep(1);
+      } else if (attempts < 20) {
+        setTimeout(tryStart, 500);
+      }
+    };
+    setTimeout(tryStart, 1500);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
@@ -6576,11 +6584,20 @@ function PublicStreamPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [tutoStep, setTutoStep] = useState(0);
 
-  // Démarrer tuto dès l'ouverture si pas encore vu
+  // Démarrer tuto après que les boutons soient dans le DOM
   useEffect(() => {
-    if (!localStorage.getItem('dz_tuto_seen_v2')) {
-      setTimeout(() => setTutoStep(1), 2000);
-    }
+    if (localStorage.getItem('dz_tuto_seen_v2')) return;
+    let attempts = 0;
+    const tryStart = () => {
+      attempts++;
+      const playBtn = document.getElementById('btn-play');
+      if (playBtn && playBtn.getBoundingClientRect().width > 0) {
+        setTutoStep(1);
+      } else if (attempts < 20) {
+        setTimeout(tryStart, 500);
+      }
+    };
+    setTimeout(tryStart, 1500);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recordPublicStream = async (track: string, duration: number) => {
