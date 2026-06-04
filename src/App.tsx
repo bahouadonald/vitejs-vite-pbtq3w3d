@@ -6686,13 +6686,13 @@ function PublicStreamPage() {
             </div>
           </div>
         ) : (
-          <button onClick={handleAddToZiko} disabled={zikoState === 'adding' || zikoState === 'done'}
-            style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background: zikoState === 'done' ? 'linear-gradient(135deg,#00a040,#00c050)' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState !== 'idle' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
+          <button onClick={handleAddToZiko} disabled={zikoState === 'adding'}
+            style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:15, cursor: zikoState === 'adding' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, marginBottom:24, opacity: zikoState === 'adding' ? 0.7 : 1, boxShadow:'0 4px 20px rgba(124,58,237,0.4)' }}>
             <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>
-              {zikoState === 'adding' ? '⏳' : zikoState === 'done' ? '✅' : '➕'}
+              {zikoState === 'adding' ? '⏳' : '➕'}
             </span>
             <div style={{ textAlign:'left' }}>
-              <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : zikoState === 'done' ? 'Déjà dans votre Zikothèque' : 'Ajouter à ma Zikothèque'}</p>
+              <p style={{ margin:0, fontWeight:800 }}>{zikoState === 'adding' ? 'Ajout en cours...' : 'Ajouter à ma Zikothèque'}</p>
               <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Retrouvez cet album à tout moment</p>
             </div>
           </button>
