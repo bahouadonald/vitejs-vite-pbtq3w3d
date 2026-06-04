@@ -850,7 +850,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded 
     <>
       {audioFiles.length > 0 && (
         <div style={S.card}>
-          <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎵 LECTEUR AUDIO — STREAMING GRATUIT</p>
+          <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>LECTEUR AUDIO</p>
           <AudioPlayer files={audioFiles} onStream={onStream} />
           {onSafari && !downloaded && (
             <div style={{ borderTop: '1px solid #dce6f7', paddingTop: 12 }}>
@@ -1377,7 +1377,7 @@ function FanPage() {
             {/* ── ÉCOUTER EN STREAMING ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
               <div style={{ marginBottom:20 }}>
-                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>🎧 Écouter en streaming</p>
+                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Écouter en streaming</p>
                 <AudioPlayer
                   files={qrData.files.filter((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))}
                   onStream={recordStream}
@@ -1394,7 +1394,7 @@ function FanPage() {
             {/* ── VIDÉOS ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i)) && (
               <div style={{ marginBottom:20 }}>
-                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>🎬 Vidéos</p>
+                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Vidéos</p>
                 <VideoPlayer files={qrData.files.filter((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i))} />
               </div>
             )}
@@ -1523,7 +1523,7 @@ function FanPage() {
                   📚 Ma Zikothèque
                 </a>
                 <button onClick={() => setStep('ready')} style={{ width:'100%', padding:'12px', fontSize:13, fontWeight:700, borderRadius:14, border:'1px solid rgba(255,255,255,0.08)', background:'transparent', color:'#6a88aa', cursor:'pointer' }}>
-                  🎵 Écouter en streaming
+                  Écouter en streaming
                 </button>
               </>
             )}
@@ -4238,27 +4238,31 @@ function ZikothequePage({ user }: { user: any }) {
           <div style={{ animation: 'fadeUp .4s ease' }}>
             {/* NOW PLAYING — si un album est sélectionné */}
             {currentAlbum && (
-              <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.15), rgba(77,166,255,0.05))', border: '1px solid rgba(30,111,255,0.2)', borderRadius: 16, padding: 16, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.2), rgba(77,166,255,0.08))', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 18, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
                 {currentAlbum.coverUrl ? (
-                  <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                  <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 50, height: 50, borderRadius: 10, objectFit: 'cover', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
                 ) : (
-                  <div style={{ width: 52, height: 52, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}></div>
+                  <div style={{ width: 50, height: 50, borderRadius: 10, background: 'linear-gradient(135deg,#1e3a6e,#0a1535)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                  </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 11, color: '#4da6ff', fontWeight: 700, marginBottom: 2, letterSpacing: 1 }}>EN COURS</p>
-                  <p style={{ fontWeight: 700, fontSize: 14, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentTrack?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentTrackIdx + 1)}</p>
-                  <p style={{ color: '#4a5878', fontSize: 11 }}>{currentAlbum.label} · {currentAlbum.artist}</p>
+                  <p style={{ fontSize: 10, color: '#4da6ff', fontWeight: 700, marginBottom: 2, letterSpacing: 1.5, textTransform: 'uppercase' }}>En lecture</p>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentAlbum.label}</p>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{currentAlbum.artist}</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {playing && <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 18 }}>
-                    {[1,2,3,4].map(i => <div key={i} style={{ width: 3, background: '#4da6ff', borderRadius: 99, animation: `bar${i} ${0.4 + i * 0.1}s ease infinite alternate`, minHeight: 3 }} />)}
-                  </div>}
-                </div>
+                {playing && (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 20 }}>
+                    {[1,2,3,4].map(i => (
+                      <div key={i} style={{ width: 3, background: '#4da6ff', borderRadius: 99, minHeight: 4, height: `${4 + Math.random()*12}px`, transition: 'height .3s' }} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* LISTE ALBUMS */}
-            <p style={{ color: '#4a5878', fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 14, textTransform: 'uppercase' }}>MES ALBUMS</p>
+            <p style={{ color: '#4a5878', fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 14, textTransform: 'uppercase' }}>Mes contenus</p>
             {items.map((item, idx) => {
               const audioFiles = (item.files || []).filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i));
               const isActive = currentAlbum?.id === item.id;
@@ -4376,7 +4380,7 @@ function ZikothequePage({ user }: { user: any }) {
               {/* Track info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 700, fontSize: 13, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentTrack?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentTrackIdx + 1)}
+                  {currentAlbum?.label || currentTrack?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (currentTrackIdx + 1)}
                 </p>
                 <p style={{ color: '#4a5878', fontSize: 11 }}>{currentAlbum.artist}</p>
               </div>
@@ -6560,7 +6564,17 @@ function PublicStreamPage() {
   useEffect(() => {
     const load = async () => {
       const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
-      if (!snap.empty) setData({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      if (!snap.empty) {
+        const d = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+        setData(d);
+        // Compter le Buzz — incrémenter visits
+        try {
+          await updateDoc(doc(db, 'publicLinks', snap.docs[0].id), { visits: (d.visits || 0) + 1 });
+          // Aussi dans decouvrir si publié
+          const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',publicLinkId)));
+          if (!dSnap.empty) await updateDoc(doc(db,'decouvrir',dSnap.docs[0].id),{ buzz:(dSnap.docs[0].data().buzz||0)+1 });
+        } catch(e) { console.error('buzz',e); }
+      }
       setLoading(false);
     };
     load();
@@ -6671,7 +6685,7 @@ function PublicStreamPage() {
           <img
             src={data.coverUrl}
             alt={data.label}
-            style={{ width: '100%', maxHeight: 380, objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6693,7 +6707,7 @@ function PublicStreamPage() {
         {/* ── ÉCOUTER EN STREAMING ── */}
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>🎧 Écouter en streaming</p>
+            <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Écouter en streaming</p>
             <AudioPlayer files={audioFiles} onStream={recordPublicStream} />
           </div>
         )}
@@ -6712,7 +6726,7 @@ function PublicStreamPage() {
         {/* ── VIDÉOS ── */}
         {videoFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>🎬 Vidéos</p>
+            <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Vidéos</p>
             <VideoPlayer files={videoFiles} />
           </div>
         )}
