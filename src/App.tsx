@@ -126,12 +126,13 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
     setSending(kiffement.id);
     try {
       // Créer la transaction kiffement (paiement Wave à intégrer)
-      await addDoc(collection(db, 'kiffementx'), {
+      await addDoc(collection(db, 'cadeaux'), {
         qrId, artistEmail,
         kiffementId: kiffement.id,
         kiffementLabel: kiffement.label,
         kiffementIcon: kiffement.icon,
         montant: kiffement.prix,
+        coins: kiffement.coins || 0,
         partArtiste: kiffement.partArtiste,
         partPlateforme: kiffement.prix - kiffement.partArtiste,
         userId: user.uid,
@@ -169,11 +170,11 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
           {msg && <p style={{ color:'#ffd700', fontSize:13, marginBottom:10 }}>{msg}</p>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {KIFFEMENTS.map(k => (
-              <button key={c.id} onClick={() => envoyer(c)} disabled={sending === c.id}
+              <button key={k.id} onClick={() => envoyer(k)} disabled={sending === k.id}
                 style={{ padding:'12px 8px', borderRadius:12, border:'1px solid rgba(255,200,0,0.2)', background:'rgba(255,200,0,0.05)', cursor:'pointer', textAlign:'center', transition:'all .2s' }}>
-                <p style={{ fontSize:24, margin:'0 0 4px' }}>{c.icon}</p>
-                <p style={{ color:'#dde4f5', fontSize:12, fontWeight:600, margin:'0 0 2px' }}>{c.label}</p>
-                <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{c.prix.toLocaleString()} F</p>
+                <p style={{ fontSize:24, margin:'0 0 4px' }}>{k.icon}</p>
+                <p style={{ color:'#dde4f5', fontSize:12, fontWeight:600, margin:'0 0 2px' }}>{k.label}</p>
+                <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{k.prix.toLocaleString()} F</p>
               </button>
             ))}
           </div>
