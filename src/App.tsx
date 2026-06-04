@@ -4170,7 +4170,7 @@ function ZikothequePage({ user }: { user: any }) {
   const logout = async () => { await signOut(auth); };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#161b27', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#1a1f35 0%,#1e2540 50%,#1a1f35 100%)', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
@@ -4200,7 +4200,7 @@ function ZikothequePage({ user }: { user: any }) {
       )}
 
       {/* HEADER */}
-      <div style={{ background: 'rgba(22,27,39,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ background: 'rgba(26,31,53,0.96)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 62, position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Logo size="sm" />
           <div>
@@ -4209,8 +4209,7 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <a href="/artiste" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>Artiste</a>
-          <a href="/annonceurs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>Annonceurs</a>
+          <a href="/decouvrir" style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 20, padding: '6px 12px', color: '#4da6ff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Découvrir</a>
           {user.email === ADMIN_EMAIL && (
             <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
           )}
@@ -4226,13 +4225,13 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         ) : items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', animation: 'fadeUp .4s ease' }}>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>🎵</div>
+            <div style={{ fontSize: 64, marginBottom: 20 }}></div>
             <h3 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 12, color: '#dde4f5' }}>Votre Zikothèque est vide</h3>
             <p style={{ color: '#4a5878', fontSize: 14, lineHeight: 1.8, marginBottom: 28 }}>
               Scannez une pochette musicale ou recevez un lien<br />pour ajouter vos premiers albums.
             </p>
             <a href="/" style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 12, background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
-              🎵 Découvrir de la musique
+              Découvrir de la musique
             </a>
           </div>
         ) : (
@@ -4243,7 +4242,7 @@ function ZikothequePage({ user }: { user: any }) {
                 {currentAlbum.coverUrl ? (
                   <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                 ) : (
-                  <div style={{ width: 52, height: 52, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🎵</div>
+                  <div style={{ width: 52, height: 52, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}></div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 11, color: '#4da6ff', fontWeight: 700, marginBottom: 2, letterSpacing: 1 }}>EN COURS</p>
@@ -4265,13 +4264,13 @@ function ZikothequePage({ user }: { user: any }) {
               const isActive = currentAlbum?.id === item.id;
               return (
                 <div key={item.id} className="album-card"
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 14, background: isActive ? 'rgba(30,111,255,0.12)' : 'rgba(255,255,255,0.03)', border: isActive ? '1px solid rgba(30,111,255,0.3)' : '1px solid rgba(255,255,255,0.04)', marginBottom: 10, cursor: 'pointer', transition: 'all .2s', position:'relative' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 14, background: isActive ? 'rgba(30,111,255,0.18)' : 'rgba(255,255,255,0.06)', border: isActive ? '1px solid rgba(30,111,255,0.35)' : '1px solid rgba(255,255,255,0.08)', marginBottom: 10, cursor: 'pointer', transition: 'all .2s', position:'relative', boxShadow: isActive ? '0 4px 20px rgba(30,111,255,0.2)' : '0 2px 8px rgba(0,0,0,0.2)' }}
                   onClick={() => playAlbum(item)}>
                   {item.coverUrl ? (
                     <img src={item.coverUrl} alt={item.label} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
                     <div style={{ width: 56, height: 56, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-                      {item.type === 'video' ? '🎬' : '🎵'}
+                      {item.type === 'video' ? '''}
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -4289,7 +4288,7 @@ function ZikothequePage({ user }: { user: any }) {
                       ···
                     </button>
                     {menuOpenId === item.id && (
-                      <div style={{ position:'absolute', right:0, top:36, background:'#0d1535', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'6px 0', zIndex:100, minWidth:180, boxShadow:'0 8px 24px rgba(0,0,0,0.5)' }}
+                      <div style={{ position:'absolute', right:0, top:36, background:'#1e2540', border:'1px solid rgba(255,255,255,0.12)', borderRadius:10, padding:'6px 0', zIndex:100, minWidth:180, boxShadow:'0 8px 24px rgba(0,0,0,0.5)' }}
                         onClick={e => e.stopPropagation()}>
                         <button onClick={() => { playAlbum(item); setMenuOpenId(null); }}
                           style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 16px', background:'transparent', border:'none', color:'#dde4f5', cursor:'pointer', fontSize:13, textAlign:'left' }}>
@@ -4323,7 +4322,7 @@ function ZikothequePage({ user }: { user: any }) {
             {/* Info Premium */}
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, textAlign: 'center', marginTop: 16 }}>
               <p style={{ color: '#4a5878', fontSize: 12, lineHeight: 1.7 }}>
-                🔒 Le téléchargement depuis la Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#4da6ff' }}>Premium</strong> — bientôt disponible.
+                Le téléchargement depuis la Zikothèque sera disponible avec l'abonnement <strong style={{ color: '#4da6ff' }}>Premium</strong> — bientôt disponible.
               </p>
             </div>
           </div>
@@ -4372,7 +4371,7 @@ function ZikothequePage({ user }: { user: any }) {
               {currentAlbum.coverUrl ? (
                 <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
               ) : (
-                <div style={{ width: 44, height: 44, borderRadius: 8, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎵</div>
+                <div style={{ width: 44, height: 44, borderRadius: 8, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}></div>
               )}
               {/* Track info */}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -6729,7 +6728,7 @@ function PublicStreamPage() {
               {data.files.map((f: any, i: number) => (
                 <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < data.files.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background .15s' }}>
                   <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>
-                    {f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '🎬' : '🎵'}
+                    {f.name?.match(/\.(mp4|mov|avi|mkv)$/i) ? '''}
                   </div>
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
