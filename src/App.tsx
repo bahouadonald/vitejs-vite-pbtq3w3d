@@ -6702,13 +6702,14 @@ function PWAInstallBanner() {
     return () => { window.removeEventListener('pwaInstallAvailable', onAvailable); clearTimeout(t); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [showInstructions, setShowInstructions] = useState(false);
+
   const handleInstall = async () => {
     if ((window as any).installPWA) {
       await (window as any).installPWA();
       setInstalled(true); setShow(false);
     } else {
-      // Fallback — instructions manuelles
-      alert('Pour installer : appuyez sur le menu de votre navigateur → "Ajouter à l\'écran d\'accueil"');
+      setShowInstructions(true);
     }
   };
 
@@ -6720,6 +6721,54 @@ function PWAInstallBanner() {
         @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(30,111,255,0.4)}50%{box-shadow:0 0 0 8px rgba(30,111,255,0)}}
       `}</style>
+
+      {/* Modal instructions */}
+      {showInstructions && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:10000, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setShowInstructions(false)}>
+          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
+            <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6 }}>Installer Doniel Zik</p>
+            <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Suivez ces étapes selon votre navigateur :</p>
+
+            {/* Chrome Android */}
+            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
+              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Chrome Android</p>
+              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                1. Appuyez sur les <strong>3 points ⋮</strong> en haut à droite<br/>
+                2. Appuyez sur <strong>"Ajouter à l'écran d'accueil"</strong><br/>
+                3. Confirmez en appuyant <strong>"Ajouter"</strong>
+              </p>
+            </div>
+
+            {/* Samsung Browser */}
+            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
+              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Samsung Internet</p>
+              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                1. Appuyez sur l'icône <strong>menu ☰</strong> en bas<br/>
+                2. Appuyez sur <strong>"Ajouter page à"</strong><br/>
+                3. Choisissez <strong>"Écran d'accueil"</strong>
+              </p>
+            </div>
+
+            {/* iPhone */}
+            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
+              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>iPhone Safari</p>
+              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                1. Appuyez sur le bouton <strong>Partager ⬆</strong><br/>
+                2. Faites défiler et appuyez <strong>"Sur l'écran d'accueil"</strong><br/>
+                3. Appuyez <strong>"Ajouter"</strong>
+              </p>
+            </div>
+
+            <button onClick={() => setShowInstructions(false)}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
+              Compris
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:9999, background:'#fff', borderTop:'2px solid #1a6bff', boxShadow:'0 -4px 24px rgba(26,107,255,0.2)', padding:'14px 20px', animation:'slideUp .4s ease', display:'flex', alignItems:'center', gap:14 }}>
         {/* Logo DZ SVG inline */}
         <div style={{ width:44, height:44, borderRadius:10, background:'linear-gradient(135deg,#1a3a7e,#0a1535)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
