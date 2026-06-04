@@ -1167,7 +1167,7 @@ function MediaPlayers({ files, onStream, onSafari, downloaded, onMarkDownloaded,
       {videoFiles.length > 0 && (
         <div style={S.card}>
           <p style={{ color: '#8098b8', fontSize: 10, marginBottom: 12, letterSpacing: 1 }}>🎬 STREAMING VIDÉO — ACHETEURS UNIQUEMENT</p>
-          <VideoPlayer files={videoFiles} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
+          <VideoPlayer files={videoFiles} onPlay={onPlay} />
         </div>
       )}
     </>
