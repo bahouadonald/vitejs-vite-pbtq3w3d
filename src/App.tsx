@@ -6684,39 +6684,63 @@ function HomePage() {
 
 
 function PWAInstallBanner() {
-  const [show, setShow] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) { setInstalled(true); return; }
-    const onAvailable = () => {
-      const dismissed = localStorage.getItem('pwa-dismissed');
-      const dismissedAt = dismissed ? parseInt(dismissed) : 0;
-      if (Date.now() - dismissedAt > 24 * 60 * 60 * 1000) setTimeout(() => setShow(true), 2000);
-    };
+    // Déjà installé en mode standalone
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setInstalled(true); return;
+    }
+    // Écouter l'événement d'installation disponible
+    const onAvailable = () => { setCanInstall(true); setShow(true); };
     window.addEventListener('pwaInstallAvailable', onAvailable);
     if ((window as any).installPWA) onAvailable();
-    return () => window.removeEventListener('pwaInstallAvailable', onAvailable);
-  }, []);
+    // Afficher le bouton même sans l'événement après 3s
+    const t = setTimeout(() => { if (!installed) setShow(true); }, 3000);
+    return () => { window.removeEventListener('pwaInstallAvailable', onAvailable); clearTimeout(t); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInstall = async () => {
-    if ((window as any).installPWA) { await (window as any).installPWA(); setShow(false); setInstalled(true); }
+    if ((window as any).installPWA) {
+      await (window as any).installPWA();
+      setInstalled(true); setShow(false);
+    } else {
+      // Fallback — instructions manuelles
+      alert('Pour installer : appuyez sur le menu de votre navigateur → "Ajouter à l\'écran d\'accueil"');
+    }
   };
-  const handleDismiss = () => { localStorage.setItem('pwa-dismissed', Date.now().toString()); setShow(false); };
 
-  if (!show || installed) return null;
+  if (installed || !show) return null;
+
   return (
     <>
-      <style>{`@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#ffffff', borderTop: '2px solid #1a6bff', boxShadow: '0 -4px 24px rgba(26,107,255,0.15)', padding: '14px 20px', animation: 'slideUp 0.4s ease', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <img src="/icon-192x192.png" alt="DZ" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 10, flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <p style={{ fontWeight: 800, fontSize: 14, color: '#1a2340', marginBottom: 2 }}>Installer Doniel Zik</p>
-          <p style={{ color: '#8098b8', fontSize: 12 }}>Accès rapide · Fonctionne hors-ligne</p>
+      <style>{`
+        @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(30,111,255,0.4)}50%{box-shadow:0 0 0 8px rgba(30,111,255,0)}}
+      `}</style>
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:9999, background:'#fff', borderTop:'2px solid #1a6bff', boxShadow:'0 -4px 24px rgba(26,107,255,0.2)', padding:'14px 20px', animation:'slideUp .4s ease', display:'flex', alignItems:'center', gap:14 }}>
+        {/* Logo DZ SVG inline */}
+        <div style={{ width:44, height:44, borderRadius:10, background:'linear-gradient(135deg,#1a3a7e,#0a1535)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <svg width="28" height="20" viewBox="0 0 28 20" fill="none">
+            <text x="0" y="16" fontFamily="Arial Black,sans-serif" fontSize="18" fontWeight="900" fill="#1a6bff">D</text>
+            <text x="13" y="16" fontFamily="Arial Black,sans-serif" fontSize="18" fontWeight="900" fill="#4da6ff">Z</text>
+          </svg>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={handleDismiss} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #dce6f7', background: 'transparent', color: '#8098b8', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Plus tard</button>
-          <button onClick={handleInstall} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a6bff', color: '#ffffff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>⬇ Installer</button>
+        <div style={{ flex:1 }}>
+          <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:2 }}>Installer Doniel Zik</p>
+          <p style={{ color:'#8098b8', fontSize:12 }}>Accès rapide · Fonctionne hors-ligne</p>
+        </div>
+        <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+          <button onClick={() => setShow(false)}
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer', fontWeight:600 }}>
+            Plus tard
+          </button>
+          <button id="pwa-install-btn" onClick={handleInstall}
+            style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite' }}>
+            Installer
+          </button>
         </div>
       </div>
     </>
