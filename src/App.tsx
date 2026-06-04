@@ -7101,26 +7101,72 @@ function PublicStreamPage() {
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    // Barre de progression animée pendant le chargement
+    const steps = [15, 35, 55, 75, 90];
+    let i = 0;
+    const t = setInterval(() => {
+      if (i < steps.length) { setProgress(steps[i]); i++; }
+      else clearInterval(t);
+    }, 300);
+
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setAuthLoading(false);
+      setProgress(100);
+      setTimeout(() => {
+        setAuthLoading(false);
+        // Cacher le splash screen natif de index.html
+        (window as any).__hideSplash?.();
+      }, 400);
     });
-    return unsub;
+    return () => { unsub(); clearInterval(t); };
   }, []);
+
+  if (authLoading) return (
+    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#1a1f35 0%,#1e2540 100%)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes progressGlow{0%,100%{box-shadow:0 0 8px rgba(30,111,255,0.6)}50%{box-shadow:0 0 20px rgba(30,111,255,0.9)}}
+      `}</style>
+
+      {/* Logo */}
+      <div style={{ animation:'fadeIn .5s ease', marginBottom:40 }}>
+        <Logo size="lg" />
+      </div>
+
+      {/* Barre de progression */}
+      <div style={{ width:220, animation:'fadeIn .5s ease .1s both' }}>
+        <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:99, height:4, overflow:'hidden', marginBottom:12 }}>
+          <div style={{
+            height:'100%',
+            width: `${progress}%`,
+            background:'linear-gradient(90deg,#1a6bff,#4da6ff)',
+            borderRadius:99,
+            transition:'width .3s ease',
+            animation:'progressGlow 1.5s ease infinite',
+          }} />
+        </div>
+        <p style={{ color:'rgba(255,255,255,0.35)', fontSize:12, textAlign:'center', letterSpacing:1 }}>
+          {progress < 50 ? 'Initialisation...' : progress < 90 ? 'Chargement de votre musique...' : 'Presque prêt...'}
+        </p>
+      </div>
+
+      {/* Tagline */}
+      <p style={{ color:'rgba(255,255,255,0.15)', fontSize:11, marginTop:40, letterSpacing:2, textTransform:'uppercase', animation:'fadeIn .5s ease .3s both' }}>
+        La Musique. Un Scan. Un Monde.
+      </p>
+    </div>
+  );
 
   return (
     <BrowserRouter>
       <PWAInstallBanner />
       <Routes>
         <Route path="/" element={
-          authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            </div>
-          ) : user ? <ZikothequePage user={user} /> : <LandingPage />
+user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
