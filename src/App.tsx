@@ -255,13 +255,25 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
 // ─────────────────────────────────────────────
 function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
   const [comments, setComments] = useState<any[]>([]);
+  const [count, setCount] = useState(0);
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const user = auth.currentUser;
 
+  // Charger le compteur dès le montage
   useEffect(() => {
-    if (!open) return;
+    if (!qrId) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'commentaires'), where('qrId','==',qrId)),
+      snap => setCount(snap.size)
+    );
+    return unsub;
+  }, [qrId]);
+
+  // Charger les commentaires complets quand ouvert
+  useEffect(() => {
+    if (!open || !qrId) return;
     const unsub = onSnapshot(
       query(collection(db, 'commentaires'), where('qrId','==',qrId), orderBy('createdAt','desc')),
       snap => setComments(snap.docs.map(d => ({id:d.id,...d.data()})))
@@ -297,8 +309,6 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
     } catch(e) { console.error(e); }
     setLoading(false);
   };
-
-  const count = comments.length;
 
   return (
     <div style={{ marginBottom:16 }}>
@@ -1098,7 +1108,7 @@ function FanPage() {
 
   // Démarrer tuto dès l'ouverture si pas encore vu
   useEffect(() => {
-    const seen = localStorage.getItem('dz_tuto_seen');
+    const seen = localStorage.getItem('dz_tuto_seen_v2');
     if (!seen) {
       setTimeout(() => setTutoStep(1), 2000);
     }
@@ -1270,7 +1280,7 @@ function FanPage() {
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO POINTEUR RÉEL — flèche sur le bouton exact ── */}
-      {tutoStep > 0 && tutoStep <= 6 && <TutoPointer step={tutoStep} onNext={() => setTutoStep(s => s+1)} onSkip={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }} />}
+      {tutoStep > 0 && tutoStep <= 6 && <TutoPointer step={tutoStep} onNext={() => setTutoStep(s => s+1)} onSkip={() => { localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }} />}
 
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -6538,7 +6548,7 @@ function PublicStreamPage() {
 
   // Démarrer tuto dès l'ouverture si pas encore vu
   useEffect(() => {
-    if (!localStorage.getItem('dz_tuto_seen')) {
+    if (!localStorage.getItem('dz_tuto_seen_v2')) {
       setTimeout(() => setTutoStep(1), 2000);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -6653,11 +6663,11 @@ function PublicStreamPage() {
               {tutoStep === 6 && <>
                 <p style={{ fontWeight:800, fontSize:18, color:'#1a2340', marginBottom:6 }}>Téléchargez l'application Doniel Zik</p>
                 <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:16 }}>Installez l'application pour accéder à votre musique hors ligne et retrouver votre Zikothèque à tout moment.</p>
-                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                <button onClick={() => { const btn = document.getElementById('pwa-install-btn'); if (btn) btn.click(); localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }}
                   style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:8 }}>
                   Télécharger l'application maintenant
                 </button>
-                <button onClick={() => { localStorage.setItem('dz_tuto_seen','1'); setTutoStep(0); }}
+                <button onClick={() => { localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }}
                   style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                   Plus tard
                 </button>
