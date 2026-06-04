@@ -2,67 +2,150 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Doniel Zik — La Musique. Un Scan. Un Monde.</title>
-
-    <!-- ═══ PWA ═══ -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#1a6bff" />
+    <link rel="icon" type="image/png" href="/icon-192x192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Doniel Zik" />
-
-    <!-- ═══ ICÔNES APPLE ═══ -->
-    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png" />
-
-    <!-- ═══ FAVICON ═══ -->
-    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96x96.png" />
-
-    <!-- ═══ SEO ═══ -->
+    <meta name="theme-color" content="#1a6bff" />
     <meta name="description" content="Distribution musicale via QR Code. Scannez une pochette et accédez à la musique instantanément." />
     <meta property="og:title" content="Doniel Zik" />
     <meta property="og:description" content="La Musique. Un Scan. Un Monde." />
     <meta property="og:image" content="/icon-512x512.png" />
-    <meta property="og:url" content="https://doniel.vercel.app" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://doniel.art" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Doniel Zik" />
+    <meta name="twitter:description" content="La Musique. Un Scan. Un Monde." />
+    <meta name="twitter:image" content="/icon-512x512.png" />
+    <title>Doniel Zik — La Musique. Un Scan. Un Monde.</title>
+
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #1a1f35; }
+
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(160deg, #1a1f35 0%, #1e2540 50%, #1a1f35 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        opacity: 1;
+        transition: opacity 0.4s ease;
+        font-family: -apple-system, 'DM Sans', sans-serif;
+      }
+
+      #splash.hiding {
+        opacity: 0;
+      }
+
+      #splash-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 18px;
+        margin-bottom: 36px;
+        animation: splashFadeIn 0.5s ease;
+      }
+
+      #splash-bar-wrap {
+        width: 220px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 99px;
+        height: 4px;
+        overflow: hidden;
+        margin-bottom: 14px;
+        animation: splashFadeIn 0.5s ease 0.1s both;
+      }
+
+      #splash-bar-inner {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #1a6bff, #4da6ff);
+        border-radius: 99px;
+        transition: width 0.3s ease;
+        box-shadow: 0 0 8px rgba(30,111,255,0.6);
+        animation: progressGlow 1.5s ease infinite;
+      }
+
+      #splash-msg {
+        color: rgba(255,255,255,0.35);
+        font-size: 12px;
+        letter-spacing: 1px;
+        margin-bottom: 48px;
+        animation: splashFadeIn 0.5s ease 0.15s both;
+        min-height: 18px;
+        transition: opacity 0.3s;
+      }
+
+      #splash-tagline {
+        position: absolute;
+        bottom: 48px;
+        color: rgba(255,255,255,0.15);
+        font-size: 10px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        animation: splashFadeIn 0.5s ease 0.3s both;
+      }
+
+      @keyframes splashFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes progressGlow {
+        0%,100% { box-shadow: 0 0 8px rgba(30,111,255,0.6); }
+        50%      { box-shadow: 0 0 20px rgba(77,166,255,0.9); }
+      }
+    </style>
   </head>
+
   <body>
+    <!-- Splash screen natif — visible AVANT que React charge -->
+    <div id="splash">
+      <img id="splash-logo" src="/icon-192x192.png" alt="Doniel Zik" />
+      <div id="splash-bar-wrap">
+        <div id="splash-bar-inner"></div>
+      </div>
+      <p id="splash-msg">Initialisation...</p>
+      <p id="splash-tagline">La Musique · Un Scan · Un Monde</p>
+    </div>
+
     <div id="root"></div>
 
-    <!-- ═══ SERVICE WORKER ═══ -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .then((reg) => console.log('[SW] Enregistré:', reg.scope))
-            .catch((err) => console.error('[SW] Erreur:', err));
-        });
-      }
-    </script>
+      // Animer la barre de progression avant React
+      var progress = 0;
+      var bar = document.getElementById('splash-bar-inner');
+      var msg = document.getElementById('splash-msg');
 
-    <!-- ═══ BOUTON INSTALLATION PWA ═══ -->
-    <script>
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        window.installPWA = async () => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('[PWA] Installation:', outcome);
-            deferredPrompt = null;
+      var messages = ['Initialisation...', 'Chargement de votre musique...', 'Connexion sécurisée...', 'Presque prêt...'];
+      var msgIdx = 0;
+
+      var t = setInterval(function() {
+        progress = Math.min(progress + Math.random() * 18, 85);
+        bar.style.width = progress + '%';
+
+        if (progress > 20 && msgIdx === 0) { msgIdx = 1; msg.textContent = messages[1]; }
+        if (progress > 50 && msgIdx === 1) { msgIdx = 2; msg.textContent = messages[2]; }
+        if (progress > 75 && msgIdx === 2) { msgIdx = 3; msg.textContent = messages[3]; }
+      }, 350);
+
+      // Appelé par React quand l'app est prête
+      window.__hideSplash = function() {
+        clearInterval(t);
+        bar.style.width = '100%';
+        setTimeout(function() {
+          var splash = document.getElementById('splash');
+          if (splash) {
+            splash.classList.add('hiding');
+            setTimeout(function() { splash.remove(); }, 450);
           }
-        };
-        window.dispatchEvent(new CustomEvent('pwaInstallAvailable'));
-      });
-      window.addEventListener('appinstalled', () => {
-        console.log('[PWA] Installée !');
-        deferredPrompt = null;
-      });
+        }, 300);
+      };
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
