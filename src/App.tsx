@@ -530,7 +530,7 @@ function LikeButton({ qrId }: { qrId: string }) {
     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
       <button onClick={toggle}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' }}>
-        {liked ? '❤️' : '🤍'} {count > 0 ? count.toLocaleString() : ''} {liked ? 'J\'aime' : 'J\'aime'}
+        {liked ? '❤️' : '🤍'} {count > 0 ? count.toLocaleString() : ''} Kiff
       </button>
     </div>
   );
@@ -4539,6 +4539,7 @@ function DecouvrirPage() {
               <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
                 <LikeButton qrId={c.publicLinkId} />
                 <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
+                <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <a href={`/ecoute/${c.publicLinkId}`}
                   style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600 }}>
                   Écouter
