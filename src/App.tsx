@@ -466,10 +466,10 @@ function Travailleurs({ qrId, artistEmail }: { qrId: string, artistEmail?: strin
 }
 
 // ─────────────────────────────────────────────
-// TUTO POINTER — flèche qui pointe le vrai bouton via getBoundingClientRect
+// TUTO POINTER — flèche qui pointe le vrai bouton
 // ─────────────────────────────────────────────
 const TUTO_STEPS = [
-  { id:'', label:'Écoutez', desc:'Appuyez sur Play pour écouter la musique de votre artiste', color:'#1a6bff' },
+  { id:'btn-play', label:'Écoutez', desc:'Appuyez sur Play pour écouter la musique de votre artiste', color:'#1a6bff' },
   { id:'btn-download', label:'Téléchargez', desc:'Téléchargez ce contenu sur votre téléphone', color:'#1a6bff' },
   { id:'btn-like', label:'Kiffez', desc:'Appuyez sur Kiff pour soutenir votre artiste', color:'#f04a6a' },
   { id:'btn-kiffement', label:'Kiffement', desc:'Envoyez un kiffement — 70% va directement à l\'artiste', color:'#ffd700' },
@@ -478,46 +478,76 @@ const TUTO_STEPS = [
 ];
 
 function TutoPointer({ step, onNext, onSkip }: { step: number, onNext: () => void, onSkip: () => void }) {
-  const [arrowPos, setArrowPos] = useState<{x:number,y:number}|null>(null);
+  const [arrowPos, setArrowPos] = useState<{x:number,y:number,w:number,h:number}|null>(null);
   const current = TUTO_STEPS[step - 1];
+  const retryRef = useRef<any>(null);
+
+  const findAndPosition = () => {
+    if (!current?.id) return;
+    const el = document.getElementById(current.id);
+    if (!el) {
+      // Retry toutes les 300ms si l'élément n'est pas encore dans le DOM
+      retryRef.current = setTimeout(findAndPosition, 300);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) {
+      retryRef.current = setTimeout(findAndPosition, 300);
+      return;
+    }
+    setArrowPos({ x: rect.left + rect.width/2, y: rect.top, w: rect.width, h: rect.height });
+  };
 
   useEffect(() => {
-    if (!current?.id) { setArrowPos(null); return; }
-    const el = document.getElementById(current.id);
-    if (!el) { setArrowPos(null); return; }
-    const rect = el.getBoundingClientRect();
-    setArrowPos({ x: rect.left + rect.width/2, y: rect.top - 8 });
-    // Observer les changements de position (scroll)
-    const obs = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      setArrowPos({ x: r.left + r.width/2, y: r.top - 8 });
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [step, current]);
+    if (retryRef.current) clearTimeout(retryRef.current);
+    setArrowPos(null);
+    // Attendre 500ms que le DOM se stabilise
+    retryRef.current = setTimeout(findAndPosition, 500);
+    return () => { if (retryRef.current) clearTimeout(retryRef.current); };
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isLast = step === 6;
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:9998, pointerEvents:'none' }}>
       <style>{`
-        @keyframes tutoArrow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes tutoArrow { 0%,100%{transform:translateY(0) translateX(-50%)} 50%{transform:translateY(-10px) translateX(-50%)} }
         @keyframes tutoSlide { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes tutoPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.15)} }
+        @keyframes tutoPulse { 0%,100%{transform:scale(1);opacity:0.8} 50%{transform:scale(1.2);opacity:0.4} }
       `}</style>
 
-      {/* Overlay */}
-      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.5)' }} />
+      {/* Overlay sombre */}
+      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} />
 
-      {/* Flèche pointante */}
+      {/* Flèche + cercle sur le bouton */}
       {arrowPos && (
-        <div style={{ position:'absolute', left:arrowPos.x - 16, top:arrowPos.y - 44, pointerEvents:'none', animation:'tutoArrow 0.8s ease infinite', zIndex:9999 }}>
-          <svg width="32" height="40" viewBox="0 0 32 40">
-            <polygon points="16,40 0,0 32,0" fill={current.color} opacity="0.9"/>
-          </svg>
-          {/* Cercle pulsant sur le bouton */}
-          <div style={{ position:'absolute', top:32, left:-12, width:56, height:56, borderRadius:99, border:`3px solid ${current.color}`, animation:'tutoPulse 1s ease infinite', opacity:0.7 }} />
-        </div>
+        <>
+          {/* Cercle pulsant autour du bouton */}
+          <div style={{
+            position:'absolute',
+            left: arrowPos.x - arrowPos.w/2 - 8,
+            top: arrowPos.y - 8,
+            width: arrowPos.w + 16,
+            height: arrowPos.h + 16,
+            borderRadius: 99,
+            border: `3px solid ${current.color}`,
+            boxShadow: `0 0 0 4px ${current.color}33`,
+            animation: 'tutoPulse 1.2s ease infinite',
+            zIndex: 9999,
+          }} />
+          {/* Flèche pointante */}
+          <div style={{
+            position:'absolute',
+            left: arrowPos.x,
+            top: arrowPos.y - 50,
+            animation: 'tutoArrow 0.8s ease infinite',
+            zIndex: 9999,
+          }}>
+            <svg width="28" height="36" viewBox="0 0 28 36">
+              <polygon points="14,36 0,0 28,0" fill={current.color}/>
+            </svg>
+          </div>
+        </>
       )}
 
       {/* Bulle info en bas */}
@@ -531,7 +561,7 @@ function TutoPointer({ step, onNext, onSkip }: { step: number, onNext: () => voi
           </div>
 
           <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', textAlign:'center', marginBottom:8 }}>{current.label}</p>
-          <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, textAlign:'center', marginBottom:20 }}>{current.desc}</p>
+          <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7, textAlign:'center', marginBottom:20 }}>{current.desc}</p>
 
           {isLast ? (
             <>
@@ -835,7 +865,7 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 28 }}>
         <button onClick={prev} disabled={idx === 0}
           style={{ background: 'none', border: 'none', color: idx === 0 ? 'rgba(100,140,220,0.18)' : 'rgba(100,140,220,0.6)', fontSize: 22, cursor: idx === 0 ? 'default' : 'pointer', padding: 4 }}>⏮</button>
-        <button onClick={toggle}
+        <button id="btn-play" onClick={toggle}
           style={{ width: 58, height: 58, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 24px rgba(30,111,255,0.55)', flexShrink: 0 }}>
           {playing ? '⏸' : '▶'}
         </button>
@@ -1340,7 +1370,7 @@ function FanPage() {
                         </div>
                       </button>
                     ) : (
-                      <button onClick={startDownload}
+                      <button id="btn-download" onClick={startDownload}
                         style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)' }}>
                         <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>⬇</span>
                         <div style={{ textAlign:'left' }}>
@@ -1447,9 +1477,9 @@ function FanPage() {
                     Retrouvez cette {qrData?.type === 'video' ? 'vidéo' : qrData?.type === 'album' ? 'album' : 'musique'} à tout moment, même sans le lien.
                   </p>
                   <div style={{ display:'flex', gap:8 }}>
-                    <button onClick={handleAddToZiko}
+                    <button id="btn-ziko" onClick={handleAddToZiko}
                       style={{ padding:'8px 16px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                      ➕ Ajouter à ma Zikothèque
+                      Ajouter à ma Zikothèque
                     </button>
                     <button onClick={() => setShowZikoTuto(false)}
                       style={{ padding:'8px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
