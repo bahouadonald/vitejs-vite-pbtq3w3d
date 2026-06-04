@@ -483,19 +483,14 @@ function TutoPointer({ step, onNext, onSkip }: { step: number, onNext: () => voi
   const retryRef = useRef<any>(null);
 
   const findAndPosition = () => {
-    if (!current?.id) return;
+    if (!current?.id) { setArrowPos(null); return; }
     const el = document.getElementById(current.id);
     if (!el) {
-      // Retry toutes les 300ms si l'élément n'est pas encore dans le DOM
       retryRef.current = setTimeout(findAndPosition, 300);
       return;
     }
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0) {
-      retryRef.current = setTimeout(findAndPosition, 300);
-      return;
-    }
-    setArrowPos({ x: rect.left + rect.width/2, y: rect.top, w: rect.width, h: rect.height });
+    setArrowPos({ x: rect.left + rect.width/2, y: rect.top, w: Math.max(rect.width, 40), h: Math.max(rect.height, 40) });
   };
 
   useEffect(() => {
@@ -1136,22 +1131,21 @@ function FanPage() {
   const [tutoStep, setTutoStep] = useState(0);
   const [tutoSeen, setTutoSeen] = useState(false);
 
-  // Démarrer tuto après que les boutons soient dans le DOM
+  // Démarrer tuto après chargement des données
   useEffect(() => {
     if (localStorage.getItem('dz_tuto_seen_v2')) return;
     let attempts = 0;
     const tryStart = () => {
       attempts++;
-      const playBtn = document.getElementById('btn-play');
-      if (playBtn && playBtn.getBoundingClientRect().width > 0) {
+      const el = document.getElementById('btn-play') || document.getElementById('btn-download') || document.getElementById('btn-like');
+      if (el) {
         setTutoStep(1);
-      } else if (attempts < 20) {
-        setTimeout(tryStart, 500);
+      } else if (attempts < 30) {
+        setTimeout(tryStart, 300);
       }
     };
-    setTimeout(tryStart, 1500);
+    setTimeout(tryStart, 800);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
   useEffect(() => {
@@ -6584,20 +6578,20 @@ function PublicStreamPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [tutoStep, setTutoStep] = useState(0);
 
-  // Démarrer tuto après que les boutons soient dans le DOM
+  // Démarrer tuto après chargement
   useEffect(() => {
     if (localStorage.getItem('dz_tuto_seen_v2')) return;
     let attempts = 0;
     const tryStart = () => {
       attempts++;
-      const playBtn = document.getElementById('btn-play');
-      if (playBtn && playBtn.getBoundingClientRect().width > 0) {
+      const el = document.getElementById('btn-play') || document.getElementById('btn-download') || document.getElementById('btn-like');
+      if (el) {
         setTutoStep(1);
-      } else if (attempts < 20) {
-        setTimeout(tryStart, 500);
+      } else if (attempts < 30) {
+        setTimeout(tryStart, 300);
       }
     };
-    setTimeout(tryStart, 1500);
+    setTimeout(tryStart, 800);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recordPublicStream = async (track: string, duration: number) => {
