@@ -1296,7 +1296,7 @@ function FanPage() {
 
   // Démarrer tuto après chargement des données
   useEffect(() => {
-    if (localStorage.getItem('dz_tuto_seen_v3')) return;
+    if (localStorage.getItem('dz_tuto_seen_v4')) return;
     let attempts = 0;
     const tryStart = () => {
       attempts++;
@@ -1379,7 +1379,7 @@ function FanPage() {
       await updateDoc(doc(db, 'qrcodes', qrDocId.current), { streams: (qrData.streams || 0) + 1 });
       setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
       // Déclencher tuto cascade après la première écoute
-      if (!localStorage.getItem('dz_tuto_seen_v3')) {
+      if (!localStorage.getItem('dz_tuto_seen_v4')) {
         setTimeout(() => setShowTutoCascade(true), 500);
       }
       if (zikoState === 'idle') setShowZikoTuto(true);
@@ -1479,7 +1479,7 @@ function FanPage() {
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO CASCADE — bulles après Play ── */}
-      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v3','1'); }} />}
+      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -6865,7 +6865,7 @@ function PublicStreamPage() {
       }
     } catch(e) { console.error('pubStream', e); }
     // Déclencher tuto cascade après premier play
-    if (!localStorage.getItem('dz_tuto_seen_v3')) {
+    if (!localStorage.getItem('dz_tuto_seen_v4')) {
       setTimeout(() => setShowTutoCascade(true), 800);
     }
   };
@@ -6948,7 +6948,7 @@ function PublicStreamPage() {
       {/* PUB MAISON */}
 
       {/* ── TUTO CASCADE — bulles après Play ── */}
-      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v3','1'); }} />}
+      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
       {/* ── POCHETTE — grande, visible, pleine largeur ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease' }}>
