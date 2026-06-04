@@ -4588,10 +4588,10 @@ function DecouvrirPage() {
             {/* Pochette */}
             <a href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
               {c.coverUrl ? (
-                <img src={c.coverUrl} alt={c.label} style={{ width:'100%', height:200, objectFit:'cover', display:'block' }} />
+                <img src={c.coverUrl} alt={c.label} style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'top', display:'block' }} />
               ) : (
-                <div style={{ width:'100%', height:200, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:48 }}>
-                  {c.type === 'video' || c.type === 'court-metrage' ? '🎬' : c.type === 'contenu-humoristique' ? '😄' : '🎵'}
+                <div style={{ width:'100%', height:220, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 </div>
               )}
             </a>
