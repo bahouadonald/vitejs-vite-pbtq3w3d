@@ -298,6 +298,7 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState('');
   const user = auth.currentUser;
 
   // Charger le compteur dès le montage
@@ -351,6 +352,7 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
 
   return (
     <div style={{ marginBottom:16 }}>
+      {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       <button onClick={() => setOpen(!open)}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 }}>
         Commenter {count > 0 ? count : ''}
@@ -792,18 +794,24 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [pendingNext, setPendingNext] = useState(false);
 
-  // Pub toutes les 60 secondes pendant lecture audio
+  // Pub pendant lecture audio — 3 fois par piste, sans son, passable après 5s
   const [showPubDuringPlay, setShowPubDuringPlay] = useState(false);
   const pubIntervalRef = useRef<any>(null);
+  const pubCountRef = useRef(0);
 
   useEffect(() => {
+    pubCountRef.current = 0; // reset à chaque nouvelle piste
+    if (pubIntervalRef.current) clearInterval(pubIntervalRef.current);
     if (playing) {
-      // Première pub après 60s, puis toutes les 60s
+      // Pub après 20s, 40s, 60s (3 fois max par piste)
       pubIntervalRef.current = setInterval(() => {
-        if (playing) setShowPubDuringPlay(true);
-      }, 60000);
-    } else {
-      if (pubIntervalRef.current) clearInterval(pubIntervalRef.current);
+        if (playing && pubCountRef.current < 3) {
+          pubCountRef.current++;
+          setShowPubDuringPlay(true);
+        } else {
+          clearInterval(pubIntervalRef.current);
+        }
+      }, 20000);
     }
     return () => { if (pubIntervalRef.current) clearInterval(pubIntervalRef.current); };
   }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -858,7 +866,7 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
 
       {/* PUB plein écran pendant lecture — musique continue en arrière-plan */}
       {showPubDuringPlay && (
-        <PubOverlay trigger="play" onDone={() => setShowPubDuringPlay(false)} />
+        <PubOverlay trigger="audio_during" silent={true} onDone={() => setShowPubDuringPlay(false)} />
       )}
 
       <audio ref={ref} src={cur?.url}
@@ -929,6 +937,91 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
   );
 }
 // ─────────────────────────────────────────────
+// TUTO CASCADE — bulles qui apparaissent après Play
+// ─────────────────────────────────────────────
+const TUTO_BUBBLES = [
+  { id:'btn-like', text:'Kiffez la musique de votre artiste', color:'#f04a6a', side:'left' },
+  { id:'btn-comment', text:'Commentez', color:'#1a6bff', side:'right' },
+  { id:'btn-kiffement', text:'Faites un kiffement à votre artiste', color:'#ffd700', side:'left' },
+  { id:'btn-ziko', text:'Ajoutez à votre Zikothèque', color:'#7c3aed', side:'right' },
+  { id:'btn-download', text:'Téléchargez la musique', color:'#1a6bff', side:'left' },
+];
+
+function TutoCascade({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0);
+  const [pos, setPos] = useState<{x:number,y:number,side:string}|null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (step >= TUTO_BUBBLES.length) { onDone(); return; }
+    const bubble = TUTO_BUBBLES[step];
+    const el = document.getElementById(bubble.id);
+    if (!el) { setStep(s => s+1); return; }
+    const rect = el.getBoundingClientRect();
+    setPos({ x: rect.left + rect.width/2, y: rect.top + rect.height/2, side: bubble.side });
+    setVisible(true);
+    const t = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => setStep(s => s+1), 300);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (step >= TUTO_BUBBLES.length || !pos) return null;
+  const bubble = TUTO_BUBBLES[step];
+
+  return (
+    <div style={{ position:'fixed', zIndex:9990, pointerEvents:'none', inset:0 }}>
+      {/* Cercle pulsant sur le bouton */}
+      <div style={{
+        position:'absolute',
+        left: pos.x - 24,
+        top: pos.y - 24,
+        width: 48, height: 48,
+        borderRadius: 99,
+        border: `2px solid ${bubble.color}`,
+        boxShadow: `0 0 0 4px ${bubble.color}33`,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity .3s',
+        animation: visible ? 'tutoPulse 1s ease infinite' : 'none',
+      }} />
+      {/* Bulle texte */}
+      <div style={{
+        position:'absolute',
+        left: bubble.side === 'left' ? pos.x - 180 : pos.x + 12,
+        top: pos.y - 20,
+        background: bubble.color,
+        color: '#fff',
+        fontWeight: 700,
+        fontSize: 12,
+        borderRadius: 10,
+        padding: '8px 14px',
+        maxWidth: 160,
+        lineHeight: 1.4,
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(8px)',
+        transition: 'all .3s ease',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+        whiteSpace: 'pre-wrap',
+      }}>
+        {bubble.text}
+        {/* Flèche */}
+        <div style={{
+          position:'absolute',
+          top: '50%',
+          [bubble.side === 'left' ? 'right' : 'left']: -6,
+          transform: 'translateY(-50%)',
+          width: 0, height: 0,
+          borderTop: '6px solid transparent',
+          borderBottom: '6px solid transparent',
+          [bubble.side === 'left' ? 'borderLeft' : 'borderRight']: `6px solid ${bubble.color}`,
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // FAN PAGE
 // ─────────────────────────────────────────────
 
@@ -937,19 +1030,47 @@ function AudioPlayer({ files, onStream }: { files: any[], onStream?: (track: str
 // ─────────────────────────────────────────────
 function VideoPlayer({ files }: { files: any[] }) {
   const [idx, setIdx] = useState(0);
-  const [showPubBefore, setShowPubBefore] = useState(true); // pub avant la première vidéo
+  const [showPubBefore, setShowPubBefore] = useState(true);
   const [showPubAfter, setShowPubAfter] = useState(false);
+  const [countdown, setCountdown] = useState(10);
   const [pendingIdx, setPendingIdx] = useState<number|null>(null);
   const ref = useRef<HTMLVideoElement>(null);
+  const countRef = useRef<any>(null);
   if (!files || files.length === 0) return null;
   const cur = files[idx];
+
+  // Compte à rebours 10s avant pub vidéo
+  useEffect(() => {
+    if (!showPubBefore) return;
+    setCountdown(10);
+    countRef.current = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(countRef.current); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countRef.current);
+  }, [showPubBefore, idx]);
 
   return (
     <div style={{ background: '#000', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
 
+      {/* Compte à rebours avant pub */}
+      {showPubBefore && countdown > 0 && (
+        <div style={{ position:'relative' }}>
+          <video ref={ref} key={cur?.url} src={cur?.url} style={{ width:'100%', maxHeight:280, display:'block', opacity:0.3 }} />
+          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8 }}>
+            <div style={{ width:56, height:56, borderRadius:99, border:'3px solid #fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span style={{ color:'#fff', fontWeight:900, fontSize:22 }}>{countdown}</span>
+            </div>
+            <p style={{ color:'rgba(255,255,255,0.7)', fontSize:12 }}>Publicité dans {countdown}s</p>
+          </div>
+        </div>
+      )}
+
       {/* Pub avant lecture vidéo */}
-      {showPubBefore && (
-        <PubOverlay trigger="play" onDone={() => setShowPubBefore(false)} />
+      {showPubBefore && countdown === 0 && (
+        <PubOverlay trigger="play" onDone={() => { setShowPubBefore(false); ref.current?.play(); }} />
       )}
 
       {/* Pub après fin vidéo */}
@@ -959,30 +1080,31 @@ function VideoPlayer({ files }: { files: any[] }) {
           if (pendingIdx !== null) {
             setIdx(pendingIdx);
             setPendingIdx(null);
-            setShowPubBefore(true); // pub avant la prochaine vidéo
+            // Pas de pub avant la vidéo suivante — seulement à la fin
           }
         }} />
       )}
 
       {/* Lecteur vidéo */}
-      <video
-        ref={ref}
-        key={cur?.url}
-        src={cur?.url}
-        controls
-        controlsList="nodownload"
-        style={{ width: '100%', maxHeight: 280, background: '#000', display: 'block' }}
-        onEnded={() => {
-          if (idx < files.length - 1) {
-            // Pub après fin + avant prochaine
-            setPendingIdx(idx + 1);
-            setShowPubAfter(true);
-          }
-        }}
-      />
+      {!showPubBefore && !showPubAfter && (
+        <video
+          ref={ref}
+          key={cur?.url}
+          src={cur?.url}
+          controls
+          controlsList="nodownload"
+          style={{ width: '100%', maxHeight: 280, background: '#000', display: 'block' }}
+          onEnded={() => {
+            if (idx < files.length - 1) {
+              setPendingIdx(idx + 1);
+              setShowPubAfter(true);
+            }
+          }}
+        />
+      )}
 
       {/* Titre */}
-      <div style={{ padding: '12px 16px', borderBottom: files.length > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', background:'rgba(0,0,0,0.8)' }}>
+      <div style={{ padding: '10px 16px', background:'rgba(0,0,0,0.8)' }}>
         <p style={{ fontWeight: 700, fontSize: 13, color:'#fff' }}>{cur?.name?.replace(/\.[^/.]+$/, '') || 'Clip ' + (idx + 1)}</p>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>{idx + 1} / {files.length}</p>
       </div>
@@ -993,7 +1115,6 @@ function VideoPlayer({ files }: { files: any[] }) {
           {files.map((f, i) => (
             <div key={i} onClick={() => {
               if (i !== idx) {
-                // Pub avant chaque changement de vidéo
                 setPendingIdx(i);
                 setShowPubAfter(true);
               }
@@ -1170,6 +1291,7 @@ function FanPage() {
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
   const [tutoStep, setTutoStep] = useState(0);
+  const [showTutoCascade, setShowTutoCascade] = useState(false);
   const [tutoSeen, setTutoSeen] = useState(false);
 
   // Démarrer tuto après chargement des données
@@ -1256,7 +1378,10 @@ function FanPage() {
       });
       await updateDoc(doc(db, 'qrcodes', qrDocId.current), { streams: (qrData.streams || 0) + 1 });
       setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
-      // Afficher tuto Zikothèque après écoute (si pas encore ajouté)
+      // Déclencher tuto cascade après la première écoute
+      if (!localStorage.getItem('dz_tuto_seen_v2')) {
+        setTimeout(() => setShowTutoCascade(true), 500);
+      }
       if (zikoState === 'idle') setShowZikoTuto(true);
     } catch (e) { console.error('stream', e); }
   };
@@ -1353,8 +1478,8 @@ function FanPage() {
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
 
           {/* PUB après téléchargement gratuit */}
-      {/* ── TUTO POINTEUR RÉEL — flèche sur le bouton exact ── */}
-      {tutoStep > 0 && tutoStep <= 6 && <TutoPointer step={tutoStep} onNext={() => setTutoStep(s => s+1)} onSkip={() => { localStorage.setItem('dz_tuto_seen_v2','1'); setTutoStep(0); }} />}
+      {/* ── TUTO CASCADE — bulles après Play ── */}
+      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v2','1'); }} />}
 
       {showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -1695,9 +1820,17 @@ function CommerciauxtTab({ db }: { db: any }) {
                   <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>
                   <p style={{ color:'#b0c4d8', fontSize:10, marginTop:4 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
                 </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => valider(c)} style={{ ...S.btn, fontSize:12, padding:'6px 14px' }}>✅ Valider</button>
-                  <button onClick={() => refuser(c)} style={{ ...S.btnRed, fontSize:12, padding:'6px 14px' }}>✕ Refuser</button>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:200 }}>
+                  <input
+                    placeholder="Email responsable (optionnel)"
+                    style={{ ...S.inp, fontSize:11, padding:'6px 10px' }}
+                    defaultValue={responsableEmail}
+                    onChange={e => setResponsableEmail(e.target.value)}
+                  />
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={() => valider(c)} style={{ ...S.btn, fontSize:12, padding:'6px 14px' }}>Valider</button>
+                    <button onClick={() => refuser(c)} style={{ ...S.btnRed, fontSize:12, padding:'6px 14px' }}>Refuser</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1984,7 +2117,7 @@ function useActivePub() {
 // Règle Doniel Zik : bouton Passer après 8s toujours
 // Durée pub : 30s — si pas de clic Passer, pub suivante automatique
 // ─────────────────────────────────────────────
-function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'track', onDone: () => void }) {
+function PubOverlay({ trigger, onDone, silent }: { trigger: 'page'|'play'|'download'|'track'|'audio_during', onDone: () => void, silent?: boolean }) {
   const [pubs, setPubs] = useState<any[]>([]);
   const [pubIndex, setPubIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0); // secondes écoulées sur la pub courante
@@ -2078,7 +2211,7 @@ function PubOverlay({ trigger, onDone }: { trigger: 'page'|'play'|'download'|'tr
             <video
               src={pub.imageUrl}
               autoPlay
-              muted={false}
+              muted={silent || false}
               playsInline
               style={{ width:'100%', height:'75vh', display:'block', borderRadius:12, background:'#000', objectFit:'contain' }}
               onEnded={() => {
