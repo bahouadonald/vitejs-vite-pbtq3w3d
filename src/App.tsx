@@ -1801,30 +1801,24 @@ function ResponsablesTab() {
     try {
       let uid = '';
       try {
-        // Essayer de créer un nouveau compte
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         uid = cred.user.uid;
       } catch(e: any) {
         if (e.code === 'auth/email-already-in-use') {
-          // Email déjà existant — connecter pour récupérer l'UID
-          const cred = await signInWithEmailAndPassword(auth, email, password);
-          uid = cred.user.uid;
+          // Email déjà existant — utiliser l'email comme ID unique
+          uid = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+          setMsg('⚠️ Email déjà utilisé — rôle responsable ajouté au compte existant.');
         } else throw e;
       }
-      // Enregistrer le rôle responsable dans Firestore
       await setDoc(doc(db, 'responsables', uid), {
         nom, email: email.trim().toLowerCase(), telephone,
         status: 'actif', createdAt: new Date().toISOString(),
         commerciauxCount: 0,
       });
-      setMsg('Compte responsable activé avec succès !');
+      if (!msg) setMsg('Compte responsable créé avec succès !');
       setNom(''); setEmail(''); setTelephone(''); setPassword('');
     } catch(e: any) {
-      if (e.code === 'auth/wrong-password') {
-        setMsg('Mot de passe incorrect pour ce compte existant.');
-      } else {
-        setMsg('Erreur : ' + e.message);
-      }
+      setMsg('Erreur : ' + e.message);
     }
     setLoading(false);
   };
@@ -5871,11 +5865,15 @@ function AnnonceurDashboard({ annonceur, user }: { annonceur: any, user: any }) 
         lien: annonceur.telephone,
         lienType: 'tel',
         btnLabel: 'Contacter',
-        active: false, // activé après validation + paiement
+        active: false,
         annonceurEmail: user.email,
         budget: parseInt(form.budget),
         vues: 0, clics: 0,
         status: 'en_attente_paiement',
+        // Répartition CA pub : Artiste 50% / Entreprise 40% / Commercial 10%
+        partArtiste: Math.round(parseInt(form.budget) * 0.50),
+        partEntreprise: Math.round(parseInt(form.budget) * 0.40),
+        partCommercial: Math.round(parseInt(form.budget) * 0.10),
         createdAt: new Date().toISOString(),
       });
       setMsg('✅ Campagne soumise ! Effectuez votre paiement pour activation.');
