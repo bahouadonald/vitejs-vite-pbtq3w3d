@@ -202,12 +202,16 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
         await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: soldeCoins - kiffement.coins });
       }
       // Enregistrer le kiffement
+      // Répartition kiffement : Artiste 70% / Entreprise 20% / Commercial 10%
+      const montantKiff = kiffement.coins * 100;
       await addDoc(collection(db,'cadeaux'), {
         qrId, artistEmail,
         kiffementId: kiffement.id,
         kiffementLabel: kiffement.label,
         coins: kiffement.coins,
-        partArtiste: kiffement.partArtiste,
+        partArtiste: Math.round(montantKiff * 0.70),
+        partEntreprise: Math.round(montantKiff * 0.20),
+        partCommercial: Math.round(montantKiff * 0.10),
         userId: user.uid,
         userName: user.displayName || user.email?.split('@')[0],
         status: 'paid',
@@ -3011,7 +3015,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 </div>
                 <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
                 <div><label style={S.lbl}>Email du commercial (optionnel)</label><input style={S.inp} type="email" value={newCommercialEmail} onChange={e => setNewCommercialEmail(e.target.value)} placeholder="commercial@email.com" /></div>
-                <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="500" /></div>
+                <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="700" /></div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -6845,8 +6849,17 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
       // 1. Créer la demande dans Firestore
       const artSnap = await getDocs(query(collection(db, 'artists'), where('email','==',artistEmail)));
       const artistId = artSnap.empty ? '' : (artSnap.docs[0].data().uid || artSnap.docs[0].id);
+      const commercialEmail = artSnap.empty ? '' : (artSnap.docs[0].data().responsableEmail || artSnap.docs[0].data().commercialEmail || '');
+
+      // Répartition : Artiste 70% / Entreprise 20% / Commercial 10%
+      const partArtiste = Math.round(prix * 0.70);
+      const partEntreprise = Math.round(prix * 0.20);
+      const partCommercial = Math.round(prix * 0.10);
+
       const venteRef = await addDoc(collection(db, 'ventes'), {
         qrId, artistId, artistEmail, albumLabel, prix,
+        partArtiste, partEntreprise, partCommercial,
+        commercialEmail,
         statut: 'en_attente', dlActive: false,
         readByArtist: false, createdAt: new Date().toISOString(),
       });
