@@ -1795,18 +1795,32 @@ function ResponsablesTab() {
     if (!nom || !email || !password) { setMsg('Nom, email et mot de passe requis'); return; }
     setLoading(true); setMsg('');
     try {
-      // Créer compte Firebase Auth
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Enregistrer dans Firestore
-      await addDoc(collection(db, 'responsables'), {
+      let uid = '';
+      try {
+        // Essayer de créer un nouveau compte
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        uid = cred.user.uid;
+      } catch(e: any) {
+        if (e.code === 'auth/email-already-in-use') {
+          // Email déjà existant — connecter pour récupérer l'UID
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          uid = cred.user.uid;
+        } else throw e;
+      }
+      // Enregistrer le rôle responsable dans Firestore
+      await setDoc(doc(db, 'responsables', uid), {
         nom, email: email.trim().toLowerCase(), telephone,
         status: 'actif', createdAt: new Date().toISOString(),
         commerciauxCount: 0,
       });
-      setMsg('Compte créé avec succès !');
+      setMsg('Compte responsable activé avec succès !');
       setNom(''); setEmail(''); setTelephone(''); setPassword('');
     } catch(e: any) {
-      setMsg('Erreur : ' + e.message);
+      if (e.code === 'auth/wrong-password') {
+        setMsg('Mot de passe incorrect pour ce compte existant.');
+      } else {
+        setMsg('Erreur : ' + e.message);
+      }
     }
     setLoading(false);
   };
