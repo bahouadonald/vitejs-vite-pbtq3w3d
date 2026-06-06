@@ -256,6 +256,9 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
     <div style={{ marginBottom:16 }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       <button onClick={() => setOpen(!open)}
+        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+        Kiffement
+      </button>
       {/* Modal recharge stylé */}
       {rechargeModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
