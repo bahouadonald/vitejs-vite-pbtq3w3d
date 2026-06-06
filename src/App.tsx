@@ -289,9 +289,6 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
           </div>
         </div>
       )}
-        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
-        Kiffement
-      </button>
 
       {open && (
         <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
