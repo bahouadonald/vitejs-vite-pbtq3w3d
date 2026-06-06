@@ -708,8 +708,8 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     });
     const unsub2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), snap => setCommentCount(snap.size));
     const unsub3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), snap => {
-      const Oscart = snap.docs.reduce((s,d) => s + (d.data().coins||0), 0);
-      setTotalCoins(coins);
+      const totalOscart = snap.docs.reduce((s,d) => s + (d.data().coins||0), 0);
+      setTotalCoins(totalOscart);
     });
     return () => { unsub1(); unsub2(); unsub3(); };
   }, [qrId, user]);
@@ -5046,7 +5046,7 @@ function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
   return <>
     {stat('Kiffs', kiffs)}
     {stat('Commentaires', comments)}
-    {coins > 0 && stat('Oscart', Oscart)}
+    {coins > 0 && stat('Oscart', coins)}
     {stat('Buzz', buzz)}
   </>;
 }
