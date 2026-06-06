@@ -2789,12 +2789,23 @@ function AdminPage() {
   const saveEdit = async () => {
     if (!editModal) return;
     const newTotal = parseInt(editScans) || editModal.totalScans;
+    const newPrice = parseInt(editPrice) || editModal.price;
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
-      price: parseInt(editPrice) || editModal.price, totalScans: newTotal,
+      price: newPrice, totalScans: newTotal,
       files: editFiles, fileCount: editFiles.length, whatsapp: editWhatsapp,
       status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
     });
-    setEditModal(null); setMsg('QR mis a jour !');
+    // Synchroniser le prix dans publicLinks
+    if (editModal.publicLinkId) {
+      const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',editModal.publicLinkId)));
+      if (!plSnap.empty) await updateDoc(doc(db,'publicLinks',plSnap.docs[0].id), { price: newPrice });
+    }
+    // Synchroniser dans decouvrir
+    if (editModal.publicLinkId) {
+      const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',editModal.publicLinkId)));
+      if (!dSnap.empty) await updateDoc(doc(db,'decouvrir',dSnap.docs[0].id), { price: newPrice });
+    }
+    setEditModal(null); setMsg('QR mis à jour !');
   };
 
   const generateBulkQRs = async () => {
