@@ -142,6 +142,29 @@ function LoginModal({ onClose, message }: { onClose: () => void, message: string
   );
 }
 
+// Sélecteur devise pour la recharge
+function RechargeDeviseSelector({ fcfa }: { fcfa: number }) {
+  const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
+  const montant = devise === 'fcfa' ? `${fcfa.toLocaleString()} F CFA`
+    : devise === 'eur' ? `${(fcfa * 0.0015).toFixed(2)} €`
+    : `${(fcfa * 0.0016).toFixed(2)} $`;
+  return (
+    <>
+      <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:12 }}>
+        {(['fcfa','eur','usd'] as const).map(d => (
+          <button key={d} onClick={() => setDevise(d)}
+            style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${devise===d?'#ffd700':'rgba(255,255,255,0.1)'}`, background:devise===d?'rgba(255,215,0,0.15)':'transparent', color:devise===d?'#ffd700':'rgba(255,255,255,0.4)', fontSize:11, cursor:'pointer' }}>
+            {d === 'fcfa' ? 'F CFA' : d === 'eur' ? '€' : '$'}
+          </button>
+        ))}
+      </div>
+      <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, textAlign:'center', marginBottom:20 }}>
+        Montant : <strong style={{ color:'#ffd700' }}>{montant}</strong>
+      </p>
+    </>
+  );
+}
+
 // ─────────────────────────────────────────────
 // SYSTÈME COINS — recharge + kiffements
 // ─────────────────────────────────────────────
@@ -174,13 +197,29 @@ const RECHARGES = [
 
 const KIFFEMENTS = [
   { id:'note', label:'Note', coins:1, partArtiste:70,
-    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
+    icon: (
+      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(145deg,#ffe066,#f0a500)', boxShadow:'0 6px 16px rgba(240,165,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7a4800" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+    )},
   { id:'micro', label:'Micro', coins:5, partArtiste:350,
-    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg> },
+    icon: (
+      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(145deg,#c084fc,#7c3aed)', boxShadow:'0 6px 16px rgba(124,58,237,0.5), inset 0 1px 0 rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+      </div>
+    )},
   { id:'trophee', label:'Trophée', coins:10, partArtiste:700,
-    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M8 21h8M12 17v4M17 3H7l1 7a4 4 0 0 0 8 0l1-7z"/><path d="M17 3c0 0 2 0 3 2s0 5-3 6"/><path d="M7 3c0 0-2 0-3 2s0 5 3 6"/></svg> },
+    icon: (
+      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(145deg,#fb923c,#dc2626)', boxShadow:'0 6px 16px rgba(220,38,38,0.5), inset 0 1px 0 rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M8 21h8M12 17v4M17 3H7l1 7a4 4 0 0 0 8 0l1-7z"/><path d="M17 3c0 0 2 0 3 2s0 5-3 6"/><path d="M7 3c0 0-2 0-3 2s0 5 3 6"/></svg>
+      </div>
+    )},
   { id:'couronne', label:'Couronne', coins:50, partArtiste:3500,
-    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M2 19h20M2 19l3-9 5 5 5-8 5 8-3-4z"/><circle cx="12" cy="7" r="1" fill="#ffd700"/><circle cx="5" cy="12" r="1" fill="#ffd700"/><circle cx="19" cy="12" r="1" fill="#ffd700"/></svg> },
+    icon: (
+      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(145deg,#fde047,#f59e0b)', boxShadow:'0 6px 20px rgba(245,158,11,0.6), inset 0 1px 0 rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="#7a4800" stroke="#7a4800" strokeWidth="1.5" strokeLinecap="round"><path d="M2 19h20M2 19l3-10 5 6 5-9 5 9-3-6z"/></svg>
+      </div>
+    )},
 ];
 
 function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
@@ -269,9 +308,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
             <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>
               Recharger {rechargeModal.oscart} Oscart
             </p>
-            <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, textAlign:'center', marginBottom:20 }}>
-              Montant : {rechargeModal.fcfa.toLocaleString()} F CFA = {(rechargeModal.oscart * 0.015).toFixed(2)} €
-            </p>
+            <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
             <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:20 }}>
               <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.8, margin:0, textAlign:'center' }}>
                 Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
@@ -3080,9 +3117,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
                 <div><label style={S.lbl}>Email du commercial (optionnel)</label><input style={S.inp} type="email" value={newCommercialEmail} onChange={e => setNewCommercialEmail(e.target.value)} placeholder="commercial@email.com" /></div>
                 <div>
-                  <label style={S.lbl}>Prix en Oscart * <span style={{ color:'#8098b8', fontWeight:400 }}>(1 Oscart = 10 F CFA)</span></label>
-                  <input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="50" />
-                  {newPrice && <p style={{ color:'#4da6ff', fontSize:11, marginTop:2 }}>{parseInt(newPrice)||0} Oscart = {((parseInt(newPrice)||0)*10).toLocaleString()} F CFA = {((parseInt(newPrice)||0)*0.015).toFixed(2)} €</p>}
+                  <label style={S.lbl}>Prix en F CFA * <span style={{ color:'#8098b8', fontWeight:400 }}>(converti automatiquement en Oscart)</span></label>
+                  <input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="1000" />
+                  {newPrice && <p style={{ color:'#ffd700', fontSize:12, marginTop:4, fontWeight:700 }}>= {Math.ceil((parseInt(newPrice)||0)/10)} Oscart</p>}
                 </div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
@@ -6999,6 +7036,98 @@ function PWAInstallBanner() {
 
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// OSCART PAY BUTTON — payer avec Oscart ou recharger
+// ─────────────────────────────────────────────
+function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
+  prix: number, qrId: string, albumLabel: string, artistEmail: string, files: any[]
+}) {
+  const [solde, setSolde] = useState(0);
+  const [paying, setPaying] = useState(false);
+  const [done, setDone] = useState(false);
+  const user = auth.currentUser;
+  const prixOscart = Math.ceil(prix / 10);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(
+      query(collection(db,'coins_solde'), where('uid','==',user.uid)),
+      snap => setSolde(snap.empty ? 0 : snap.docs[0].data().solde || 0)
+    );
+    return unsub;
+  }, [user]);
+
+  const payer = async () => {
+    if (!user || solde < prixOscart) return;
+    setPaying(true);
+    try {
+      const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!snap.empty) await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: solde - prixOscart });
+      const artSnap = await getDocs(query(collection(db,'artists'), where('email','==',artistEmail)));
+      const commercialEmail = artSnap.empty ? '' : (artSnap.docs[0].data().commercialEmail || '');
+      await addDoc(collection(db,'ventes'), {
+        qrId, artistEmail, albumLabel, prix, prixOscart,
+        userId: user.uid,
+        partArtiste: Math.round(prix * 0.70),
+        partEntreprise: Math.round(prix * 0.20),
+        partCommercial: Math.round(prix * 0.10),
+        commercialEmail, dlActive: true,
+        statut: 'paid', createdAt: new Date().toISOString(),
+      });
+      setDone(true);
+    } catch(e) { console.error(e); }
+    setPaying(false);
+  };
+
+  const downloadAll = () => {
+    files.forEach((f:any, i:number) => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+        a.download = f.name; a.target = '_blank';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }, i * 1200);
+    });
+  };
+
+  if (done) return (
+    <button onClick={downloadAll}
+      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+      Télécharger maintenant
+    </button>
+  );
+
+  if (!user) return (
+    <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
+      Connectez-vous pour télécharger
+    </a>
+  );
+
+  if (solde < prixOscart) return (
+    <div>
+      <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>
+        Solde insuffisant — il vous faut {prixOscart} Oscart · Votre solde : {solde} Oscart
+      </p>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+        {RECHARGES.filter(r => r.oscart >= prixOscart).slice(0,2).map(r => (
+          <button key={r.oscart} onClick={() => alert(`Rechargez ${r.fcfa.toLocaleString()} F CFA pour obtenir ${r.oscart} Oscart`)}
+            style={{ padding:'10px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.08)', cursor:'pointer', textAlign:'center' }}>
+            <p style={{ color:'#ffd700', fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
+            <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <button onClick={payer} disabled={paying}
+      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+      {paying ? 'Traitement...' : `Télécharger — ${prixOscart} Oscart`}
+    </button>
+  );
+}
+
 // TÉLÉCHARGER WIDGET — paiement Wave automatique
 // Flux : clic → session Wave créée côté serveur → redirection Wave → webhook → DL actif
 // ─────────────────────────────────────────────
@@ -7116,28 +7245,30 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
 
   return (
     <div style={{ marginBottom:20 }}>
-      <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
-      {state === 'error' && (
-        <div style={{ background:'rgba(240,74,106,0.1)', border:'1px solid rgba(240,74,106,0.3)', borderRadius:10, padding:'10px 14px', marginBottom:12 }}>
-          <p style={{ color:'#f04a6a', fontSize:12, margin:0 }}>⚠ {errMsg}</p>
+      <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Télécharger</p>
+
+      {/* Prix en Oscart */}
+      <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:24, color:'#ffd700', margin:'0 0 2px' }}>
+              {Math.ceil(prix / 10)} Oscart
+            </p>
+            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:10, margin:0 }}>
+              Monnaie de la plateforme · 1 Oscart = 10 F
+            </p>
+          </div>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="1.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
         </div>
-      )}
-      <button onClick={handlePay} disabled={state === 'loading'}
-        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background: state === 'loading' ? 'rgba(30,111,255,0.5)' : 'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor: state === 'loading' ? 'default' : 'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
-        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px', flexShrink:0 }}>
-          {state === 'loading' ? '⏳' : '⬇'}
-        </span>
-        <div style={{ textAlign:'left' }}>
-          <p style={{ margin:0, fontWeight:800 }}>
-            {state === 'loading' ? 'Préparation du paiement...' : (files.length > 1 ? "Télécharger l'album" : 'Télécharger')}
-          </p>
-          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>
-            {prix > 0 ? `${prix.toLocaleString()} FCFA · Paiement sécurisé Wave` : 'Paiement Wave'}
-          </p>
-        </div>
-      </button>
+
+        {/* Bouton selon solde */}
+        <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
+      </div>
+
       <p style={{ color:'#2a3a60', fontSize:10, textAlign:'center', marginTop:8 }}>
-        🔒 Paiement sécurisé via Wave · Téléchargement automatique après confirmation
+        Rechargez vos Oscart pour télécharger ce contenu
       </p>
     </div>
   );
@@ -7433,7 +7564,10 @@ export default function App() {
       setTimeout(() => {
         setAuthLoading(false);
         // Cacher le splash screen natif de index.html
-        (window as any).__hideSplash?.();
+        // On attend un peu plus pour que React ait le temps de rendre la page
+        setTimeout(() => {
+          (window as any).__hideSplash?.();
+        }, 600);
       }, 400);
     });
     return () => { unsub(); clearInterval(t); };
