@@ -2750,6 +2750,7 @@ function AdminPage() {
       await addDoc(collection(db, 'publicLinks'), {
         publicLinkId, label: newLabel, artist: newArtist, type: newType,
         files: uploaded, coverUrl, artistEmail: newArtistEmail,
+        price: parseInt(newPrice) || 0,
         createdAt: new Date().toISOString(),
       });
       // Enregistrer l'artiste dans la collection 'artists' si email fourni
@@ -2789,21 +2790,19 @@ function AdminPage() {
   const saveEdit = async () => {
     if (!editModal) return;
     const newTotal = parseInt(editScans) || editModal.totalScans;
-    const newPrice = parseInt(editPrice) || editModal.price;
+    const newPriceVal = parseInt(editPrice) || editModal.price;
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
-      price: newPrice, totalScans: newTotal,
+      price: newPriceVal, totalScans: newTotal,
       files: editFiles, fileCount: editFiles.length, whatsapp: editWhatsapp,
       status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
     });
-    // Synchroniser le prix dans publicLinks
-    if (editModal.publicLinkId) {
-      const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',editModal.publicLinkId)));
-      if (!plSnap.empty) await updateDoc(doc(db,'publicLinks',plSnap.docs[0].id), { price: newPrice });
-    }
-    // Synchroniser dans decouvrir
-    if (editModal.publicLinkId) {
-      const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',editModal.publicLinkId)));
-      if (!dSnap.empty) await updateDoc(doc(db,'decouvrir',dSnap.docs[0].id), { price: newPrice });
+    // Synchroniser prix dans publicLinks via publicLinkId du qrcode
+    const pid = editModal.publicLinkId || editModal.qrId;
+    if (pid) {
+      const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',pid)));
+      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { price: newPriceVal });
+      const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',pid)));
+      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { price: newPriceVal });
     }
     setEditModal(null); setMsg('QR mis à jour !');
   };
