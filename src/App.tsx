@@ -152,30 +152,48 @@ const optimizeCloudinaryUrl = (url: string, opts = 'f_auto,q_auto,w_400') => {
   return url.replace('/upload/', '/upload/' + opts + '/');
 };
 
+// 1 Oscart = 10 F CFA = 0.015 € = 0.016 $
+const OSCART_TO_FCFA = 10;
+const OSCART_TO_EUR = 0.015;
+const OSCART_TO_USD = 0.016;
+
+const formatOscart = (oscart: number, devise: 'fcfa'|'eur'|'usd' = 'fcfa') => {
+  if (devise === 'eur') return `${(oscart * OSCART_TO_EUR).toFixed(2)} €`;
+  if (devise === 'usd') return `${(oscart * OSCART_TO_USD).toFixed(2)} $`;
+  return `${(oscart * OSCART_TO_FCFA).toLocaleString()} F CFA`;
+};
+
 const RECHARGES = [
-  { coins:10, prix:100 },
-  { coins:50, prix:500 },
-  { coins:100, prix:1000 },
-  { coins:500, prix:5000 },
+  { fcfa:500,   oscart:35  },
+  { fcfa:1000,  oscart:80  },
+  { fcfa:2000,  oscart:175 },
+  { fcfa:3000,  oscart:270 },
+  { fcfa:5000,  oscart:460 },
+  { fcfa:10000, oscart:950 },
 ];
 
 const KIFFEMENTS = [
-  { id:'note', label:'Note', coins:1, partArtiste:70 },
-  { id:'micro', label:'Micro', coins:5, partArtiste:350 },
-  { id:'trophee', label:'Trophée', coins:10, partArtiste:700 },
-  { id:'couronne', label:'Couronne', coins:50, partArtiste:3500 },
+  { id:'note', label:'Note', coins:1, partArtiste:70,
+    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
+  { id:'micro', label:'Micro', coins:5, partArtiste:350,
+    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg> },
+  { id:'trophee', label:'Trophée', coins:10, partArtiste:700,
+    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M8 21h8M12 17v4M17 3H7l1 7a4 4 0 0 0 8 0l1-7z"/><path d="M17 3c0 0 2 0 3 2s0 5-3 6"/><path d="M7 3c0 0-2 0-3 2s0 5 3 6"/></svg> },
+  { id:'couronne', label:'Couronne', coins:50, partArtiste:3500,
+    icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M2 19h20M2 19l3-9 5 5 5-8 5 8-3-4z"/><circle cx="12" cy="7" r="1" fill="#ffd700"/><circle cx="5" cy="12" r="1" fill="#ffd700"/><circle cx="19" cy="12" r="1" fill="#ffd700"/></svg> },
 ];
 
 function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
   const [open, setOpen] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
+  const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const [soldeCoins, setSoldeCoins] = useState(0);
   const [sending, setSending] = useState<string|null>(null);
   const [msg, setMsg] = useState('');
   const [showLoginModal, setShowLoginModal] = useState('');
   const user = auth.currentUser;
 
-  // Charger le solde coins de l'utilisateur
+  // Charger le solde Oscart de l'utilisateur
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(
@@ -196,7 +214,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
     }
     setSending(kiffement.id);
     try {
-      // Débiter les coins
+      // Débiter les Oscart
       const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       if (!snap.empty) {
         await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: soldeCoins - kiffement.coins });
@@ -222,13 +240,13 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
         await addDoc(collection(db,'notifications'), {
           to: artistEmail,
           type: 'kiffement',
-          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.coins} coins — ${kiffement.label}`,
+          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.coins} Oscart — ${kiffement.label}`,
           qrId, from: user.displayName || user.email,
           createdAt: new Date().toISOString(),
           lu: false,
         });
       }
-      setMsg(`Kiffement envoyé ! ${kiffement.coins} coins débités.`);
+      setMsg(`Kiffement envoyé ! ${kiffement.coins} Oscart débités.`);
       setTimeout(() => setMsg(''), 3000);
     } catch(e) { console.error(e); }
     setSending(null);
@@ -238,6 +256,36 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
     <div style={{ marginBottom:16 }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       <button onClick={() => setOpen(!open)}
+      {/* Modal recharge stylé */}
+      {rechargeModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setRechargeModal(null)}>
+          <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+            <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>
+              Recharger {rechargeModal.oscart} Oscart
+            </p>
+            <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, textAlign:'center', marginBottom:20 }}>
+              Montant : {rechargeModal.fcfa.toLocaleString()} F CFA = {(rechargeModal.oscart * 0.015).toFixed(2)} €
+            </p>
+            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:20 }}>
+              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.8, margin:0, textAlign:'center' }}>
+                Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
+                via Wave ou Orange Money<br/>
+                <span style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Les instructions vous seront communiquées par notre équipe</span>
+              </p>
+            </div>
+            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, textAlign:'center', marginBottom:16 }}>
+              Vos Oscart seront crédités sous 24h après confirmation
+            </p>
+            <button onClick={() => setRechargeModal(null)}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+              J'ai effectué le paiement
+            </button>
+          </div>
+        </div>
+      )}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
         Kiffement
       </button>
@@ -245,11 +293,11 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
       {open && (
         <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
 
-          {/* Solde coins */}
+          {/* Solde Oscart */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
             <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>Votre solde</p>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ color:'#ffd700', fontWeight:800, fontSize:14 }}>{soldeCoins} coins</span>
+              <span style={{ color:'#ffd700', fontWeight:800, fontSize:14 }}>{soldeCoins} Oscart = {(soldeCoins * 10).toLocaleString()} F CFA</span>
               <button onClick={() => setShowRecharge(!showRecharge)}
                 style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:11, fontWeight:700, cursor:'pointer' }}>
                 Recharger
@@ -260,16 +308,14 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
           {/* Panel recharge */}
           {showRecharge && (
             <div style={{ background:'rgba(0,0,0,0.3)', borderRadius:10, padding:12, marginBottom:12 }}>
-              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:8 }}>Recharger mes coins</p>
+              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:8 }}>Recharger mes Oscart</p>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 {RECHARGES.map(r => (
-                  <button key={r.coins} onClick={() => {
-                    // En attendant API — afficher le numéro de paiement
-                    alert(`Envoyez ${r.prix} FCFA sur Wave au +225 05 02 10 14 52\nObjet : "${r.coins} coins - ${user?.email}"\nVos coins seront crédités sous 24h.`);
-                  }}
+                  <button key={r.oscart} onClick={() => setRechargeModal(r)}
                     style={{ padding:'10px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.2)', background:'rgba(255,215,0,0.06)', cursor:'pointer', textAlign:'center' }}>
-                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.coins} coins</p>
-                    <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.prix.toLocaleString()} FCFA</p>
+                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F CFA</p>
+                    <p style={{ color:'rgba(255,255,255,0.2)', fontSize:10, margin:0 }}>{(r.oscart * 0.015).toFixed(2)} €</p>
                   </button>
                 ))}
               </div>
@@ -281,18 +327,19 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
 
           {/* Kiffements */}
           <p style={{ color:'#8098b8', fontSize:11, marginBottom:8 }}>Choisissez un kiffement</p>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-            {KIFFEMENTS.map(k => {
-              const canSend = soldeCoins >= k.coins;
-              return (
-                <button key={k.id} onClick={() => envoyer(k)} disabled={sending === k.id}
-                  style={{ padding:'12px 8px', borderRadius:12, border:`1px solid ${canSend?'rgba(255,200,0,0.3)':'rgba(255,255,255,0.05)'}`, background: canSend?'rgba(255,200,0,0.08)':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.5, transition:'all .2s' }}>
-                  <p style={{ color: canSend?'#dde4f5':'#4a5878', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>{k.label}</p>
-                  <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{k.coins} coins</p>
-                </button>
-              );
-            })}
-          </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {KIFFEMENTS.map(k => {
+                const canSend = soldeCoins >= k.coins;
+                return (
+                  <button key={k.id} onClick={() => envoyer(k)} disabled={sending === k.id}
+                    style={{ padding:'14px 8px', borderRadius:14, border:`1px solid ${canSend?'rgba(255,200,0,0.4)':'rgba(255,255,255,0.05)'}`, background: canSend?'rgba(255,200,0,0.08)':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.4, transition:'all .2s' }}>
+                    <div style={{ display:'flex', justifyContent:'center', marginBottom:6 }}>{k.icon}</div>
+                    <p style={{ color: canSend?'#dde4f5':'#4a5878', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>{k.label}</p>
+                    <p style={{ color:'#ffd700', fontSize:11, margin:0 }}>{k.coins} Oscart</p>
+                  </button>
+                );
+              })}
+              </div>
           <p style={{ color:'#4a5878', fontSize:10, marginTop:10, textAlign:'center' }}>70% reversé à l'artiste</p>
         </div>
       )}
@@ -477,7 +524,7 @@ function Travailleurs({ qrId, artistEmail }: { qrId: string, artistEmail?: strin
             <span style={{ fontSize:16, fontWeight:900, color:'#ffd700', minWidth:20 }}>#{i+1}</span>
             <div style={{ flex:1 }}>
               <p style={{ fontWeight:700, fontSize:13, color:'#dde4f5', margin:0 }}>{t.userName}</p>
-              <p style={{ fontSize:10, color, margin:0 }}>{titre} · {t.coins} coins · {t.count} kiffements</p>
+              <p style={{ fontSize:10, color, margin:0 }}>{titre} · {t.coins} Oscart · {t.count} kiffements</p>
             </div>
             {isArtist && (
               <button onClick={() => setShowReply(showReply === t.userId ? null : t.userId)}
@@ -661,7 +708,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     });
     const unsub2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), snap => setCommentCount(snap.size));
     const unsub3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), snap => {
-      const coins = snap.docs.reduce((s,d) => s + (d.data().coins||0), 0);
+      const Oscart = snap.docs.reduce((s,d) => s + (d.data().coins||0), 0);
       setTotalCoins(coins);
     });
     return () => { unsub1(); unsub2(); unsub3(); };
@@ -719,7 +766,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
-          <span style={{ fontSize:10, fontWeight:700 }}>Kiffement {totalCoins > 0 ? totalCoins+'c' : ''}</span>
+          <span style={{ fontSize:10, fontWeight:700 }}>Kiffement {totalCoins > 0 ? totalCoins+' Oscart' : ''}</span>
         </button>
 
         {/* BUZZ */}
@@ -1796,26 +1843,19 @@ function ResponsablesTab() {
   }, []);
 
   const creerCompte = async () => {
-    if (!nom || !email || !password) { setMsg('Nom, email et mot de passe requis'); return; }
+    if (!nom || !email) { setMsg('Nom et email requis'); return; }
     setLoading(true); setMsg('');
     try {
-      let uid = '';
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        uid = cred.user.uid;
-      } catch(e: any) {
-        if (e.code === 'auth/email-already-in-use') {
-          // Email déjà existant — utiliser l'email comme ID unique
-          uid = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-          setMsg('⚠️ Email déjà utilisé — rôle responsable ajouté au compte existant.');
-        } else throw e;
-      }
-      await setDoc(doc(db, 'responsables', uid), {
+      // Vérifier si déjà existant
+      const existing = await getDocs(query(collection(db,'responsables'), where('email','==',email.trim().toLowerCase())));
+      if (!existing.empty) { setMsg('Ce responsable existe déjà.'); setLoading(false); return; }
+      // Enregistrer dans Firestore — il créera son mot de passe lui-même sur /responsable
+      await addDoc(collection(db,'responsables'), {
         nom, email: email.trim().toLowerCase(), telephone,
         status: 'actif', createdAt: new Date().toISOString(),
         commerciauxCount: 0,
       });
-      if (!msg) setMsg('Compte responsable créé avec succès !');
+      setMsg('✅ Responsable enregistré ! Il peut maintenant créer son compte sur doniel.art/responsable');
       setNom(''); setEmail(''); setTelephone(''); setPassword('');
     } catch(e: any) {
       setMsg('Erreur : ' + e.message);
@@ -1829,19 +1869,20 @@ function ResponsablesTab() {
 
       {/* Formulaire création */}
       <div style={{ ...S.card, marginBottom:24 }}>
-        <p style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>Créer un compte responsable</p>
+        <p style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>Enregistrer un responsable commercial</p>
         <label style={S.lbl}>Nom complet *</label>
         <input style={S.inp} value={nom} onChange={e => setNom(e.target.value)} placeholder="Prénom Nom" />
         <label style={S.lbl}>Email *</label>
         <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemple.com" />
         <label style={S.lbl}>Téléphone</label>
         <input style={S.inp} type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+225 07 00 00 00 00" />
-        <label style={S.lbl}>Mot de passe *</label>
-        <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 caractères" />
-        {msg && <p style={{ color: msg.includes('succès') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+        {msg && <p style={{ color: msg.includes('✅') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
         <button style={{ ...S.btn, width:'100%', padding:12 }} onClick={creerCompte} disabled={loading}>
-          {loading ? 'Création...' : 'Créer le compte'}
+          {loading ? 'Enregistrement...' : 'Enregistrer le responsable'}
         </button>
+        <p style={{ color:'#8098b8', fontSize:11, marginTop:8, textAlign:'center' }}>
+          Il créera son mot de passe sur doniel.art/responsable
+        </p>
       </div>
 
       {/* Liste responsables */}
@@ -2510,6 +2551,12 @@ function AdminPage() {
   const [adminChatMsgs, setAdminChatMsgs] = useState<any[]>([]);
   const [adminChatInput, setAdminChatInput] = useState('');
   const [adminChatSending, setAdminChatSending] = useState(false);
+  const [audienceStats, setAudienceStats] = useState({
+    artistes: 0, melomanes: 0, annonceurs: 0,
+    pochettes: 0, telecharements: 0, streams: 0,
+    ventes: 0, kiffements: 0
+  });
+  const AUDIENCE_SEUILS = [1000, 5000, 10000, 20000, 50000, 100000];
 
   useEffect(() => {
     // Vérifier silencieusement si l'admin est déjà connecté au chargement
@@ -2557,7 +2604,27 @@ function AdminPage() {
     const u2 = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), s => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(collection(db, 'annonceurs'), orderBy('createdAt', 'desc')), s => setAnnonceurs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u4 = onSnapshot(query(collection(db, 'pubs'), orderBy('createdAt', 'desc')), s => setPubs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { u1(); u2(); u3(); u4(); };
+
+    // Stats audience globale en temps réel
+    const uArtistes = onSnapshot(collection(db, 'artists'), s => {
+      setAudienceStats(prev => ({ ...prev, artistes: s.size }));
+    });
+    const uMelomanes = onSnapshot(collection(db, 'zikotheque'), s => {
+      // Compter les UIDs uniques = mélomanes actifs
+      const uids = new Set(s.docs.map(d => d.data().uid));
+      setAudienceStats(prev => ({ ...prev, melomanes: uids.size }));
+    });
+    const uStreams = onSnapshot(collection(db, 'streams'), s => {
+      setAudienceStats(prev => ({ ...prev, streams: s.size }));
+    });
+    const uVentes = onSnapshot(collection(db, 'ventes'), s => {
+      setAudienceStats(prev => ({ ...prev, telecharements: s.size }));
+    });
+    const uKiffements = onSnapshot(collection(db, 'cadeaux'), s => {
+      setAudienceStats(prev => ({ ...prev, kiffements: s.size }));
+    });
+
+    return () => { u1(); u2(); u3(); u4(); uArtistes(); uMelomanes(); uStreams(); uVentes(); uKiffements(); };
   }, [user]);
 
   // ── Chat admin ↔ annonceur ──
@@ -2961,6 +3028,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>Commerciaux</button>
         <button style={tabStyle(tab === 'responsables')} onClick={() => setTab('responsables')}>Responsables</button>
+        <button style={tabStyle(tab === 'audience')} onClick={() => setTab('audience')}>
+          Audience {audienceStats.melomanes > 0 ? `(${audienceStats.melomanes.toLocaleString()})` : ''}
+        </button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
           Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
@@ -3009,7 +3079,11 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 </div>
                 <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
                 <div><label style={S.lbl}>Email du commercial (optionnel)</label><input style={S.inp} type="email" value={newCommercialEmail} onChange={e => setNewCommercialEmail(e.target.value)} placeholder="commercial@email.com" /></div>
-                <div><label style={S.lbl}>Prix (FCFA) *</label><input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="700" /></div>
+                <div>
+                  <label style={S.lbl}>Prix en Oscart * <span style={{ color:'#8098b8', fontWeight:400 }}>(1 Oscart = 10 F CFA)</span></label>
+                  <input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="50" />
+                  {newPrice && <p style={{ color:'#4da6ff', fontSize:11, marginTop:2 }}>{parseInt(newPrice)||0} Oscart = {((parseInt(newPrice)||0)*10).toLocaleString()} F CFA = {((parseInt(newPrice)||0)*0.015).toFixed(2)} €</p>}
+                </div>
                 <div><label style={S.lbl}>Nb scans *</label><input style={S.inp} type="number" value={newScans} onChange={e => setNewScans(e.target.value)} placeholder="100" /></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -3073,6 +3147,28 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         {tab === 'commerciaux' && <CommerciauxtTab db={db} />}
 
         {tab === 'responsables' && <ResponsablesTab />}
+
+        {/* ────────── ONGLET AUDIENCE ────────── */}
+        {tab === 'audience' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:20 }}>Audience</h2>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              {[
+                { label:'Artistes inscrits', val:audienceStats.artistes, color:'#1a6bff' },
+                { label:'Mélomanes actifs', val:audienceStats.melomanes, color:'#7c3aed' },
+                { label:'Écoutes totales', val:audienceStats.streams, color:'#00c853' },
+                { label:'Téléchargements', val:audienceStats.telecharements, color:'#f04a6a' },
+                { label:'Kiffements', val:audienceStats.kiffements, color:'#ffd700' },
+                { label:'Annonceurs', val:annonceurs.length, color:'#4da6ff' },
+              ].map((s,i) => (
+                <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
+                  <p style={{ fontSize:28, fontWeight:900, color:s.color, marginBottom:4 }}>{s.val.toLocaleString()}</p>
+                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} />}
 
@@ -3414,7 +3510,8 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'ventes'|'notifs'|'options'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'ventes'|'notifs'|'options'>('stats');
+  const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
 
   // Ventes / chat mélomane
   const [ventes, setVentes] = useState<any[]>([]);
@@ -3638,7 +3735,8 @@ function ArtistPage() {
 
       {/* TABS */}
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
-        <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>📊 Stats</button>
+        <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
+        <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='ventes')} onClick={() => setDashTab('ventes')}>
           Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
           {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
@@ -3678,30 +3776,51 @@ function ArtistPage() {
               ))}
             </div>
             <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#eef4ff,#dce8ff)' }}>
-              <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{((stats.streams||0)*0.45).toFixed(0)} FCFA</p>
-              <p style={{ color:'#8098b8', fontSize:11 }}>Revenus streaming · 0,10 – 0,80 FCFA / écoute</p>
+              <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{(stats.streams||0).toLocaleString()} F CFA</p>
+              <p style={{ color:'#8098b8', fontSize:11 }}>Revenus streaming · 1 F CFA / écoute · retrait disponible à partir de 15 000 F</p>
             </div>
 
-            {/* SOLDE TÉLÉCHARGEMENTS */}
-            <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#eef4ff,#dce8ff)' }}>
-              <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{(stats.soldeDL||0).toLocaleString()} FCFA</p>
-              <p style={{ color:'#8098b8', fontSize:11, marginBottom:stats.soldeDL >= 10000 ? 12 : 0 }}>Solde téléchargements payants</p>
-              {(stats.soldeDL||0) >= 10000 && (
+            {/* SOLDE ARTISTE — Oscart + sélecteur devise */}
+            <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#1a2340,#1e2a50)' }}>
+              {/* Sélecteur devise */}
+              <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:12 }}>
+                {(['fcfa','eur','usd'] as const).map(d => (
+                  <button key={d} onClick={() => setDevise(d)}
+                    style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${devise===d?'#ffd700':'rgba(255,255,255,0.1)'}`, background:devise===d?'rgba(255,215,0,0.15)':'transparent', color:devise===d?'#ffd700':'#8098b8', fontSize:11, fontWeight:devise===d?700:400, cursor:'pointer' }}>
+                    {d === 'fcfa' ? 'F CFA' : d === 'eur' ? '€' : '$'}
+                  </button>
+                ))}
+              </div>
+              {/* Solde en Oscart */}
+              <p style={{ fontSize:32, fontWeight:900, color:'#ffd700', marginBottom:2 }}>
+                {Math.round((stats.soldeDL||0) / 10).toLocaleString()} Oscart
+              </p>
+              {/* Équivalent dans la devise choisie */}
+              <p style={{ fontSize:18, fontWeight:700, color:'#dde4f5', marginBottom:4 }}>
+                {devise === 'fcfa' && `${(stats.soldeDL||0).toLocaleString()} F CFA`}
+                {devise === 'eur' && `${((stats.soldeDL||0) * 0.0015).toFixed(2)} €`}
+                {devise === 'usd' && `${((stats.soldeDL||0) * 0.0016).toFixed(2)} $`}
+              </p>
+              <p style={{ color:'#8098b8', fontSize:11, marginBottom:(stats.soldeDL||0) >= 15000 ? 12 : 4 }}>
+                Solde disponible — retrait à partir de 15 000 F CFA
+              </p>
+              {(stats.soldeDL||0) >= 15000 && (
                 <button onClick={async () => {
                   await addDoc(collection(db, 'retraits'), {
                     artistEmail: user.email,
                     montant: stats.soldeDL,
+                    oscart: Math.round((stats.soldeDL||0) / 10),
                     statut: 'en_attente',
                     createdAt: new Date().toISOString(),
                   });
-                  alert('Demande de retrait envoyée ! L\'admin vous contactera sous 24-48h.');
+                  alert('Demande de retrait envoyée ! Versement via Wave/Orange Money sous 72h.');
                 }} style={{ ...S.btn, padding:'8px 20px', fontSize:13 }}>
                   Demander un retrait
                 </button>
               )}
-              {(stats.soldeDL||0) < 10000 && (stats.soldeDL||0) > 0 && (
-                <p style={{ color:'#8098b8', fontSize:11, marginTop:4 }}>
-                  Retrait disponible à partir de 10 000 FCFA ({(10000-(stats.soldeDL||0)).toLocaleString()} FCFA restants)
+              {(stats.soldeDL||0) < 15000 && (stats.soldeDL||0) > 0 && (
+                <p style={{ color:'#4a5878', fontSize:11, marginTop:4 }}>
+                  {(15000-(stats.soldeDL||0)).toLocaleString()} F CFA restants avant retrait
                 </p>
               )}
             </div>
@@ -3804,7 +3923,7 @@ function ArtistPage() {
                 ))}
               </div>
               <p style={{ color:'#b0c4d8', fontSize:11, marginTop:14, textAlign:'center' }}>
-                Versement trimestriel · Orange Money · Wave · MTN MoMo
+                Retrait sur demande · Orange Money · Wave · MTN MoMo
               </p>
             </div>
 
@@ -3837,6 +3956,72 @@ function ArtistPage() {
         )}
 
         {/* ────────── ONGLET VENTES ────────── */}
+        {/* ── POCHETTES PHYSIQUES ── */}
+        {dashTab === 'pochettes' && (
+          <div style={{ animation:'fadeUp .3s ease' }}>
+            <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:16 }}>Mes pochettes physiques</h3>
+            {(stats.qrcodes || []).filter((q:any) => q.totalScans > 0).length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ color:'#8098b8', fontSize:14 }}>Aucune pochette physique enregistrée.</p>
+                <p style={{ color:'#b0c4d8', fontSize:12, marginTop:8 }}>Contactez votre commercial pour commander vos pochettes.</p>
+              </div>
+            ) : (
+              (stats.qrcodes || []).filter((q:any) => q.totalScans > 0).map((q:any) => {
+                const scansRestants = (q.totalScans || 0) - (q.usedScans || 0);
+                const pct = Math.round(((q.usedScans||0) / (q.totalScans||1)) * 100);
+                const nombrePochettes = Math.ceil((q.totalScans||0) / 2); // 2 scans par pochette
+                const pochettesVendues = Math.floor((q.usedScans||0) / 2);
+                const gainTotal = pochettesVendues * (q.prixVente || 0);
+                return (
+                  <div key={q.id} style={{ ...S.card, marginBottom:16 }}>
+                    <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:12 }}>
+                      {q.coverUrl && <img src={q.coverUrl} style={{ width:56, height:56, borderRadius:10, objectFit:'cover' }} alt="" />}
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{q.label}</p>
+                        <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>{q.artist}</p>
+                      </div>
+                    </div>
+                    {/* Stats pochettes */}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+                      {[
+                        { label:'Pochettes totales', val:nombrePochettes },
+                        { label:'Pochettes vendues', val:pochettesVendues },
+                        { label:'Scans restants', val:scansRestants },
+                      ].map((s,i) => (
+                        <div key={i} style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                          <p style={{ fontWeight:800, fontSize:16, color:'#1a6bff', margin:'0 0 2px' }}>{s.val}</p>
+                          <p style={{ color:'#8098b8', fontSize:10, margin:0 }}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Barre progression scans */}
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                        <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Scans utilisés</p>
+                        <p style={{ color:'#1a6bff', fontSize:11, fontWeight:700, margin:0 }}>{pct}%</p>
+                      </div>
+                      <div style={{ background:'#dce6f7', borderRadius:99, height:6, overflow:'hidden' }}>
+                        <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99 }} />
+                      </div>
+                    </div>
+                    {/* Prix vente + gain */}
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <p style={{ color:'#5a7090', fontSize:12, margin:0 }}>
+                        Prix de vente : <strong>{q.prixVente ? q.prixVente.toLocaleString()+' F CFA' : 'Non défini'}</strong>
+                      </p>
+                      {gainTotal > 0 && (
+                        <p style={{ color:'#00a040', fontSize:13, fontWeight:700, margin:0 }}>
+                          +{gainTotal.toLocaleString()} F CFA
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {dashTab === 'ventes' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
             {!chatVenteId ? (
@@ -3997,7 +4182,7 @@ function ArtistPage() {
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Zéro effort</span>
                     <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Paiement automatique</span>
-                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Versement trimestriel</span>
+                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Retrait sur demande</span>
                   </div>
                 </div>
               </div>
@@ -4861,7 +5046,7 @@ function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
   return <>
     {stat('Kiffs', kiffs)}
     {stat('Commentaires', comments)}
-    {coins > 0 && stat('Coins', coins)}
+    {coins > 0 && stat('Oscart', Oscart)}
     {stat('Buzz', buzz)}
   </>;
 }
@@ -7196,6 +7381,38 @@ function PublicStreamPage() {
   );
 }
 
+// ─────────────────────────────────────────────
+// PRIVACY PAGE — politique de confidentialité
+// ─────────────────────────────────────────────
+function PrivacyPage() {
+  return (
+    <div style={{ minHeight:'100vh', background:'#f5f8ff', fontFamily:"'DM Sans',sans-serif", padding:'40px 20px' }}>
+      <div style={{ maxWidth:640, margin:'0 auto' }}>
+        <a href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', display:'block', marginBottom:24 }}>← Retour</a>
+        <h1 style={{ fontFamily:'serif', fontSize:26, fontWeight:900, color:'#1a2340', marginBottom:8 }}>Politique de confidentialité</h1>
+        <p style={{ color:'#8098b8', fontSize:12, marginBottom:32 }}>Dernière mise à jour : juin 2026 · BDE SARL · doniel.art</p>
+
+        {[
+          { titre:'1. Présentation', texte:'Doniel Zik est une plateforme numérique de distribution et monétisation de contenus créatifs, opérée par BDE SARL, RCCM CI-ABJ-2017-B-15187, Abidjan, Côte d\'Ivoire.' },
+          { titre:'2. Données collectées', texte:'Nom, adresse email, numéro de téléphone lors de la création de votre compte. Contenus écoutés, téléchargés, Oscart envoyés, commentaires publiés. Type d\'appareil, système d\'exploitation, adresse IP, données de connexion.' },
+          { titre:'3. Utilisation des données', texte:'Créer et gérer votre compte. Vous permettre d\'accéder aux contenus. Traiter vos paiements et Oscart. Vous envoyer des notifications. Améliorer nos services. Respecter nos obligations légales.' },
+          { titre:'4. Partage des données', texte:'Vos données personnelles ne sont jamais vendues. Elles peuvent être partagées uniquement avec nos prestataires techniques — Firebase (Google), Cloudinary — ou les autorités compétentes sur demande légale.' },
+          { titre:'5. Sécurité', texte:'Vos données sont stockées de manière sécurisée sur les serveurs Firebase de Google. Nous mettons en œuvre toutes les mesures nécessaires contre tout accès non autorisé.' },
+          { titre:'6. Conservation', texte:'Vos données sont conservées tant que votre compte est actif. En cas de suppression, vos données sont effacées sous 30 jours.' },
+          { titre:'7. Vos droits', texte:'Droit d\'accès, de rectification, de suppression et d\'opposition. Pour exercer ces droits : bdonaldservices@gmail.com' },
+          { titre:'8. Cookies', texte:'Doniel Zik utilise uniquement des cookies techniques nécessaires au bon fonctionnement. Aucun cookie publicitaire tiers.' },
+          { titre:'9. Contact', texte:'BDE SARL · bdonaldservices@gmail.com · +225 05 02 10 14 52 · doniel.art · Abidjan, Côte d\'Ivoire' },
+        ].map((s,i) => (
+          <div key={i} style={{ marginBottom:24 }}>
+            <h2 style={{ fontSize:15, fontWeight:700, color:'#1a2340', marginBottom:8 }}>{s.titre}</h2>
+            <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.8 }}>{s.texte}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -7287,6 +7504,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/responsable" element={<ResponsablePage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
           authLoading ? null : user ? <ZikothequePage user={user} /> : <LandingPage />
