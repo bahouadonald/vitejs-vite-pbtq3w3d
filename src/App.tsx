@@ -477,9 +477,8 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
   const [comments, setComments] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState('');
+  const [editCommentId, setEditCommentId] = useState<string|null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
   const user = auth.currentUser;
 
   // Charger le compteur dès le montage
@@ -502,9 +501,19 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
     return unsub;
   }, [qrId, open]);
 
+  const MOTS_INTERDITS = ['nul','nuls','nulle','idiot','idiot','con','connard','bête','stupide','mauvais','horrible','merdique','pourri','déchet','trash','wack','pas bon','sans talent','zéro talent'];
+
   const submit = async () => {
     if (!user) { setShowLoginModal('Connectez-vous pour commenter'); return; }
     if (!text.trim()) return;
+    // Modération automatique
+    const textLower = text.toLowerCase();
+    const motInterdit = MOTS_INTERDITS.find(m => textLower.includes(m));
+    if (motInterdit) {
+      setMsg('Votre commentaire contient des termes non autorisés. Encouragez les artistes avec bienveillance.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       await addDoc(collection(db, 'commentaires'), {
@@ -514,19 +523,18 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
         userPhoto: user.photoURL || '',
         createdAt: new Date().toISOString(),
       });
-      // Notification à l'artiste
       if (artistEmail) {
         await addDoc(collection(db, 'notifications'), {
           to: artistEmail,
           type: 'commentaire',
-          text: `Nouveau commentaire sur votre contenu`,
+          text: `${user.displayName || 'Un fan'} a commenté votre contenu`,
           qrId,
           from: user.displayName || user.email,
           createdAt: new Date().toISOString(),
           lu: false,
         });
       }
-      setText('');
+      setText(''); setMsg('');
     } catch(e) { console.error(e); }
     setLoading(false);
   };
@@ -542,16 +550,17 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
       {open && (
         <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:14 }}>
           {/* Saisie commentaire */}
-          <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-            <input value={text} onChange={e => setText(e.target.value)}
+          <div style={{ display:'flex', gap:8, marginBottom: msg ? 8 : 14 }}>
+            <input value={text} onChange={e => { setText(e.target.value); setMsg(''); }}
               onKeyDown={e => e.key==='Enter' && submit()}
-              placeholder="Écrivez un commentaire..."
+              placeholder="Encouragez votre artiste..."
               style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:99, padding:'8px 14px', color:'#fff', fontSize:13, outline:'none' }} />
             <button onClick={submit} disabled={loading || !text.trim()}
               style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
               {loading ? '...' : 'Envoyer'}
             </button>
           </div>
+          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
           {/* Liste commentaires */}
           {comments.length === 0 ? (
             <p style={{ color:'#4a5878', fontSize:12, textAlign:'center' }}>Soyez le premier à commenter</p>
@@ -562,8 +571,42 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
               </div>
               <div style={{ flex:1 }}>
                 <p style={{ fontWeight:700, fontSize:12, color:'#4da6ff', marginBottom:2 }}>{c.userName}</p>
-                <p style={{ fontSize:13, color:'#dde4f5', lineHeight:1.5 }}>{c.text}</p>
-                <p style={{ fontSize:10, color:'#4a5878', marginTop:2 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                {editCommentId === c.id ? (
+                  <div style={{ display:'flex', gap:6, marginTop:4 }}>
+                    <input value={editCommentText} onChange={e => setEditCommentText(e.target.value)}
+                      style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 10px', color:'#fff', fontSize:13, outline:'none' }} />
+                    <button onClick={async () => {
+                      if (!editCommentText.trim()) return;
+                      await updateDoc(doc(db,'commentaires',c.id), { text: editCommentText.trim() });
+                      setEditCommentId(null); setEditCommentText('');
+                    }} style={{ padding:'6px 10px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:12, cursor:'pointer' }}>OK</button>
+                    <button onClick={() => { setEditCommentId(null); setEditCommentText(''); }}
+                      style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer' }}>Annuler</button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize:13, color:'#dde4f5', lineHeight:1.5 }}>{c.text}</p>
+                )}
+                <div style={{ display:'flex', gap:10, marginTop:4 }}>
+                  <p style={{ fontSize:10, color:'#4a5878' }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                  {user && c.userId === user.uid && (
+                    <>
+                      <button onClick={() => { setEditCommentId(c.id); setEditCommentText(c.text); }}
+                        style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                        Modifier
+                      </button>
+                      <button onClick={async () => { if (window.confirm('Supprimer ce commentaire ?')) await deleteDoc(doc(db,'commentaires',c.id)); }}
+                        style={{ fontSize:10, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                        Supprimer
+                      </button>
+                    </>
+                  )}
+                  {user && user.email === artistEmail && (
+                    <button onClick={() => setText(`@${c.userName} `)}
+                      style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                      Répondre
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -845,6 +888,17 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
     } else {
       await addDoc(collection(db,'likes'),{ qrId, userId:user.uid, createdAt:new Date().toISOString() });
+      // Notification à l'artiste
+      if (artistEmail) {
+        await addDoc(collection(db,'notifications'), {
+          to: artistEmail,
+          type: 'kiff',
+          text: `${user.displayName || 'Un fan'} a kiffé votre contenu`,
+          qrId, from: user.displayName || user.email,
+          createdAt: new Date().toISOString(),
+          lu: false,
+        });
+      }
     }
     if (tutoStep === 3) onTutoNext();
   };
@@ -1958,6 +2012,47 @@ function FanPage() {
 // ARTISTES TAB — Liste des artistes enregistrés
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// PRODUCTION TAB — demandes de production
+// ─────────────────────────────────────────────
+function ProductionTab() {
+  const [demandes, setDemandes] = useState<any[]>([]);
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db,'demandes_production'), orderBy('createdAt','desc')),
+      snap => setDemandes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, []);
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Demandes de production</h2>
+      {demandes.length === 0 ? (
+        <p style={{ color:'#8098b8', fontSize:13 }}>Aucune demande pour l'instant.</p>
+      ) : demandes.map(d => (
+        <div key={d.id} style={{ ...S.card, marginBottom:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <p style={{ fontWeight:700, fontSize:14, margin:'0 0 4px' }}>{d.nom}</p>
+              <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 4px', textTransform:'capitalize' }}>{d.type}</p>
+              <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 4px', lineHeight:1.6 }}>{d.description}</p>
+              <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>WhatsApp : {d.whatsapp}</p>
+              {d.email && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{d.email}</p>}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <span style={{ background:d.statut==='traite'?'#eaffea':'#fff8e1', border:`1px solid ${d.statut==='traite'?'#4dff9a':'#ffd700'}`, borderRadius:99, padding:'3px 10px', fontSize:10, color:d.statut==='traite'?'#00a040':'#b07a00', fontWeight:700 }}>
+                {d.statut === 'traite' ? 'Traité' : 'En attente'}
+              </span>
+              <button onClick={() => updateDoc(doc(db,'demandes_production',d.id), { statut:'traite' })}
+                style={{ ...S.btn, fontSize:10, padding:'4px 8px' }}>Marquer traité</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // RESPONSABLES TAB — créer comptes responsables commerciaux
 // ─────────────────────────────────────────────
 function ResponsablesTab() {
@@ -2655,6 +2750,7 @@ function AdminPage() {
   const [newType, setNewType] = useState('album');
   const [newPrice, setNewPrice] = useState('');
   const [newScans, setNewScans] = useState('');
+  const [newCategorie, setNewCategorie] = useState('autres');
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [newArtistEmail, setNewArtistEmail] = useState('');
   const [newCommercialEmail, setNewCommercialEmail] = useState('');
@@ -2836,7 +2932,7 @@ function AdminPage() {
       const publicLinkId = newArtist.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + newLabel.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString(36);
       await addDoc(collection(db, 'qrcodes'), {
         qrId, label: newLabel, artist: newArtist, type: newType,
-        price: parseInt(newPrice), totalScans: parseInt(newScans),
+        price: parseInt(newPrice), totalScans: parseInt(newScans), categorie: newCategorie || 'autres',
         usedScans: 0, downloads: 0, files: uploaded, fileCount: uploaded.length,
         status: 'active', whatsapp: newWhatsapp, coverUrl,
         artistEmail: newArtistEmail,
@@ -2848,7 +2944,7 @@ function AdminPage() {
       await addDoc(collection(db, 'publicLinks'), {
         publicLinkId, label: newLabel, artist: newArtist, type: newType,
         files: uploaded, coverUrl, artistEmail: newArtistEmail,
-        price: parseInt(newPrice) || 0,
+        price: parseInt(newPrice) || 0, categorie: newCategorie || 'autres',
         createdAt: new Date().toISOString(),
       });
       // Enregistrer l'artiste dans la collection 'artists' si email fourni
@@ -3176,6 +3272,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={tabStyle(tab === 'audience')} onClick={() => setTab('audience')}>
           Audience {audienceStats.melomanes > 0 ? `(${audienceStats.melomanes.toLocaleString()})` : ''}
         </button>
+        <button style={tabStyle(tab === 'production')} onClick={() => setTab('production')}>Productions</button>
         <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
           Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
@@ -3224,6 +3321,17 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                 </div>
                 <div><label style={S.lbl}>Email de l'artiste</label><input style={S.inp} type="email" value={newArtistEmail} onChange={e => setNewArtistEmail(e.target.value)} placeholder="artiste@email.com" /></div>
                 <div><label style={S.lbl}>Email du commercial (optionnel)</label><input style={S.inp} type="email" value={newCommercialEmail} onChange={e => setNewCommercialEmail(e.target.value)} placeholder="commercial@email.com" /></div>
+                <div>
+                  <label style={S.lbl}>Catégorie</label>
+                  <select style={S.inp} value={newCategorie} onChange={e => setNewCategorie(e.target.value)}>
+                    <optgroup label="Musique (Audio)">
+                      {CATEGORIES_AUDIO.filter(c => c.id !== 'tous').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </optgroup>
+                    <optgroup label="Vidéo">
+                      {CATEGORIES_VIDEO.filter(c => c.id !== 'tous').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </optgroup>
+                  </select>
+                </div>
                 <div>
                   <label style={S.lbl}>Prix en F CFA * <span style={{ color:'#8098b8', fontWeight:400 }}>(converti automatiquement en Oscart)</span></label>
                   <input style={S.inp} type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="1000" />
@@ -3292,6 +3400,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         {tab === 'commerciaux' && <CommerciauxtTab db={db} />}
 
         {tab === 'responsables' && <ResponsablesTab />}
+
+        {/* ────────── ONGLET PRODUCTIONS ────────── */}
+        {tab === 'production' && <ProductionTab />}
 
         {/* ────────── ONGLET AUDIENCE ────────── */}
         {tab === 'audience' && (
@@ -4715,6 +4826,20 @@ function UserAuthPage() {
     try {
       const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(newUser, { displayName });
+      // Oscart de bienvenue — 50 Oscart offerts
+      await addDoc(collection(db,'coins_solde'), {
+        uid: newUser.uid,
+        solde: 50,
+        createdAt: new Date().toISOString(),
+      });
+      // Notification de bienvenue
+      await addDoc(collection(db,'notifications'), {
+        to: email,
+        type: 'bienvenue',
+        text: 'Bienvenue sur Doniel Zik ! Vous recevez 50 Oscart offerts pour découvrir la plateforme.',
+        createdAt: new Date().toISOString(),
+        lu: false,
+      });
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
@@ -5251,9 +5376,51 @@ function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
 // ─────────────────────────────────────────────
 // PAGE DÉCOUVRIR — /decouvrir — style Suno/TikTok
 // ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// CATÉGORIES MUSICALES ET VIDÉO
+// ─────────────────────────────────────────────
+const CATEGORIES_AUDIO = [
+  { id:'tous', label:'Tous' },
+  { id:'gospel', label:'Gospel / Religieux' },
+  { id:'coupe_decale', label:'Coupé décalé' },
+  { id:'afrobeat', label:'Afrobeat / Afropop' },
+  { id:'afrotrap', label:'Afro trap' },
+  { id:'rnb', label:'R&B / Soul' },
+  { id:'hiphop', label:'Hip-hop / Rap' },
+  { id:'zouk', label:'Zouk / Kompa' },
+  { id:'reggae', label:'Reggae / Dancehall' },
+  { id:'traditionnel', label:'Musique traditionnelle' },
+  { id:'pop', label:'Pop / Variété' },
+  { id:'jazz', label:'Jazz / Blues' },
+  { id:'classique', label:'Classique' },
+  { id:'comedie', label:'Comédie musicale' },
+  { id:'slam', label:'Spoken word / Slam' },
+  { id:'humour_audio', label:'Humour audio' },
+  { id:'autres', label:'Autres' },
+];
+
+const CATEGORIES_VIDEO = [
+  { id:'tous', label:'Tous' },
+  { id:'clip_officiel', label:'Clip officiel' },
+  { id:'clip_danse', label:'Clip de danse' },
+  { id:'court_metrage', label:'Court-métrage' },
+  { id:'serie', label:'Série / Drama' },
+  { id:'documentaire', label:'Documentaire' },
+  { id:'humour_video', label:'Humour / Sketches' },
+  { id:'autres', label:'Autres' },
+];
+
+const TYPES_CONTENU = [
+  { id:'tous', label:'Tout' },
+  { id:'audio', label:'Musique' },
+  { id:'video', label:'Vidéo' },
+];
+
 function DecouvrirPage() {
   const [contenus, setContenus] = useState<any[]>([]);
-  const [filtre, setFiltre] = useState<'tous'|'musique'|'humour'|'video'>('tous');
+  const [typeFiltre, setTypeFiltre] = useState('tous');
+  const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
   const user = auth.currentUser;
 
@@ -5268,18 +5435,19 @@ function DecouvrirPage() {
     return unsub;
   }, []);
 
-  const filtres = [
-    { key:'tous', label:'Tous' },
-    { key:'musique', label:'Musique' },
-    { key:'humour', label:'Humour' },
-    { key:'video', label:'Vidéo' },
-  ];
+  // Réinitialiser catégorie quand on change de type
+  const handleTypeChange = (type: string) => {
+    setTypeFiltre(type);
+    setCategorieFiltre('tous');
+  };
+
+  const categoriesActuelles = typeFiltre === 'video' ? CATEGORIES_VIDEO : CATEGORIES_AUDIO;
 
   const contenusFiltres = contenus.filter(c => {
-    if (filtre === 'tous') return true;
-    if (filtre === 'musique') return ['single','album'].includes(c.type);
-    if (filtre === 'humour') return c.type === 'contenu-humoristique';
-    if (filtre === 'video') return ['video','court-metrage','saison'].includes(c.type);
+    const isVideo = c.files?.some((f:any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i));
+    if (typeFiltre === 'audio' && isVideo) return false;
+    if (typeFiltre === 'video' && !isVideo) return false;
+    if (categorieFiltre !== 'tous' && c.categorie !== categorieFiltre) return false;
     return true;
   });
 
@@ -5292,12 +5460,22 @@ function DecouvrirPage() {
         <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
       </div>
 
-      {/* FILTRES */}
-      <div style={{ display:'flex', gap:8, padding:'12px 16px', overflowX:'auto' }}>
-        {filtres.map(f => (
-          <button key={f.key} onClick={() => setFiltre(f.key as any)}
-            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${filtre===f.key?'#1a6bff':'rgba(255,255,255,0.1)'}`, background: filtre===f.key?'#1a6bff':'transparent', color: filtre===f.key?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap' }}>
-            {f.label}
+      {/* FILTRES TYPE */}
+      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto' }}>
+        {TYPES_CONTENU.map(t => (
+          <button key={t.id} onClick={() => handleTypeChange(t.id)}
+            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* FILTRES CATÉGORIE */}
+      <div style={{ display:'flex', gap:6, padding:'0 16px 12px', overflowX:'auto' }}>
+        {categoriesActuelles.map(c => (
+          <button key={c.id} onClick={() => setCategorieFiltre(c.id)}
+            style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${categorieFiltre===c.id?'#ffd700':'rgba(255,255,255,0.08)'}`, background:categorieFiltre===c.id?'rgba(255,215,0,0.15)':'transparent', color:categorieFiltre===c.id?'#ffd700':'#4a5878', cursor:'pointer', fontSize:11, fontWeight:600, whiteSpace:'nowrap' }}>
+            {c.label}
           </button>
         ))}
       </div>
@@ -5368,21 +5546,125 @@ function DecouvrirPage() {
 // ─────────────────────────────────────────────
 // PAGE PROFIL MÉLOMANE — /profil
 // ─────────────────────────────────────────────
-function ProfilPage() {
+// ─────────────────────────────────────────────
+// PAGE NOTIFICATIONS MÉLOMANE
+// ─────────────────────────────────────────────
+function NotificationsPage() {
   const [user, setUser] = useState<any>(null);
-  const [likes, setLikes] = useState(0);
+  const [notifs, setNotifs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
       if (!u) { window.location.href = '/ziko'; return; }
       setUser(u);
-      // Compter les likes
-      const snap = await getDocs(query(collection(db, 'likes'), where('userId','==', u.uid)));
-      setLikes(snap.size);
+      const unsub = onSnapshot(
+        query(collection(db,'notifications'), where('to','==',u.email), orderBy('createdAt','desc')),
+        snap => { setNotifs(snap.docs.map(d => ({id:d.id,...d.data()}))); setLoading(false); }
+      );
+      return unsub;
+    });
+  }, []);
+
+  const markRead = async (id: string) => {
+    await updateDoc(doc(db,'notifications',id), { lu: true });
+  };
+
+  const getIcon = (type: string) => {
+    if (type === 'kiff') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#f04a6a" stroke="#f04a6a" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+    if (type === 'commentaire') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+    if (type === 'kiffement') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffd700" stroke="#ffd700" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+    if (type === 'signature') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#7c3aed" stroke="#7c3aed" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>;
+    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8098b8" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>;
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
+        <Logo size="sm" />
+        <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
+      </div>
+
+      <div style={{ maxWidth:500, margin:'0 auto', padding:'16px' }}>
+        {loading ? (
+          <p style={{ color:'#4a5878', textAlign:'center', padding:40 }}>Chargement...</p>
+        ) : notifs.length === 0 ? (
+          <div style={{ textAlign:'center', padding:60 }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2a3a60" strokeWidth="1.5" style={{ marginBottom:16 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <p style={{ color:'#2a3a60', fontSize:14 }}>Aucune notification pour l'instant</p>
+          </div>
+        ) : notifs.map(n => (
+          <div key={n.id} onClick={() => markRead(n.id)}
+            style={{ display:'flex', gap:14, padding:'14px 16px', borderRadius:14, marginBottom:8, background: n.lu ? 'rgba(255,255,255,0.02)' : 'rgba(30,111,255,0.08)', border:`1px solid ${n.lu ? 'rgba(255,255,255,0.04)' : 'rgba(30,111,255,0.2)'}`, cursor:'pointer' }}>
+            <div style={{ flexShrink:0, width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {getIcon(n.type)}
+            </div>
+            <div style={{ flex:1 }}>
+              <p style={{ fontSize:13, color: n.lu ? '#5a7090' : '#dde4f5', margin:'0 0 4px', lineHeight:1.5 }}>{n.text}</p>
+              <p style={{ fontSize:11, color:'#2a3a60', margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</p>
+            </div>
+            {!n.lu && <div style={{ width:8, height:8, borderRadius:99, background:'#1a6bff', flexShrink:0, marginTop:6 }} />}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+        {[
+          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
+          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+        ].map((item) => (
+          <a key={item.path} href={item.path}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
+            {item.svg}
+            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PROFIL PAGE
+// ─────────────────────────────────────────────
+function ProfilPage() {
+  const [user, setUser] = useState<any>(null);
+  const [likes, setLikes] = useState(0);
+  const [kiffements, setKiffements] = useState(0);
+  const [soldeOscart, setSoldeOscart] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [showProjet, setShowProjet] = useState(false);
+  const [projetForm, setProjetForm] = useState({ nom:'', type:'musique', description:'', whatsapp:'' });
+  const [projetSent, setProjetSent] = useState(false);
+  const [rechargeModalProfil, setRechargeModalProfil] = useState<{fcfa:number,oscart:number}|null>(null);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, async (u) => {
+      if (!u) { window.location.href = '/ziko'; return; }
+      setUser(u);
+      const [likesSnap, kiffSnap, soldeSnap] = await Promise.all([
+        getDocs(query(collection(db,'likes'), where('userId','==',u.uid))),
+        getDocs(query(collection(db,'cadeaux'), where('userId','==',u.uid))),
+        getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid))),
+      ]);
+      setLikes(likesSnap.size);
+      setKiffements(kiffSnap.size);
+      setSoldeOscart(soldeSnap.empty ? 0 : soldeSnap.docs[0].data().solde || 0);
       setLoading(false);
     });
   }, []);
+
+  const envoyerProjet = async () => {
+    if (!projetForm.nom || !projetForm.whatsapp) return;
+    await addDoc(collection(db,'demandes_production'), {
+      ...projetForm, userId: user?.uid, email: user?.email,
+      statut: 'en_attente', createdAt: new Date().toISOString(),
+    });
+    setProjetSent(true);
+  };
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -5391,15 +5673,14 @@ function ProfilPage() {
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
-      {/* HEADER */}
+    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
       </div>
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'24px 16px' }}>
-        {/* Avatar + infos */}
-        <div style={{ textAlign:'center', marginBottom:28 }}>
+        {/* Avatar */}
+        <div style={{ textAlign:'center', marginBottom:24 }}>
           {user?.photoURL ? (
             <img src={user.photoURL} alt="Avatar" style={{ width:80, height:80, borderRadius:99, border:'3px solid #1a6bff', marginBottom:12 }} />
           ) : (
@@ -5411,19 +5692,107 @@ function ProfilPage() {
           <p style={{ color:'#4a5878', fontSize:13 }}>{user?.email}</p>
         </div>
 
-        {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
-          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'16px', textAlign:'center' }}>
-            <p style={{ fontWeight:900, fontSize:24, color:'#f04a6a', marginBottom:4 }}>{likes}</p>
-            <p style={{ color:'#4a5878', fontSize:12 }}>Contenus likés</p>
-          </div>
-          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:'16px', textAlign:'center' }}>
-            <p style={{ fontWeight:900, fontSize:24, color:'#4da6ff', marginBottom:4 }}>0</p>
-            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffementx envoyés</p>
+        {/* PORTEFEUILLE OSCART */}
+        <div style={{ background:'linear-gradient(135deg,#1a2340,#1e2a50)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:16, padding:'18px 20px', marginBottom:16 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div>
+              <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Mon portefeuille</p>
+              <p style={{ fontWeight:900, fontSize:28, color:'#ffd700', margin:0 }}>{soldeOscart} Oscart</p>
+              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscart * 10).toLocaleString()} F CFA</p>
+            </div>
+            <button onClick={() => setRechargeModalProfil(RECHARGES[1])}
+              style={{ padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+              Recharger
+            </button>
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Modal recharge profil */}
+        {rechargeModalProfil && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+            onClick={() => setRechargeModalProfil(null)}>
+            <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+              <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+                {RECHARGES.map(r => (
+                  <button key={r.oscart} onClick={() => setRechargeModalProfil(r)}
+                    style={{ padding:'12px 8px', borderRadius:10, border:`2px solid ${rechargeModalProfil.oscart===r.oscart?'#ffd700':'rgba(255,215,0,0.2)'}`, background:rechargeModalProfil.oscart===r.oscart?'rgba(255,215,0,0.15)':'rgba(255,215,0,0.05)', cursor:'pointer', textAlign:'center' }}>
+                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
+                  </button>
+                ))}
+              </div>
+              <button onClick={async () => {
+                try {
+                  const res = await fetch('/api/create-checkout', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ amount: rechargeModalProfil.fcfa, oscart: rechargeModalProfil.oscart, email: user?.email||'', userId: user?.uid||'' })
+                  });
+                  const data = await res.json();
+                  if (data.url) window.location.href = data.url;
+                } catch(e) { alert('Erreur. Réessayez.'); }
+              }} style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                Payer par carte Visa
+              </button>
+              <button onClick={() => setRechargeModalProfil(null)}
+                style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:16, textAlign:'center' }}>
+            <p style={{ fontWeight:900, fontSize:24, color:'#f04a6a', marginBottom:4 }}>{likes}</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffs envoyés</p>
+          </div>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:16, textAlign:'center' }}>
+            <p style={{ fontWeight:900, fontSize:24, color:'#ffd700', marginBottom:4 }}>{kiffements}</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffements envoyés</p>
+          </div>
+        </div>
+
+        {/* PROJET CRÉATIF */}
+        <div style={{ background:'rgba(30,111,255,0.06)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:16, padding:'18px 20px', marginBottom:16 }}>
+          <p style={{ fontWeight:800, fontSize:15, color:'#4da6ff', marginBottom:6 }}>Vous avez un projet créatif ?</p>
+          <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>
+            Vous êtes artiste, humoriste, réalisateur ou scénariste mais vous n'avez pas les moyens de produire ? Doniel Zik peut vous aider à produire et promouvoir votre contenu.
+          </p>
+          {!showProjet ? (
+            <button onClick={() => setShowProjet(true)}
+              style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+              Soumettre mon projet
+            </button>
+          ) : projetSent ? (
+            <p style={{ color:'#00c853', fontWeight:700, textAlign:'center' }}>Demande envoyée ! Nous vous contacterons bientôt.</p>
+          ) : (
+            <div>
+              <input style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any }}
+                placeholder="Votre nom" value={projetForm.nom} onChange={e => setProjetForm(f => ({...f, nom:e.target.value}))} />
+              <select style={{ width:'100%', background:'#1e2540', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any }}
+                value={projetForm.type} onChange={e => setProjetForm(f => ({...f, type:e.target.value}))}>
+                <option value="musique">Musique</option>
+                <option value="video">Vidéo / Film</option>
+                <option value="humour">Humour</option>
+                <option value="autre">Autre</option>
+              </select>
+              <textarea style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any, minHeight:80, resize:'none' as any }}
+                placeholder="Décrivez votre projet..." value={projetForm.description} onChange={e => setProjetForm(f => ({...f, description:e.target.value}))} />
+              <input style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:12, boxSizing:'border-box' as any }}
+                placeholder="Votre WhatsApp (+225...)" value={projetForm.whatsapp} onChange={e => setProjetForm(f => ({...f, whatsapp:e.target.value}))} />
+              <button onClick={envoyerProjet}
+                style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Envoyer ma demande
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Déconnexion */}
         <button onClick={() => signOut(auth).then(() => window.location.href = '/')}
           style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid rgba(240,74,106,0.3)', background:'rgba(240,74,106,0.08)', color:'#f04a6a', fontWeight:700, fontSize:14, cursor:'pointer' }}>
           Se déconnecter
@@ -7937,6 +8306,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/home" element={<HomePage />} />
         <Route path="/decouvrir" element={<DecouvrirPage />} />
         <Route path="/profil" element={<ProfilPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
         <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/responsable" element={<ResponsablePage />} />
