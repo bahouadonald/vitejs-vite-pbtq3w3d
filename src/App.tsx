@@ -3589,6 +3589,18 @@ function ArtistPage() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
   const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'ventes'|'notifs'|'options'>('stats');
+  const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
+  const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
+
+  // Charger solde Oscart artiste
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(
+      query(collection(db,'coins_solde'), where('uid','==',user.uid)),
+      snap => setSoldeOscartArtiste(snap.empty ? 0 : snap.docs[0].data().solde || 0)
+    );
+    return unsub;
+  }, [user]);
   const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
 
   // Ventes / chat mélomane
@@ -3829,6 +3841,61 @@ function ArtistPage() {
         {/* ────────── ONGLET STATS ────────── */}
         {dashTab === 'stats' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
+
+            {/* PORTEFEUILLE OSCART ARTISTE */}
+            <div style={{ ...S.card, background:'linear-gradient(135deg,#1a2340,#1e2a50)', marginBottom:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div>
+                  <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Votre portefeuille</p>
+                  <p style={{ fontWeight:900, fontSize:24, color:'#ffd700', margin:0 }}>{soldeOscartArtiste} Oscart</p>
+                  <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscartArtiste * 10).toLocaleString()} F CFA</p>
+                </div>
+                <button onClick={() => setRechargeModalArtiste(RECHARGES[1])}
+                  style={{ padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                  Recharger
+                </button>
+              </div>
+              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:10, margin:0 }}>
+                Utilisez vos Oscart pour publier vos contenus · Single 500 Oscart · Album 1 500 Oscart
+              </p>
+            </div>
+
+            {/* Modal recharge artiste */}
+            {rechargeModalArtiste && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+                onClick={() => setRechargeModalArtiste(null)}>
+                <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+                  onClick={e => e.stopPropagation()}>
+                  <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+                  <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+                    {RECHARGES.map(r => (
+                      <button key={r.oscart} onClick={() => setRechargeModalArtiste(r)}
+                        style={{ padding:'12px 8px', borderRadius:10, border:`2px solid ${rechargeModalArtiste.oscart===r.oscart?'#ffd700':'rgba(255,215,0,0.2)'}`, background:rechargeModalArtiste.oscart===r.oscart?'rgba(255,215,0,0.15)':'rgba(255,215,0,0.05)', cursor:'pointer', textAlign:'center' }}>
+                        <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
+                        <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={async () => {
+                    try {
+                      const res = await fetch('/api/create-checkout', {
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ amount: rechargeModalArtiste.fcfa, oscart: rechargeModalArtiste.oscart, email: user?.email || '', userId: user?.uid || '' })
+                      });
+                      const data = await res.json();
+                      if (data.url) window.location.href = data.url;
+                    } catch(e) { alert('Erreur. Réessayez.'); }
+                  }} style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                    Payer {rechargeModalArtiste.fcfa.toLocaleString()} F par carte Visa
+                  </button>
+                  <button onClick={() => setRechargeModalArtiste(null)}
+                    style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            )}
             <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:20 }}>Mon tableau de bord</h2>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
@@ -5541,10 +5608,10 @@ function ResponsablePage() {
 // ─────────────────────────────────────────────
 function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: string, db: any }) {
   const TARIFS = [
-    { type:'single', label:'Single audio', prix:5000, commission:1000, desc:'1 titre audio' },
-    { type:'album', label:'Album audio', prix:15000, commission:3000, desc:'Plusieurs titres audio' },
-    { type:'video', label:'Vidéo solo', prix:5000, commission:1000, desc:'1 clip ou court-métrage' },
-    { type:'saison', label:'Saison vidéo', prix:25000, commission:5000, desc:'Plusieurs épisodes vidéo' },
+    { type:'single', label:'Single audio', prix:5000, oscart:500, desc:'1 titre audio' },
+    { type:'album', label:'Album audio', prix:15000, oscart:1500, desc:'Plusieurs titres audio' },
+    { type:'video', label:'Vidéo solo', prix:5000, oscart:500, desc:'1 clip vidéo · court-métrage · film découpé 3 min' },
+    { type:'saison', label:'Série complète', prix:25000, oscart:2500, desc:'Série complète · épisodes de 3 min' },
   ];
 
   const [nom, setNom] = useState('');
@@ -7086,6 +7153,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
   const [solde, setSolde] = useState(0);
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
+  const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const user = auth.currentUser;
   const prixOscart = Math.ceil(prix / 10);
 
@@ -7144,28 +7212,71 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     </a>
   );
 
-  if (solde < prixOscart) return (
-    <div>
-      <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>
-        Solde insuffisant — il vous faut {prixOscart} Oscart · Votre solde : {solde} Oscart
-      </p>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-        {RECHARGES.filter(r => r.oscart >= prixOscart).slice(0,2).map(r => (
-          <button key={r.oscart} onClick={() => alert(`Rechargez ${r.fcfa.toLocaleString()} F CFA pour obtenir ${r.oscart} Oscart`)}
-            style={{ padding:'10px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.08)', cursor:'pointer', textAlign:'center' }}>
-            <p style={{ color:'#ffd700', fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
-            <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   return (
-    <button onClick={payer} disabled={paying}
-      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-      {paying ? 'Traitement...' : `Télécharger — ${prixOscart} Oscart`}
-    </button>
+    <div>
+      {/* Modal recharge intégré */}
+      {rechargeModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setRechargeModal(null)}>
+          <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+            <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
+              Recharger {rechargeModal.oscart} Oscart
+            </p>
+            <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
+            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:12 }}>
+              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:6 }}>Wave · Orange Money · MTN MoMo</p>
+              <p style={{ color:'#dde4f5', fontSize:13, margin:0 }}>
+                Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
+                <span style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Instructions communiquées par notre équipe</span>
+              </p>
+            </div>
+            <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:14, padding:16, marginBottom:16 }}>
+              <p style={{ color:'#4da6ff', fontSize:12, fontWeight:700, marginBottom:8 }}>Visa · Mastercard</p>
+              <button onClick={async () => {
+                try {
+                  const res = await fetch('/api/create-checkout', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ amount: rechargeModal.fcfa, oscart: rechargeModal.oscart, email: user?.email || '', userId: user?.uid || '' })
+                  });
+                  const data = await res.json();
+                  if (data.url) window.location.href = data.url;
+                } catch(e) { alert('Erreur paiement carte. Réessayez.'); }
+              }} style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Payer {rechargeModal.fcfa.toLocaleString()} F CFA par carte
+              </button>
+            </div>
+            <button onClick={() => setRechargeModal(null)}
+              style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {solde < prixOscart ? (
+        <div>
+          <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>
+            Solde insuffisant — {prixOscart} Oscart requis · Votre solde : {solde} Oscart
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+            {RECHARGES.filter(r => r.oscart >= prixOscart).slice(0,2).map(r => (
+              <button key={r.oscart} onClick={() => setRechargeModal(r)}
+                style={{ padding:'12px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.08)', cursor:'pointer', textAlign:'center' }}>
+                <p style={{ color:'#ffd700', fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
+                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F CFA</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <button onClick={payer} disabled={paying}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          {paying ? 'Traitement...' : `Télécharger — ${prixOscart} Oscart`}
+        </button>
+      )}
+    </div>
   );
 }
 
