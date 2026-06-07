@@ -7562,14 +7562,6 @@ function PWAInstallBanner() {
           </div>
         </div>
       )}
-
-            <button onClick={() => setShowInstructions(false)}
-              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
-              Compris
-            </button>
-          </div>
-        </div>
-      )}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:9999, background:'#fff', borderTop:'2px solid #1a6bff', boxShadow:'0 -4px 24px rgba(26,107,255,0.2)', padding:'14px 20px', animation:'slideUp .4s ease', display:'flex', alignItems:'center', gap:14 }}>
         <div style={{ width:44, height:44, borderRadius:10, background:'linear-gradient(135deg,#1a3a7e,#0a1535)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <svg width="28" height="20" viewBox="0 0 28 20" fill="none">
