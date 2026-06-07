@@ -5650,7 +5650,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
         commercialEmail,
         typeContenu,
         montant: tarif?.prix || 0,
-        commission: tarif?.commission || 0,
+        commission: tarif?.oscart ? Math.round(tarif.oscart * 0.1) : 0,
         status: 'pending',
         createdAt: new Date().toISOString(),
       });
@@ -5673,7 +5673,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
           <p style={{ fontWeight:800, fontSize:15, color:'#00a040', margin:'0 0 6px' }}>✅ Artiste enregistré !</p>
           <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 4px' }}><strong>{done.nom}</strong> — {done.email}</p>
           <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 4px' }}>{done.tarif?.label} — {done.tarif?.prix?.toLocaleString()} FCFA</p>
-          <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 12px' }}>Votre commission : <strong style={{ color:'#1a6bff' }}>{done.tarif?.commission?.toLocaleString()} FCFA</strong></p>
+          <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 12px' }}>Votre commission : <strong style={{ color:'#1a6bff' }}>{done.tarif?.oscart ? Math.round(done.tarif.oscart * 0.1) : 0} Oscart</strong></p>
           <p style={{ color:'#8098b8', fontSize:11 }}>En attente de validation du paiement par l'admin. L'artiste pourra créer son compte dès validation.</p>
           <button onClick={() => setDone(null)} style={{ ...S.btn2, marginTop:10 }}>Enregistrer un autre artiste</button>
         </div>
@@ -5702,7 +5702,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
           {tarif && (
             <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
               <p style={{ color:'#1a2340', fontSize:13, margin:'0 0 4px' }}>Prix : <strong>{tarif.prix.toLocaleString()} FCFA</strong></p>
-              <p style={{ color:'#1a6bff', fontSize:13, margin:0 }}>Votre commission : <strong>{tarif.commission.toLocaleString()} FCFA</strong></p>
+              <p style={{ color:'#1a6bff', fontSize:13, margin:0 }}>Votre commission : <strong>{Math.round(tarif.oscart * 0.1).toLocaleString()} Oscart</strong></p>
             </div>
           )}
 
