@@ -1,33 +1,54 @@
 {
+  "id": "doniel-zik",
   "name": "Doniel Zik",
   "short_name": "Doniel Zik",
   "description": "La première plateforme africaine de distribution musicale via QR Code. Écoutez, téléchargez et soutenez vos artistes préférés.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#1a1f35",
   "theme_color": "#1a6bff",
   "orientation": "portrait",
   "lang": "fr",
+  "dir": "ltr",
   "categories": ["music", "entertainment"],
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "screenshots": [
+  "shortcuts": [
     {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "name": "Découvrir",
+      "url": "/decouvrir",
+      "description": "Découvrez les artistes africains"
+    },
+    {
+      "name": "Ma Zikothèque",
+      "url": "/ziko",
+      "description": "Votre bibliothèque musicale"
     }
   ],
   "prefer_related_applications": false
