@@ -20,6 +20,29 @@
   "scope_extensions": [
     { "origin": "https://doniel.art" }
   ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "widgets": [
+    {
+      "name": "Doniel Zik",
+      "description": "Écoutez votre musique africaine préférée",
+      "tag": "doniel-zik-widget",
+      "ms_ac_template": "widget/ac-template.json",
+      "data": "widget/data.json",
+      "type": "application/json",
+      "screenshots": [
+        {
+          "src": "/icons/screenshot1.png",
+          "sizes": "720x304",
+          "label": "Doniel Zik Widget"
+        }
+      ],
+      "icons": [
+        { "src": "/icons/icon-192x192.png", "sizes": "192x192" }
+      ]
+    }
+  ],
   "share_target": {
     "action": "/",
     "method": "GET",
