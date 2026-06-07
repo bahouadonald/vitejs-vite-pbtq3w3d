@@ -7486,6 +7486,10 @@ function PWAInstallBanner() {
 
   if (installed || !show) return null;
 
+  // Détecter Android
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
   return (
     <>
       <style>{`
@@ -7501,37 +7505,63 @@ function PWAInstallBanner() {
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
             <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6 }}>Installer Doniel Zik</p>
-            <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Suivez ces étapes selon votre navigateur :</p>
+            <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez votre méthode d'installation :</p>
 
-            {/* Chrome Android */}
-            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
-              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Chrome Android</p>
-              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
-                1. Appuyez sur les <strong>3 points ⋮</strong> en haut à droite<br/>
-                2. Appuyez sur <strong>"Ajouter à l'écran d'accueil"</strong><br/>
-                3. Confirmez en appuyant <strong>"Ajouter"</strong>
-              </p>
-            </div>
-
-            {/* Samsung Browser */}
-            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
-              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Samsung Internet</p>
-              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
-                1. Appuyez sur l'icône <strong>menu ☰</strong> en bas<br/>
-                2. Appuyez sur <strong>"Ajouter page à"</strong><br/>
-                3. Choisissez <strong>"Écran d'accueil"</strong>
-              </p>
-            </div>
+            {/* Android — APK direct */}
+            {isAndroid && (
+              <div style={{ background:'#f0f9ff', borderRadius:12, padding:'14px 16px', marginBottom:12, border:'2px solid #1a6bff' }}>
+                <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:8 }}>Android — Application native</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:12 }}>
+                  Téléchargez l'application Android directement — pas besoin du Play Store.
+                </p>
+                <a href="/doniel-zik.apk" download="Doniel-Zik.apk"
+                  style={{ display:'block', width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none', boxSizing:'border-box' as any }}>
+                  Télécharger l'APK Android (1,5 MB)
+                </a>
+              </div>
+            )}
 
             {/* iPhone */}
-            <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
-              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>iPhone Safari</p>
-              <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
-                1. Appuyez sur le bouton <strong>Partager ⬆</strong><br/>
-                2. Faites défiler et appuyez <strong>"Sur l'écran d'accueil"</strong><br/>
-                3. Appuyez <strong>"Ajouter"</strong>
-              </p>
-            </div>
+            {isIOS && (
+              <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
+                <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>iPhone Safari</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                  1. Appuyez sur le bouton <strong>Partager ⬆</strong><br/>
+                  2. Faites défiler et appuyez <strong>"Sur l'écran d'accueil"</strong><br/>
+                  3. Appuyez <strong>"Ajouter"</strong>
+                </p>
+              </div>
+            )}
+
+            {/* Chrome Android PWA */}
+            {isAndroid && (
+              <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
+                <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Ou via Chrome — PWA</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                  1. Appuyez sur les <strong>3 points ⋮</strong> en haut à droite<br/>
+                  2. Appuyez sur <strong>"Ajouter à l'écran d'accueil"</strong><br/>
+                  3. Confirmez en appuyant <strong>"Ajouter"</strong>
+                </p>
+              </div>
+            )}
+
+            {/* Autres navigateurs */}
+            {!isAndroid && !isIOS && (
+              <div style={{ background:'#f5f8ff', borderRadius:12, padding:'12px 16px', marginBottom:10 }}>
+                <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:6 }}>Navigateur</p>
+                <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7 }}>
+                  Cliquez sur l'icône d'installation dans la barre d'adresse de votre navigateur.
+                </p>
+              </div>
+            )}
+
+            <button onClick={() => setShowInstructions(false)}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', marginTop:8 }}>
+              Compris
+            </button>
+          </div>
+        </div>
+      )}
 
             <button onClick={() => setShowInstructions(false)}
               style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
@@ -7541,7 +7571,6 @@ function PWAInstallBanner() {
         </div>
       )}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:9999, background:'#fff', borderTop:'2px solid #1a6bff', boxShadow:'0 -4px 24px rgba(26,107,255,0.2)', padding:'14px 20px', animation:'slideUp .4s ease', display:'flex', alignItems:'center', gap:14 }}>
-        {/* Logo DZ SVG inline */}
         <div style={{ width:44, height:44, borderRadius:10, background:'linear-gradient(135deg,#1a3a7e,#0a1535)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <svg width="28" height="20" viewBox="0 0 28 20" fill="none">
             <text x="0" y="16" fontFamily="Arial Black,sans-serif" fontSize="18" fontWeight="900" fill="#1a6bff">D</text>
@@ -7550,17 +7579,26 @@ function PWAInstallBanner() {
         </div>
         <div style={{ flex:1 }}>
           <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:2 }}>Installer Doniel Zik</p>
-          <p style={{ color:'#8098b8', fontSize:12 }}>Accès rapide · Fonctionne hors-ligne</p>
+          <p style={{ color:'#8098b8', fontSize:12 }}>
+            {isAndroid ? 'App Android native · Hors-ligne' : 'Accès rapide · Fonctionne hors-ligne'}
+          </p>
         </div>
         <div style={{ display:'flex', gap:8, flexShrink:0 }}>
           <button onClick={() => setShow(false)}
             style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer', fontWeight:600 }}>
             Plus tard
           </button>
-          <button id="pwa-install-btn" onClick={handleInstall}
-            style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite' }}>
-            Installer
-          </button>
+          {isAndroid ? (
+            <a href="/doniel-zik.apk" download="Doniel-Zik.apk"
+              style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite', textDecoration:'none', display:'flex', alignItems:'center' }}>
+              Télécharger
+            </a>
+          ) : (
+            <button id="pwa-install-btn" onClick={handleInstall}
+              style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite' }}>
+              Installer
+            </button>
+          )}
         </div>
       </div>
     </>
