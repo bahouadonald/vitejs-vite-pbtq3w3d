@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs'
 
 // Plugin pour forcer la copie de .well-known/assetlinks.json
 function copyWellKnown() {
