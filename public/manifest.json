@@ -6,7 +6,7 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": ["standalone", "window-controls-overlay", "tabbed", "minimal-ui"],
   "background_color": "#1a1f35",
   "theme_color": "#1a6bff",
   "orientation": "portrait",
@@ -14,11 +14,15 @@
   "dir": "ltr",
   "categories": ["music", "entertainment"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "note_taking": {
+    "new_note_url": "/"
+  },
   "launch_handler": {
     "client_mode": "navigate-existing"
   },
   "scope_extensions": [
-    { "origin": "https://doniel.art" }
+    { "origin": "https://doniel.art" },
+    { "origin": "https://doniel.vercel.app" }
   ],
   "edge_side_panel": {
     "preferred_width": 400
@@ -31,32 +35,17 @@
       "ms_ac_template": "widget/ac-template.json",
       "data": "widget/data.json",
       "type": "application/json",
-      "screenshots": [
-        {
-          "src": "/icons/screenshot1.png",
-          "sizes": "720x304",
-          "label": "Doniel Zik Widget"
-        }
-      ],
-      "icons": [
-        { "src": "/icons/icon-192x192.png", "sizes": "192x192" }
-      ]
+      "screenshots": [{ "src": "/icons/screenshot1.png", "sizes": "720x304", "label": "Doniel Zik Widget" }],
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
   "share_target": {
     "action": "/",
     "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
+    "params": { "title": "title", "text": "text", "url": "url" }
   },
   "protocol_handlers": [
-    {
-      "protocol": "web+donielzik",
-      "url": "/?uri=%s"
-    }
+    { "protocol": "web+donielzik", "url": "/?uri=%s" }
   ],
   "file_handlers": [
     {
@@ -79,41 +68,13 @@
     { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "screenshots": [
-    {
-      "src": "/icons/screenshot1.png",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Doniel Zik — FanPage artiste"
-    },
-    {
-      "src": "/icons/screenshot1.png",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Doniel Zik — Découvrir"
-    }
+    { "src": "/icons/screenshot1.png", "type": "image/png", "form_factor": "narrow", "label": "Doniel Zik — FanPage" },
+    { "src": "/icons/screenshot1.png", "type": "image/png", "form_factor": "wide", "label": "Doniel Zik — Découvrir" }
   ],
   "shortcuts": [
-    {
-      "name": "Découvrir",
-      "short_name": "Découvrir",
-      "url": "/decouvrir",
-      "description": "Découvrez les artistes africains",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Ma Zikothèque",
-      "short_name": "Zikothèque",
-      "url": "/ziko",
-      "description": "Votre bibliothèque musicale",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Recharger Oscart",
-      "short_name": "Recharge",
-      "url": "/ziko",
-      "description": "Recharger vos Oscart",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
-    }
+    { "name": "Découvrir", "short_name": "Découvrir", "url": "/decouvrir", "description": "Découvrez les artistes africains", "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }] },
+    { "name": "Ma Zikothèque", "short_name": "Zikothèque", "url": "/ziko", "description": "Votre bibliothèque musicale", "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }] },
+    { "name": "Recharger Oscart", "short_name": "Recharge", "url": "/ziko", "description": "Recharger vos Oscart", "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }] }
   ],
   "related_applications": [],
   "prefer_related_applications": false
