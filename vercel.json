@@ -1,16 +1,19 @@
 {
   "rewrites": [
-    {
-      "source": "/((?!api/|.well-known/|assets/|icons/|.*\\.).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/.well-known/assetlinks.json",
-      "headers": [
-        { "key": "Content-Type", "value": "application/json" }
-      ]
-    }
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/decouvrir", "destination": "/index.html" },
+    { "source": "/notifications", "destination": "/index.html" },
+    { "source": "/profil", "destination": "/index.html" },
+    { "source": "/ziko", "destination": "/index.html" },
+    { "source": "/artiste", "destination": "/index.html" },
+    { "source": "/annonceurs", "destination": "/index.html" },
+    { "source": "/commercial", "destination": "/index.html" },
+    { "source": "/responsable", "destination": "/index.html" },
+    { "source": "/conditions", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/studio", "destination": "/index.html" },
+    { "source": "/fan/:id*", "destination": "/index.html" },
+    { "source": "/ecoute/:id*", "destination": "/index.html" }
   ]
 }
