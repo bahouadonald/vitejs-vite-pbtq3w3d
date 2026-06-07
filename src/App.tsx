@@ -3896,11 +3896,6 @@ function ArtistPage() {
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
         <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>Options</button>
-          Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
-          {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
-        </button>
-        <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>🔔 Notifs</button>
-        <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>⚙️ Options</button>
       </div>
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px' }}>
