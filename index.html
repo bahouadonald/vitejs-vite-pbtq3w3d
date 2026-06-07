@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Doniel Zik" />
     <meta name="theme-color" content="#1a6bff" />
     <meta name="description" content="Distribution musicale via QR Code. Scannez une pochette et accédez à la musique instantanément." />
+    <link rel="manifest" href="/manifest.json" />
     <meta property="og:title" content="Doniel Zik" />
     <meta property="og:description" content="La Musique. Un Scan. Un Monde." />
     <meta property="og:image" content="/icon-512x512.png" />
@@ -149,5 +150,12 @@
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(console.error);
+        });
+      }
+    </script>
   </body>
 </html>
