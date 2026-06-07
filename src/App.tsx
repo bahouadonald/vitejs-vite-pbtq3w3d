@@ -16,6 +16,8 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
+const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
+
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.art';
@@ -309,19 +311,48 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
               Recharger {rechargeModal.oscart} Oscart
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
-            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:20 }}>
-              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.8, margin:0, textAlign:'center' }}>
+
+            {/* Option Wave/Orange Money */}
+            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:12 }}>
+              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:6 }}>Wave · Orange Money · MTN MoMo</p>
+              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.8, margin:0 }}>
                 Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
-                via Wave ou Orange Money<br/>
                 <span style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Les instructions vous seront communiquées par notre équipe</span>
               </p>
             </div>
+
+            {/* Option Visa/Stripe */}
+            <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:14, padding:16, marginBottom:16 }}>
+              <p style={{ color:'#4da6ff', fontSize:12, fontWeight:700, marginBottom:8 }}>Visa · Mastercard · Carte bancaire</p>
+              <button onClick={async () => {
+                try {
+                  const res = await fetch('/api/create-checkout', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                      amount: rechargeModal.fcfa,
+                      oscart: rechargeModal.oscart,
+                      email: auth.currentUser?.email || '',
+                      userId: auth.currentUser?.uid || ''
+                    })
+                  });
+                  const data = await res.json();
+                  if (data.url) window.location.href = data.url;
+                } catch(e) { alert('Erreur paiement carte. Réessayez.'); }
+              }}
+                style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Payer {rechargeModal.fcfa.toLocaleString()} F CFA par carte
+              </button>
+              <p style={{ color:'rgba(255,255,255,0.2)', fontSize:10, textAlign:'center', marginTop:6 }}>Paiement sécurisé Stripe</p>
+            </div>
+
             <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, textAlign:'center', marginBottom:16 }}>
-              Vos Oscart seront crédités sous 24h après confirmation
+              Vos Oscart seront crédités automatiquement après confirmation
             </p>
             <button onClick={() => setRechargeModal(null)}
               style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-              J'ai effectué le paiement
+              J'ai effectué le paiement Wave/Orange
             </button>
           </div>
         </div>
