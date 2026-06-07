@@ -168,6 +168,61 @@ function RechargeDeviseSelector({ fcfa }: { fcfa: number }) {
 }
 
 // ─────────────────────────────────────────────
+// SIGNATURES ARTISTE — ce que l'artiste peut offrir
+// ─────────────────────────────────────────────
+const SIGNATURES = [
+  { id:'vocal', label:'Message vocal', desc:'L\'artiste vous envoie un message vocal personnalisé', icon:'🎙', color:'#f04a6a' },
+  { id:'selfie', label:'Selfie dédié', desc:'Une photo dédicacée spécialement pour vous', icon:'📸', color:'#1a6bff' },
+  { id:'invitation', label:'Invitation événement', desc:'Entrée gratuite à un concert ou une prestation', icon:'🎫', color:'#7c3aed' },
+  { id:'vip', label:'Accès VIP', desc:'Accès coulisses et rencontre privée avec l\'artiste', icon:'⭐', color:'#ffd700' },
+  { id:'clip', label:'Dans son clip', desc:'Votre visage apparaît dans le prochain clip', icon:'🎬', color:'#00c853' },
+  { id:'mention', label:'Mention spéciale', desc:'Dédicace vidéo personnalisée rien que pour vous', icon:'💌', color:'#f04a6a' },
+  { id:'challenge', label:'Challenge clip', desc:'Votre challenge sera intégré dans un clip', icon:'🔥', color:'#fb923c' },
+  { id:'tournage', label:'Tournage avec vous', desc:'Participez à un tournage avec l\'artiste', icon:'🎥', color:'#1a6bff' },
+];
+
+function SignatureShowcase({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:9995, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+      onClick={onClose}>
+      <div style={{ background:'linear-gradient(160deg,#1a1f35,#1e2540)', borderRadius:'24px 24px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'80vh', overflowY:'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+        <p style={{ fontWeight:900, fontSize:18, color:'#fff', textAlign:'center', marginBottom:4 }}>
+          Envoyez des kiffements
+        </p>
+        <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, textAlign:'center', marginBottom:20 }}>
+          Votre artiste peut vous offrir en retour
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
+          {SIGNATURES.map(s => (
+            <div key={s.id} style={{
+              background:`linear-gradient(135deg,${s.color}22,${s.color}11)`,
+              border:`1px solid ${s.color}44`,
+              borderRadius:16, padding:'14px 12px', textAlign:'center',
+              boxShadow:`0 4px 16px ${s.color}22`,
+            }}>
+              <div style={{ fontSize:28, marginBottom:8 }}>{s.icon}</div>
+              <p style={{ fontWeight:800, fontSize:13, color:'#fff', margin:'0 0 4px' }}>{s.label}</p>
+              <p style={{ color:'rgba(255,255,255,0.45)', fontSize:10, lineHeight:1.5, margin:0 }}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', borderRadius:14, padding:'12px 16px', marginBottom:16 }}>
+          <p style={{ color:'#ffd700', fontSize:13, fontWeight:700, textAlign:'center', margin:0 }}>
+            Plus vous envoyez de kiffements, plus vos chances d'obtenir une signature augmentent
+          </p>
+        </div>
+        <button onClick={onClose}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          Envoyer un kiffement maintenant
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // SYSTÈME COINS — recharge + kiffements
 // ─────────────────────────────────────────────
 
@@ -767,6 +822,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   const [totalCoins, setTotalCoins] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
   const [showLoginModal, setShowLoginModal] = useState('');
+  const [showSignatures, setShowSignatures] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -811,6 +867,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   return (
     <div style={{ marginBottom:16 }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
+      {showSignatures && <SignatureShowcase onClose={() => setShowSignatures(false)} />}
       {/* Barre principale */}
       <div id="action-bar" style={{ display:'flex', gap:6, marginBottom:8 }}>
         {/* KIFF */}
@@ -835,6 +892,15 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
           <span style={{ fontSize:10, fontWeight:700 }}>Kiffement {totalCoins > 0 ? totalCoins+' Oscart' : ''}</span>
+        </button>
+
+
+        {/* SIGNATURE */}
+        <button onClick={() => setShowSignatures(true)} style={{ ...btnStyle(false, '255,215,0'), background:'rgba(255,215,0,0.1)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <span style={{ fontSize:10, fontWeight:700, color:'#ffd700' }}>Signature</span>
         </button>
 
         {/* BUZZ */}
@@ -1125,34 +1191,35 @@ function TutoCascade({ onDone }: { onDone: () => void }) {
       {/* Bulle texte — grande et lisible */}
       <div style={{
         position:'absolute',
-        left: isRight ? Math.min(pos.x + pos.w/2 + 12, window.innerWidth - 190) : Math.max(pos.x - pos.w/2 - 192, 8),
-        top: Math.max(pos.y - 30, 8),
-        background: bubble.color,
+        left: isRight ? Math.min(pos.x + pos.w/2 + 16, window.innerWidth - 220) : Math.max(pos.x - pos.w/2 - 226, 8),
+        top: Math.max(pos.y - 36, 8),
+        background: `linear-gradient(135deg, ${bubble.color}, ${bubble.color}dd)`,
         color: '#fff',
-        fontWeight: 800,
-        fontSize: 15,
-        borderRadius: 14,
-        padding: '12px 18px',
-        width: 175,
+        fontWeight: 900,
+        fontSize: 14,
+        borderRadius: 16,
+        padding: '14px 18px',
+        width: 200,
         lineHeight: 1.5,
         opacity: visible ? 1 : 0,
-        transform: visible ? 'scale(1)' : 'scale(0.8)',
+        transform: visible ? 'scale(1)' : 'scale(0.85)',
         transition: 'all .35s ease',
-        boxShadow: '0 6px 24px rgba(0,0,0,0.4)',
+        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.2)`,
         whiteSpace: 'pre-wrap',
         zIndex: 9992,
+        textShadow: '0 1px 3px rgba(0,0,0,0.3)',
       }}>
         {bubble.text}
         {/* Flèche */}
         <div style={{
           position:'absolute',
           top: '50%',
-          [isRight ? 'left' : 'right']: -10,
+          [isRight ? 'left' : 'right']: -12,
           transform: 'translateY(-50%)',
           width: 0, height: 0,
-          borderTop: '8px solid transparent',
-          borderBottom: '8px solid transparent',
-          [isRight ? 'borderRight' : 'borderLeft']: `10px solid ${bubble.color}`,
+          borderTop: '10px solid transparent',
+          borderBottom: '10px solid transparent',
+          [isRight ? 'borderRight' : 'borderLeft']: `12px solid ${bubble.color}`,
         }} />
       </div>
     </div>
@@ -3827,7 +3894,8 @@ function ArtistPage() {
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
-        <button style={tabStyle(dashTab==='ventes')} onClick={() => setDashTab('ventes')}>
+        <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
+        <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>Options</button>
           Ventes{ventes.length > 0 ? ` (${ventes.length})` : ''}
           {unreadVentes > 0 && <span style={{ marginLeft:5, background:'#f04a6a', borderRadius:99, padding:'1px 6px', fontSize:9, color:'#fff', fontWeight:800 }}>{unreadVentes}</span>}
         </button>
@@ -3950,18 +4018,7 @@ function ArtistPage() {
                 Solde disponible — retrait à partir de 15 000 F CFA
               </p>
               {(stats.soldeDL||0) >= 15000 && (
-                <button onClick={async () => {
-                  await addDoc(collection(db, 'retraits'), {
-                    artistEmail: user.email,
-                    montant: stats.soldeDL,
-                    oscart: Math.round((stats.soldeDL||0) / 10),
-                    statut: 'en_attente',
-                    createdAt: new Date().toISOString(),
-                  });
-                  alert('Demande de retrait envoyée ! Versement via Wave/Orange Money sous 72h.');
-                }} style={{ ...S.btn, padding:'8px 20px', fontSize:13 }}>
-                  Demander un retrait
-                </button>
+                <RetraitModal montant={stats.soldeDL} oscart={Math.round((stats.soldeDL||0)/10)} artistEmail={user?.email||''} />
               )}
               {(stats.soldeDL||0) < 15000 && (stats.soldeDL||0) > 0 && (
                 <p style={{ color:'#4a5878', fontSize:11, marginTop:4 }}>
@@ -7661,6 +7718,105 @@ function PublicStreamPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// RETRAIT MODAL — méthodes de paiement
+// ─────────────────────────────────────────────
+function RetraitModal({ montant, oscart, artistEmail }: { montant:number, oscart:number, artistEmail:string }) {
+  const [open, setOpen] = useState(false);
+  const [methode, setMethode] = useState('');
+  const [numero, setNumero] = useState('');
+  const [iban, setIban] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const METHODES = [
+    { id:'wave', label:'Wave', icon:'📱', color:'#1a6bff' },
+    { id:'orange', label:'Orange Money', icon:'📱', color:'#fb923c' },
+    { id:'mtn', label:'MTN MoMo', icon:'📱', color:'#ffd700' },
+    { id:'virement', label:'Virement bancaire', icon:'🏦', color:'#00c853' },
+    { id:'visa', label:'Visa / Mastercard', icon:'💳', color:'#7c3aed' },
+  ];
+
+  const envoyer = async () => {
+    if (!methode) return;
+    await addDoc(collection(db,'retraits'), {
+      artistEmail, montant, oscart, methode,
+      numero: numero || iban,
+      statut: 'en_attente',
+      createdAt: new Date().toISOString(),
+    });
+    setSent(true);
+  };
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{ ...S.btn, padding:'8px 20px', fontSize:13 }}>
+      Demander un retrait
+    </button>
+  );
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ ...S.btn, padding:'8px 20px', fontSize:13 }}>
+        Demander un retrait
+      </button>
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+        onClick={() => setOpen(false)}>
+        <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
+          {sent ? (
+            <div style={{ textAlign:'center' }}>
+              <p style={{ fontSize:40, marginBottom:12 }}>✅</p>
+              <p style={{ fontWeight:800, fontSize:17, color:'#1a2340' }}>Demande envoyée !</p>
+              <p style={{ color:'#8098b8', fontSize:13, marginTop:8 }}>
+                Votre retrait de {montant.toLocaleString()} F CFA sera traité sous 72h via {methode}
+              </p>
+              <button onClick={() => { setOpen(false); setSent(false); }}
+                style={{ ...S.btn, marginTop:20, width:'100%', padding:12 }}>Fermer</button>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>Demande de retrait</p>
+              <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>{montant.toLocaleString()} F CFA = {oscart} Oscart</p>
+              <p style={{ fontWeight:700, fontSize:13, color:'#1a2340', marginBottom:10 }}>Choisissez votre méthode</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+                {METHODES.map(m => (
+                  <button key={m.id} onClick={() => setMethode(m.id)}
+                    style={{ padding:'10px 8px', borderRadius:10, border:`2px solid ${methode===m.id?m.color:'#dce6f7'}`, background:methode===m.id?`${m.color}11`:'#fff', cursor:'pointer', textAlign:'center' }}>
+                    <p style={{ fontSize:20, margin:'0 0 4px' }}>{m.icon}</p>
+                    <p style={{ fontWeight:700, fontSize:12, color:methode===m.id?m.color:'#1a2340', margin:0 }}>{m.label}</p>
+                  </button>
+                ))}
+              </div>
+              {methode && methode !== 'virement' && (
+                <div style={{ marginBottom:16 }}>
+                  <label style={S.lbl}>Numéro {methode}</label>
+                  <input style={S.inp} value={numero} onChange={e => setNumero(e.target.value)} placeholder="+225 07 00 00 00 00" />
+                </div>
+              )}
+              {methode === 'virement' && (
+                <div style={{ marginBottom:16 }}>
+                  <label style={S.lbl}>IBAN</label>
+                  <input style={S.inp} value={iban} onChange={e => setIban(e.target.value)} placeholder="FR76 3000 6000 0112 3456 7890 189" />
+                </div>
+              )}
+              {methode === 'visa' && (
+                <div style={{ marginBottom:16 }}>
+                  <label style={S.lbl}>Numéro de carte (4 derniers chiffres)</label>
+                  <input style={S.inp} value={numero} onChange={e => setNumero(e.target.value)} placeholder="**** **** **** 1234" />
+                </div>
+              )}
+              <button onClick={envoyer} disabled={!methode}
+                style={{ ...S.btn, width:'100%', padding:14, opacity:methode?1:0.5 }}>
+                Confirmer la demande
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
