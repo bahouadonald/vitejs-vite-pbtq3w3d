@@ -4830,20 +4830,6 @@ function UserAuthPage() {
     try {
       const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(newUser, { displayName });
-      // Oscart de bienvenue — 50 Oscart offerts
-      await addDoc(collection(db,'coins_solde'), {
-        uid: newUser.uid,
-        solde: 50,
-        createdAt: new Date().toISOString(),
-      });
-      // Notification de bienvenue
-      await addDoc(collection(db,'notifications'), {
-        to: email,
-        type: 'bienvenue',
-        text: 'Bienvenue sur Doniel Zik ! Vous recevez 50 Oscart offerts pour découvrir la plateforme.',
-        createdAt: new Date().toISOString(),
-        lu: false,
-      });
     } catch (e: any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
@@ -5591,7 +5577,10 @@ function NotificationsPage() {
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'16px' }}>
         {loading ? (
-          <p style={{ color:'#4a5878', textAlign:'center', padding:40 }}>Chargement...</p>
+          <div style={{ textAlign:'center', padding:60 }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2a3a60" strokeWidth="1.5" style={{ marginBottom:16 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <p style={{ color:'#2a3a60', fontSize:14 }}>Aucune notification pour l'instant</p>
+          </div>
         ) : notifs.length === 0 ? (
           <div style={{ textAlign:'center', padding:60 }}>
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2a3a60" strokeWidth="1.5" style={{ marginBottom:16 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -8264,13 +8253,30 @@ export default function App() {
       else clearInterval(t);
     }, 300);
 
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      // Oscart de bienvenue — 50 Oscart au premier login (toutes méthodes)
+      if (u) {
+        try {
+          const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid)));
+          if (soldeSnap.empty) {
+            await addDoc(collection(db,'coins_solde'), {
+              uid: u.uid, solde: 50, bienvenue: true,
+              createdAt: new Date().toISOString(),
+            });
+            if (u.email) {
+              await addDoc(collection(db,'notifications'), {
+                to: u.email, type: 'bienvenue',
+                text: 'Bienvenue sur Doniel Zik ! Vous recevez 50 Oscart offerts pour découvrir la plateforme.',
+                createdAt: new Date().toISOString(), lu: false,
+              });
+            }
+          }
+        } catch(e) { console.error('welcome oscart', e); }
+      }
       setProgress(100);
       setTimeout(() => {
         setAuthLoading(false);
-        // Cacher le splash screen natif de index.html
-        // On attend un peu plus pour que React ait le temps de rendre la page
         setTimeout(() => {
           (window as any).__hideSplash?.();
         }, 600);
