@@ -1,18 +1,21 @@
 {
-  "id": "doniel-zik",
+  "id": "/",
   "name": "Doniel Zik",
   "short_name": "Doniel Zik",
   "description": "La première plateforme africaine de distribution musicale via QR Code. Écoutez, téléchargez et soutenez vos artistes préférés.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": ["standalone"],
   "background_color": "#1a1f35",
   "theme_color": "#1a6bff",
   "orientation": "portrait",
   "lang": "fr",
   "dir": "ltr",
   "categories": ["music", "entertainment"],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -48,7 +51,7 @@
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-384x384.png",
@@ -60,13 +63,18 @@
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
     {
       "src": "/icons/screenshot1.png",
-      "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow"
     }
@@ -74,14 +82,26 @@
   "shortcuts": [
     {
       "name": "Découvrir",
+      "short_name": "Découvrir",
       "url": "/decouvrir",
-      "description": "Découvrez les artistes africains"
+      "description": "Découvrez les artistes africains",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Ma Zikothèque",
+      "short_name": "Zikothèque",
       "url": "/ziko",
-      "description": "Votre bibliothèque musicale"
+      "description": "Votre bibliothèque musicale",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Recharger",
+      "short_name": "Recharge",
+      "url": "/ziko",
+      "description": "Recharger vos Oscart",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ],
+  "related_applications": [],
   "prefer_related_applications": false
 }
