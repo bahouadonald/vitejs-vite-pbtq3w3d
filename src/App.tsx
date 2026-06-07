@@ -477,6 +477,10 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
   const [comments, setComments] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState('');
+  const [msg, setMsg] = useState('');
   const [editCommentId, setEditCommentId] = useState<string|null>(null);
   const [editCommentText, setEditCommentText] = useState('');
   const user = auth.currentUser;
