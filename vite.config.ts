@@ -1,23 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, mkdirSync, existsSync } from 'fs'
+import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs'
 
-// Plugin pour copier .well-known qui est ignoré par défaut
+// Plugin pour forcer la copie de .well-known/assetlinks.json
 function copyWellKnown() {
   return {
     name: 'copy-well-known',
-    closeBundle() {
-      const src = 'public/.well-known/assetlinks.json'
-      if (existsSync(src)) {
-        if (!existsSync('dist/.well-known')) mkdirSync('dist/.well-known', { recursive: true })
-        copyFileSync(src, 'dist/.well-known/assetlinks.json')
+    writeBundle() {
+      try {
+        const content = readFileSync('public/.well-known/assetlinks.json', 'utf-8')
+        if (!existsSync('dist/.well-known')) {
+          mkdirSync('dist/.well-known', { recursive: true })
+        }
+        writeFileSync('dist/.well-known/assetlinks.json', content)
+        console.log('✓ assetlinks.json copié dans dist/.well-known/')
+      } catch (e) {
+        console.error('Erreur copie assetlinks:', e)
       }
     }
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), copyWellKnown()],
-  publicDir: 'public',
 })
