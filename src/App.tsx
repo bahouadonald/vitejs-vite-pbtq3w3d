@@ -2016,6 +2016,120 @@ function FanPage() {
 // ARTISTES TAB — Liste des artistes enregistrés
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// SIGNATURES ARTISTE TAB — voir donateurs + offrir signature
+// ─────────────────────────────────────────────
+function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
+  const [donateurs, setDonateurs] = useState<any[]>([]);
+  const [offreModal, setOffreModal] = useState<any>(null);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    // Récupérer tous les kiffements reçus, groupés par donateur
+    const unsub = onSnapshot(
+      query(collection(db,'cadeaux'), where('artistEmail','==',artistEmail)),
+      snap => {
+        const parDonateur: any = {};
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const key = data.userId || data.userName;
+          if (!parDonateur[key]) {
+            parDonateur[key] = { userId: data.userId, userName: data.userName || 'Fan', userEmail: data.userEmail || '', totalOscart: 0, count: 0 };
+          }
+          parDonateur[key].totalOscart += (data.coins || 0);
+          parDonateur[key].count += 1;
+        });
+        setDonateurs(Object.values(parDonateur).sort((a:any,b:any) => b.totalOscart - a.totalOscart));
+      }
+    );
+    return unsub;
+  }, [artistEmail]);
+
+  const offrirSignature = async (signature: any) => {
+    if (!offreModal) return;
+    await addDoc(collection(db,'notifications'), {
+      to: offreModal.userEmail || offreModal.userId,
+      type: 'signature',
+      text: `Votre artiste vous offre : ${signature.label} ! ${signature.desc}`,
+      createdAt: new Date().toISOString(), lu: false,
+    });
+    await addDoc(collection(db,'signatures'), {
+      artistEmail, donateurId: offreModal.userId, donateurName: offreModal.userName,
+      type: signature.id, label: signature.label,
+      createdAt: new Date().toISOString(),
+    });
+    setSent(true);
+    setTimeout(() => { setSent(false); setOffreModal(null); }, 2000);
+  };
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:8 }}>Vos donateurs</h3>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>
+        Récompensez vos fans qui vous envoient des kiffements en leur offrant une signature exclusive.
+      </p>
+
+      {donateurs.length === 0 ? (
+        <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+          <p style={{ color:'#8098b8', fontSize:14 }}>Aucun kiffement reçu pour l'instant.</p>
+        </div>
+      ) : donateurs.map((d, i) => (
+        <div key={i} style={{ ...S.card, marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:44, height:44, borderRadius:99, background:'linear-gradient(135deg,#ffd700,#f0a500)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, color:'#1a2340', fontSize:18 }}>
+              {d.userName[0]?.toUpperCase()}
+            </div>
+            <div>
+              <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{d.userName}</p>
+              <p style={{ color:'#ffd700', fontSize:12, margin:0 }}>{d.totalOscart} Oscart · {d.count} kiffement{d.count>1?'s':''}</p>
+            </div>
+          </div>
+          <button onClick={() => setOffreModal(d)}
+            style={{ padding:'8px 14px', borderRadius:99, border:'1px solid #1a6bff', background:'rgba(26,107,255,0.08)', color:'#1a6bff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            Offrir une signature
+          </button>
+        </div>
+      ))}
+
+      {/* Modal offrir signature */}
+      {offreModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => !sent && setOffreModal(null)}>
+          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'80vh', overflowY:'auto' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
+            {sent ? (
+              <div style={{ textAlign:'center', padding:20 }}>
+                <p style={{ fontSize:40, marginBottom:12 }}>✅</p>
+                <p style={{ fontWeight:800, fontSize:16, color:'#1a2340' }}>Signature envoyée à {offreModal.userName} !</p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>Offrir à {offreModal.userName}</p>
+                <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez la récompense à offrir</p>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  {SIGNATURES.map(s => (
+                    <button key={s.id} onClick={() => offrirSignature(s)}
+                      style={{ padding:'14px 10px', borderRadius:14, border:`1px solid ${s.color}44`, background:`${s.color}11`, cursor:'pointer', textAlign:'center' }}>
+                      <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
+                      <p style={{ fontWeight:800, fontSize:12, color:'#1a2340', margin:'0 0 2px' }}>{s.label}</p>
+                      <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.4, margin:0 }}>{s.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setOffreModal(null)}
+                  style={{ width:'100%', marginTop:16, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  Annuler
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // PRODUCTION TAB — demandes de production
 // ─────────────────────────────────────────────
 function ProductionTab() {
@@ -2384,11 +2498,26 @@ function ArtistesTab({ db, qrcodes }: { db: any, qrcodes: any[] }) {
               <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                 {!a.uid && (
                   <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'2px 10px', fontSize:10, color:'#b07a00', fontWeight:700 }}>
-                    ⏳ En attente
+                    En attente
                   </span>
                 )}
-                <button onClick={() => { if (window.confirm(`Supprimer ${a.name} ?`)) import('firebase/firestore').then(({deleteDoc:dd,doc:d})=>dd(d(db,'artists',a.id))); }}
-                  style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>🗑️</button>
+                <button onClick={async () => {
+                  if (window.confirm(`BANNIR ${a.name} ?\n\nCela supprimera l'artiste ET tout son contenu (QR codes, liens publics, contenus Découvrir). Action irréversible.`)) {
+                    // Supprimer tout le contenu de l'artiste
+                    const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('artistEmail','==',a.email)));
+                    for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
+                    const plSnap = await getDocs(query(collection(db,'publicLinks'), where('artistEmail','==',a.email)));
+                    for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
+                    const decSnap = await getDocs(query(collection(db,'decouvrir'), where('artistEmail','==',a.email)));
+                    for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
+                    await deleteDoc(doc(db,'artists',a.id));
+                    setMsg(`${a.name} et tout son contenu ont été bannis.`);
+                  }
+                }} style={{ background:'#7a0000', color:'#fff', border:'none', borderRadius:8, fontSize:11, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>
+                  Bannir
+                </button>
+                <button onClick={() => { if (window.confirm(`Supprimer ${a.name} de la liste (sans toucher au contenu) ?`)) deleteDoc(doc(db,'artists',a.id)); }}
+                  style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Retirer</button>
               </div>
             </div>
 
@@ -3770,7 +3899,7 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'ventes'|'notifs'|'options'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'signatures'|'notifs'|'options'>('stats');
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
 
@@ -4009,6 +4138,7 @@ function ArtistPage() {
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
+        <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
         <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
         <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>Options</button>
       </div>
@@ -4472,6 +4602,8 @@ function ArtistPage() {
         )}
 
         {/* ────────── ONGLET OPTIONS ────────── */}
+        {dashTab === 'signatures' && <SignaturesArtisteTab artistEmail={user.email} />}
+
         {dashTab === 'notifs' && <NotificationsTab userEmail={user.email} />}
 
         {dashTab === 'options' && (
