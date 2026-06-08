@@ -16,6 +16,7 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
+const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
 const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
 
 const CLOUDINARY_CLOUD = 'drjp8ht84';
@@ -2918,7 +2919,7 @@ function AdminPage() {
   const [audienceStats, setAudienceStats] = useState({
     artistes: 0, melomanes: 0, annonceurs: 0,
     pochettes: 0, telecharements: 0, streams: 0,
-    ventes: 0, kiffements: 0
+    ventes: 0, kiffements: 0, visites: 0
   });
   const AUDIENCE_SEUILS = [1000, 5000, 10000, 20000, 50000, 100000];
 
@@ -2987,8 +2988,11 @@ function AdminPage() {
     const uKiffements = onSnapshot(collection(db, 'cadeaux'), s => {
       setAudienceStats(prev => ({ ...prev, kiffements: s.size }));
     });
+    const uVisites = onSnapshot(collection(db, 'visits'), s => {
+      setAudienceStats(prev => ({ ...prev, visites: s.size }));
+    });
 
-    return () => { u1(); u2(); u3(); u4(); uArtistes(); uMelomanes(); uStreams(); uVentes(); uKiffements(); };
+    return () => { u1(); u2(); u3(); u4(); uArtistes(); uMelomanes(); uStreams(); uVentes(); uKiffements(); uVisites(); };
   }, [user]);
 
   // ── Chat admin ↔ annonceur ──
@@ -3543,6 +3547,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
             <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:20 }}>Audience</h2>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               {[
+                { label:'Visites du site', val:audienceStats.visites, color:'#ff8c00' },
                 { label:'Artistes inscrits', val:audienceStats.artistes, color:'#1a6bff' },
                 { label:'Mélomanes actifs', val:audienceStats.melomanes, color:'#7c3aed' },
                 { label:'Écoutes totales', val:audienceStats.streams, color:'#00c853' },
@@ -4647,9 +4652,27 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
 // LANDING PAGE — page d'accueil professionnelle
 // ─────────────────────────────────────────────
 function LandingPage() {
+  useEffect(() => {
+    // Enregistrer une visite du site (1 fois par session)
+    if (!sessionStorage.getItem('dz_visited')) {
+      sessionStorage.setItem('dz_visited', '1');
+      addDoc(collection(db, 'visits'), {
+        page: 'landing', ts: new Date().toISOString(),
+        ua: navigator.userAgent.substring(0, 100),
+      }).catch(() => {});
+    }
+  }, []);
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#060d2a 0%,#091840 40%,#040e28 100%)', color:'#fff', fontFamily:"'DM Sans',sans-serif" }}>
-      <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
+      <style>{`
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes glowPulse{0%,100%{box-shadow:0 8px 32px rgba(30,111,255,0.4)}50%{box-shadow:0 8px 48px rgba(30,111,255,0.7)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        .dz-hero-btn{animation:glowPulse 2.5s ease infinite}
+        .dz-service-card{animation:fadeInUp .5s ease backwards}
+        .dz-service-card:hover{transform:translateY(-4px);transition:transform .2s ease}
+      `}</style>
 
       {/* HERO */}
       <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 24px 40px', textAlign:'center' }}>
@@ -4658,7 +4681,7 @@ function LandingPage() {
         </div>
         <p style={{ color:'rgba(255,255,255,0.5)', fontSize:12, letterSpacing:3, fontWeight:600, marginBottom:32, textTransform:'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
 
-        <a href="/ziko" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
+        <a href="/ziko" className="dz-hero-btn" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
           Accéder à ma Zikothèque
         </a>
         <a href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:15, borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
@@ -4674,7 +4697,7 @@ function LandingPage() {
           { titre:'Pour les Annonceurs', desc:'Diffusez votre publicité auprès de milliers de mélomanes ivoiriens actifs. À partir de 1 000 FCFA.', lien:'/annonceurs', btn:'Espace Annonceur' },
           { titre:'Devenir Commercial', desc:'Rejoignez notre réseau terrain. Recrutez des artistes et annonceurs. Gagnez des commissions sur chaque inscription.', lien:'/commercial', btn:'Espace Commercial' },
         ].map((s,i) => (
-          <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+          <div key={i} className="dz-service-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12, animationDelay:`${i * 0.12}s` }}>
             <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', marginBottom:6 }}>{s.titre}</p>
             <p style={{ color:'rgba(255,255,255,0.45)', fontSize:12, lineHeight:1.6, marginBottom:12 }}>{s.desc}</p>
             <a href={s.lien} style={{ display:'inline-block', padding:'8px 18px', borderRadius:99, background:'rgba(30,111,255,0.2)', border:'1px solid rgba(30,111,255,0.3)', color:'#4da6ff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
@@ -5756,8 +5779,11 @@ function ResponsablePage() {
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
-      if (u) { setUser(u); setView('dashboard'); }
-      else { setUser(null); setView('login'); }
+      if (u && RESPONSABLES_AUTORISES.includes((u.email||'').toLowerCase())) {
+        setUser(u); setView('dashboard');
+      } else {
+        setUser(null); setView('login');
+      }
     });
   }, []);
 
@@ -5785,6 +5811,10 @@ function ResponsablePage() {
 
   const login = async () => {
     setLoading(true); setMsg('');
+    if (!RESPONSABLES_AUTORISES.includes(email.trim().toLowerCase())) {
+      setMsg('Cet email n\'est pas autorisé comme responsable commercial.');
+      setLoading(false); return;
+    }
     try { await signInWithEmailAndPassword(auth, email, password); }
     catch { setMsg('Email ou mot de passe incorrect'); }
     setLoading(false);
@@ -5820,6 +5850,10 @@ function ResponsablePage() {
               <button style={{ ...S.btn, width:'100%', padding:14 }} disabled={loading} onClick={async () => {
                 if (!respNom || !email || !password) { setMsg('Nom, email et mot de passe requis'); return; }
                 if (password.length < 6) { setMsg('Mot de passe : minimum 6 caractères'); return; }
+                if (!RESPONSABLES_AUTORISES.includes(email.trim().toLowerCase())) {
+                  setMsg('Cet email n\'est pas autorisé à devenir responsable commercial.');
+                  return;
+                }
                 setLoading(true); setMsg('');
                 try {
                   let uid = '';
@@ -5882,6 +5916,11 @@ function ResponsablePage() {
                 try {
                   const provider = new GoogleAuthProvider();
                   const cred = await signInWithPopup(auth, provider);
+                  if (!RESPONSABLES_AUTORISES.includes((cred.user.email||'').toLowerCase())) {
+                    await signOut(auth);
+                    setMsg('Ce compte n\'est pas autorisé comme responsable commercial.');
+                    setLoading(false); return;
+                  }
                   // Vérifier ou créer le responsable
                   const existing = await getDocs(query(collection(db,'responsables'), where('email','==', cred.user.email)));
                   if (existing.empty) {
