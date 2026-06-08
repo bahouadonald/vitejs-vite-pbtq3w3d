@@ -5746,7 +5746,10 @@ function ResponsablePage() {
   const [user, setUser] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<'stats'|'equipe'>('stats');
+  const [tab, setTab] = useState<'stats'|'demandes'|'equipe'>('stats');
+  const [respMode, setRespMode] = useState<'login'|'inscription'>('login');
+  const [respNom, setRespNom] = useState('');
+  const [respTel, setRespTel] = useState('');
   const [commerciaux, setCommerciaux] = useState<any[]>([]);
   const [allArtistes, setAllArtistes] = useState<any[]>([]);
   const [allMarchands, setAllMarchands] = useState<any[]>([]);
@@ -5760,10 +5763,12 @@ function ResponsablePage() {
 
   useEffect(() => {
     if (!user) return;
-    // Commerciaux de ce responsable
+    // Tous les commerciaux : en attente (sans responsable) + les siens
     const u1 = onSnapshot(
-      query(collection(db, 'commerciaux'), where('responsableEmail','==', user.email)),
-      snap => setCommerciaux(snap.docs.map(d => ({id:d.id,...d.data()})))
+      query(collection(db, 'commerciaux')),
+      snap => setCommerciaux(snap.docs.map(d => ({id:d.id,...d.data()})).filter((c:any) =>
+        c.status === 'en_attente' || c.responsableEmail === user.email
+      ))
     );
     // Artistes liés aux commerciaux de ce responsable
     const u2 = onSnapshot(
@@ -5800,21 +5805,80 @@ function ResponsablePage() {
           <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>📋 Espace Responsable Commercial</p>
         </div>
         <div style={S.card}>
-          <label style={S.lbl}>Email</label>
-          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
-          <label style={S.lbl}>Mot de passe</label>
-          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
-          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
-          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
-            {loading ? '⏳...' : 'Se connecter'}
-          </button>
-          <button onClick={async () => {
-            if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-            try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
-            catch { setMsg('Email introuvable'); }
-          }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
-            Mot de passe oublié ?
-          </button>
+          {respMode === 'inscription' ? (
+            <>
+              <p style={{ fontWeight:700, fontSize:15, marginBottom:14, textAlign:'center' }}>Créer mon compte responsable</p>
+              <label style={S.lbl}>Nom complet *</label>
+              <input style={S.inp} value={respNom} onChange={e => setRespNom(e.target.value)} placeholder="Prénom Nom" />
+              <label style={S.lbl}>Email *</label>
+              <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
+              <label style={S.lbl}>Téléphone</label>
+              <input style={S.inp} type="tel" value={respTel} onChange={e => setRespTel(e.target.value)} placeholder="+225 07 00 00 00 00" />
+              <label style={S.lbl}>Mot de passe *</label>
+              <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 caractères" />
+              {msg && <p style={{ color: msg.startsWith('✅')?'#00a040':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+              <button style={{ ...S.btn, width:'100%', padding:14 }} disabled={loading} onClick={async () => {
+                if (!respNom || !email || !password) { setMsg('Nom, email et mot de passe requis'); return; }
+                if (password.length < 6) { setMsg('Mot de passe : minimum 6 caractères'); return; }
+                setLoading(true); setMsg('');
+                try {
+                  let uid = '';
+                  try {
+                    const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+                    uid = cred.user.uid;
+                  } catch(e:any) {
+                    if (e.code === 'auth/email-already-in-use') {
+                      // Compte existe déjà (ex: mélomane) → se connecter pour récupérer l'uid
+                      const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+                      uid = cred.user.uid;
+                    } else throw e;
+                  }
+                  // Enregistrer comme responsable
+                  const existing = await getDocs(query(collection(db,'responsables'), where('email','==',email.trim().toLowerCase())));
+                  if (existing.empty) {
+                    await addDoc(collection(db,'responsables'), {
+                      uid, nom: respNom, email: email.trim().toLowerCase(), telephone: respTel,
+                      status: 'actif', createdAt: new Date().toISOString(), commerciauxCount: 0,
+                    });
+                  }
+                  setMsg('✅ Compte créé !');
+                } catch(e:any) {
+                  setMsg(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'
+                    ? 'Cet email a déjà un compte avec un autre mot de passe. Utilisez ce mot de passe ou "Se connecter".'
+                    : 'Erreur : ' + e.message);
+                }
+                setLoading(false);
+              }}>
+                {loading ? '...' : 'Créer mon compte'}
+              </button>
+              <button onClick={() => { setRespMode('login'); setMsg(''); }}
+                style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:8 }}>
+                J'ai déjà un compte — Se connecter
+              </button>
+            </>
+          ) : (
+            <>
+              <label style={S.lbl}>Email</label>
+              <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
+              <label style={S.lbl}>Mot de passe</label>
+              <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+              {msg && <p style={{ color: msg.startsWith('✅')?'#00a040':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+              <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
+                {loading ? '...' : 'Se connecter'}
+              </button>
+              <button onClick={() => { setRespMode('inscription'); setMsg(''); }}
+                style={{ width:'100%', padding:12, marginTop:10, borderRadius:10, border:'1px solid #1a6bff', background:'rgba(26,107,255,0.05)', color:'#1a6bff', cursor:'pointer', fontSize:13, fontWeight:700 }}>
+                Première fois ? Créer mon compte
+              </button>
+              <button onClick={async () => {
+                if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+                catch { setMsg('Email introuvable'); }
+              }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+                Mot de passe oublié ?
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -5836,7 +5900,7 @@ function ResponsablePage() {
 
       {/* TABS */}
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', background:'#fff' }}>
-        {[['stats','📊 Stats'],['equipe',`👥 Mon équipe (${commerciaux.length})`]].map(([t,l]) => (
+        {[['stats','Stats'],['demandes',`Demandes (${commerciaux.filter(c=>c.status==='en_attente').length})`],['equipe',`Mon équipe (${commerciaux.filter(c=>c.status!=='en_attente').length})`]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t as any)}
             style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:13, fontWeight: tab===t?700:400, borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}` }}>
             {l}
@@ -5889,18 +5953,66 @@ function ResponsablePage() {
         )}
 
         {/* ÉQUIPE */}
+        {tab === 'demandes' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Demandes d'inscription</h2>
+            <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
+              Commerciaux qui se sont inscrits et attendent votre validation.
+            </p>
+            {commerciaux.filter(c => c.status === 'en_attente').length === 0 ? (
+              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucune demande en attente</p>
+              </div>
+            ) : commerciaux.filter(c => c.status === 'en_attente').map(c => (
+              <div key={c.id} style={{ ...S.card, marginBottom:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                  <div style={{ width:44, height:44, borderRadius:99, background:'linear-gradient(135deg,#eaf1ff,#c8d8ef)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#1a6bff' }}>
+                    {(c.name||c.email)[0]?.toUpperCase()}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.name || c.email}</p>
+                    <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{c.email}</p>
+                    {c.telephone && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>}
+                  </div>
+                </div>
+                {/* Profilage */}
+                {(c.methode || c.cible || c.objectif) && (
+                  <div style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 12px', marginBottom:12 }}>
+                    {c.methode && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Prospection :</strong> {c.methode}</p>}
+                    {c.cible && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Cibles :</strong> {c.cible}</p>}
+                    {c.objectif && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Objectif/mois :</strong> {c.objectif} créateurs</p>}
+                    {c.scenario && <p style={{ fontSize:11, color:'#1a6bff', margin:0, fontWeight:700 }}>Scénario choisi : {c.scenario}</p>}
+                  </div>
+                )}
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={async () => {
+                    await updateDoc(doc(db,'commerciaux',c.id), { status:'valide', responsableEmail: user.email });
+                  }} style={{ flex:1, padding:10, borderRadius:8, border:'none', background:'#00a040', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Valider
+                  </button>
+                  <button onClick={async () => {
+                    if (window.confirm('Refuser ce commercial ?')) await updateDoc(doc(db,'commerciaux',c.id), { status:'refuse', responsableEmail: user.email });
+                  }} style={{ flex:1, padding:10, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Refuser
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {tab === 'equipe' && (
           <div>
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Mon équipe</h2>
             <p style={{ color:'#8098b8', fontSize:12, marginBottom:20 }}>
-              Commerciaux enregistrés sous votre supervision.
+              Commerciaux validés sous votre supervision.
             </p>
-            {commerciaux.length === 0 ? (
+
+            {commerciaux.filter(c => c.status !== 'en_attente' && c.status !== 'refuse').length === 0 ? (
               <div style={{ ...S.card, textAlign:'center', padding:40 }}>
-                <p style={{ fontSize:36, marginBottom:10 }}>👥</p>
-                <p style={{ color:'#5a7090', fontSize:14 }}>Aucun commercial dans votre équipe pour l'instant</p>
+                <p style={{ color:'#5a7090', fontSize:14 }}>Aucun commercial validé dans votre équipe</p>
               </div>
-            ) : commerciaux.map(c => {
+            ) : commerciaux.filter(c => c.status !== 'en_attente' && c.status !== 'refuse').map(c => {
               const artistes = allArtistes.filter(a => a.commercialEmail === c.email);
               const marchands = allMarchands.filter(m => m.commercialEmail === c.email);
               const commC = (artistes.length * 1000) +
@@ -6076,6 +6188,16 @@ function CommercialPage() {
   const [tab, setTab] = useState<'stats'|'enregistrer'|'artistes'|'marchands'>('stats');
   const [artistes, setArtistes] = useState<any[]>([]);
   const [marchands, setMarchands] = useState<any[]>([]);
+  const [mode, setMode] = useState<'login'|'inscription'>('login');
+  const [inscStep, setInscStep] = useState(1);
+  const [inscNom, setInscNom] = useState('');
+  const [inscEmail, setInscEmail] = useState('');
+  const [inscTel, setInscTel] = useState('');
+  const [inscPass, setInscPass] = useState('');
+  const [inscMethode, setInscMethode] = useState('');
+  const [inscCible, setInscCible] = useState('');
+  const [inscObjectif, setInscObjectif] = useState('');
+  const [inscScenario, setInscScenario] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -6103,10 +6225,19 @@ function CommercialPage() {
     setLoading(true); setMsg('');
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      const snap = await getDocs(query(collection(db, 'commerciaux'), where('email','==', cred.user.email), where('status','==','valide')));
+      const snap = await getDocs(query(collection(db, 'commerciaux'), where('email','==', cred.user.email)));
       if (snap.empty) {
         await signOut(auth);
-        setMsg('Cet email n\'est pas enregistré comme commercial Doniel Zik. Contactez-nous.');
+        setMsg('Cet email n\'est pas enregistré comme commercial.');
+      } else {
+        const statut = snap.docs[0].data().status;
+        if (statut === 'en_attente') {
+          await signOut(auth);
+          setMsg('Votre compte est en attente de validation par votre responsable.');
+        } else if (statut === 'refuse') {
+          await signOut(auth);
+          setMsg('Votre demande n\'a pas été acceptée.');
+        }
       }
     } catch { setMsg('Email ou mot de passe incorrect'); }
     setLoading(false);
@@ -6124,29 +6255,157 @@ function CommercialPage() {
       <div style={{ width:'100%', maxWidth:380 }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
           <Logo size="lg" />
-          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>👔 Espace Commercial</p>
+          <p style={{ color:'#1a6bff', fontWeight:700, fontSize:14, marginTop:8 }}>Espace Commercial</p>
         </div>
         <div style={S.card}>
-          <label style={S.lbl}>Email</label>
-          <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
-          <label style={S.lbl}>Mot de passe</label>
-          <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
-          {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
-          <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
-            {loading ? '⏳...' : 'Se connecter'}
-          </button>
-          <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', marginTop:14 }}>
-            <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.7, margin:0 }}>
-              ⚠️ Seuls les commerciaux enregistrés par Doniel Zik peuvent accéder à cet espace.
-            </p>
-          </div>
-          <button onClick={async () => {
-            if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-            try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
-            catch { setMsg('Email introuvable'); }
-          }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
-            Mot de passe oublié ?
-          </button>
+          {mode === 'inscription' ? (
+            <>
+              <p style={{ fontWeight:700, fontSize:15, marginBottom:4, textAlign:'center' }}>Devenir commercial DZ TEAM</p>
+              <p style={{ color:'#8098b8', fontSize:11, textAlign:'center', marginBottom:16 }}>Étape {inscStep}/3</p>
+
+              {/* ÉTAPE 1 — Identité */}
+              {inscStep === 1 && (
+                <>
+                  <label style={S.lbl}>Nom complet *</label>
+                  <input style={S.inp} value={inscNom} onChange={e => setInscNom(e.target.value)} placeholder="Prénom Nom" />
+                  <label style={S.lbl}>Email *</label>
+                  <input style={S.inp} type="email" value={inscEmail} onChange={e => setInscEmail(e.target.value)} placeholder="votre@email.com" />
+                  <label style={S.lbl}>Téléphone *</label>
+                  <input style={S.inp} type="tel" value={inscTel} onChange={e => setInscTel(e.target.value)} placeholder="+225 07 00 00 00 00" />
+                  <label style={S.lbl}>Mot de passe *</label>
+                  <input style={S.inp} type="password" value={inscPass} onChange={e => setInscPass(e.target.value)} placeholder="Minimum 6 caractères" />
+                  {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+                  <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={() => {
+                    if (!inscNom || !inscEmail || !inscTel || !inscPass) { setMsg('Tous les champs sont requis'); return; }
+                    if (inscPass.length < 6) { setMsg('Mot de passe : minimum 6 caractères'); return; }
+                    setMsg(''); setInscStep(2);
+                  }}>Continuer</button>
+                </>
+              )}
+
+              {/* ÉTAPE 2 — Profilage */}
+              {inscStep === 2 && (
+                <>
+                  <label style={S.lbl}>Comment comptez-vous prospecter ? *</label>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:14 }}>
+                    {['Digital (réseaux sociaux, WhatsApp, recherche en ligne)','Terrain (maquis, événements, studios, prospection directe)','Les deux (digital + terrain)'].map(m => (
+                      <button key={m} onClick={() => setInscMethode(m)}
+                        style={{ padding:'10px 12px', borderRadius:10, border:`1px solid ${inscMethode===m?'#1a6bff':'#dce6f7'}`, background:inscMethode===m?'#eaf1ff':'#fff', color:inscMethode===m?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:600, textAlign:'left' }}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label style={S.lbl}>Quelles cibles allez-vous recruter ? *</label>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:14 }}>
+                    {['Artistes ayant déjà des contenus','Artistes voulant réaliser un projet (production)','Marchands / Annonceurs','Toutes les cibles'].map(c => (
+                      <button key={c} onClick={() => setInscCible(c)}
+                        style={{ padding:'10px 12px', borderRadius:10, border:`1px solid ${inscCible===c?'#1a6bff':'#dce6f7'}`, background:inscCible===c?'#eaf1ff':'#fff', color:inscCible===c?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:600, textAlign:'left' }}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label style={S.lbl}>Combien de créateurs pouvez-vous recruter par mois ? *</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:14 }}>
+                    {['10','30','50','60','100'].map(o => (
+                      <button key={o} onClick={() => setInscObjectif(o)}
+                        style={{ padding:'10px', borderRadius:10, border:`1px solid ${inscObjectif===o?'#1a6bff':'#dce6f7'}`, background:inscObjectif===o?'#eaf1ff':'#fff', color:inscObjectif===o?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:13, fontWeight:700 }}>
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                  {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button style={{ ...S.btn2, flex:1, padding:14 }} onClick={() => setInscStep(1)}>Retour</button>
+                    <button style={{ ...S.btn, flex:2, padding:14 }} onClick={() => {
+                      if (!inscMethode || !inscCible || !inscObjectif) { setMsg('Répondez à toutes les questions'); return; }
+                      setMsg(''); setInscStep(3);
+                    }}>Voir les revenus</button>
+                  </div>
+                </>
+              )}
+
+              {/* ÉTAPE 3 — Scénarios de rémunération */}
+              {inscStep === 3 && (
+                <>
+                  <p style={{ fontSize:13, color:'#5a7090', marginBottom:14, lineHeight:1.6 }}>
+                    Vous êtes rémunéré uniquement sur les résultats — aucun risque, vous gagnez sur l'argent généré. Voici vos revenus potentiels en fin de mois :
+                  </p>
+                  {[
+                    { n:10, total:120000, det:'10 artistes + 10 marchands actifs' },
+                    { n:30, total:360000, det:'30 artistes + 30 marchands actifs' },
+                    { n:50, total:600000, det:'50 artistes + 50 marchands actifs' },
+                  ].map(s => (
+                    <button key={s.n} onClick={() => setInscScenario(String(s.n))}
+                      style={{ width:'100%', padding:'14px 16px', borderRadius:12, border:`2px solid ${inscScenario===String(s.n)?'#1a6bff':'#dce6f7'}`, background:inscScenario===String(s.n)?'#eaf1ff':'#fff', cursor:'pointer', textAlign:'left', marginBottom:10 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <div>
+                          <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', margin:'0 0 2px' }}>Scénario {s.n}</p>
+                          <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{s.det}</p>
+                        </div>
+                        <p style={{ fontWeight:900, fontSize:18, color:'#00a040', margin:0 }}>{s.total.toLocaleString()} F</p>
+                      </div>
+                    </button>
+                  ))}
+                  <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+                    <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.7, margin:0 }}>
+                      Détail des commissions : 50 F par pochette dupliquée · 10% sur les téléchargements · 10% sur les kiffements · 20% sur les publications (single, album, film, série) · 10% sur le CA des marchands. Bonus mensuel possible si objectif atteint.
+                    </p>
+                  </div>
+                  {msg && <p style={{ color: msg.startsWith('✅')?'#00a040':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button style={{ ...S.btn2, flex:1, padding:14 }} onClick={() => setInscStep(2)}>Retour</button>
+                    <button style={{ ...S.btn, flex:2, padding:14 }} disabled={loading} onClick={async () => {
+                      if (!inscScenario) { setMsg('Choisissez un scénario'); return; }
+                      setLoading(true); setMsg('');
+                      try {
+                        const cred = await createUserWithEmailAndPassword(auth, inscEmail.trim().toLowerCase(), inscPass);
+                        await addDoc(collection(db,'commerciaux'), {
+                          uid: cred.user.uid, name: inscNom, email: inscEmail.trim().toLowerCase(), telephone: inscTel,
+                          methode: inscMethode, cible: inscCible, objectif: inscObjectif, scenario: inscScenario,
+                          status: 'en_attente', createdAt: new Date().toISOString(),
+                        });
+                        setMsg('✅ Inscription envoyée ! Votre compte sera validé par votre responsable.');
+                        await signOut(auth);
+                        setTimeout(() => { setMode('login'); setInscStep(1); setInscNom(''); setInscEmail(''); setInscTel(''); setInscPass(''); setMsg(''); }, 2500);
+                      } catch(e:any) {
+                        setMsg(e.code === 'auth/email-already-in-use' ? 'Cet email a déjà un compte.' : 'Erreur : ' + e.message);
+                      }
+                      setLoading(false);
+                    }}>{loading ? '...' : 'Envoyer ma candidature'}</button>
+                  </div>
+                </>
+              )}
+
+              <button onClick={() => { setMode('login'); setInscStep(1); setMsg(''); }}
+                style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:8 }}>
+                J'ai déjà un compte — Se connecter
+              </button>
+            </>
+          ) : (
+            <>
+              <label style={S.lbl}>Email</label>
+              <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" onKeyDown={e => e.key==='Enter' && login()} />
+              <label style={S.lbl}>Mot de passe</label>
+              <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key==='Enter' && login()} />
+              {msg && <p style={{ color: msg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+              <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={login} disabled={loading}>
+                {loading ? '...' : 'Se connecter'}
+              </button>
+              <button onClick={() => { setMode('inscription'); setMsg(''); }}
+                style={{ width:'100%', padding:12, marginTop:10, borderRadius:10, border:'1px solid #1a6bff', background:'rgba(26,107,255,0.05)', color:'#1a6bff', cursor:'pointer', fontSize:13, fontWeight:700 }}>
+                Devenir commercial — S'inscrire
+              </button>
+              <button onClick={async () => {
+                if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+                catch { setMsg('Email introuvable'); }
+              }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+                Mot de passe oublié ?
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
