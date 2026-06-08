@@ -3899,7 +3899,7 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'signatures'|'notifs'|'options'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'signatures'|'notifs'>('stats');
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
 
@@ -4140,7 +4140,6 @@ function ArtistPage() {
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
         <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
-        <button style={tabStyle(dashTab==='options')} onClick={() => setDashTab('options')}>Options</button>
       </div>
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px' }}>
@@ -4467,72 +4466,6 @@ function ArtistPage() {
         {dashTab === 'signatures' && <SignaturesArtisteTab artistEmail={user.email} />}
 
         {dashTab === 'notifs' && <NotificationsTab userEmail={user.email} />}
-
-        {/* ────────── ONGLET OPTIONS ────────── */}
-        {dashTab === 'options' && (
-          <div style={{ animation:'fadeUp .3s ease' }}>
-            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>⚙️ Options de paiement</h2>
-            <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.7, marginBottom:24 }}>
-              Les paiements sont gérés automatiquement via Wave.
-            </p>
-
-            <div style={{ ...S.card, background:'linear-gradient(135deg,#eef4ff,#dce8ff)', border:'1px solid #1a6bff33', marginBottom:28 }}>
-              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <div style={{ width:24, height:24, borderRadius:99, background:'#1a6bff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
-                  <span style={{ color:'#fff', fontSize:13, fontWeight:800 }}>✓</span>
-                </div>
-                <div>
-                  <p style={{ fontWeight:800, fontSize:15, marginBottom:6, color:'#1a6bff' }}>Paiement automatique via Wave</p>
-                  <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.7, marginBottom:10 }}>
-                    Doniel Zik reçoit le paiement du mélomane, prélève sa commission, et vous verse le reste automatiquement chaque trimestre via Mobile Money.
-                  </p>
-                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Zéro effort</span>
-                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Paiement automatique</span>
-                    <span style={{ background:'#eaf1ff', borderRadius:6, padding:'3px 10px', fontSize:11, color:'#1a6bff', fontWeight:600 }}>Retrait sur demande</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── ACTION PUB ANNONCEUR — 3 boutons ── */}
-            <div style={{ borderTop:'1px solid #dce6f7', paddingTop:24 }}>
-              <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:800, marginBottom:6 }}>📢 Action de ma publicité</h3>
-              <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.7, marginBottom:16 }}>
-                Quand quelqu'un clique sur votre pub, où voulez-vous le rediriger ?
-              </p>
-              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                {[['url','🌐 Mon site'],['whatsapp','💬 WhatsApp'],['tel','📞 Appel direct']].map(([type, label]) => (
-                  <button key={type} onClick={() => { setOptionPaiement(optionPaiement); setPubActionType(type); }}
-                    style={{ flex:1, padding:'12px 6px', borderRadius:10, border:`1px solid ${pubActionType===type?'#1a6bff':'#c8d8ef'}`, background: pubActionType===type?'#eaf1ff':'#fff', color: pubActionType===type?'#1a6bff':'#5a7090', cursor:'pointer', fontSize:12, fontWeight:700, textAlign:'center' }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <label style={S.lbl}>
-                {pubActionType==='url' ? 'URL de votre site ou boutique' : pubActionType==='whatsapp' ? 'Numéro WhatsApp (+225...)' : 'Numéro de téléphone'}
-              </label>
-              <input className="art-inp" value={pubActionLien} onChange={e => setPubActionLien(e.target.value)}
-                placeholder={pubActionType==='url' ? 'https://votre-boutique.com' : '+225 07 00 00 00 00'}
-                style={{ marginBottom:4 }} />
-              <p style={{ color:'#8098b8', fontSize:11, marginBottom:12 }}>
-                Ce lien sera utilisé quand quelqu'un clique sur votre publicité
-              </p>
-              <button onClick={async () => {
-                if (!pubActionLien) { setPubActionMsg('Entrez un lien ou numéro'); return; }
-                try {
-                  await setDoc(doc(db, 'artistOptions', user.uid), {
-                    pubActionType, pubActionLien, updatedAt: new Date().toISOString()
-                  }, { merge: true });
-                  setPubActionMsg('✅ Action sauvegardée !');
-                } catch(e:any) { setPubActionMsg('Erreur: '+e.message); }
-              }} style={{ ...S.btn, width:'100%', padding:12, fontSize:14 }}>
-                💾 Sauvegarder l'action
-              </button>
-              {pubActionMsg && <p style={{ color: pubActionMsg.startsWith('✅')?'#1a6bff':'#f04a6a', fontSize:12, marginTop:8 }}>{pubActionMsg}</p>}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
