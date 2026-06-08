@@ -5976,8 +5976,9 @@ function ResponsablePage() {
                   </div>
                 </div>
                 {/* Profilage */}
-                {(c.methode || c.cible || c.objectif) && (
+                {(c.methode || c.cible || c.objectif || c.commune) && (
                   <div style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 12px', marginBottom:12 }}>
+                    {c.commune && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Commune :</strong> {c.commune}</p>}
                     {c.methode && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Prospection :</strong> {c.methode}</p>}
                     {c.cible && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Cibles :</strong> {c.cible}</p>}
                     {c.objectif && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Objectif/mois :</strong> {c.objectif} créateurs</p>}
@@ -6025,6 +6026,8 @@ function ResponsablePage() {
                     <div style={{ flex:1 }}>
                       <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.name || c.email}</p>
                       <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{c.email}</p>
+                      {c.telephone && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>}
+                      {c.commune && <p style={{ color:'#1a6bff', fontSize:11, margin:0 }}>{c.commune}</p>}
                     </div>
                     <div style={{ textAlign:'right' }}>
                       <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, margin:0 }}>+{Math.round(commC*0.1).toLocaleString()} F</p>
@@ -6193,6 +6196,7 @@ function CommercialPage() {
   const [inscNom, setInscNom] = useState('');
   const [inscEmail, setInscEmail] = useState('');
   const [inscTel, setInscTel] = useState('');
+  const [inscCommune, setInscCommune] = useState('');
   const [inscPass, setInscPass] = useState('');
   const [inscMethode, setInscMethode] = useState('');
   const [inscCible, setInscCible] = useState('');
@@ -6272,11 +6276,13 @@ function CommercialPage() {
                   <input style={S.inp} type="email" value={inscEmail} onChange={e => setInscEmail(e.target.value)} placeholder="votre@email.com" />
                   <label style={S.lbl}>Téléphone *</label>
                   <input style={S.inp} type="tel" value={inscTel} onChange={e => setInscTel(e.target.value)} placeholder="+225 07 00 00 00 00" />
+                  <label style={S.lbl}>Commune / Ville *</label>
+                  <input style={S.inp} value={inscCommune} onChange={e => setInscCommune(e.target.value)} placeholder="Ex: Cocody, Yopougon, Abidjan..." />
                   <label style={S.lbl}>Mot de passe *</label>
                   <input style={S.inp} type="password" value={inscPass} onChange={e => setInscPass(e.target.value)} placeholder="Minimum 6 caractères" />
                   {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
                   <button style={{ ...S.btn, width:'100%', padding:14 }} onClick={() => {
-                    if (!inscNom || !inscEmail || !inscTel || !inscPass) { setMsg('Tous les champs sont requis'); return; }
+                    if (!inscNom || !inscEmail || !inscTel || !inscCommune || !inscPass) { setMsg('Tous les champs sont requis'); return; }
                     if (inscPass.length < 6) { setMsg('Mot de passe : minimum 6 caractères'); return; }
                     setMsg(''); setInscStep(2);
                   }}>Continuer</button>
@@ -6363,6 +6369,7 @@ function CommercialPage() {
                         const cred = await createUserWithEmailAndPassword(auth, inscEmail.trim().toLowerCase(), inscPass);
                         await addDoc(collection(db,'commerciaux'), {
                           uid: cred.user.uid, name: inscNom, email: inscEmail.trim().toLowerCase(), telephone: inscTel,
+                          commune: inscCommune,
                           methode: inscMethode, cible: inscCible, objectif: inscObjectif, scenario: inscScenario,
                           status: 'en_attente', createdAt: new Date().toISOString(),
                         });
