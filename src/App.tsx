@@ -6151,19 +6151,31 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-            media.play().then(() => setPlaying(true)).catch(() => {});
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            media.muted = muted;
+            const p = media.play();
+            if (p && p.then) p.then(() => setPlaying(true)).catch(() => setPlaying(false));
           } else {
             media.pause();
             setPlaying(false);
           }
         });
       },
-      { threshold: [0, 0.6, 1] }
+      { threshold: [0, 0.5, 1] }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [muted]);
+
+  // Lecture manuelle au clic sur le média (si autoplay bloqué)
+  const handleTap = (e: any) => {
+    const media = mediaRef.current;
+    if (!media) return;
+    if (media.paused) {
+      e.preventDefault(); e.stopPropagation();
+      media.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  };
 
   const toggleMute = (e: any) => {
     e.preventDefault(); e.stopPropagation();
@@ -6176,10 +6188,10 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
   return (
     <div ref={containerRef} style={{ position:'relative', width:'100%', background:'#0a0e1a' }}>
       {isVideo ? (
-        <video ref={mediaRef} src={fileUrl} poster={coverUrl} muted={muted} loop playsInline
+        <video ref={mediaRef} src={fileUrl} poster={coverUrl} muted={muted} loop playsInline onClick={handleTap}
           style={{ width:'100%', height:280, objectFit:'cover', display:'block' }} />
       ) : (
-        <>
+        <div onClick={handleTap} style={{ position:'relative' }}>
           {coverUrl ? (
             <img src={coverUrl} alt={label} style={{ width:'100%', height:280, objectFit:'cover', objectPosition:'top', display:'block' }} />
           ) : (
@@ -6187,8 +6199,15 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
             </div>
           )}
-          <audio ref={mediaRef} src={fileUrl} muted={muted} loop />
-        </>
+          {!playing && (
+            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+              <div style={{ width:60, height:60, borderRadius:99, background:'rgba(26,107,255,0.85)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+              </div>
+            </div>
+          )}
+          <audio ref={mediaRef} src={fileUrl} loop />
+        </div>
       )}
 
       {/* Indicateur lecture + bouton son */}
@@ -6314,8 +6333,9 @@ function DecouvrirPage() {
           </div>
         ) : contenusFiltres.map(c => {
           const mediaFile = c.files?.[0];
-          const isVideo = mediaFile?.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i);
-          const fileUrl = mediaFile?.url || '';
+          const rawUrl = mediaFile?.url || mediaFile?.name || c.fileUrl || '';
+          const isVideo = /\.(mp4|mov|avi|mkv|webm|m4v)(\?|$)/i.test(rawUrl);
+          const fileUrl = rawUrl;
           return (
           <div key={c.id} style={{ marginBottom:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, overflow:'hidden' }}>
             {/* Média avec lecture automatique */}
