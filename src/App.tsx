@@ -15,8 +15,18 @@ import {
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
-const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
+const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
+// SOUS-ADMINS : font tout SAUF supprimer, bannir, créer comptes. Ajoute les emails ici.
+const SOUS_ADMINS = [
+  // 'admin1@gmail.com',
+  // 'admin2@gmail.com',
+];
+// Helpers de rôle
+const estSuperAdmin = (email?: string|null) => (email||'').toLowerCase() === ADMIN_EMAIL.toLowerCase();
+const estSousAdmin = (email?: string|null) => SOUS_ADMINS.map(e=>e.toLowerCase()).includes((email||'').toLowerCase());
+const estAdmin = (email?: string|null) => estSuperAdmin(email) || estSousAdmin(email);
+const peutSupprimer = (email?: string|null) => estSuperAdmin(email); // SEUL le super admin supprime/bannit
 const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
 
 const CLOUDINARY_CLOUD = 'drjp8ht84';
@@ -2047,12 +2057,35 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 
   const offrirSignature = async (signature: any) => {
     if (!offreModal) return;
+    // Récupérer le nom de l'artiste
+    let artistName = artistEmail.split('@')[0];
+    try {
+      const aSnap = await getDocs(query(collection(db,'artists'), where('email','==',artistEmail)));
+      if (!aSnap.empty) artistName = aSnap.docs[0].data().name || artistName;
+    } catch {}
+
+    // 1. Notification PERSONNELLE au fan ciblé
     await addDoc(collection(db,'notifications'), {
       to: offreModal.userEmail || offreModal.userId,
       type: 'signature',
-      text: `Votre artiste vous offre : ${signature.label} ! ${signature.desc}`,
+      text: `${artistName} a signé pour vous : ${signature.label} ! ${signature.desc}`,
       createdAt: new Date().toISOString(), lu: false,
     });
+    // 2. Notification GÉNÉRALE (visible par tous)
+    await addDoc(collection(db,'notifications'), {
+      to: 'all', type: 'generale',
+      text: `${artistName} a signé "${signature.label}" pour ${offreModal.userName}.`,
+      createdAt: new Date().toISOString(), lu: false,
+    });
+    // 3. Publier dans "Le mot de l'artiste" (auto-validé car c'est une signature)
+    await addDoc(collection(db,'mots_artiste'), {
+      artistEmail, artistName,
+      texte: `a signé "${signature.label}" pour ${offreModal.userName}. ${signature.desc || ''}`,
+      videoUrl: '', estSignature: true,
+      statut: 'valide',
+      createdAt: new Date().toISOString(),
+    });
+    // 4. Enregistrer la signature
     await addDoc(collection(db,'signatures'), {
       artistEmail, donateurId: offreModal.userId, donateurName: offreModal.userName,
       type: signature.id, label: signature.label,
@@ -2133,17 +2166,297 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 // ─────────────────────────────────────────────
 // PRODUCTION TAB — demandes de production
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SOUMISSIONS TAB — écouter & valider les contenus soumis par les artistes
+// ─────────────────────────────────────────────
+function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
+  const [soumissions, setSoumissions] = useState<any[]>([]);
+  const [mots, setMots] = useState<any[]>([]);
+  const [scansModal, setScansModal] = useState<any>(null);
+  const [nbScans, setNbScans] = useState('1');
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db,'soumissions'), orderBy('createdAt','desc')),
+      snap => setSoumissions(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    const unsubMots = onSnapshot(
+      query(collection(db,'mots_artiste'), orderBy('createdAt','desc')),
+      snap => setMots(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { unsub(); unsubMots(); };
+  }, []);
+
+  const validerMot = async (m: any) => {
+    try {
+      await updateDoc(doc(db,'mots_artiste',m.id), { statut:'valide' });
+      // Notification perso à l'artiste
+      await addDoc(collection(db,'notifications'), {
+        to: m.artistEmail, type:'mot_valide',
+        text: `Votre message est validé et publié dans "L'artiste vous dit quelque chose".`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      // Notification GÉNÉRALE à tous
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'generale',
+        text: `${m.artistName} a quelque chose à vous dire. Allez voir dans Découvrir !`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+  const refuserMot = async (m: any) => {
+    if (!window.confirm('Refuser ce message ?')) return;
+    await updateDoc(doc(db,'mots_artiste',m.id), { statut:'refuse' });
+    await addDoc(collection(db,'notifications'), {
+      to: m.artistEmail, type:'mot_refuse',
+      text: `Votre message n'a pas été validé car il ne correspond pas à nos conditions (uniquement professionnel).`,
+      createdAt: new Date().toISOString(), lu: false,
+    });
+  };
+  const motsEnAttente = mots.filter(m => m.statut === 'en_attente');
+
+  const valider = async (s: any) => {
+    // Générer un publicLinkId et un QR public pour l'artiste
+    const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
+    const scans = parseInt(nbScans) || 1;
+    try {
+      // Lien public (visible par l'artiste)
+      await setDoc(doc(db,'publicLinks',publicLinkId), {
+        artist: s.artistName, artistEmail: s.artistEmail,
+        label: s.titre, categorie: s.categorie,
+        fileUrl: s.fileUrl, type: s.type,
+        createdAt: new Date().toISOString(),
+      });
+      // QR privé à scan limité (visible ADMIN uniquement)
+      await addDoc(collection(db,'qrcodes'), {
+        artist: s.artistName, artistEmail: s.artistEmail,
+        label: s.titre, categorie: s.categorie,
+        totalScans: scans, usedScans: 0, status:'active',
+        publicLinkId, fileUrl: s.fileUrl,
+        createdAt: new Date().toISOString(),
+      });
+      // Ajouter à Découvrir
+      await addDoc(collection(db,'decouvrir'), {
+        publicLinkId, artist: s.artistName, artistEmail: s.artistEmail,
+        label: s.titre, categorie: s.categorie,
+        files: [{ url: s.fileUrl, name: s.fileUrl }],
+        publishedAt: new Date().toISOString(),
+      });
+      // Marquer la soumission validée
+      await updateDoc(doc(db,'soumissions',s.id), { statut:'valide', publicLinkId, totalScans: scans });
+      // Notifier l'artiste — félicitations
+      await addDoc(collection(db,'notifications'), {
+        to: s.artistEmail, type:'validation',
+        text: `Félicitations ! Votre contenu "${s.titre}" est validé et publié. Votre lien et votre QR public sont disponibles. Partagez-les à vos fans !`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      setScansModal(null); setNbScans('1');
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const refuser = async (s: any) => {
+    if (!window.confirm(`Refuser "${s.titre}" ?`)) return;
+    await updateDoc(doc(db,'soumissions',s.id), { statut:'refuse' });
+    await addDoc(collection(db,'notifications'), {
+      to: s.artistEmail, type:'refus',
+      text: `Votre contenu "${s.titre}" n'a pas pu être validé car il ne correspond pas à nos conditions. Contactez-nous pour plus d'informations.`,
+      createdAt: new Date().toISOString(), lu: false,
+    });
+  };
+
+  const enAttente = soumissions.filter(s => s.statut === 'en_attente');
+  const traitees = soumissions.filter(s => s.statut !== 'en_attente');
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Soumissions de contenus</h2>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>
+        Écoutez chaque contenu via son lien secret avant de valider. Seul le super admin peut supprimer.
+      </p>
+
+      {/* MOTS D'ARTISTES À VALIDER */}
+      {motsEnAttente.length > 0 && (
+        <div style={{ marginBottom:24 }}>
+          <h3 style={{ fontWeight:700, fontSize:15, marginBottom:12, color:'#b07a00' }}>Mots d'artistes à valider ({motsEnAttente.length})</h3>
+          {motsEnAttente.map(m => (
+            <div key={m.id} style={{ ...S.card, marginBottom:10, borderLeft:'3px solid #f0b84a' }}>
+              <p style={{ color:'#1a6bff', fontSize:12, fontWeight:700, margin:'0 0 4px' }}>{m.artistName}</p>
+              {m.texte && <p style={{ fontSize:13, margin:'0 0 8px', color:'#1a2340' }}>{m.texte}</p>}
+              {m.videoUrl && (
+                <a href={m.videoUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display:'block', textAlign:'center', padding:8, borderRadius:8, background:'#eaf1ff', color:'#1a6bff', textDecoration:'none', fontSize:12, fontWeight:700, marginBottom:8 }}>
+                  ▶ Voir la vidéo
+                </a>
+              )}
+              {canValidate && (
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => validerMot(m)} style={{ flex:2, padding:8, borderRadius:8, border:'none', background:'#00a040', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>Valider & publier</button>
+                  <button onClick={() => refuserMot(m)} style={{ flex:1, padding:8, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:12, cursor:'pointer' }}>Refuser</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {enAttente.length === 0 ? (
+        <div style={{ ...S.card, textAlign:'center', padding:30 }}>
+          <p style={{ color:'#8098b8', fontSize:14 }}>Aucune soumission en attente.</p>
+        </div>
+      ) : enAttente.map(s => (
+        <div key={s.id} style={{ ...S.card, marginBottom:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+            <div>
+              <p style={{ fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{s.titre}</p>
+              <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 2px' }}>{s.artistName}</p>
+              <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{PRIX_PUBLICATION[s.type as keyof typeof PRIX_PUBLICATION]?.label || s.type} · {s.categorie}</p>
+            </div>
+            <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'3px 10px', fontSize:10, color:'#b07a00', fontWeight:700 }}>En attente</span>
+          </div>
+
+          {/* Lien secret pour écouter */}
+          <a href={s.fileUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:8, background:'#eaf1ff', color:'#1a6bff', textDecoration:'none', fontSize:13, fontWeight:700, marginBottom:10 }}>
+            ▶ Écouter / Visionner le contenu
+          </a>
+
+          {canValidate && (
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => { setScansModal(s); setNbScans('1'); }}
+                style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#00a040', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                Valider & générer QR
+              </button>
+              <button onClick={() => refuser(s)}
+                style={{ flex:1, padding:10, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                Refuser
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Soumissions traitées */}
+      {traitees.length > 0 && (
+        <div style={{ marginTop:24 }}>
+          <h3 style={{ fontWeight:700, fontSize:14, marginBottom:12, color:'#8098b8' }}>Traitées ({traitees.length})</h3>
+          {traitees.map(s => (
+            <div key={s.id} style={{ ...S.card, marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <p style={{ fontWeight:700, fontSize:13, margin:0 }}>{s.titre}</p>
+                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{s.artistName}</p>
+              </div>
+              <span style={{ borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700,
+                background: s.statut==='valide'?'#eaffea':'#ffecec', color: s.statut==='valide'?'#00a040':'#d32f2f' }}>
+                {s.statut==='valide'?'Validé':'Refusé'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal nombre de scans */}
+      {scansModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9990, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={() => setScansModal(null)}>
+          <div style={{ background:'#fff', borderRadius:16, padding:24, maxWidth:380, width:'100%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:8 }}>Configurer le QR</h3>
+            <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>
+              "{scansModal.titre}" — définissez le nombre de scans autorisés pour le QR privé (duplication).
+            </p>
+            <label style={S.lbl}>Nombre de scans</label>
+            <input style={S.inp} type="number" min="1" value={nbScans} onChange={e => setNbScans(e.target.value)} />
+            <div style={{ display:'flex', gap:8, marginTop:16 }}>
+              <button onClick={() => setScansModal(null)} style={{ ...S.btn2, flex:1 }}>Annuler</button>
+              <button onClick={() => valider(scansModal)} style={{ ...S.btn, flex:2 }}>Générer & valider</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProductionTab() {
   const [demandes, setDemandes] = useState<any[]>([]);
+  const [commandes, setCommandes] = useState<any[]>([]);
+  const [uploadingCmd, setUploadingCmd] = useState('');
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db,'demandes_production'), orderBy('createdAt','desc')),
       snap => setDemandes(snap.docs.map(d => ({id:d.id,...d.data()})))
     );
-    return unsub;
+    const unsubCmd = onSnapshot(
+      query(collection(db,'commandes_pochettes'), orderBy('createdAt','desc')),
+      snap => setCommandes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { unsub(); unsubCmd(); };
   }, []);
+
+  const uploadCrea = async (cmdId: string, f: File) => {
+    setUploadingCmd(cmdId);
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/image/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) {
+        const cmd = commandes.find(c => c.id === cmdId);
+        await updateDoc(doc(db,'commandes_pochettes',cmdId), { creaUrl: data.secure_url, statut:'livree' });
+        // Notifier l'artiste
+        if (cmd) await addDoc(collection(db,'notifications'), {
+          to: cmd.artistEmail, type:'pochette_livree',
+          text: `Votre pochette est prête ! Téléchargez-la en PNG depuis l'onglet Pochettes.`,
+          createdAt: new Date().toISOString(), lu: false,
+        });
+      }
+    } catch {}
+    setUploadingCmd('');
+  };
+
   return (
     <div>
+      {/* COMMANDES DE POCHETTES */}
+      {commandes.length > 0 && (
+        <div style={{ marginBottom:28 }}>
+          <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:16 }}>Commandes de pochettes</h2>
+          {commandes.map(c => (
+            <div key={c.id} style={{ ...S.card, marginBottom:12 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{c.contenuTitre}</p>
+                  <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 4px' }}>{c.artistName} · {c.artistEmail}</p>
+                  <p style={{ color:'#5a7090', fontSize:12, margin:0 }}>
+                    {c.nbPochettes} pochettes · {c.nbScans} scan(s)/pièce · QR {c.qrPosition}
+                  </p>
+                  {c.creaParNous && <p style={{ color:'#b07a00', fontSize:12, margin:'4px 0 0', fontWeight:700 }}>Conception demandée (+{(c.coutCrea||5000).toLocaleString()} F)</p>}
+                  {c.infos && <p style={{ color:'#8098b8', fontSize:11, margin:'4px 0 0', lineHeight:1.5 }}>Infos : {c.infos}</p>}
+                </div>
+                <span style={{ background:c.statut==='livree'?'#eaffea':'#fff8e1', border:`1px solid ${c.statut==='livree'?'#4dff9a':'#ffd700'}`, borderRadius:99, padding:'3px 10px', fontSize:10, color:c.statut==='livree'?'#00a040':'#b07a00', fontWeight:700, whiteSpace:'nowrap' }}>
+                  {c.statut==='livree'?'Livrée':c.statut==='en_cours'?'En cours':'Reçue'}
+                </span>
+              </div>
+              {/* Photo fournie par l'artiste */}
+              {c.photoUrl && (
+                <a href={c.photoUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', marginBottom:10 }}>
+                  <img src={c.photoUrl} style={{ width:60, height:60, borderRadius:8, objectFit:'cover' }} alt="" />
+                </a>
+              )}
+              {/* Uploader la créa finale */}
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <button onClick={() => updateDoc(doc(db,'commandes_pochettes',c.id), { statut:'en_cours' })}
+                  style={{ ...S.btn2, fontSize:11, padding:'6px 12px' }}>Marquer en cours</button>
+                <label style={{ ...S.btn, fontSize:11, padding:'6px 12px', cursor:'pointer', display:'inline-block' }}>
+                  {uploadingCmd===c.id ? 'Upload...' : 'Livrer la créa (PNG)'}
+                  <input type="file" accept="image/png,image/jpeg" style={{ display:'none' }}
+                    onChange={e => e.target.files?.[0] && uploadCrea(c.id, e.target.files[0])} />
+                </label>
+                {c.creaUrl && <span style={{ color:'#00a040', fontSize:11, fontWeight:700 }}>Créa livrée ✓</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Demandes de production</h2>
       {demandes.length === 0 ? (
         <p style={{ color:'#8098b8', fontSize:13 }}>Aucune demande pour l'instant.</p>
@@ -2392,7 +2705,7 @@ function CommerciauxtTab({ db }: { db: any }) {
   );
 }
 
-function ArtistesTab({ db, qrcodes }: { db: any, qrcodes: any[] }) {
+function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[], canDelete?: boolean }) {
   const [artistes, setArtistes] = useState<any[]>([]);
   const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
@@ -2502,23 +2815,36 @@ function ArtistesTab({ db, qrcodes }: { db: any, qrcodes: any[] }) {
                     En attente
                   </span>
                 )}
-                <button onClick={async () => {
-                  if (window.confirm(`BANNIR ${a.name} ?\n\nCela supprimera l'artiste ET tout son contenu (QR codes, liens publics, contenus Découvrir). Action irréversible.`)) {
-                    // Supprimer tout le contenu de l'artiste
-                    const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('artistEmail','==',a.email)));
-                    for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
-                    const plSnap = await getDocs(query(collection(db,'publicLinks'), where('artistEmail','==',a.email)));
-                    for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
-                    const decSnap = await getDocs(query(collection(db,'decouvrir'), where('artistEmail','==',a.email)));
-                    for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
-                    await deleteDoc(doc(db,'artists',a.id));
-                    setMsg(`${a.name} et tout son contenu ont été bannis.`);
-                  }
-                }} style={{ background:'#7a0000', color:'#fff', border:'none', borderRadius:8, fontSize:11, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>
-                  Bannir
-                </button>
-                <button onClick={() => { if (window.confirm(`Supprimer ${a.name} de la liste (sans toucher au contenu) ?`)) deleteDoc(doc(db,'artists',a.id)); }}
-                  style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Retirer</button>
+                {canDelete ? (
+                  <>
+                    <button onClick={async () => {
+                      if (window.confirm(`BANNIR ${a.name} ?\n\nCela supprimera l'artiste ET tout son contenu (QR codes, liens publics, contenus Découvrir). Action irréversible.`)) {
+                        const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('artistEmail','==',a.email)));
+                        for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
+                        const plSnap = await getDocs(query(collection(db,'publicLinks'), where('artistEmail','==',a.email)));
+                        for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
+                        const decSnap = await getDocs(query(collection(db,'decouvrir'), where('artistEmail','==',a.email)));
+                        for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
+                        await deleteDoc(doc(db,'artists',a.id));
+                        setMsg(`${a.name} et tout son contenu ont été bannis.`);
+                      }
+                    }} style={{ background:'#7a0000', color:'#fff', border:'none', borderRadius:8, fontSize:11, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>
+                      Bannir
+                    </button>
+                    <button onClick={() => { if (window.confirm(`Supprimer ${a.name} de la liste (sans toucher au contenu) ?`)) deleteDoc(doc(db,'artists',a.id)); }}
+                      style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Retirer</button>
+                  </>
+                ) : (
+                  <button onClick={async () => {
+                    await addDoc(collection(db,'signalements'), {
+                      type:'artiste', cible: a.email, nom: a.name,
+                      signalePar: auth.currentUser?.email, createdAt: new Date().toISOString(), statut:'nouveau'
+                    });
+                    setMsg(`${a.name} signalé au super admin pour étude.`);
+                  }} style={{ background:'#fff3e0', color:'#b07a00', border:'1px solid #f0b84a', borderRadius:8, fontSize:11, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>
+                    Signaler
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2926,11 +3252,9 @@ function AdminPage() {
   useEffect(() => {
     // Vérifier silencieusement si l'admin est déjà connecté au chargement
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (u && u.email === ADMIN_EMAIL) {
+      if (u && estAdmin(u.email)) {
         setUser(u); setView('dashboard');
       }
-      // Si c'est un autre utilisateur ou personne → on reste sur login
-      // SANS toucher à leur session — on ne déconnecte JAMAIS ici
     });
     return unsub;
   }, []);
@@ -2939,7 +3263,7 @@ function AdminPage() {
     setLoading(true); setMsg('');
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      if (cred.user.email !== ADMIN_EMAIL) {
+      if (!estAdmin(cred.user.email)) {
         await signOut(auth);
         setMsg('Accès refusé — compte non autorisé');
         setLoading(false);
@@ -3404,6 +3728,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff', overflowX:'auto' }}>
         <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>Artistes</button>
+        <button style={tabStyle(tab === 'soumissions')} onClick={() => setTab('soumissions')}>Soumissions</button>
         <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>Commerciaux</button>
         <button style={tabStyle(tab === 'responsables')} onClick={() => setTab('responsables')}>Responsables</button>
         <button style={tabStyle(tab === 'audience')} onClick={() => setTab('audience')}>
@@ -3428,10 +3753,10 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
         {tab === 'qrcodes' && (
           <>
-            {lockedQRs.length > 0 && (
+            {lockedQRs.length > 0 && estSuperAdmin(user?.email) && (
               <div style={{ background: '#f5f8ff', border: '1px solid #3a3000', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <p style={{ color: '#b07a00', fontSize: 13 }}>🔒 {lockedQRs.length} QR bloque(s)</p>
-                <button style={S.btnRed} onClick={async () => { for (const q of lockedQRs) await deleteDoc(doc(db, 'qrcodes', q.id)); setMsg(lockedQRs.length + ' supprimes !'); }}>🗑️ Supprimer les bloques</button>
+                <button style={S.btnRed} onClick={async () => { for (const q of lockedQRs) await deleteDoc(doc(db, 'qrcodes', q.id)); setMsg(lockedQRs.length + ' supprimes !'); }}>Supprimer les bloques</button>
               </div>
             )}
 
@@ -3528,7 +3853,13 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               <ArtistFolder key={artist} artist={artist} qrcodes={qs} activeCount={activeCount} lockedCount={lockedCount}
                 onEdit={openEdit} onQrModal={setQrModal} onBulk={(q: any) => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setShowBulk(true); }}
                 onToggle={(q: any) => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}
-                onDelete={(id: string) => setConfirmDelete(id)} />
+                onDelete={(id: string) => {
+                  if (estSuperAdmin(user?.email)) { setConfirmDelete(id); }
+                  else {
+                    addDoc(collection(db,'signalements'), { type:'qrcode', cible:id, signalePar: user?.email, createdAt:new Date().toISOString(), statut:'nouveau' });
+                    setMsg('QR signalé au super admin (les admins ne peuvent pas supprimer).');
+                  }
+                }} />
             ))
             }
           </>
@@ -3564,7 +3895,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
           </div>
         )}
 
-        {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} />}
+        {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} canDelete={estSuperAdmin(user?.email)} />}
+
+        {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} />}
 
         {tab === 'pubs' && (
           <div>
@@ -3904,7 +4237,7 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'pochettes'|'signatures'|'notifs'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'publier'|'mot'|'pochettes'|'signatures'|'notifs'>('stats');
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
 
@@ -4142,6 +4475,8 @@ function ArtistPage() {
       {/* TABS */}
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
+        <button style={tabStyle(dashTab==='publier')} onClick={() => setDashTab('publier')}>Publier</button>
+        <button style={tabStyle(dashTab==='mot')} onClick={() => setDashTab('mot')}>Mon mot</button>
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
         <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
@@ -4402,9 +4737,17 @@ function ArtistPage() {
         )}
 
         {/* ────────── ONGLET VENTES ────────── */}
+        {/* ── PUBLIER UN CONTENU ── */}
+        {dashTab === 'publier' && <PublierContenuTab user={user} soldeOscart={soldeOscartArtiste} artistName={stats.artistName || user?.displayName || ''} onRecharge={() => setRechargeModalArtiste(RECHARGES[1])} />}
+
+        {/* ── MON MOT ── */}
+        {dashTab === 'mot' && <MotArtisteTab user={user} artistName={stats.artistName || user?.displayName || ''} />}
+
         {/* ── POCHETTES PHYSIQUES ── */}
         {dashTab === 'pochettes' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
+            <CommandePochettes user={user} artistName={stats.artistName || user?.displayName || ''}
+              contenusValides={(stats.qrcodes || [])} />
             <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:16 }}>Mes pochettes physiques</h3>
             {(stats.qrcodes || []).filter((q:any) => q.totalScans > 0).length === 0 ? (
               <div style={{ ...S.card, textAlign:'center', padding:40 }}>
@@ -5358,8 +5701,524 @@ const TYPES_CONTENU = [
   { id:'video', label:'Vidéo' },
 ];
 
+// ─────────────────────────────────────────────
+// AUTO-PLAY MEDIA — lecture automatique au scroll (style TikTok/Facebook)
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PUBLIER UN CONTENU — soumission par l'artiste
+// ─────────────────────────────────────────────
+const PRIX_PUBLICATION = {
+  single: { oscart: 500, label: 'Single / Titre solo' },
+  album: { oscart: 1500, label: 'Album' },
+  video: { oscart: 500, label: 'Vidéo / Clip' },
+  serie: { oscart: 2500, label: 'Série / Film complet' },
+};
+
+function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
+  const [titre, setTitre] = useState('');
+  const [type, setType] = useState<'single'|'album'|'video'|'serie'>('single');
+  const [categorie, setCategorie] = useState('autres');
+  const [file, setFile] = useState<any>(null);
+  const [fileUrl, setFileUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [mesSubmissions, setMesSubmissions] = useState<any[]>([]);
+
+  const prix = PRIX_PUBLICATION[type].oscart;
+  const estVideo = type === 'video' || type === 'serie';
+  const cats = estVideo ? CATEGORIES_VIDEO : CATEGORIES_AUDIO;
+
+  useEffect(() => {
+    if (!user?.email) return;
+    const unsub = onSnapshot(
+      query(collection(db,'soumissions'), where('artistEmail','==',user.email), orderBy('createdAt','desc')),
+      snap => setMesSubmissions(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [user?.email]);
+
+  const uploadFichier = async (f: File) => {
+    setUploading(true); setMsg('');
+    try {
+      const formData = new FormData();
+      formData.append('file', f);
+      formData.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: formData });
+      const data = await res.json();
+      if (data.secure_url) { setFileUrl(data.secure_url); setFile(f); setMsg('Fichier prêt.'); }
+      else setMsg('Erreur upload. Réessayez.');
+    } catch { setMsg('Erreur upload. Réessayez.'); }
+    setUploading(false);
+  };
+
+  const soumettre = async () => {
+    if (!titre.trim()) { setMsg('Entrez le titre du contenu'); return; }
+    if (!fileUrl) { setMsg('Ajoutez votre fichier'); return; }
+    if (soldeOscart < prix) { setMsg(`Solde insuffisant. Il vous faut ${prix} Oscart. Rechargez votre portefeuille.`); return; }
+    try {
+      // Débiter les Oscart
+      const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!soldeSnap.empty) {
+        const docRef = soldeSnap.docs[0];
+        await updateDoc(doc(db,'coins_solde',docRef.id), { solde: (docRef.data().solde||0) - prix });
+      }
+      // Créer la soumission (statut en attente)
+      await addDoc(collection(db,'soumissions'), {
+        artistEmail: user.email, artistName, artistUid: user.uid,
+        titre: titre.trim(), type, categorie, fileUrl,
+        prixPaye: prix, statut: 'en_attente',
+        createdAt: new Date().toISOString(),
+      });
+      // Notifier l'admin
+      await addDoc(collection(db,'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'soumission',
+        text: `Nouvelle soumission de ${artistName} : "${titre.trim()}" (${PRIX_PUBLICATION[type].label}). À écouter et valider.`,
+        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
+      });
+      setMsg('✅ Soumis ! Votre contenu sera écouté et validé sous peu.');
+      setTitre(''); setFile(null); setFileUrl('');
+    } catch(e:any) { setMsg('Erreur : ' + e.message); }
+  };
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Publier un contenu</h3>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:16, lineHeight:1.6 }}>
+        Soumettez votre musique ou vidéo. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation, votre QR public et votre lien seront générés.
+      </p>
+
+      <div style={S.card}>
+        <label style={S.lbl}>Titre du contenu *</label>
+        <input style={S.inp} value={titre} onChange={e => setTitre(e.target.value)} placeholder="Ex: Mon nom — Titre (feat. ...)" />
+
+        <label style={S.lbl}>Type de publication *</label>
+        <select style={S.inp} value={type} onChange={e => { setType(e.target.value as any); setCategorie('autres'); }}>
+          {Object.entries(PRIX_PUBLICATION).map(([k,v]) => (
+            <option key={k} value={k}>{v.label} — {v.oscart} Oscart</option>
+          ))}
+        </select>
+
+        <label style={S.lbl}>Catégorie *</label>
+        <select style={S.inp} value={categorie} onChange={e => setCategorie(e.target.value)}>
+          {cats.filter((c:any) => c.id !== 'tous').map((c:any) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+
+        <label style={S.lbl}>Fichier ({estVideo ? 'vidéo' : 'audio'}) *</label>
+        <input type="file" accept={estVideo ? 'video/*' : 'audio/*'}
+          onChange={e => e.target.files?.[0] && uploadFichier(e.target.files[0])}
+          style={{ ...S.inp, padding:8 }} />
+        {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
+        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté</p>}
+
+        {/* Coût */}
+        <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', margin:'14px 0' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ color:'#5a7090', fontSize:13 }}>Coût de publication</span>
+            <span style={{ color:'#1a6bff', fontWeight:800, fontSize:16 }}>{prix} Oscart</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6 }}>
+            <span style={{ color:'#8098b8', fontSize:11 }}>Votre solde</span>
+            <span style={{ color: soldeOscart >= prix ? '#00a040' : '#f04a6a', fontWeight:700, fontSize:13 }}>{soldeOscart} Oscart</span>
+          </div>
+        </div>
+
+        {msg && <p style={{ color: msg.startsWith('✅')||msg.includes('prêt')||msg.includes('ajouté') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+
+        {soldeOscart < prix ? (
+          <button onClick={onRecharge} style={{ ...S.btn, width:'100%', padding:14, background:'#ffd700', color:'#1a2340' }}>
+            Recharger mes Oscart ({prix} requis)
+          </button>
+        ) : (
+          <button onClick={soumettre} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14 }}>
+            {uploading ? 'Patientez...' : `Soumettre (${prix} Oscart)`}
+          </button>
+        )}
+      </div>
+
+      {/* Mes soumissions */}
+      {mesSubmissions.length > 0 && (
+        <div style={{ marginTop:20 }}>
+          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12 }}>Mes soumissions</h4>
+          {mesSubmissions.map(s => (
+            <div key={s.id} style={{ ...S.card, marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{s.titre}</p>
+                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{PRIX_PUBLICATION[s.type as keyof typeof PRIX_PUBLICATION]?.label || s.type}</p>
+              </div>
+              <span style={{
+                borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700,
+                background: s.statut==='valide'?'#eaffea':s.statut==='refuse'?'#ffecec':'#fff8e6',
+                color: s.statut==='valide'?'#00a040':s.statut==='refuse'?'#d32f2f':'#b07a00',
+              }}>
+                {s.statut==='valide'?'Validé':s.statut==='refuse'?'Refusé':'En attente'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// LE MOT DE L'ARTISTE — message professionnel (présentation, promo, événement)
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// COMMANDE DE POCHETTES PHYSIQUES
+// ─────────────────────────────────────────────
+const PRIX_CREA_POCHETTE = 5000; // conception graphique par notre équipe
+
+function CommandePochettes({ user, artistName, contenusValides }: any) {
+  const [contenuId, setContenuId] = useState('');
+  const [nbPochettes, setNbPochettes] = useState('100');
+  const [nbScans, setNbScans] = useState('1');
+  const [creaParNous, setCreaParNous] = useState(false);
+  const [qrPosition, setQrPosition] = useState<'bas-gauche'|'bas-droite'>('bas-droite');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [infos, setInfos] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [mesCommandes, setMesCommandes] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    const unsub = onSnapshot(
+      query(collection(db,'commandes_pochettes'), where('artistEmail','==',user.email), orderBy('createdAt','desc')),
+      snap => setMesCommandes(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [user?.email]);
+
+  const uploadPhoto = async (f: File) => {
+    setUploading(true); setMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/image/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) { setPhotoUrl(data.secure_url); setMsg('Photo ajoutée.'); }
+      else setMsg('Erreur upload.');
+    } catch { setMsg('Erreur upload.'); }
+    setUploading(false);
+  };
+
+  const commander = async () => {
+    if (!contenuId) { setMsg('Choisissez le contenu concerné'); return; }
+    const nbP = parseInt(nbPochettes) || 0;
+    const nbS = parseInt(nbScans) || 1;
+    if (nbP < 1) { setMsg('Indiquez le nombre de pochettes'); return; }
+    if (creaParNous && !photoUrl) { setMsg('Ajoutez une photo pour la conception'); return; }
+    try {
+      const contenu = contenusValides.find((c:any) => c.id === contenuId);
+      await addDoc(collection(db,'commandes_pochettes'), {
+        artistEmail: user.email, artistName,
+        contenuId, contenuTitre: contenu?.label || contenu?.titre || '',
+        nbPochettes: nbP, nbScans: nbS,
+        qrPosition, creaParNous, coutCrea: creaParNous ? PRIX_CREA_POCHETTE : 0,
+        photoUrl: creaParNous ? photoUrl : '',
+        infos: infos.trim(),
+        statut: 'nouvelle',
+        createdAt: new Date().toISOString(),
+      });
+      await addDoc(collection(db,'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'commande_pochette',
+        text: `${artistName} commande ${nbP} pochettes${creaParNous ? ' + conception (5000 F)' : ''}.`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      setMsg('✅ Commande envoyée ! Nous vous recontactons pour le paiement et la livraison.');
+      setNbPochettes('100'); setNbScans('1'); setCreaParNous(false); setPhotoUrl(''); setInfos('');
+    } catch(e:any) { setMsg('Erreur : ' + e.message); }
+  };
+
+  return (
+    <div style={{ ...S.card, marginBottom:20, border:'2px solid #1a6bff' }}>
+      <h4 style={{ fontWeight:800, fontSize:16, color:'#1a6bff', margin:'0 0 6px' }}>Commander des pochettes physiques</h4>
+      <p style={{ color:'#8098b8', fontSize:12, marginBottom:14, lineHeight:1.6 }}>
+        Vos pochettes sont au format carré, avec votre QR code en bas et les informations techniques au dos. Vos fans scannent et téléchargent directement votre musique.
+      </p>
+
+      {/* Exemple visuel recto/verso */}
+      <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+        <div style={{ flex:1, aspectRatio:'1', background:'linear-gradient(135deg,#0a1535,#1e3a6e)', borderRadius:10, position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ color:'rgba(255,255,255,0.4)', fontSize:10, position:'absolute', top:8, left:8 }}>RECTO</span>
+          <span style={{ color:'rgba(255,255,255,0.5)', fontSize:11, textAlign:'center', padding:8 }}>Visuel + titre</span>
+          <div style={{ position:'absolute', bottom:8, right:8, width:28, height:28, background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#000' }}>QR</div>
+        </div>
+        <div style={{ flex:1, aspectRatio:'1', background:'#f5f8ff', border:'1px dashed #c8d8ef', borderRadius:10, position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ color:'#8098b8', fontSize:10, position:'absolute', top:8, left:8 }}>VERSO</span>
+          <span style={{ color:'#8098b8', fontSize:10, textAlign:'center', padding:8, lineHeight:1.4 }}>Infos techniques :<br/>intervenants, crédits, contact</span>
+        </div>
+      </div>
+
+      <label style={S.lbl}>Contenu concerné *</label>
+      <select style={S.inp} value={contenuId} onChange={e => setContenuId(e.target.value)}>
+        <option value="">— Choisir —</option>
+        {contenusValides.map((c:any) => <option key={c.id} value={c.id}>{c.label || c.titre}</option>)}
+      </select>
+
+      <div style={{ display:'flex', gap:10 }}>
+        <div style={{ flex:1 }}>
+          <label style={S.lbl}>Nombre de pochettes *</label>
+          <input style={S.inp} type="number" min="1" value={nbPochettes} onChange={e => setNbPochettes(e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={S.lbl}>Scans par pochette *</label>
+          <input style={S.inp} type="number" min="1" value={nbScans} onChange={e => setNbScans(e.target.value)} />
+        </div>
+      </div>
+
+      <label style={S.lbl}>Position du QR code</label>
+      <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+        {[['bas-droite','En bas à droite'],['bas-gauche','En bas à gauche']].map(([k,l]) => (
+          <button key={k} onClick={() => setQrPosition(k as any)}
+            style={{ flex:1, padding:10, borderRadius:8, border:`2px solid ${qrPosition===k?'#1a6bff':'#dce6f7'}`, background:qrPosition===k?'#eaf1ff':'#fff', color:qrPosition===k?'#1a6bff':'#5a7090', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Option conception */}
+      <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+        <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer' }}>
+          <input type="checkbox" checked={creaParNous} onChange={e => setCreaParNous(e.target.checked)} style={{ marginTop:3 }} />
+          <span>
+            <span style={{ fontWeight:700, fontSize:13, color:'#1a2340' }}>Concevez ma pochette (+{PRIX_CREA_POCHETTE.toLocaleString()} F)</span>
+            <span style={{ display:'block', color:'#b07a00', fontSize:11, marginTop:2 }}>Notre équipe crée votre pochette. Envoyez une photo et vos informations.</span>
+          </span>
+        </label>
+      </div>
+
+      {creaParNous && (
+        <>
+          <label style={S.lbl}>Votre photo *</label>
+          <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} style={{ ...S.inp, padding:8 }} />
+          {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload...</p>}
+          {photoUrl && <img src={photoUrl} style={{ width:60, height:60, borderRadius:8, objectFit:'cover', margin:'4px 0' }} alt="" />}
+          <label style={S.lbl}>Informations pour la pochette</label>
+          <textarea style={{ ...S.inp, minHeight:70, resize:'vertical', fontFamily:'inherit' }} value={infos}
+            onChange={e => setInfos(e.target.value)} placeholder="Titre, nom d'artiste, intervenants, crédits, contact à mettre au dos..." />
+        </>
+      )}
+
+      {msg && <p style={{ color: msg.startsWith('✅')||msg.includes('ajoutée') ? '#00a040':'#f04a6a', fontSize:12, margin:'8px 0' }}>{msg}</p>}
+
+      <button onClick={commander} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:6 }}>
+        {uploading ? 'Patientez...' : 'Commander mes pochettes'}
+      </button>
+
+      {/* Mes commandes */}
+      {mesCommandes.length > 0 && (
+        <div style={{ marginTop:18 }}>
+          <p style={{ fontWeight:700, fontSize:13, marginBottom:10 }}>Mes commandes</p>
+          {mesCommandes.map(c => (
+            <div key={c.id} style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 12px', marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <p style={{ fontWeight:700, fontSize:13, margin:0 }}>{c.contenuTitre}</p>
+                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.nbPochettes} pochettes · {c.nbScans} scan(s)/pièce{c.creaParNous ? ' · créa incluse' : ''}</p>
+                </div>
+                <span style={{ borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700,
+                  background: c.statut==='livree'?'#eaffea':c.statut==='en_cours'?'#eaf1ff':'#fff8e6',
+                  color: c.statut==='livree'?'#00a040':c.statut==='en_cours'?'#1a6bff':'#b07a00' }}>
+                  {c.statut==='livree'?'Livrée':c.statut==='en_cours'?'En cours':'Reçue'}
+                </span>
+              </div>
+              {/* Créa livrée en PNG */}
+              {c.creaUrl && (
+                <a href={c.creaUrl} target="_blank" rel="noopener noreferrer" download
+                  style={{ display:'block', textAlign:'center', marginTop:8, padding:8, borderRadius:8, background:'#00a040', color:'#fff', textDecoration:'none', fontSize:12, fontWeight:700 }}>
+                  Télécharger ma pochette (PNG)
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MotArtisteTab({ user, artistName }: any) {
+  const [texte, setTexte] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [mesMots, setMesMots] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    const unsub = onSnapshot(
+      query(collection(db,'mots_artiste'), where('artistEmail','==',user.email), orderBy('createdAt','desc')),
+      snap => setMesMots(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, [user?.email]);
+
+  const uploadVideo = async (f: File) => {
+    setUploading(true); setMsg('');
+    try {
+      const formData = new FormData();
+      formData.append('file', f);
+      formData.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/video/upload', { method:'POST', body: formData });
+      const data = await res.json();
+      if (data.secure_url) { setVideoUrl(data.secure_url); setMsg('Vidéo prête.'); }
+      else setMsg('Erreur upload.');
+    } catch { setMsg('Erreur upload.'); }
+    setUploading(false);
+  };
+
+  const publier = async () => {
+    if (!texte.trim() && !videoUrl) { setMsg('Écrivez un message ou ajoutez une vidéo'); return; }
+    try {
+      await addDoc(collection(db,'mots_artiste'), {
+        artistEmail: user.email, artistName,
+        texte: texte.trim(), videoUrl,
+        statut: 'en_attente',
+        createdAt: new Date().toISOString(),
+      });
+      await addDoc(collection(db,'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'mot_artiste',
+        text: `${artistName} a soumis un mot à valider.`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      setMsg('✅ Soumis ! Votre mot sera validé puis publié.');
+      setTexte(''); setVideoUrl('');
+    } catch(e:any) { setMsg('Erreur : ' + e.message); }
+  };
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Vous avez quelque chose à dire</h3>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:8, lineHeight:1.6 }}>
+        Partagez un message professionnel avec votre communauté : présentation, invitation à un événement, promotion, annonce.
+      </p>
+      <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'10px 14px', marginBottom:16 }}>
+        <p style={{ color:'#b07a00', fontSize:11, margin:0, lineHeight:1.5 }}>
+          Uniquement professionnel : présentation, événement, promotion, description. Tout contenu hors sujet sera refusé.
+        </p>
+      </div>
+
+      <div style={S.card}>
+        <label style={S.lbl}>Votre message</label>
+        <textarea style={{ ...S.inp, minHeight:90, resize:'vertical', fontFamily:'inherit' }} value={texte}
+          onChange={e => setTexte(e.target.value)} placeholder="Ex: Bonjour à tous ! Je serai en concert le... / Mon nouveau single est disponible..." />
+
+        <label style={S.lbl}>Vidéo (optionnel)</label>
+        <input type="file" accept="video/*" onChange={e => e.target.files?.[0] && uploadVideo(e.target.files[0])} style={{ ...S.inp, padding:8 }} />
+        {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
+        {videoUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Vidéo ajoutée</p>}
+
+        {msg && <p style={{ color: msg.startsWith('✅')||msg.includes('prête') ? '#00a040':'#f04a6a', fontSize:12, margin:'10px 0' }}>{msg}</p>}
+
+        <button onClick={publier} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:8 }}>
+          {uploading ? 'Patientez...' : 'Soumettre mon mot'}
+        </button>
+      </div>
+
+      {mesMots.length > 0 && (
+        <div style={{ marginTop:20 }}>
+          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12 }}>Mes messages</h4>
+          {mesMots.map(m => (
+            <div key={m.id} style={{ ...S.card, marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
+                <p style={{ fontSize:13, margin:0, flex:1, color:'#1a2340' }}>{m.texte || '(vidéo)'}</p>
+                <span style={{ borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
+                  background: m.statut==='valide'?'#eaffea':m.statut==='refuse'?'#ffecec':'#fff8e6',
+                  color: m.statut==='valide'?'#00a040':m.statut==='refuse'?'#d32f2f':'#b07a00' }}>
+                  {m.statut==='valide'?'Publié':m.statut==='refuse'?'Refusé':'En attente'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any) {
+  const mediaRef = useRef<any>(null);
+  const containerRef = useRef<any>(null);
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    const media = mediaRef.current;
+    if (!el || !media) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+            media.play().then(() => setPlaying(true)).catch(() => {});
+          } else {
+            media.pause();
+            setPlaying(false);
+          }
+        });
+      },
+      { threshold: [0, 0.6, 1] }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const toggleMute = (e: any) => {
+    e.preventDefault(); e.stopPropagation();
+    if (mediaRef.current) {
+      mediaRef.current.muted = !muted;
+      setMuted(!muted);
+    }
+  };
+
+  return (
+    <div ref={containerRef} style={{ position:'relative', width:'100%', background:'#0a0e1a' }}>
+      {isVideo ? (
+        <video ref={mediaRef} src={fileUrl} poster={coverUrl} muted={muted} loop playsInline
+          style={{ width:'100%', height:280, objectFit:'cover', display:'block' }} />
+      ) : (
+        <>
+          {coverUrl ? (
+            <img src={coverUrl} alt={label} style={{ width:'100%', height:280, objectFit:'cover', objectPosition:'top', display:'block' }} />
+          ) : (
+            <div style={{ width:'100%', height:280, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            </div>
+          )}
+          <audio ref={mediaRef} src={fileUrl} muted={muted} loop />
+        </>
+      )}
+
+      {/* Indicateur lecture + bouton son */}
+      <div style={{ position:'absolute', bottom:10, right:10, display:'flex', gap:8 }}>
+        {playing && (
+          <button onClick={toggleMute}
+            style={{ width:38, height:38, borderRadius:99, border:'none', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            {muted ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Badge lecture auto */}
+      {playing && (
+        <div style={{ position:'absolute', top:10, left:10, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(8px)', borderRadius:99, padding:'4px 10px', display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:6, height:6, borderRadius:99, background:'#00e676', display:'inline-block' }} />
+          <span style={{ color:'#fff', fontSize:10, fontWeight:600 }}>En lecture</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DecouvrirPage() {
   const [contenus, setContenus] = useState<any[]>([]);
+  const [motsArtistes, setMotsArtistes] = useState<any[]>([]);
   const [typeFiltre, setTypeFiltre] = useState('tous');
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
@@ -5373,7 +6232,11 @@ function DecouvrirPage() {
         setLoading(false);
       }
     );
-    return unsub;
+    const unsubMots = onSnapshot(
+      query(collection(db, 'mots_artiste'), orderBy('createdAt','desc')),
+      snap => setMotsArtistes(snap.docs.map(d => ({id:d.id,...d.data()})).filter((m:any) => m.statut === 'valide'))
+    );
+    return () => { unsub(); unsubMots(); };
   }, []);
 
   // Réinitialiser catégorie quand on change de type
@@ -5421,6 +6284,24 @@ function DecouvrirPage() {
         ))}
       </div>
 
+      {/* L'ARTISTE VOUS DIT QUELQUE CHOSE */}
+      {motsArtistes.length > 0 && (
+        <div style={{ padding:'0 16px 8px' }}>
+          <p style={{ color:'#ffd700', fontWeight:700, fontSize:13, marginBottom:10 }}>L'artiste vous dit quelque chose</p>
+          <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:6 }}>
+            {motsArtistes.map(m => (
+              <div key={m.id} style={{ minWidth:240, maxWidth:240, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:14, flexShrink:0 }}>
+                <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 6px' }}>{m.artistName}</p>
+                {m.videoUrl ? (
+                  <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:8, marginBottom:8, maxHeight:160 }} />
+                ) : null}
+                {m.texte && <p style={{ color:'#dde4f5', fontSize:12, lineHeight:1.5, margin:0 }}>{m.texte}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* CONTENUS */}
       <div style={{ padding:'0 16px' }}>
         {loading ? (
@@ -5431,11 +6312,17 @@ function DecouvrirPage() {
             <p style={{ color:'#4a5878', fontSize:14 }}>Aucun contenu publié pour l'instant</p>
             <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Les artistes peuvent publier depuis leur dashboard</p>
           </div>
-        ) : contenusFiltres.map(c => (
+        ) : contenusFiltres.map(c => {
+          const mediaFile = c.files?.[0];
+          const isVideo = mediaFile?.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i);
+          const fileUrl = mediaFile?.url || '';
+          return (
           <div key={c.id} style={{ marginBottom:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, overflow:'hidden' }}>
-            {/* Pochette */}
+            {/* Média avec lecture automatique */}
             <a href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
-              {c.coverUrl ? (
+              {fileUrl ? (
+                <AutoPlayMedia fileUrl={fileUrl} isVideo={isVideo} coverUrl={c.coverUrl} label={c.label} publicLinkId={c.publicLinkId} />
+              ) : c.coverUrl ? (
                 <img src={c.coverUrl} alt={c.label} style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'top', display:'block' }} />
               ) : (
                 <div style={{ width:'100%', height:220, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -5462,7 +6349,8 @@ function DecouvrirPage() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* BARRE NAVIGATION */}
@@ -5492,20 +6380,28 @@ function DecouvrirPage() {
 // ─────────────────────────────────────────────
 function NotificationsPage() {
   const [user, setUser] = useState<any>(null);
-  const [notifs, setNotifs] = useState<any[]>([]);
+  const [notifsPerso, setNotifsPerso] = useState<any[]>([]);
+  const [notifsGen, setNotifsGen] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vue, setVue] = useState<'perso'|'generale'>('perso');
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
       if (!u) { window.location.href = '/ziko'; return; }
       setUser(u);
-      const unsub = onSnapshot(
+      const unsubP = onSnapshot(
         query(collection(db,'notifications'), where('to','==',u.email), orderBy('createdAt','desc')),
-        snap => { setNotifs(snap.docs.map(d => ({id:d.id,...d.data()}))); setLoading(false); }
+        snap => { setNotifsPerso(snap.docs.map(d => ({id:d.id,...d.data()}))); setLoading(false); }
       );
-      return unsub;
+      const unsubG = onSnapshot(
+        query(collection(db,'notifications'), where('to','==','all'), orderBy('createdAt','desc')),
+        snap => { setNotifsGen(snap.docs.map(d => ({id:d.id,...d.data()}))); setLoading(false); }
+      );
+      return () => { unsubP(); unsubG(); };
     });
   }, []);
+
+  const notifs = vue === 'perso' ? notifsPerso : notifsGen;
 
   const markRead = async (id: string) => {
     await updateDoc(doc(db,'notifications',id), { lu: true });
@@ -5516,6 +6412,7 @@ function NotificationsPage() {
     if (type === 'commentaire') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
     if (type === 'kiffement') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffd700" stroke="#ffd700" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
     if (type === 'signature') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#7c3aed" stroke="#7c3aed" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>;
+    if (type === 'generale' || type === 'mot_valide' || type === 'mot_artiste') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
     return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8098b8" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>;
   };
 
@@ -5524,6 +6421,17 @@ function NotificationsPage() {
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
         <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
+      </div>
+
+      {/* Onglets Perso / Générale */}
+      <div style={{ display:'flex', gap:8, padding:'12px 16px 4px', maxWidth:500, margin:'0 auto' }}>
+        {[['perso','Pour moi', notifsPerso.filter(n=>!n.lu).length],['generale','Général', notifsGen.length]].map(([k,l,n]) => (
+          <button key={k as string} onClick={() => setVue(k as any)}
+            style={{ flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer', fontSize:13, fontWeight:700,
+              background: vue===k ? '#1a6bff' : 'rgba(255,255,255,0.05)', color: vue===k ? '#fff' : '#8098b8' }}>
+            {l as string}{(n as number) > 0 ? ` (${n})` : ''}
+          </button>
+        ))}
       </div>
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'16px' }}>
@@ -5820,12 +6728,19 @@ function ResponsablePage() {
     setLoading(false);
   };
 
-  // Calcul commissions responsable = 1/10 de chaque commercial
-  const commInscriptions = Math.round(allArtistes.length * 1000 * 0.1);
-  const commPochettes = Math.round(allArtistes.reduce((s,a) => s + ((a.pochettes||0) * 100 * 0.1), 0));
-  const commDL = Math.round(allArtistes.reduce((s,a) => s + ((a.downloads||0) * (a.prixDL||1000) * 0.01), 0));
-  const commPub = Math.round(allMarchands.reduce((s,m) => s + ((m.cout||0) * 0.01), 0));
-  const totalCommissions = commInscriptions + commPochettes + commDL + commPub;
+  // Commissions responsable = 10% de ce que gagnent ses commerciaux
+  // Commerciaux gagnent : 10 000 F/artiste actif + résidu 10% + 10% marchands
+  const artistesActifs = allArtistes.filter(a => {
+    const vues = a.buzz || a.vues || 0;
+    return vues >= 1000 || (a.downloads||0) >= 50 || (a.pochettes||0) >= 50;
+  });
+  const commArtistes = Math.round(artistesActifs.length * 10000 * 0.10);
+  const residu = Math.round(allArtistes.reduce((s,a) => {
+    const part = (a.downloads||0)*(a.prixDL||500)*0.30 + (a.pochettes||0)*150 + (a.cadeaux||0)*10*0.30;
+    return s + part * 0.10 * 0.10;
+  }, 0));
+  const commPub = Math.round(allMarchands.reduce((s,m) => s + ((m.cout||0) * 0.10 * 0.10), 0));
+  const totalCommissions = commArtistes + residu + commPub;
 
   if (view === 'login') return (
     <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
@@ -5983,10 +6898,10 @@ function ResponsablePage() {
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Mes commissions</h2>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
               {[
-                { label:'Inscriptions artistes', val: commInscriptions.toLocaleString()+' F', detail: allArtistes.length+' artistes × 100 F', color:'#1a6bff' },
-                { label:'Pochettes dupliquées', val: commPochettes.toLocaleString()+' F', detail: '× 10 F/pochette', color:'#1a6bff' },
-                { label:'Téléchargements', val: commDL.toLocaleString()+' F', detail: '1% par DL', color:'#b07a00' },
-                { label:'Campagnes pub', val: commPub.toLocaleString()+' F', detail: '1% par campagne', color:'#b07a00' },
+                { label:'Sur artistes actifs', val: commArtistes.toLocaleString()+' F', detail: artistesActifs.length+' actifs (10% des commerciaux)', color:'#1a6bff' },
+                { label:'Prime résiduelle', val: residu.toLocaleString()+' F', detail: '10% des résidus commerciaux', color:'#00a040' },
+                { label:'Sur marchands', val: commPub.toLocaleString()+' F', detail: '10% des commissions pub', color:'#b07a00' },
+                { label:'Total équipe', val: allArtistes.length.toString(), detail: 'artistes recrutés', color:'#7c3aed' },
               ].map((s,i) => (
                 <div key={i} style={S.card}>
                   <p style={{ color:s.color, fontWeight:900, fontSize:20, margin:'0 0 4px' }}>{s.val}</p>
@@ -6049,7 +6964,6 @@ function ResponsablePage() {
                     {c.methode && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Prospection :</strong> {c.methode}</p>}
                     {c.cible && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Cibles :</strong> {c.cible}</p>}
                     {c.objectif && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 4px' }}><strong>Objectif/mois :</strong> {c.objectif} créateurs</p>}
-                    {c.scenario && <p style={{ fontSize:11, color:'#1a6bff', margin:0, fontWeight:700 }}>Scénario choisi : {c.scenario}</p>}
                   </div>
                 )}
                 <div style={{ display:'flex', gap:8 }}>
@@ -6140,6 +7054,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
 
   const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [typeContenu, setTypeContenu] = useState('');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -6148,7 +7063,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
   const tarif = TARIFS.find(t => t.type === typeContenu);
 
   const submit = async () => {
-    if (!nom || !email || !typeContenu) { setMsg('Tous les champs sont requis'); return; }
+    if (!nom || !email || !whatsapp || !typeContenu) { setMsg('Tous les champs sont requis (dont le WhatsApp)'); return; }
     setLoading(true); setMsg('');
     try {
       // Vérifier si email déjà enregistré
@@ -6159,6 +7074,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
       const artistRef = await addDoc(collection(db, 'artists'), {
         name: nom.trim(),
         email: email.trim().toLowerCase(),
+        whatsapp: whatsapp.trim(),
         commercialEmail,
         typeContenu,
         prix: tarif?.prix || 0,
@@ -6180,7 +7096,7 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
       });
 
       setDone({ nom: nom.trim(), email: email.trim(), tarif });
-      setNom(''); setEmail(''); setTypeContenu('');
+      setNom(''); setEmail(''); setWhatsapp(''); setTypeContenu('');
     } catch(e:any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
@@ -6210,6 +7126,9 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
 
           <label style={S.lbl}>Email de l'artiste *</label>
           <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="artiste@email.com" />
+
+          <label style={S.lbl}>Numéro WhatsApp de l'artiste *</label>
+          <input style={S.inp} type="tel" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="Ex: +225 07 00 00 00 00" />
 
           <label style={S.lbl}>Type de contenu *</label>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
@@ -6268,7 +7187,6 @@ function CommercialPage() {
   const [inscMethode, setInscMethode] = useState('');
   const [inscCible, setInscCible] = useState('');
   const [inscObjectif, setInscObjectif] = useState('');
-  const [inscScenario, setInscScenario] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -6314,12 +7232,26 @@ function CommercialPage() {
     setLoading(false);
   };
 
-  // Calcul commissions
-  const commInscriptions = artistes.length * 1000;
-  const commPochettes = artistes.reduce((s,a) => s + ((a.pochettes||0) * 100), 0);
-  const commDL = artistes.reduce((s,a) => s + ((a.downloads||0) * (a.prixDL||1000) * 0.1), 0);
-  const commPub = marchands.reduce((s,m) => s + ((m.cout||0) * 0.1), 0);
-  const totalCommissions = commInscriptions + commPochettes + commDL + commPub;
+  // Calcul commissions — nouvelle structure
+  // 1. Artistes actifs : 10 000 F par artiste actif
+  // 2. Résidu mensuel : 10% des revenus générés par les artistes
+  // 3. Marchands : 10% du CA publicité
+  const artistesActifs = artistes.filter(a => {
+    const vues = a.buzz || a.vues || 0;
+    const dl = a.downloads || 0;
+    const poch = a.pochettes || 0;
+    return vues >= 1000 || dl >= 50 || poch >= 50; // critère artiste actif
+  });
+  const commArtistes = artistesActifs.length * 10000;
+  // Résidu : 10% de la part plateforme (téléchargements 30%, pochettes 150F, cadeaux 30%)
+  const residu = Math.round(artistes.reduce((s,a) => {
+    const partDL = (a.downloads||0) * (a.prixDL||500) * 0.30;
+    const partPoch = (a.pochettes||0) * 150;
+    const partCad = (a.cadeaux||0) * 10 * 0.30;
+    return s + (partDL + partPoch + partCad) * 0.10;
+  }, 0));
+  const commPub = Math.round(marchands.reduce((s,m) => s + ((m.cout||0) * 0.10), 0));
+  const totalCommissions = commArtistes + residu + commPub;
 
   if (view === 'login') return (
     <div style={{ minHeight:'100vh', background:'#f0f4fb', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
@@ -6399,38 +7331,48 @@ function CommercialPage() {
                 </>
               )}
 
-              {/* ÉTAPE 3 — Scénarios de rémunération */}
+              {/* ÉTAPE 3 — Grille de rémunération */}
               {inscStep === 3 && (
                 <>
-                  <p style={{ fontSize:13, color:'#5a7090', marginBottom:14, lineHeight:1.6 }}>
-                    Vous êtes rémunéré uniquement sur les résultats — aucun risque, vous gagnez sur l'argent généré. Voici vos revenus potentiels en fin de mois :
+                  <p style={{ fontSize:13, color:'#5a7090', marginBottom:16, lineHeight:1.6 }}>
+                    Vous êtes rémunéré uniquement sur les résultats — aucun risque, vous gagnez sur l'activité réelle. Voici comment :
                   </p>
-                  {[
-                    { n:10, total:120000, det:'10 artistes + 10 marchands actifs' },
-                    { n:30, total:360000, det:'30 artistes + 30 marchands actifs' },
-                    { n:50, total:600000, det:'50 artistes + 50 marchands actifs' },
-                  ].map(s => (
-                    <button key={s.n} onClick={() => setInscScenario(String(s.n))}
-                      style={{ width:'100%', padding:'14px 16px', borderRadius:12, border:`2px solid ${inscScenario===String(s.n)?'#1a6bff':'#dce6f7'}`, background:inscScenario===String(s.n)?'#eaf1ff':'#fff', cursor:'pointer', textAlign:'left', marginBottom:10 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <div>
-                          <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', margin:'0 0 2px' }}>Scénario {s.n}</p>
-                          <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{s.det}</p>
-                        </div>
-                        <p style={{ fontWeight:900, fontSize:18, color:'#00a040', margin:0 }}>{s.total.toLocaleString()} F</p>
-                      </div>
-                    </button>
-                  ))}
-                  <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
-                    <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.7, margin:0 }}>
-                      Détail des commissions : 50 F par pochette dupliquée · 10% sur les téléchargements · 10% sur les kiffements · 20% sur les publications (single, album, film, série) · 10% sur le CA des marchands. Bonus mensuel possible si objectif atteint.
+
+                  {/* SOURCE 1 — ARTISTES */}
+                  <div style={{ border:'2px solid #1a6bff', borderRadius:12, padding:'14px 16px', marginBottom:12, background:'#f5f9ff' }}>
+                    <p style={{ fontWeight:800, fontSize:14, color:'#1a6bff', margin:'0 0 8px' }}>1. Obtention d'artistes</p>
+                    <p style={{ fontSize:13, color:'#1a2340', margin:'0 0 6px', fontWeight:700 }}>
+                      10 000 F par artiste actif
+                    </p>
+                    <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 8px', lineHeight:1.6 }}>
+                      Un artiste actif partage son contenu, atteint des vues, fait des téléchargements, vend des pochettes et reçoit des cadeaux.
+                    </p>
+                    <p style={{ fontSize:12, color:'#00a040', margin:0, fontWeight:700 }}>
+                      + Résidu mensuel : 10% des revenus générés par vos artistes, chaque mois tant qu'ils restent actifs.
                     </p>
                   </div>
+
+                  {/* SOURCE 2 — MARCHANDS */}
+                  <div style={{ border:'2px solid #ffd700', borderRadius:12, padding:'14px 16px', marginBottom:14, background:'#fffdf5' }}>
+                    <p style={{ fontWeight:800, fontSize:14, color:'#b07a00', margin:'0 0 8px' }}>2. Obtention de marchands</p>
+                    <p style={{ fontSize:13, color:'#1a2340', margin:'0 0 6px', fontWeight:700 }}>
+                      10% sur chaque publicité payée
+                    </p>
+                    <p style={{ fontSize:11, color:'#5a7090', margin:0, lineHeight:1.6 }}>
+                      Vous touchez 10% du montant de chaque publicité achetée par les marchands que vous recrutez.
+                    </p>
+                  </div>
+
+                  <div style={{ background:'#eaf1ff', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+                    <p style={{ color:'#1a6bff', fontSize:12, lineHeight:1.7, margin:0, fontWeight:700 }}>
+                      Exemple : 10 artistes actifs (100 000 F) + 1 000 000 F de publicités marchands (100 000 F) = 200 000 F le premier mois, puis les résidus chaque mois suivant.
+                    </p>
+                  </div>
+
                   {msg && <p style={{ color: msg.startsWith('✅')?'#00a040':'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
                   <div style={{ display:'flex', gap:8 }}>
                     <button style={{ ...S.btn2, flex:1, padding:14 }} onClick={() => setInscStep(2)}>Retour</button>
                     <button style={{ ...S.btn, flex:2, padding:14 }} disabled={loading} onClick={async () => {
-                      if (!inscScenario) { setMsg('Choisissez un scénario'); return; }
                       setLoading(true); setMsg('');
                       try {
                         let uid = '';
@@ -6439,12 +7381,10 @@ function CommercialPage() {
                           uid = cred.user.uid;
                         } catch(e:any) {
                           if (e.code === 'auth/email-already-in-use') {
-                            // Compte existe déjà (ex: mélomane) → se connecter avec le mot de passe saisi
                             const cred = await signInWithEmailAndPassword(auth, inscEmail.trim().toLowerCase(), inscPass);
                             uid = cred.user.uid;
                           } else throw e;
                         }
-                        // Vérifier qu'il n'est pas déjà commercial
                         const existing = await getDocs(query(collection(db,'commerciaux'), where('email','==', inscEmail.trim().toLowerCase())));
                         if (!existing.empty) {
                           setMsg('Vous avez déjà une candidature commerciale.');
@@ -6453,7 +7393,7 @@ function CommercialPage() {
                         await addDoc(collection(db,'commerciaux'), {
                           uid, name: inscNom, email: inscEmail.trim().toLowerCase(), telephone: inscTel,
                           commune: inscCommune,
-                          methode: inscMethode, cible: inscCible, objectif: inscObjectif, scenario: inscScenario,
+                          methode: inscMethode, cible: inscCible, objectif: inscObjectif,
                           status: 'en_attente', createdAt: new Date().toISOString(),
                         });
                         setMsg('✅ Inscription envoyée ! Votre compte sera validé par votre responsable.');
@@ -6539,10 +7479,10 @@ function CommercialPage() {
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Mes commissions</h2>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
               {[
-                { label:'Inscriptions artistes', val: commInscriptions.toLocaleString()+' F', detail: artistes.length+' × 1 000 F', color:'#1a6bff' },
-                { label:'Pochettes dupliquées', val: commPochettes.toLocaleString()+' F', detail: '× 100 F/pochette', color:'#1a6bff' },
-                { label:'Téléchargements', val: commDL.toLocaleString()+' F', detail: '10% par DL', color:'#b07a00' },
-                { label:'Campagnes pub', val: commPub.toLocaleString()+' F', detail: '10% par campagne', color:'#b07a00' },
+                { label:'Artistes actifs', val: commArtistes.toLocaleString()+' F', detail: artistesActifs.length+' × 10 000 F', color:'#1a6bff' },
+                { label:'Prime résiduelle', val: residu.toLocaleString()+' F', detail: '10% des revenus / mois', color:'#00a040' },
+                { label:'Marchands (pub)', val: commPub.toLocaleString()+' F', detail: '10% du CA publicité', color:'#b07a00' },
+                { label:'Artistes recrutés', val: artistes.length.toString(), detail: artistesActifs.length+' actifs', color:'#7c3aed' },
               ].map((s,i) => (
                 <div key={i} style={S.card}>
                   <p style={{ color:s.color, fontWeight:900, fontSize:20, margin:'0 0 4px' }}>{s.val}</p>
@@ -6588,21 +7528,79 @@ function CommercialPage() {
                 <p style={{ fontSize:36, marginBottom:10 }}>🎤</p>
                 <p style={{ color:'#5a7090', fontSize:14 }}>Aucun artiste recruté pour l'instant</p>
               </div>
-            ) : artistes.map(a => (
+            ) : artistes.map(a => {
+              const vues = a.buzz || a.vues || 0;
+              const dl = a.downloads || 0;
+              const poch = a.pochettes || 0;
+              const cad = a.cadeaux || 0;
+              const estActif = vues >= 1000 || dl >= 50 || poch >= 50;
+              const wa = (a.whatsapp || '').replace(/[^0-9]/g,'');
+              const prenom = (a.name||'').split(' ')[0] || 'cher artiste';
+              // Messages préconfigurés
+              const messages = [
+                { label:'Encouragement', txt: `Bonjour ${prenom} ! Sur Doniel Zik, plus tu partages ton lien à tes fans, plus tu gagnes. Partage ton contenu sur WhatsApp, Facebook, TikTok dès aujourd'hui et fais décoller ton audience !` },
+                { label:'Cadeaux', txt: `${prenom}, savais-tu que tes fans peuvent t'envoyer des cadeaux (kiffements) directement sur Doniel Zik ? Invite ta communauté à te soutenir : chaque cadeau te rapporte. Demande-leur de t'envoyer des kiffements !` },
+                { label:'Téléchargements', txt: `${prenom}, chaque téléchargement de ton contenu te rapporte de l'argent. Partage ton lien partout et encourage tes fans à télécharger ta musique sur Doniel Zik !` },
+                { label:'Pochettes', txt: `${prenom}, duplique ta pochette chez nous à seulement 250 F et revends-la à 1 000 F ! Plus besoin de lecteur : tes fans scannent et téléchargent ta musique directement. Commande tes pochettes maintenant !` },
+                { label:'Écoutes / Vues', txt: `${prenom}, plus ton contenu est écouté et visionné, plus tu gagnes en visibilité et en revenus. Partage ton lien Doniel Zik à un maximum de personnes pour booster tes vues !` },
+              ];
+              return (
               <div key={a.id} style={{ ...S.card, marginBottom:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
                   <div style={{ width:40, height:40, borderRadius:99, background:'linear-gradient(135deg,#eaf1ff,#c8d8ef)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🎤</div>
                   <div style={{ flex:1 }}>
                     <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{a.name}</p>
                     <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{a.email}</p>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <p style={{ color:'#1a6bff', fontWeight:700, fontSize:13, margin:0 }}>+1 000 F</p>
-                    <p style={{ color:'#8098b8', fontSize:10 }}>commission</p>
+                    {estActif ? (
+                      <>
+                        <p style={{ color:'#00a040', fontWeight:700, fontSize:13, margin:0 }}>+10 000 F</p>
+                        <p style={{ color:'#00a040', fontSize:10 }}>Actif</p>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ color:'#b07a00', fontWeight:700, fontSize:12, margin:0 }}>En attente</p>
+                        <p style={{ color:'#8098b8', fontSize:10 }}>pas encore actif</p>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {/* Activité de l'artiste */}
+                <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+                  {[
+                    { l:'Vues', v: vues },
+                    { l:'Téléch.', v: dl },
+                    { l:'Pochettes', v: poch },
+                    { l:'Cadeaux', v: cad },
+                  ].map((s,i) => (
+                    <div key={i} style={{ flex:1, minWidth:60, background:'#f5f8ff', borderRadius:8, padding:'6px 4px', textAlign:'center' }}>
+                      <p style={{ color:'#1a6bff', fontWeight:800, fontSize:14, margin:0 }}>{s.v.toLocaleString()}</p>
+                      <p style={{ color:'#8098b8', fontSize:9, margin:0 }}>{s.l}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Contact WhatsApp + messages préconfigurés */}
+                {wa ? (
+                  <div>
+                    <p style={{ color:'#5a7090', fontSize:11, marginBottom:6, fontWeight:600 }}>Envoyer un message (WhatsApp) :</p>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                      {messages.map((m,i) => (
+                        <a key={i} href={`https://wa.me/${wa}?text=${encodeURIComponent(m.txt)}`} target="_blank" rel="noopener noreferrer"
+                          style={{ padding:'5px 10px', borderRadius:99, background:'#eaf1ff', color:'#1a6bff', textDecoration:'none', fontSize:11, fontWeight:600, border:'1px solid #c8d8ef' }}>
+                          {m.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color:'#b0c4d8', fontSize:11, margin:0 }}>Pas de WhatsApp enregistré pour cet artiste.</p>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
