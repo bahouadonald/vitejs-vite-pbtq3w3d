@@ -5696,7 +5696,7 @@ const CATEGORIES_VIDEO = [
 ];
 
 const TYPES_CONTENU = [
-  { id:'tous', label:'Tout' },
+  { id:'tous', label:'Actu & Mood Artistique' },
   { id:'audio', label:'Musique' },
   { id:'video', label:'Vidéo' },
 ];
@@ -6308,45 +6308,35 @@ function DecouvrirPage() {
         ))}
       </div>
 
-      {/* FILTRES CATÉGORIE */}
-      <div style={{ display:'flex', gap:6, padding:'0 16px 12px', overflowX:'auto' }}>
-        {categoriesActuelles.map(c => (
-          <button key={c.id} onClick={() => setCategorieFiltre(c.id)}
-            style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${categorieFiltre===c.id?'#ffd700':'rgba(255,255,255,0.08)'}`, background:categorieFiltre===c.id?'rgba(255,215,0,0.15)':'transparent', color:categorieFiltre===c.id?'#ffd700':'#4a5878', cursor:'pointer', fontSize:11, fontWeight:600, whiteSpace:'nowrap' }}>
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* LE MOOD DE L'ARTISTE */}
-      {!loading && (
-        <div style={{ padding:'0 16px 8px' }}>
-          <p style={{ color:'#ffd700', fontWeight:700, fontSize:13, marginBottom:10 }}>Actu & Mood Artistique</p>
-          {motsArtistes.length === 0 ? (
-            <div style={{ background:'rgba(255,215,0,0.04)', border:'1px solid rgba(255,215,0,0.12)', borderRadius:14, padding:'16px', marginBottom:4 }}>
-              <p style={{ color:'#6a7a98', fontSize:12, margin:0 }}>Aucun mood pour l'instant. Les artistes partageront bientôt leurs annonces, invitations et signatures ici.</p>
-            </div>
-          ) : (
-            <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:6 }}>
-              {motsArtistes.map(m => (
-                <div key={m.id} style={{ minWidth:240, maxWidth:240, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:14, flexShrink:0 }}>
-                  <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 6px' }}>{m.artistName}</p>
-                  {m.videoUrl ? (
-                    <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:8, marginBottom:8, maxHeight:160 }} />
-                  ) : null}
-                  {m.texte && <p style={{ color:'#dde4f5', fontSize:12, lineHeight:1.5, margin:0 }}>{m.texte}</p>}
-                </div>
-              ))}
-            </div>
-          )}
+      {/* FILTRES CATÉGORIE — seulement sur Musique/Vidéo */}
+      {typeFiltre !== 'tous' && (
+        <div style={{ display:'flex', gap:6, padding:'0 16px 12px', overflowX:'auto' }}>
+          {categoriesActuelles.map(c => (
+            <button key={c.id} onClick={() => setCategorieFiltre(c.id)}
+              style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${categorieFiltre===c.id?'#ffd700':'rgba(255,255,255,0.08)'}`, background:categorieFiltre===c.id?'rgba(255,215,0,0.15)':'transparent', color:categorieFiltre===c.id?'#ffd700':'#4a5878', cursor:'pointer', fontSize:11, fontWeight:600, whiteSpace:'nowrap' }}>
+              {c.label}
+            </button>
+          ))}
         </div>
       )}
 
       {/* CONTENUS */}
       <div style={{ padding:'0 16px' }}>
+        {/* MOODS — affichés dans le fil uniquement sur l'onglet Actu & Mood */}
+        {!loading && typeFiltre === 'tous' && motsArtistes.map(m => (
+          <div key={'mood-'+m.id} style={{ marginBottom:16, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.22)', borderRadius:16, overflow:'hidden', padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <span style={{ background:'rgba(255,215,0,0.2)', color:'#ffd700', fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:99 }}>MOOD</span>
+              <span style={{ color:'#ffd700', fontWeight:700, fontSize:13 }}>{m.artistName}</span>
+            </div>
+            {m.videoUrl && <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:10, marginBottom:8, maxHeight:300 }} />}
+            {m.texte && <p style={{ color:'#dde4f5', fontSize:14, lineHeight:1.6, margin:0 }}>{m.texte}</p>}
+          </div>
+        ))}
+
         {loading ? (
           <div style={{ textAlign:'center', padding:40, color:'#4a5878' }}>Chargement...</div>
-        ) : contenusFiltres.length === 0 ? (
+        ) : contenusFiltres.length === 0 && !(typeFiltre === 'tous' && motsArtistes.length > 0) ? (
           <div style={{ textAlign:'center', padding:40 }}>
             <p style={{ fontSize:36, marginBottom:10 }}>🎵</p>
             <p style={{ color:'#4a5878', fontSize:14 }}>Aucun contenu publié pour l'instant</p>
@@ -6773,7 +6763,7 @@ function ResponsablePage() {
   // Commerciaux gagnent : 10 000 F/artiste actif + résidu 10% + 10% marchands
   const artistesActifs = allArtistes.filter(a => {
     const vues = a.buzz || a.vues || 0;
-    return vues >= 1000 || (a.downloads||0) >= 50 || (a.pochettes||0) >= 50;
+    return vues >= 5000 || (a.downloads||0) >= 30 || (a.cadeaux||0) >= 2000;
   });
   const commArtistes = Math.round(artistesActifs.length * 10000 * 0.10);
   const residu = Math.round(allArtistes.reduce((s,a) => {
@@ -7280,8 +7270,8 @@ function CommercialPage() {
   const artistesActifs = artistes.filter(a => {
     const vues = a.buzz || a.vues || 0;
     const dl = a.downloads || 0;
-    const poch = a.pochettes || 0;
-    return vues >= 1000 || dl >= 50 || poch >= 50; // critère artiste actif
+    const cad = a.cadeaux || 0;
+    return vues >= 5000 || dl >= 30 || cad >= 2000; // critère artiste actif
   });
   const commArtistes = artistesActifs.length * 10000;
   // Résidu : 10% de la part plateforme (téléchargements 30%, pochettes 150F, cadeaux 30%)
@@ -7386,10 +7376,26 @@ function CommercialPage() {
                       10 000 F par artiste actif
                     </p>
                     <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 8px', lineHeight:1.6 }}>
-                      Un artiste actif partage son contenu, atteint des vues, fait des téléchargements, vend des pochettes et reçoit des cadeaux.
+                      Vous touchez 10 000 F uniquement pour un artiste qui devient actif.
                     </p>
                     <p style={{ fontSize:12, color:'#00a040', margin:0, fontWeight:700 }}>
-                      + Résidu mensuel : 10% des revenus générés par vos artistes, chaque mois tant qu'ils restent actifs.
+                      + Une prime mensuelle sur l'activité de vos artistes (versée par la suite).
+                    </p>
+                  </div>
+
+                  {/* CONDITIONS ARTISTE ACTIF */}
+                  <div style={{ border:'1px solid #f0b84a', background:'#fff8e6', borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+                    <p style={{ fontWeight:800, fontSize:13, color:'#b07a00', margin:'0 0 8px' }}>Qu'est-ce qu'un artiste actif ?</p>
+                    <p style={{ fontSize:12, color:'#5a4a20', margin:'0 0 8px', lineHeight:1.6 }}>
+                      Un artiste est considéré comme actif lorsqu'il atteint au moins l'un de ces résultats :
+                    </p>
+                    <p style={{ fontSize:12, color:'#5a4a20', margin:0, lineHeight:1.9 }}>
+                      • 5 000 vues (buzz) ou plus<br/>
+                      • 30 téléchargements ou plus<br/>
+                      • 2 000 cadeaux (kiffements) ou plus
+                    </p>
+                    <p style={{ fontSize:11, color:'#8a7340', margin:'8px 0 0', lineHeight:1.5 }}>
+                      Votre rôle : recruter de vrais artistes et les encourager à partager activement leur musique sur les réseaux pour générer du buzz.
                     </p>
                   </div>
 
@@ -7406,7 +7412,7 @@ function CommercialPage() {
 
                   <div style={{ background:'#eaf1ff', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
                     <p style={{ color:'#1a6bff', fontSize:12, lineHeight:1.7, margin:0, fontWeight:700 }}>
-                      Exemple : 10 artistes actifs (100 000 F) + 1 000 000 F de publicités marchands (100 000 F) = 200 000 F le premier mois, puis les résidus chaque mois suivant.
+                      Exemples : 50 artistes actifs = 500 000 F · une publicité marchand de 600 000 F = 60 000 F de commission.
                     </p>
                   </div>
 
@@ -7574,7 +7580,7 @@ function CommercialPage() {
               const dl = a.downloads || 0;
               const poch = a.pochettes || 0;
               const cad = a.cadeaux || 0;
-              const estActif = vues >= 1000 || dl >= 50 || poch >= 50;
+              const estActif = vues >= 5000 || dl >= 30 || cad >= 2000;
               const wa = (a.whatsapp || '').replace(/[^0-9]/g,'');
               const prenom = (a.name||'').split(' ')[0] || 'cher artiste';
               // Messages préconfigurés
