@@ -18,9 +18,9 @@ import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
 // SOUS-ADMINS : font tout SAUF supprimer, bannir, créer comptes. Ajoute les emails ici.
-const SOUS_ADMINS = [
-  // 'admin1@gmail.com',
-  // 'admin2@gmail.com',
+const SOUS_ADMINS: string[] = [
+  'bigb80313@icloud.com',
+  'ruthssgoudo@gmail.com',
 ];
 // Helpers de rôle
 const estSuperAdmin = (email?: string|null) => (email||'').toLowerCase() === ADMIN_EMAIL.toLowerCase();
