@@ -1028,7 +1028,7 @@ function LikeButton({ qrId }: { qrId: string }) {
   };
 
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
       <button onClick={toggle}
         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' }}>
         Kiff {count > 0 ? count.toLocaleString() : ''}
@@ -4475,7 +4475,7 @@ function ArtistPage() {
       {/* TABS */}
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
-        <button style={tabStyle(dashTab==='publier')} onClick={() => setDashTab('publier')}>Publier</button>
+        <button style={tabStyle(dashTab==='publier')} onClick={() => setDashTab('publier')}>Enregistrer</button>
         <button style={tabStyle(dashTab==='mot')} onClick={() => setDashTab('mot')}>Mon Mood</button>
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
@@ -5782,9 +5782,9 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Publier un contenu</h3>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Enregistrer un contenu</h3>
       <p style={{ color:'#8098b8', fontSize:13, marginBottom:16, lineHeight:1.6 }}>
-        Soumettez votre musique ou vidéo. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation, votre QR public et votre lien seront générés.
+        Enregistrez votre musique ou vidéo sur la plateforme. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation par notre équipe, votre QR public et votre lien seront générés — vous pourrez alors les partager et publier.
       </p>
 
       <div style={S.card}>
@@ -6368,14 +6368,26 @@ function DecouvrirPage() {
               <div style={{ display:'flex', gap:14, marginBottom:10 }}>
                 <DiscouvrirStat qrId={c.publicLinkId} buzz={c.buzz||0} />
               </div>
-              {/* Actions — tout sur une ligne */}
-              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              {/* Actions — une seule ligne, défilement si besoin */}
+              <div style={{ display:'flex', gap:6, alignItems:'center', overflowX:'auto', whiteSpace:'nowrap', paddingBottom:2 }}>
                 <LikeButton qrId={c.publicLinkId} />
                 <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
                 <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
-                <a href={`/ecoute/${c.publicLinkId}`}
-                  style={{ display:'inline-flex', alignItems:'center', padding:'8px 16px', borderRadius:99, background:'rgba(30,111,255,0.15)', color:'#4da6ff', textDecoration:'none', fontSize:13, fontWeight:600, whiteSpace:'nowrap' }}>
-                  Lire
+                <button onClick={() => {
+                  const url = `${window.location.origin}/ecoute/${c.publicLinkId}`;
+                  const texte = `Écoute "${c.label}" de ${c.artist} sur Doniel Zik : ${url}`;
+                  if (navigator.share) {
+                    navigator.share({ title: c.label, text: `Écoute "${c.label}" de ${c.artist}`, url }).catch(()=>{});
+                  } else {
+                    navigator.clipboard?.writeText(texte);
+                    alert('Lien copié ! Partage-le à tes amis.');
+                  }
+                }} title="Partager" style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                </button>
+                <a href={`/ecoute/${c.publicLinkId}`} title="Lire"
+                  style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(30,111,255,0.2)', flexShrink:0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#4da6ff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
                 </a>
               </div>
             </div>
@@ -7077,57 +7089,83 @@ function ResponsablePage() {
 // ─────────────────────────────────────────────
 function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: string, db: any }) {
   const TARIFS = [
-    { type:'single', label:'Single audio', prix:5000, oscart:500, desc:'1 titre audio' },
-    { type:'album', label:'Album audio', prix:15000, oscart:1500, desc:'Plusieurs titres audio' },
-    { type:'video', label:'Vidéo solo', prix:5000, oscart:500, desc:'1 clip vidéo · court-métrage · film découpé 3 min' },
-    { type:'saison', label:'Série complète', prix:25000, oscart:2500, desc:'Série complète · épisodes de 3 min' },
+    { type:'single', label:'Single audio', desc:'1 titre audio' },
+    { type:'album', label:'Album audio', desc:'Plusieurs titres audio' },
+    { type:'video', label:'Vidéo solo', desc:'1 clip vidéo · court-métrage · film découpé 3 min' },
+    { type:'saison', label:'Série complète', desc:'Série complète · épisodes de 3 min' },
   ];
 
   const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [typeContenu, setTypeContenu] = useState('');
+  const [titreContenu, setTitreContenu] = useState('');
+  const [categorieContenu, setCategorieContenu] = useState('autres');
+  const [fileUrl, setFileUrl] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<any>(null);
 
   const tarif = TARIFS.find(t => t.type === typeContenu);
+  const estVideoType = typeContenu === 'video' || typeContenu === 'saison';
+
+  const uploadContenu = async (f: File) => {
+    setUploadingFile(true); setMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) { setFileUrl(data.secure_url); setMsg('Contenu ajouté.'); }
+      else setMsg('Erreur upload du contenu.');
+    } catch { setMsg('Erreur upload du contenu.'); }
+    setUploadingFile(false);
+  };
 
   const submit = async () => {
     if (!nom || !email || !whatsapp || !typeContenu) { setMsg('Tous les champs sont requis (dont le WhatsApp)'); return; }
+    if (!titreContenu.trim()) { setMsg('Indiquez le titre du contenu'); return; }
+    if (!fileUrl) { setMsg('Ajoutez le fichier du contenu (musique ou vidéo)'); return; }
     setLoading(true); setMsg('');
     try {
       // Vérifier si email déjà enregistré
       const existing = await getDocs(query(collection(db, 'artists'), where('email','==', email.trim().toLowerCase())));
-      if (!existing.empty) { setMsg('Cet email est déjà enregistré'); setLoading(false); return; }
+      if (existing.empty) {
+        // Créer la fiche artiste (compte créé automatiquement quand l'artiste se connectera avec cet email)
+        await addDoc(collection(db, 'artists'), {
+          name: nom.trim(),
+          email: email.trim().toLowerCase(),
+          whatsapp: whatsapp.trim(),
+          commercialEmail,
+          typeContenu,
+          statut: 'actif',
+          createdAt: new Date().toISOString(),
+        });
+      }
 
-      // Créer l'artiste dans Firestore
-      const artistRef = await addDoc(collection(db, 'artists'), {
-        name: nom.trim(),
-        email: email.trim().toLowerCase(),
-        whatsapp: whatsapp.trim(),
-        commercialEmail,
-        typeContenu,
-        prix: tarif?.prix || 0,
-        statut: 'en_attente_paiement',
-        createdAt: new Date().toISOString(),
-      });
-
-      // Créer la demande de paiement
-      await addDoc(collection(db, 'payments'), {
-        artistId: artistRef.id,
-        artistNom: nom.trim(),
+      // Créer la SOUMISSION du contenu → validation par l'admin (lien d'écoute)
+      await addDoc(collection(db, 'soumissions'), {
         artistEmail: email.trim().toLowerCase(),
-        commercialEmail,
-        typeContenu,
-        montant: tarif?.prix || 0,
-        commission: tarif?.oscart ? Math.round(tarif.oscart * 0.1) : 0,
-        status: 'pending',
+        artistName: nom.trim(),
+        titre: titreContenu.trim(),
+        type: typeContenu === 'single' ? 'single' : typeContenu === 'album' ? 'album' : typeContenu === 'video' ? 'video' : 'serie',
+        categorie: categorieContenu,
+        fileUrl,
+        parCommercial: commercialEmail,
+        statut: 'en_attente',
         createdAt: new Date().toISOString(),
       });
 
-      setDone({ nom: nom.trim(), email: email.trim(), tarif });
-      setNom(''); setEmail(''); setWhatsapp(''); setTypeContenu('');
+      // Notifier l'admin
+      await addDoc(collection(db, 'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'soumission',
+        text: `${commercialEmail} a enregistré "${titreContenu.trim()}" pour l'artiste ${nom.trim()}. À écouter et valider.`,
+        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
+      });
+
+      setDone({ nom: nom.trim(), email: email.trim(), titre: titreContenu.trim(), tarif });
+      setNom(''); setEmail(''); setWhatsapp(''); setTypeContenu(''); setTitreContenu(''); setCategorieContenu('autres'); setFileUrl('');
     } catch(e:any) { setMsg('Erreur: ' + e.message); }
     setLoading(false);
   };
@@ -7136,16 +7174,15 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
     <div>
       <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>➕ Enregistrer un artiste</h2>
       <p style={{ color:'#8098b8', fontSize:13, marginBottom:20, lineHeight:1.6 }}>
-        Enregistrez un artiste sur Doniel Zik. Le paiement sera validé manuellement par l'admin.
+        Enregistrez l'artiste et son contenu. Le contenu sera écouté et validé par notre équipe avant publication.
       </p>
 
       {done && (
         <div style={{ ...S.card, background:'#eaffea', border:'1px solid #4dff9a', marginBottom:20 }}>
-          <p style={{ fontWeight:800, fontSize:15, color:'#00a040', margin:'0 0 6px' }}>✅ Artiste enregistré !</p>
+          <p style={{ fontWeight:800, fontSize:15, color:'#00a040', margin:'0 0 6px' }}>✅ Enregistré avec succès !</p>
           <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 4px' }}><strong>{done.nom}</strong> — {done.email}</p>
-          <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 4px' }}>{done.tarif?.label} — {done.tarif?.prix?.toLocaleString()} FCFA</p>
-          <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 12px' }}>Votre commission : <strong style={{ color:'#1a6bff' }}>{done.tarif?.oscart ? Math.round(done.tarif.oscart * 0.1) : 0} Oscart</strong></p>
-          <p style={{ color:'#8098b8', fontSize:11 }}>En attente de validation du paiement par l'admin. L'artiste pourra créer son compte dès validation.</p>
+          <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 4px' }}>Contenu : « {done.titre} »</p>
+          <p style={{ color:'#8098b8', fontSize:11, marginTop:8 }}>Le contenu a été soumis pour validation. Une fois validé, l'artiste recevra son lien et son QR public dans son compte (accessible avec son email).</p>
           <button onClick={() => setDone(null)} style={{ ...S.btn2, marginTop:10 }}>Enregistrer un autre artiste</button>
         </div>
       )}
@@ -7167,29 +7204,38 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
               <button key={t.type} onClick={() => setTypeContenu(t.type)}
                 style={{ padding:'14px 10px', borderRadius:12, border:`2px solid ${typeContenu===t.type?'#1a6bff':'#dce6f7'}`, background: typeContenu===t.type?'#eaf1ff':'#fff', cursor:'pointer', textAlign:'left', transition:'all .2s' }}>
                 <p style={{ fontWeight:700, fontSize:13, color: typeContenu===t.type?'#1a6bff':'#1a2340', margin:'0 0 2px' }}>{t.label}</p>
-                <p style={{ color:'#8098b8', fontSize:11, margin:'0 0 4px' }}>{t.desc}</p>
-                <p style={{ color: typeContenu===t.type?'#1a6bff':'#5a7090', fontWeight:700, fontSize:12, margin:0 }}>{t.prix.toLocaleString()} FCFA</p>
+                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{t.desc}</p>
               </button>
             ))}
           </div>
 
-          {tarif && (
-            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
-              <p style={{ color:'#1a2340', fontSize:13, margin:'0 0 4px' }}>Prix : <strong>{tarif.prix.toLocaleString()} FCFA</strong></p>
-              <p style={{ color:'#1a6bff', fontSize:13, margin:0 }}>Votre commission : <strong>{Math.round(tarif.oscart * 0.1).toLocaleString()} Oscart</strong></p>
-            </div>
-          )}
+          <label style={S.lbl}>Titre du contenu *</label>
+          <input style={S.inp} value={titreContenu} onChange={e => setTitreContenu(e.target.value)} placeholder="Ex: Nom de l'artiste — Titre (feat. ...)" />
 
-          {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+          <label style={S.lbl}>Catégorie *</label>
+          <select style={S.inp} value={categorieContenu} onChange={e => setCategorieContenu(e.target.value)}>
+            {(estVideoType ? CATEGORIES_VIDEO : CATEGORIES_AUDIO).filter((c:any) => c.id !== 'tous').map((c:any) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
 
-          <button onClick={submit} disabled={loading || !typeContenu}
-            style={{ ...S.btn, width:'100%', padding:14, opacity: typeContenu?1:0.5 }}>
-            {loading ? '⏳ Enregistrement...' : 'Enregistrer et créer la demande de paiement'}
+          <label style={S.lbl}>Fichier du contenu ({estVideoType ? 'vidéo' : 'audio'}) *</label>
+          <input type="file" accept={estVideoType ? 'video/*' : 'audio/*'}
+            onChange={e => e.target.files?.[0] && uploadContenu(e.target.files[0])}
+            style={{ ...S.inp, padding:8 }} />
+          {uploadingFile && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
+          {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Contenu ajouté</p>}
+
+          {msg && <p style={{ color: msg.includes('ajouté')||msg.includes('Contenu ajouté') ? '#00a040':'#f04a6a', fontSize:12, margin:'10px 0' }}>{msg}</p>}
+
+          <button onClick={submit} disabled={loading || uploadingFile || !typeContenu}
+            style={{ ...S.btn, width:'100%', padding:14, marginTop:8, opacity: typeContenu?1:0.5 }}>
+            {loading ? 'Enregistrement...' : 'Enregistrer le contenu'}
           </button>
 
           <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'10px 14px', marginTop:14 }}>
             <p style={{ color:'#b07a00', fontSize:11, lineHeight:1.7, margin:0 }}>
-              ⚠️ Le paiement de {tarif?.prix?.toLocaleString() || '...'} FCFA sera collecté manuellement. L'artiste pourra créer son compte dès que l'admin valide le paiement.
+              Le contenu sera écouté et validé par notre équipe. Une fois validé, l'artiste recevra son lien et son QR public dans son compte (accessible avec son email).
             </p>
           </div>
         </div>
