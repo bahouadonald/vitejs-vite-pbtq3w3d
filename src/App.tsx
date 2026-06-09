@@ -2193,7 +2193,7 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
       // Notification perso à l'artiste
       await addDoc(collection(db,'notifications'), {
         to: m.artistEmail, type:'mot_valide',
-        text: `Votre message est validé et publié dans "L'artiste vous dit quelque chose".`,
+        text: `Votre message est validé et publié dans "Actu & Mood Artistique".`,
         createdAt: new Date().toISOString(), lu: false,
       });
       // Notification GÉNÉRALE à tous
@@ -4476,7 +4476,7 @@ function ArtistPage() {
       <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
         <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
         <button style={tabStyle(dashTab==='publier')} onClick={() => setDashTab('publier')}>Publier</button>
-        <button style={tabStyle(dashTab==='mot')} onClick={() => setDashTab('mot')}>Mon mot</button>
+        <button style={tabStyle(dashTab==='mot')} onClick={() => setDashTab('mot')}>Mon Mood</button>
         <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
         <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
         <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
@@ -6089,13 +6089,28 @@ function MotArtisteTab({ user, artistName }: any) {
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Vous avez quelque chose à dire</h3>
-      <p style={{ color:'#8098b8', fontSize:13, marginBottom:8, lineHeight:1.6 }}>
-        Partagez un message professionnel avec votre communauté : présentation, invitation à un événement, promotion, annonce.
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Mon Mood</h3>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:12, lineHeight:1.6 }}>
+        Votre Mood est votre espace d'expression professionnel, public et validé par notre équipe. Ce n'est pas un espace de buzz ou de divertissement personnel.
       </p>
-      <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'10px 14px', marginBottom:16 }}>
-        <p style={{ color:'#b07a00', fontSize:11, margin:0, lineHeight:1.5 }}>
-          Uniquement professionnel : présentation, événement, promotion, description. Tout contenu hors sujet sera refusé.
+
+      <div style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+        <p style={{ color:'#00a040', fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce que vous pouvez publier :</p>
+        <p style={{ color:'#1a7040', fontSize:11, margin:0, lineHeight:1.7 }}>
+          • Vous présenter à votre public<br/>
+          • Décrire votre univers, votre projet musical<br/>
+          • Promouvoir une sortie, un single, un clip<br/>
+          • Inviter à un événement (concert, showcase)<br/>
+          • Une signature ou un mot pour vos fans
+        </p>
+      </div>
+
+      <div style={{ background:'#ffecec', border:'1px solid #f0a0a0', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
+        <p style={{ color:'#d32f2f', fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce qui sera refusé :</p>
+        <p style={{ color:'#b03030', fontSize:11, margin:0, lineHeight:1.7 }}>
+          • Contenu de type buzz / divertissement (style TikTok)<br/>
+          • Sujets personnels, sociaux ou hors musique<br/>
+          • Tout ce qui n'est pas professionnel ou promotionnel
         </p>
       </div>
 
@@ -6303,21 +6318,27 @@ function DecouvrirPage() {
         ))}
       </div>
 
-      {/* L'ARTISTE VOUS DIT QUELQUE CHOSE */}
-      {motsArtistes.length > 0 && (
+      {/* LE MOOD DE L'ARTISTE */}
+      {!loading && (
         <div style={{ padding:'0 16px 8px' }}>
-          <p style={{ color:'#ffd700', fontWeight:700, fontSize:13, marginBottom:10 }}>L'artiste vous dit quelque chose</p>
-          <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:6 }}>
-            {motsArtistes.map(m => (
-              <div key={m.id} style={{ minWidth:240, maxWidth:240, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:14, flexShrink:0 }}>
-                <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 6px' }}>{m.artistName}</p>
-                {m.videoUrl ? (
-                  <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:8, marginBottom:8, maxHeight:160 }} />
-                ) : null}
-                {m.texte && <p style={{ color:'#dde4f5', fontSize:12, lineHeight:1.5, margin:0 }}>{m.texte}</p>}
-              </div>
-            ))}
-          </div>
+          <p style={{ color:'#ffd700', fontWeight:700, fontSize:13, marginBottom:10 }}>Actu & Mood Artistique</p>
+          {motsArtistes.length === 0 ? (
+            <div style={{ background:'rgba(255,215,0,0.04)', border:'1px solid rgba(255,215,0,0.12)', borderRadius:14, padding:'16px', marginBottom:4 }}>
+              <p style={{ color:'#6a7a98', fontSize:12, margin:0 }}>Aucun mood pour l'instant. Les artistes partageront bientôt leurs annonces, invitations et signatures ici.</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:6 }}>
+              {motsArtistes.map(m => (
+                <div key={m.id} style={{ minWidth:240, maxWidth:240, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:14, flexShrink:0 }}>
+                  <p style={{ color:'#ffd700', fontWeight:700, fontSize:12, margin:'0 0 6px' }}>{m.artistName}</p>
+                  {m.videoUrl ? (
+                    <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:8, marginBottom:8, maxHeight:160 }} />
+                  ) : null}
+                  {m.texte && <p style={{ color:'#dde4f5', fontSize:12, lineHeight:1.5, margin:0 }}>{m.texte}</p>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
