@@ -2747,6 +2747,7 @@ function CommerciauxtTab({ db }: { db: any }) {
                 <div>
                   <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.nom}</p>
                   <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
+                  {c.telephone && <p style={{ color:'#1a6bff', fontSize:12, margin:'2px 0', fontWeight:600 }}>{c.telephone}</p>}
                   {c.responsableEmail && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Responsable : {c.responsableEmail}</p>}
                   <p style={{ color:'#b0c4d8', fontSize:10, margin:'2px 0 0' }}>Validé le {new Date(c.validatedAt||c.createdAt).toLocaleDateString('fr')}</p>
                 </div>
@@ -2879,6 +2880,7 @@ function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[], canD
                 <div>
                   <p style={{ fontWeight:800, fontSize:15, marginBottom:2 }}>{a.name}</p>
                   <p style={{ color:'#8098b8', fontSize:12 }}>{a.email}</p>
+                  {a.whatsapp && <p style={{ color:'#1a6bff', fontSize:12, fontWeight:600 }}>{a.whatsapp}</p>}
                   <p style={{ color:'#b0c4d8', fontSize:10, marginTop:2 }}>
                     Enregistré le {new Date(a.createdAt).toLocaleDateString('fr')}
                     {a.uid && <span style={{ marginLeft:8, color:'#4dff9a', fontWeight:700 }}>✅ Compte créé</span>}
