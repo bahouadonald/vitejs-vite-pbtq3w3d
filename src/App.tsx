@@ -54,6 +54,50 @@ const S = {
 const tabStyle = (a: boolean): React.CSSProperties => ({ padding: '10px 18px', border: 'none', background: 'transparent', color: a ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 13, fontWeight: a ? 700 : 400, borderBottom: '2px solid ' + (a ? '#1a6bff' : 'transparent') });
 const badgeStyle = (s: string): React.CSSProperties => { const m: any = { active: ['#eaf1ff', '#1a6bff'], locked: ['#fff8e6', '#b07a00'], pending: ['#fff8e6', '#b07a00'], verified: ['#eaf1ff', '#1a6bff'], rejected: ['#fff0f3', '#e04060'] }; const [bg, c] = m[s] || ['#f0f4fb', '#8098b8']; return { fontSize: 11, padding: '3px 10px', borderRadius: 99, background: bg, color: c, fontWeight: 700 }; };
 const formatSize = (bytes: number) => { if (!bytes) return ''; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB'; return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; };
+
+// ─────────────────────────────────────────────
+// TEXTES JURIDIQUES
+// ─────────────────────────────────────────────
+const CONTRAT_COMMERCIAL = [
+  { t: "Article 1 — Objet", c: "Le présent contrat définit les conditions dans lesquelles l'Apporteur fait la promotion de la plateforme Doniel Zik et recrute des artistes et des annonceurs, en ligne et sur le terrain." },
+  { t: "Article 2 — Statut", c: "L'Apporteur agit en qualité d'apporteur d'affaires indépendant. Le présent contrat ne crée aucun lien de subordination ni de salariat. L'Apporteur n'est pas un employé de la Société et organise librement son activité." },
+  { t: "Article 3 — Mission", c: "L'Apporteur présente la plateforme aux artistes et les enregistre avec leur contenu, recrute des annonceurs pour la publicité, et accompagne les artistes recrutés afin qu'ils deviennent actifs." },
+  { t: "Article 4 — Rémunération", c: "La rémunération est exclusivement basée sur les résultats : 10 000 FCFA par artiste actif (au moins 5 000 vues, 30 téléchargements, 2 000 cadeaux ou 1 000 partages) ; 10 % du chiffre d'affaires publicité des annonceurs recrutés ; et une prime résiduelle mensuelle sur l'activité continue des artistes recrutés, tant qu'ils restent actifs, selon les conditions en vigueur." },
+  { t: "Article 5 — Conditions de paiement", c: "Les sommes dues sont calculées et versées selon les modalités et la périodicité définies par la Société. Aucun paiement n'est dû pour un artiste qui n'atteint pas le statut d'actif." },
+  { t: "Article 6 — Obligations", c: "L'Apporteur s'engage à représenter la plateforme avec honnêteté, à ne faire aucune promesse mensongère, à ne recruter que de vrais artistes et annonceurs, et à respecter l'image de la Société." },
+  { t: "Article 7 — Confidentialité", c: "L'Apporteur s'engage à ne divulguer aucune information interne, méthode, donnée ou outil de la Société. Les QR codes de duplication et données privées restent strictement confidentiels." },
+  { t: "Article 8 — Durée et résiliation", c: "Le contrat prend effet à la validation du compte et reste valable tant que l'activité se poursuit. Chaque partie peut y mettre fin à tout moment. Les commissions acquises avant la rupture restent dues." },
+  { t: "Article 9 — Droit applicable", c: "Le présent contrat est régi par le droit en vigueur en Côte d'Ivoire." },
+];
+
+const CONDITIONS_ARTISTE = [
+  { t: "1. Votre contenu vous appartient", c: "Vous déclarez être l'auteur ou le détenteur des droits du contenu enregistré. Vous devez figurer dans ce contenu (featuring accepté). Tout contenu plagié ou ne vous appartenant pas est interdit et sera retiré." },
+  { t: "2. Autorisation de diffusion", c: "Vous autorisez Doniel Zik à héberger, diffuser, faire écouter, télécharger et promouvoir votre contenu sur la plateforme et via les liens et QR codes publics générés." },
+  { t: "3. Revenus et répartition", c: "Votre contenu vous rapporte selon les règles de la plateforme : sur chaque téléchargement, une part vous revient et une part revient à la plateforme ; sur chaque cadeau (kiffement), une part vous revient et une part revient à la plateforme ; vous percevez une part des revenus publicitaires liés aux vues. Les pourcentages appliqués sont ceux en vigueur." },
+  { t: "4. Validation et modération", c: "Tout contenu enregistré est soumis à validation avant publication. La plateforme se réserve le droit de refuser ou retirer tout contenu non conforme (qualité, plagiat, contenu interdit)." },
+  { t: "5. Monnaie Oscart", c: "Les transactions sur la plateforme utilisent l'Oscart. En tant qu'artiste, vos revenus sont comptés en Oscart : vous pouvez les utiliser sur la plateforme (notamment pour enregistrer vos contenus) ou demander leur retrait selon les modalités en vigueur. L'Oscart ne peut pas être transféré entre membres." },
+  { t: "6. QR codes", c: "Vous recevez un lien public et un QR code public à partager. Les QR codes de duplication à scan limité restent gérés par la plateforme." },
+  { t: "7. Comportement", c: "Doniel Zik est une plateforme professionnelle, pas un réseau social. Tout usage détourné, frauduleux ou nuisible entraîne la suspension du compte." },
+  { t: "8. Droit applicable", c: "Les présentes conditions sont régies par le droit en vigueur en Côte d'Ivoire." },
+];
+
+// Modal d'affichage d'un document juridique
+function DocumentLegalModal({ titre, articles, onClose }: { titre: string, articles: {t:string,c:string}[], onClose: () => void }) {
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9995, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+      <div style={{ background:'#fff', borderRadius:16, maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto', padding:24 }} onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontFamily:'serif', fontSize:19, fontWeight:800, color:'#1a2340', marginBottom:16 }}>{titre}</h2>
+        {articles.map((a,i) => (
+          <div key={i} style={{ marginBottom:14 }}>
+            <p style={{ fontWeight:700, fontSize:13, color:'#1a6bff', margin:'0 0 4px' }}>{a.t}</p>
+            <p style={{ fontSize:13, color:'#3a4860', lineHeight:1.6, margin:0 }}>{a.c}</p>
+          </div>
+        ))}
+        <button onClick={onClose} style={{ ...S.btn, width:'100%', padding:12, marginTop:8 }}>Fermer</button>
+      </div>
+    </div>
+  );
+}
 const cleanName = (name: string) => name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
 const formatTime = (t: number) => { if (!t || isNaN(t)) return '0:00'; const m = Math.floor(t / 60); const s = Math.floor(t % 60); return m + ':' + (s < 10 ? '0' : '') + s; };
 
@@ -7191,6 +7235,8 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
   const [categorieContenu, setCategorieContenu] = useState('autres');
   const [fileUrl, setFileUrl] = useState('');
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [conditionsOK, setConditionsOK] = useState(false);
+  const [showConditions, setShowConditions] = useState(false);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<any>(null);
@@ -7316,8 +7362,19 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
 
           {msg && <p style={{ color: msg.includes('ajouté')||msg.includes('Contenu ajouté') ? '#00a040':'#f04a6a', fontSize:12, margin:'10px 0' }}>{msg}</p>}
 
-          <button onClick={submit} disabled={loading || uploadingFile || !typeContenu}
-            style={{ ...S.btn, width:'100%', padding:14, marginTop:8, opacity: typeContenu?1:0.5 }}>
+          {showConditions && <DocumentLegalModal titre="Conditions d'enregistrement de l'artiste" articles={CONDITIONS_ARTISTE} onClose={() => setShowConditions(false)} />}
+
+          <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', margin:'14px 0', padding:'12px', background:'#f5f8ff', borderRadius:10, border:'1px solid #dce6f7' }}>
+            <input type="checkbox" checked={conditionsOK} onChange={e => setConditionsOK(e.target.checked)} style={{ marginTop:3 }} />
+            <span style={{ fontSize:12, color:'#3a4860', lineHeight:1.5 }}>
+              L'artiste a été informé et accepte les{' '}
+              <span onClick={(e) => { e.preventDefault(); setShowConditions(true); }} style={{ color:'#1a6bff', fontWeight:700, textDecoration:'underline' }}>conditions d'enregistrement</span>{' '}
+              de Doniel Zik.
+            </span>
+          </label>
+
+          <button onClick={submit} disabled={loading || uploadingFile || !typeContenu || !conditionsOK}
+            style={{ ...S.btn, width:'100%', padding:14, marginTop:8, opacity: (typeContenu && conditionsOK)?1:0.5 }}>
             {loading ? 'Enregistrement...' : 'Enregistrer le contenu'}
           </button>
 
@@ -7352,6 +7409,30 @@ function CommercialPage() {
   const [inscMethode, setInscMethode] = useState('');
   const [inscCible, setInscCible] = useState('');
   const [inscObjectif, setInscObjectif] = useState('');
+  const [contratAccepte, setContratAccepte] = useState<boolean|null>(null);
+  const [showContrat, setShowContrat] = useState(false);
+  const [monDocId, setMonDocId] = useState('');
+
+  // Vérifier si le contrat est accepté
+  useEffect(() => {
+    if (!user?.email) return;
+    getDocs(query(collection(db,'commerciaux'), where('email','==',user.email.toLowerCase()))).then(snap => {
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        setMonDocId(d.id);
+        setContratAccepte(d.data().contratAccepte === true);
+      } else {
+        setContratAccepte(true); // pas de fiche = ne pas bloquer
+      }
+    }).catch(() => setContratAccepte(true));
+  }, [user?.email]);
+
+  const accepterContrat = async () => {
+    if (monDocId) {
+      await updateDoc(doc(db,'commerciaux',monDocId), { contratAccepte: true, contratAccepteLe: new Date().toISOString() });
+    }
+    setContratAccepte(true); setShowContrat(false);
+  };
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -7629,6 +7710,25 @@ function CommercialPage() {
 
   return (
     <div style={{ ...S.bg, minHeight:'100vh' }}>
+      {contratAccepte === false && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, background:'#f0f4fb', overflowY:'auto', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16 }}>
+          <div style={{ background:'#fff', borderRadius:16, maxWidth:560, width:'100%', margin:'20px 0', padding:24 }}>
+            <Logo size="sm" />
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, color:'#1a2340', margin:'16px 0 4px' }}>Contrat d'apporteur d'affaires</h2>
+            <p style={{ color:'#8098b8', fontSize:12, marginBottom:16 }}>BDE SARL — RCCM CI-ABJ-2017-B-15187 — éditrice de Doniel Zik</p>
+            <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:12, padding:16, marginBottom:16 }}>
+              {CONTRAT_COMMERCIAL.map((a,i) => (
+                <div key={i} style={{ marginBottom:12 }}>
+                  <p style={{ fontWeight:700, fontSize:13, color:'#1a6bff', margin:'0 0 4px' }}>{a.t}</p>
+                  <p style={{ fontSize:13, color:'#3a4860', lineHeight:1.6, margin:0 }}>{a.c}</p>
+                </div>
+              ))}
+            </div>
+            <button onClick={accepterContrat} style={{ ...S.btn, width:'100%', padding:14 }}>J'ai lu et j'accepte le contrat</button>
+            <button onClick={() => signOut(auth)} style={{ width:'100%', padding:12, marginTop:10, borderRadius:10, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:13 }}>Refuser et quitter</button>
+          </div>
+        </div>
+      )}
       {/* HEADER */}
       <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
