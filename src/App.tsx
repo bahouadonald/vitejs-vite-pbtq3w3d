@@ -290,7 +290,7 @@ const KIFFEMENTS = [
     )},
 ];
 
-function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artistEmail?: string, compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
@@ -360,10 +360,13 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
   };
 
   return (
-    <div style={{ marginBottom:16 }}>
+    <div style={{ marginBottom: compact ? 0 : 16, display: compact ? 'inline-block' : 'block' }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
-      <button onClick={() => setOpen(!open)}
-        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 }}>
+      <button onClick={() => setOpen(!open)} title="Kiffement"
+        style={ compact
+          ? { display:'inline-flex', alignItems:'center', gap:5, padding:'0 12px', height:40, borderRadius:99, border:'none', background:'rgba(255,200,0,0.12)', color:'#ffd700', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0, whiteSpace:'nowrap' }
+          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 } }>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
         Kiffement
       </button>
       {/* Modal recharge stylé */}
@@ -484,7 +487,7 @@ function KiffementSection({ qrId, artistEmail }: { qrId: string, artistEmail?: s
 // ─────────────────────────────────────────────
 // SECTION COMMENTAIRES — style TikTok
 // ─────────────────────────────────────────────
-function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: string }) {
+function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEmail?: string, compact?: boolean }) {
   const [comments, setComments] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
@@ -555,11 +558,14 @@ function CommentSection({ qrId, artistEmail }: { qrId: string, artistEmail?: str
   };
 
   return (
-    <div style={{ marginBottom:16 }}>
+    <div style={{ marginBottom: compact ? 0 : 16, display: compact ? 'inline-block' : 'block' }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
-      <button onClick={() => setOpen(!open)}
-        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 }}>
-        Commenter {count > 0 ? count : ''}
+      <button onClick={() => setOpen(!open)} title="Commenter"
+        style={ compact
+          ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background:'rgba(255,255,255,0.06)', color:'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
+          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 } }>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        {compact ? (count > 0 ? count : '') : `Commenter ${count > 0 ? count : ''}`}
       </button>
 
       {open && (
@@ -993,7 +999,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 // ─────────────────────────────────────────────
 // LIKE BUTTON — like sur un contenu
 // ─────────────────────────────────────────────
-function LikeButton({ qrId }: { qrId: string }) {
+function LikeButton({ qrId, compact }: { qrId: string, compact?: boolean }) {
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -1029,9 +1035,12 @@ function LikeButton({ qrId }: { qrId: string }) {
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      <button onClick={toggle}
-        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' }}>
-        Kiff {count > 0 ? count.toLocaleString() : ''}
+      <button onClick={toggle} title="Kiff"
+        style={ compact
+          ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: liked?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
+          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' } }>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={liked?'#f04a6a':'none'} stroke={liked?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        {compact ? (count > 0 ? count.toLocaleString() : '') : `Kiff ${count > 0 ? count.toLocaleString() : ''}`}
       </button>
     </div>
   );
@@ -2033,6 +2042,11 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
   const [donateurs, setDonateurs] = useState<any[]>([]);
   const [offreModal, setOffreModal] = useState<any>(null);
   const [sent, setSent] = useState(false);
+  const [typeChoisi, setTypeChoisi] = useState<any>(null);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image'|'video'>('image');
+  const [uploadingSig, setUploadingSig] = useState(false);
+  const [sigMsg, setSigMsg] = useState('');
 
   useEffect(() => {
     // Récupérer tous les kiffements reçus, groupés par donateur
@@ -2055,8 +2069,24 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
     return unsub;
   }, [artistEmail]);
 
-  const offrirSignature = async (signature: any) => {
-    if (!offreModal) return;
+  const uploadSignature = async (f: File) => {
+    setUploadingSig(true); setSigMsg('');
+    const isVid = f.type.startsWith('video');
+    setMediaType(isVid ? 'video' : 'image');
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch(`https://api.cloudinary.com/v1_1/dlnpdjgpc/${isVid?'video':'image'}/upload`, { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) { setMediaUrl(data.secure_url); setSigMsg('Contenu prêt.'); }
+      else setSigMsg('Erreur upload.');
+    } catch { setSigMsg('Erreur upload.'); }
+    setUploadingSig(false);
+  };
+
+  const offrirSignature = async () => {
+    if (!offreModal || !typeChoisi) return;
+    if (!mediaUrl) { setSigMsg('Ajoutez votre photo ou vidéo'); return; }
     // Récupérer le nom de l'artiste
     let artistName = artistEmail.split('@')[0];
     try {
@@ -2068,31 +2098,33 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
     await addDoc(collection(db,'notifications'), {
       to: offreModal.userEmail || offreModal.userId,
       type: 'signature',
-      text: `${artistName} a signé pour vous : ${signature.label} ! ${signature.desc}`,
+      text: `${artistName} a signé pour vous : ${typeChoisi.label} ! Regardez dans Actu & Mood.`,
       createdAt: new Date().toISOString(), lu: false,
     });
     // 2. Notification GÉNÉRALE (visible par tous)
     await addDoc(collection(db,'notifications'), {
       to: 'all', type: 'generale',
-      text: `${artistName} a signé "${signature.label}" pour ${offreModal.userName}.`,
+      text: `${artistName} offre "${typeChoisi.label}" à ${offreModal.userName}.`,
       createdAt: new Date().toISOString(), lu: false,
     });
-    // 3. Publier dans "Le mot de l'artiste" (auto-validé car c'est une signature)
+    // 3. Publier dans le Mood avec le contenu réel (photo/vidéo)
     await addDoc(collection(db,'mots_artiste'), {
       artistEmail, artistName,
-      texte: `a signé "${signature.label}" pour ${offreModal.userName}. ${signature.desc || ''}`,
-      videoUrl: '', estSignature: true,
+      texte: `offre "${typeChoisi.label}" à ${offreModal.userName}.`,
+      videoUrl: mediaType === 'video' ? mediaUrl : '',
+      imageUrl: mediaType === 'image' ? mediaUrl : '',
+      estSignature: true, typeSignature: typeChoisi.id,
       statut: 'valide',
       createdAt: new Date().toISOString(),
     });
     // 4. Enregistrer la signature
     await addDoc(collection(db,'signatures'), {
       artistEmail, donateurId: offreModal.userId, donateurName: offreModal.userName,
-      type: signature.id, label: signature.label,
+      type: typeChoisi.id, label: typeChoisi.label, mediaUrl, mediaType,
       createdAt: new Date().toISOString(),
     });
     setSent(true);
-    setTimeout(() => { setSent(false); setOffreModal(null); }, 2000);
+    setTimeout(() => { setSent(false); setOffreModal(null); setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); }, 2000);
   };
 
   return (
@@ -2127,22 +2159,23 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
       {/* Modal offrir signature */}
       {offreModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-          onClick={() => !sent && setOffreModal(null)}>
-          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'80vh', overflowY:'auto' }}
+          onClick={() => !sent && !uploadingSig && (setOffreModal(null), setTypeChoisi(null), setMediaUrl(''), setSigMsg(''))}>
+          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'85vh', overflowY:'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
             {sent ? (
               <div style={{ textAlign:'center', padding:20 }}>
                 <p style={{ fontSize:40, marginBottom:12 }}>✅</p>
-                <p style={{ fontWeight:800, fontSize:16, color:'#1a2340' }}>Signature envoyée à {offreModal.userName} !</p>
+                <p style={{ fontWeight:800, fontSize:16, color:'#1a2340' }}>Signature offerte à {offreModal.userName} !</p>
+                <p style={{ color:'#8098b8', fontSize:13, marginTop:6 }}>Publiée dans Actu & Mood.</p>
               </div>
-            ) : (
+            ) : !typeChoisi ? (
               <>
                 <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>Offrir à {offreModal.userName}</p>
-                <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez la récompense à offrir</p>
+                <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez ce que vous offrez. Vous ferez ensuite une photo ou vidéo pour l'annoncer.</p>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {SIGNATURES.map(s => (
-                    <button key={s.id} onClick={() => offrirSignature(s)}
+                    <button key={s.id} onClick={() => { setTypeChoisi(s); setSigMsg(''); }}
                       style={{ padding:'14px 10px', borderRadius:14, border:`1px solid ${s.color}44`, background:`${s.color}11`, cursor:'pointer', textAlign:'center' }}>
                       <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
                       <p style={{ fontWeight:800, fontSize:12, color:'#1a2340', margin:'0 0 2px' }}>{s.label}</p>
@@ -2150,9 +2183,39 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setOffreModal(null)}
+                <button onClick={() => (setOffreModal(null), setMediaUrl(''))}
                   style={{ width:'100%', marginTop:16, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                   Annuler
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>{typeChoisi.icon} {typeChoisi.label}</p>
+                <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>
+                  Pour <strong>{offreModal.userName}</strong>. Ajoutez une photo ou une vidéo où vous annoncez ce que vous offrez (mentionnez {offreModal.userName}).
+                </p>
+
+                <label style={{ display:'block', padding:'20px', borderRadius:14, border:'2px dashed #c8d8ef', background:'#f5f8ff', textAlign:'center', cursor:'pointer', marginBottom:14 }}>
+                  {mediaUrl ? (
+                    mediaType === 'video'
+                      ? <video src={mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, maxHeight:200 }} />
+                      : <img src={mediaUrl} style={{ width:'100%', borderRadius:10, maxHeight:200, objectFit:'cover' }} alt="" />
+                  ) : (
+                    <span style={{ color:'#1a6bff', fontSize:13, fontWeight:600 }}>{uploadingSig ? 'Upload en cours...' : 'Toucher pour ajouter une photo ou vidéo'}</span>
+                  )}
+                  <input type="file" accept="image/*,video/*" style={{ display:'none' }}
+                    onChange={e => e.target.files?.[0] && uploadSignature(e.target.files[0])} />
+                </label>
+
+                {sigMsg && <p style={{ color: sigMsg.includes('prêt') ? '#00a040':'#f04a6a', fontSize:12, margin:'0 0 12px' }}>{sigMsg}</p>}
+
+                <button onClick={offrirSignature} disabled={uploadingSig || !mediaUrl}
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: mediaUrl ? 'linear-gradient(135deg,#1a6bff,#4da6ff)' : '#c8d8ef', color:'#fff', fontWeight:800, fontSize:15, cursor: mediaUrl?'pointer':'default' }}>
+                  Offrir et publier dans le Mood
+                </button>
+                <button onClick={() => { setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); }}
+                  style={{ width:'100%', marginTop:10, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  Retour
                 </button>
               </>
             )}
@@ -2270,9 +2333,22 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
   return (
     <div>
       <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6 }}>Soumissions de contenus</h2>
-      <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:12 }}>
         Écoutez chaque contenu via son lien secret avant de valider. Seul le super admin peut supprimer.
       </p>
+
+      {/* NETTOYER LES MOODS */}
+      {mots.length > 0 && (
+        <button onClick={async () => {
+          if (!window.confirm(`Supprimer TOUS les moods (${mots.length}) du fil Actu & Mood ? Cette action est définitive.`)) return;
+          try {
+            for (const m of mots) { await deleteDoc(doc(db,'mots_artiste',m.id)); }
+            alert('Tous les moods ont été supprimés.');
+          } catch(e:any) { alert('Erreur : ' + e.message); }
+        }} style={{ padding:'8px 14px', borderRadius:10, border:'1px solid #f04a6a', background:'rgba(240,74,106,0.06)', color:'#f04a6a', fontSize:12, fontWeight:700, cursor:'pointer', marginBottom:16 }}>
+          Nettoyer le fil ({mots.length} moods)
+        </button>
+      )}
 
       {/* MOTS D'ARTISTES À VALIDER */}
       {motsEnAttente.length > 0 && (
@@ -4450,7 +4526,7 @@ function ArtistPage() {
   const logout = async () => { await signOut(auth); };
 
   if (view === 'dashboard' && user) return (
-    <div style={{ ...S.bg, minHeight: '100vh' }}>
+    <div style={{ ...S.bg, minHeight: '100vh', overflowX:'hidden', width:'100%', maxWidth:'100vw' }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         .vente-row:hover{background:#eaf1ff!important}
@@ -4459,30 +4535,30 @@ function ArtistPage() {
       `}</style>
 
       {/* HEADER */}
-      <div style={{ background:'#ffffff', borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'#ffffff', borderBottom:'1px solid #dce6f7', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50, gap:8 }}>
         <Logo size="sm" />
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flexShrink:1 }}>
           {unreadVentes > 0 && (
-            <span style={{ background:'#fff0f3', border:'1px solid #f04a6a', borderRadius:99, padding:'3px 9px', fontSize:11, fontWeight:700, color:'#f04a6a' }}>
+            <span style={{ background:'#fff0f3', border:'1px solid #f04a6a', borderRadius:99, padding:'3px 9px', fontSize:11, fontWeight:700, color:'#f04a6a', flexShrink:0 }}>
               {unreadVentes} new
             </span>
           )}
-          <span style={{ color:'#5a7090', fontSize:13 }}>{stats.artistName || user.email}</span>
-          <button style={S.btn2} onClick={async () => await signOut(auth)}>Déconnexion</button>
+          <span style={{ color:'#5a7090', fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{stats.artistName || user.email}</span>
+          <button style={{...S.btn2, flexShrink:0}} onClick={async () => await signOut(auth)}>Déconnexion</button>
         </div>
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 24px', display:'flex', background:'#ffffff' }}>
-        <button style={tabStyle(dashTab==='stats')} onClick={() => setDashTab('stats')}>Stats</button>
-        <button style={tabStyle(dashTab==='publier')} onClick={() => setDashTab('publier')}>Enregistrer</button>
-        <button style={tabStyle(dashTab==='mot')} onClick={() => setDashTab('mot')}>Mon Mood</button>
-        <button style={tabStyle(dashTab==='pochettes')} onClick={() => setDashTab('pochettes')}>Pochettes</button>
-        <button style={tabStyle(dashTab==='signatures')} onClick={() => setDashTab('signatures')}>Signatures</button>
-        <button style={tabStyle(dashTab==='notifs')} onClick={() => setDashTab('notifs')}>Notifs</button>
+      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 12px', display:'flex', background:'#ffffff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+        <button style={{...tabStyle(dashTab==='stats'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('stats')}>Stats</button>
+        <button style={{...tabStyle(dashTab==='publier'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('publier')}>Enregistrer</button>
+        <button style={{...tabStyle(dashTab==='mot'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('mot')}>Mon Mood</button>
+        <button style={{...tabStyle(dashTab==='pochettes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('pochettes')}>Pochettes</button>
+        <button style={{...tabStyle(dashTab==='signatures'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('signatures')}>Signatures</button>
+        <button style={{...tabStyle(dashTab==='notifs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('notifs')}>Notifs</button>
       </div>
 
-      <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px' }}>
+      <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px', boxSizing:'border-box', width:'100%' }}>
         {msg && <div style={{ background:'#eaf1ff', border:'1px solid #1a6bff', borderRadius:10, padding:'10px 14px', marginBottom:16, color:'#1a6bff', fontSize:13 }}>{msg} <span style={{ cursor:'pointer', float:'right' }} onClick={() => setMsg('')}>✕</span></div>}
 
         {/* ────────── ONGLET STATS ────────── */}
@@ -5628,7 +5704,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
 // ─────────────────────────────────────────────
 // DECOUVRIR STAT — stats sous chaque contenu
 // ─────────────────────────────────────────────
-function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
+function DiscouvrirStat({ qrId, buzz, partages }: { qrId: string, buzz: number, partages?: number }) {
   const [kiffs, setKiffs] = useState(0);
   const [comments, setComments] = useState(0);
   const [coins, setCoins] = useState(0);
@@ -5654,6 +5730,7 @@ function DiscouvrirStat({ qrId, buzz }: { qrId: string, buzz: number }) {
     {stat('Commentaires', comments)}
     {coins > 0 && stat('Oscart', coins)}
     {stat('Buzz', buzz)}
+    {stat('Partages', partages || 0)}
   </>;
 }
 
@@ -6330,6 +6407,7 @@ function DecouvrirPage() {
               <span style={{ color:'#ffd700', fontWeight:700, fontSize:13 }}>{m.artistName}</span>
             </div>
             {m.videoUrl && <video src={m.videoUrl} controls playsInline style={{ width:'100%', borderRadius:10, marginBottom:8, maxHeight:300 }} />}
+            {m.imageUrl && <img src={m.imageUrl} style={{ width:'100%', borderRadius:10, marginBottom:8, maxHeight:300, objectFit:'cover' }} alt="" />}
             {m.texte && <p style={{ color:'#dde4f5', fontSize:14, lineHeight:1.6, margin:0 }}>{m.texte}</p>}
           </div>
         ))}
@@ -6366,20 +6444,25 @@ function DecouvrirPage() {
               <p style={{ color:'#4da6ff', fontSize:13, marginBottom:8 }}>{c.artist}</p>
               {/* Stats Buzz */}
               <div style={{ display:'flex', gap:14, marginBottom:10 }}>
-                <DiscouvrirStat qrId={c.publicLinkId} buzz={c.buzz||0} />
+                <DiscouvrirStat qrId={c.publicLinkId} buzz={c.buzz||0} partages={c.partages||0} />
               </div>
-              {/* Actions — une seule ligne, défilement si besoin */}
-              <div style={{ display:'flex', gap:6, alignItems:'center', overflowX:'auto', whiteSpace:'nowrap', paddingBottom:2 }}>
-                <LikeButton qrId={c.publicLinkId} />
-                <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
-                <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} />
-                <button onClick={() => {
+              {/* Actions — une seule ligne, tout compact et visible */}
+              <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                <LikeButton qrId={c.publicLinkId} compact />
+                <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
+                <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
+                <button onClick={async () => {
                   const url = `${window.location.origin}/ecoute/${c.publicLinkId}`;
-                  const texte = `Écoute "${c.label}" de ${c.artist} sur Doniel Zik : ${url}`;
+                  // Compter le partage
+                  try {
+                    await addDoc(collection(db,'partages'), { publicLinkId: c.publicLinkId, artistEmail: c.artistEmail||'', ts: new Date().toISOString() });
+                    const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',c.publicLinkId)));
+                    if (!qrSnap.empty) await updateDoc(doc(db,'qrcodes',qrSnap.docs[0].id), { partages: (qrSnap.docs[0].data().partages||0) + 1 });
+                  } catch {}
                   if (navigator.share) {
                     navigator.share({ title: c.label, text: `Écoute "${c.label}" de ${c.artist}`, url }).catch(()=>{});
                   } else {
-                    navigator.clipboard?.writeText(texte);
+                    navigator.clipboard?.writeText(`Écoute "${c.label}" de ${c.artist} sur Doniel Zik : ${url}`);
                     alert('Lien copié ! Partage-le à tes amis.');
                   }
                 }} title="Partager" style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
@@ -6775,7 +6858,7 @@ function ResponsablePage() {
   // Commerciaux gagnent : 10 000 F/artiste actif + résidu 10% + 10% marchands
   const artistesActifs = allArtistes.filter(a => {
     const vues = a.buzz || a.vues || 0;
-    return vues >= 5000 || (a.downloads||0) >= 30 || (a.cadeaux||0) >= 2000;
+    return vues >= 5000 || (a.downloads||0) >= 30 || (a.cadeaux||0) >= 2000 || (a.partages||0) >= 1000;
   });
   const commArtistes = Math.round(artistesActifs.length * 10000 * 0.10);
   const residu = Math.round(allArtistes.reduce((s,a) => {
@@ -7317,7 +7400,8 @@ function CommercialPage() {
     const vues = a.buzz || a.vues || 0;
     const dl = a.downloads || 0;
     const cad = a.cadeaux || 0;
-    return vues >= 5000 || dl >= 30 || cad >= 2000; // critère artiste actif
+    const parts = a.partages || 0;
+    return vues >= 5000 || dl >= 30 || cad >= 2000 || parts >= 1000; // critère artiste actif
   });
   const commArtistes = artistesActifs.length * 10000;
   // Résidu : 10% de la part plateforme (téléchargements 30%, pochettes 150F, cadeaux 30%)
@@ -7438,7 +7522,8 @@ function CommercialPage() {
                     <p style={{ fontSize:12, color:'#5a4a20', margin:0, lineHeight:1.9 }}>
                       • 5 000 vues (buzz) ou plus<br/>
                       • 30 téléchargements ou plus<br/>
-                      • 2 000 cadeaux (kiffements) ou plus
+                      • 2 000 cadeaux (kiffements) ou plus<br/>
+                      • 1 000 partages ou plus
                     </p>
                     <p style={{ fontSize:11, color:'#8a7340', margin:'8px 0 0', lineHeight:1.5 }}>
                       Votre rôle : recruter de vrais artistes et les encourager à partager activement leur musique sur les réseaux pour générer du buzz.
@@ -7624,9 +7709,9 @@ function CommercialPage() {
             ) : artistes.map(a => {
               const vues = a.buzz || a.vues || 0;
               const dl = a.downloads || 0;
-              const poch = a.pochettes || 0;
+              const parts = a.partages || 0;
               const cad = a.cadeaux || 0;
-              const estActif = vues >= 5000 || dl >= 30 || cad >= 2000;
+              const estActif = vues >= 5000 || dl >= 30 || cad >= 2000 || parts >= 1000;
               const wa = (a.whatsapp || '').replace(/[^0-9]/g,'');
               const prenom = (a.name||'').split(' ')[0] || 'cher artiste';
               // Messages préconfigurés
@@ -7665,7 +7750,7 @@ function CommercialPage() {
                   {[
                     { l:'Vues', v: vues },
                     { l:'Téléch.', v: dl },
-                    { l:'Pochettes', v: poch },
+                    { l:'Partages', v: parts },
                     { l:'Cadeaux', v: cad },
                   ].map((s,i) => (
                     <div key={i} style={{ flex:1, minWidth:60, background:'#f5f8ff', borderRadius:8, padding:'6px 4px', textAlign:'center' }}>
