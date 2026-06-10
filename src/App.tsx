@@ -6803,7 +6803,7 @@ function ResponsablePage() {
   const [user, setUser] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<'stats'|'demandes'|'equipe'>('stats');
+  const [tab, setTab] = useState<'stats'|'enregistrer'|'demandes'|'equipe'>('stats');
   const [respMode, setRespMode] = useState<'login'|'inscription'>('login');
   const [respNom, setRespNom] = useState('');
   const [respTel, setRespTel] = useState('');
@@ -7007,16 +7007,19 @@ function ResponsablePage() {
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', background:'#fff' }}>
-        {[['stats','Stats'],['demandes',`Demandes (${commerciaux.filter(c=>c.status==='en_attente').length})`],['equipe',`Mon équipe (${commerciaux.filter(c=>c.status!=='en_attente').length})`]].map(([t,l]) => (
+      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 12px', display:'flex', background:'#fff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+        {[['stats','Stats'],['enregistrer','Enregistrer'],['demandes',`Demandes (${commerciaux.filter(c=>c.status==='en_attente').length})`],['equipe',`Mon équipe (${commerciaux.filter(c=>c.status!=='en_attente').length})`]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t as any)}
-            style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:13, fontWeight: tab===t?700:400, borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}` }}>
+            style={{ padding:'12px 14px', border:'none', background:'transparent', color: tab===t?'#1a6bff':'#8098b8', cursor:'pointer', fontSize:13, fontWeight: tab===t?700:400, borderBottom:`2px solid ${tab===t?'#1a6bff':'transparent'}`, flexShrink:0, whiteSpace:'nowrap' }}>
             {l}
           </button>
         ))}
       </div>
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* ENREGISTRER UN ARTISTE */}
+        {tab === 'enregistrer' && <EnregistrerArtisteTab commercialEmail={user.email} db={db} />}
 
         {/* STATS */}
         {tab === 'stats' && (
