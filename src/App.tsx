@@ -22,6 +22,21 @@ const SOUS_ADMINS: string[] = [
   'bigb80313@icloud.com',
   'ruthssgoudo@gmail.com',
 ];
+
+const GROUPE_WHATSAPP = 'https://chat.whatsapp.com/F3MpBQrjcGx0eDUJmJ3fsP?s=cl&p=a&mlu=4';
+
+// Lien WhatsApp cliquable réutilisable
+function WhatsAppLink({ numero, size = 11 }: { numero: string, size?: number }) {
+  if (!numero) return null;
+  const clean = (numero || '').replace(/[^0-9]/g, '');
+  return (
+    <a href={`https://wa.me/${clean}`} target="_blank" rel="noopener noreferrer"
+      style={{ display:'inline-flex', alignItems:'center', gap:4, color:'#25D366', fontSize:size, fontWeight:700, textDecoration:'none' }}>
+      <svg width={size+2} height={size+2} viewBox="0 0 24 24" fill="#25D366"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.737-.961z"/></svg>
+      {numero}
+    </a>
+  );
+}
 // Helpers de rôle
 const estSuperAdmin = (email?: string|null) => (email||'').toLowerCase() === ADMIN_EMAIL.toLowerCase();
 const estSousAdmin = (email?: string|null) => SOUS_ADMINS.map(e=>e.toLowerCase()).includes((email||'').toLowerCase());
@@ -2017,6 +2032,18 @@ function FanPage() {
               />
             )}
 
+            {/* ── DÉCOUVRIR D'AUTRES ARTISTES — garder le visiteur sur la plateforme ── */}
+            <a href="/decouvrir" style={{ textDecoration:'none', display:'block', marginBottom:20 }}>
+              <div style={{ padding:'16px 20px', borderRadius:14, background:'linear-gradient(135deg,#1e6fff,#4da6ff)', display:'flex', alignItems:'center', gap:14, boxShadow:'0 4px 20px rgba(30,111,255,0.35)' }}>
+                <span style={{ fontSize:24, background:'rgba(255,255,255,0.18)', borderRadius:10, padding:'6px 9px' }}>🎵</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ margin:0, fontWeight:800, fontSize:15, color:'#fff' }}>Découvrir d'autres artistes</p>
+                  <p style={{ margin:'2px 0 0', fontSize:12, color:'rgba(255,255,255,0.85)' }}>Explorez toute la musique et les talents sur Doniel Zik</p>
+                </div>
+                <span style={{ fontSize:20, color:'#fff' }}>→</span>
+              </div>
+            </a>
+
             {/* FOOTER */}
             <div style={{ textAlign:'center' }}>
               <img src={LOGO_B64} alt="DZ" style={{ width:36, opacity:0.4, display:'block', margin:'0 auto 6px' }} />
@@ -2760,7 +2787,7 @@ function CommerciauxtTab({ db }: { db: any }) {
                 <div>
                   <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.nom}</p>
                   <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
-                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>
+                  <p style={{ margin:'2px 0 0' }}><WhatsAppLink numero={c.telephone} /></p>
                   <p style={{ color:'#b0c4d8', fontSize:10, marginTop:4 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:200 }}>
@@ -2791,7 +2818,7 @@ function CommerciauxtTab({ db }: { db: any }) {
                 <div>
                   <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.nom}</p>
                   <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
-                  {c.telephone && <p style={{ color:'#1a6bff', fontSize:12, margin:'2px 0', fontWeight:600 }}>{c.telephone}</p>}
+                  {c.telephone && <p style={{ margin:'2px 0' }}><WhatsAppLink numero={c.telephone} size={12} /></p>}
                   {c.responsableEmail && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Responsable : {c.responsableEmail}</p>}
                   <p style={{ color:'#b0c4d8', fontSize:10, margin:'2px 0 0' }}>Validé le {new Date(c.validatedAt||c.createdAt).toLocaleDateString('fr')}</p>
                 </div>
@@ -2924,7 +2951,7 @@ function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[], canD
                 <div>
                   <p style={{ fontWeight:800, fontSize:15, marginBottom:2 }}>{a.name}</p>
                   <p style={{ color:'#8098b8', fontSize:12 }}>{a.email}</p>
-                  {a.whatsapp && <p style={{ color:'#1a6bff', fontSize:12, fontWeight:600 }}>{a.whatsapp}</p>}
+                  {a.whatsapp && <p style={{ margin:'2px 0 0' }}><WhatsAppLink numero={a.whatsapp} size={12} /></p>}
                   <p style={{ color:'#b0c4d8', fontSize:10, marginTop:2 }}>
                     Enregistré le {new Date(a.createdAt).toLocaleDateString('fr')}
                     {a.uid && <span style={{ marginLeft:8, color:'#4dff9a', fontWeight:700 }}>✅ Compte créé</span>}
@@ -6499,12 +6526,13 @@ function DecouvrirPage() {
                 <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
                 <button onClick={async () => {
                   const url = `${window.location.origin}/ecoute/${c.publicLinkId}`;
-                  // Compter le partage
+                  // Compter le partage (collection decouvrir = ce qui s'affiche, + qrcodes pour stats artiste)
                   try {
                     await addDoc(collection(db,'partages'), { publicLinkId: c.publicLinkId, artistEmail: c.artistEmail||'', ts: new Date().toISOString() });
+                    await updateDoc(doc(db,'decouvrir',c.id), { partages: (c.partages||0) + 1 });
                     const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',c.publicLinkId)));
                     if (!qrSnap.empty) await updateDoc(doc(db,'qrcodes',qrSnap.docs[0].id), { partages: (qrSnap.docs[0].data().partages||0) + 1 });
-                  } catch {}
+                  } catch(e) { console.log('partage', e); }
                   if (navigator.share) {
                     navigator.share({ title: c.label, text: `Écoute "${c.label}" de ${c.artist}`, url }).catch(()=>{});
                   } else {
@@ -7064,6 +7092,18 @@ function ResponsablePage() {
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 16px' }}>
 
+        {/* REJOINDRE LE GROUPE WHATSAPP */}
+        <a href={GROUPE_WHATSAPP} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block', marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:12, background:'#25D366', boxShadow:'0 3px 14px rgba(37,211,102,0.3)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.737-.961z"/></svg>
+            <div style={{ flex:1 }}>
+              <p style={{ margin:0, fontWeight:800, fontSize:14, color:'#fff' }}>Rejoindre le groupe WhatsApp</p>
+              <p style={{ margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,0.9)' }}>Échangez avec l'équipe et recevez les actualités</p>
+            </div>
+            <span style={{ fontSize:18, color:'#fff' }}>→</span>
+          </div>
+        </a>
+
         {/* ENREGISTRER UN ARTISTE */}
         {tab === 'enregistrer' && <EnregistrerArtisteTab commercialEmail={user.email} db={db} />}
 
@@ -7129,7 +7169,7 @@ function ResponsablePage() {
                   <div style={{ flex:1 }}>
                     <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.name || c.email}</p>
                     <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{c.email}</p>
-                    {c.telephone && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>}
+                    {c.telephone && <p style={{ margin:'2px 0 0' }}><WhatsAppLink numero={c.telephone} /></p>}
                   </div>
                 </div>
                 {/* Profilage */}
@@ -7182,7 +7222,13 @@ function ResponsablePage() {
                     <div style={{ flex:1 }}>
                       <p style={{ fontWeight:700, fontSize:14, margin:0 }}>{c.name || c.email}</p>
                       <p style={{ color:'#8098b8', fontSize:11, margin:'2px 0 0' }}>{c.email}</p>
-                      {c.telephone && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.telephone}</p>}
+                      {c.telephone && (
+                        <a href={`https://wa.me/${(c.telephone||'').replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer"
+                          style={{ display:'inline-flex', alignItems:'center', gap:4, color:'#25D366', fontSize:11, fontWeight:700, textDecoration:'none', margin:'2px 0 0' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="#25D366"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.737-.961zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                          {c.telephone}
+                        </a>
+                      )}
                       {c.commune && <p style={{ color:'#1a6bff', fontSize:11, margin:0 }}>{c.commune}</p>}
                     </div>
                     <div style={{ textAlign:'right' }}>
@@ -7752,6 +7798,18 @@ function CommercialPage() {
       </div>
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* REJOINDRE LE GROUPE WHATSAPP */}
+        <a href={GROUPE_WHATSAPP} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block', marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:12, background:'#25D366', boxShadow:'0 3px 14px rgba(37,211,102,0.3)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.737-.961z"/></svg>
+            <div style={{ flex:1 }}>
+              <p style={{ margin:0, fontWeight:800, fontSize:14, color:'#fff' }}>Rejoindre le groupe WhatsApp</p>
+              <p style={{ margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,0.9)' }}>Échangez avec l'équipe et recevez les actualités</p>
+            </div>
+            <span style={{ fontSize:18, color:'#fff' }}>→</span>
+          </div>
+        </a>
 
         {/* STATS */}
         {/* ENREGISTRER UN ARTISTE */}
