@@ -3801,21 +3801,21 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 24px', display: 'flex', background: '#ffffff', overflowX:'auto' }}>
-        <button style={tabStyle(tab === 'qrcodes')} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
-        <button style={tabStyle(tab === 'artistes')} onClick={() => setTab('artistes')}>Artistes</button>
-        <button style={tabStyle(tab === 'soumissions')} onClick={() => setTab('soumissions')}>Soumissions</button>
-        <button style={tabStyle(tab === 'commerciaux')} onClick={() => setTab('commerciaux')}>Commerciaux</button>
-        <button style={tabStyle(tab === 'responsables')} onClick={() => setTab('responsables')}>Responsables</button>
-        <button style={tabStyle(tab === 'audience')} onClick={() => setTab('audience')}>
+      <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 12px', display: 'flex', background: '#ffffff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+        <button style={{...tabStyle(tab === 'qrcodes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
+        <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
+        <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
+        <button style={{...tabStyle(tab === 'commerciaux'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('commerciaux')}>Commerciaux</button>
+        <button style={{...tabStyle(tab === 'responsables'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('responsables')}>Responsables</button>
+        <button style={{...tabStyle(tab === 'audience'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('audience')}>
           Audience {audienceStats.melomanes > 0 ? `(${audienceStats.melomanes.toLocaleString()})` : ''}
         </button>
-        <button style={tabStyle(tab === 'production')} onClick={() => setTab('production')}>Productions</button>
-        <button style={tabStyle(tab === 'payments')} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
-        <button style={tabStyle(tab === 'annonceurs')} onClick={() => setTab('annonceurs')}>
+        <button style={{...tabStyle(tab === 'production'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('production')}>Productions</button>
+        <button style={{...tabStyle(tab === 'payments'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
+        <button style={{...tabStyle(tab === 'annonceurs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('annonceurs')}>
           Annonceurs {annonceurs.filter(a => a.status === 'pending').length > 0 ? '(' + annonceurs.filter(a => a.status === 'pending').length + ')' : ''}
         </button>
-        <button style={tabStyle(tab === 'pubs')} onClick={() => setTab('pubs')}>
+        <button style={{...tabStyle(tab === 'pubs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('pubs')}>
           Pubs {pubs.length > 0 ? `(${pubs.length})` : ''}
         </button>
       </div>
