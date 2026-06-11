@@ -2383,7 +2383,7 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 // ─────────────────────────────────────────────
 // SOUMISSIONS TAB — écouter & valider les contenus soumis par les artistes
 // ─────────────────────────────────────────────
-function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
+function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, canDelete?: boolean }) {
   const [soumissions, setSoumissions] = useState<any[]>([]);
   const [mots, setMots] = useState<any[]>([]);
   const [scansModal, setScansModal] = useState<any>(null);
@@ -2392,7 +2392,7 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db,'soumissions'), orderBy('createdAt','desc')),
-      snap => setSoumissions(snap.docs.map(d => ({id:d.id,...d.data()})))
+      snap => setSoumissions(snap.docs.map(d => ({id:d.id,...d.data()})).filter((s:any) => !s.estSortie))
     );
     const unsubMots = onSnapshot(
       query(collection(db,'mots_artiste'), orderBy('createdAt','desc')),
@@ -2489,7 +2489,7 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
       await updateDoc(doc(db,'soumissions',s.id), { statut:'valide' });
       await addDoc(collection(db,'notifications'), {
         to: s.artistEmail, type:'validation',
-        text: `Votre sortie "${s.titre}" est validée et publiée dans "Bientôt" ! Les fans peuvent réserver dès maintenant. Le jour J, uploadez votre fichier officiel.`,
+        text: `Votre sortie "${s.titre}" est validée et publiée dans "Sortie officielle" ! Les fans peuvent réserver dès maintenant. Le jour J, uploadez votre fichier officiel.`,
         createdAt: new Date().toISOString(), lu: false,
       });
     } catch(e:any) { alert('Erreur : ' + e.message); }
@@ -2516,7 +2516,7 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
       </p>
 
       {/* NETTOYER LES MOODS */}
-      {mots.length > 0 && (
+      {mots.length > 0 && canDelete && (
         <button onClick={async () => {
           if (!window.confirm(`Supprimer TOUS les moods (${mots.length}) du fil Actu & Mood ? Cette action est définitive.`)) return;
           try {
@@ -2632,6 +2632,190 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
               <button onClick={() => valider(scansModal)} style={{ ...S.btn, flex:2 }}>Générer & valider</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE ADMIN DÉDIÉE — SORTIES OFFICIELLES
+// Validation des demandes + lancement le jour J
+// ─────────────────────────────────────────────
+function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, canDelete?: boolean }) {
+  const [enAttente, setEnAttente] = useState<any[]>([]);
+  const [sorties, setSorties] = useState<any[]>([]);
+  const [uploadingSortie, setUploadingSortie] = useState('');
+
+  useEffect(() => {
+    // Demandes de sortie en attente de validation (soumissions estSortie)
+    const u1 = onSnapshot(
+      query(collection(db,'soumissions'), orderBy('createdAt','desc')),
+      snap => setEnAttente(snap.docs.map(d => ({id:d.id,...d.data()})).filter((s:any) => s.estSortie && s.statut === 'en_attente'))
+    );
+    // Sorties validées (a_venir = en réservation, sortie = déjà lancée)
+    const u2 = onSnapshot(
+      query(collection(db,'sorties'), orderBy('createdAt','desc')),
+      snap => setSorties(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { u1(); u2(); };
+  }, []);
+
+  const validerSortie = async (s: any) => {
+    if (!window.confirm(`Valider et publier la sortie officielle "${s.titre}" (sortie le ${s.dateSortie}) ?`)) return;
+    try {
+      await addDoc(collection(db,'sorties'), {
+        artistEmail: s.artistEmail, artistName: s.artistName,
+        titre: s.titre, type: s.type, categorie: s.categorie,
+        teaserUrl: s.fileUrl, pochetteUrl: s.pochetteUrl || '',
+        fichierOfficiel: '', dateSortie: s.dateSortie,
+        objTelech: s.objTelech || 0, objCadeaux: s.objCadeaux || 0,
+        prixMusique: s.prixMusique, prixOscart: s.prixOscart,
+        reservations: 0, statut: 'a_venir',
+        createdAt: new Date().toISOString(),
+      });
+      await updateDoc(doc(db,'soumissions',s.id), { statut:'valide' });
+      await addDoc(collection(db,'notifications'), {
+        to: s.artistEmail, type:'validation',
+        text: `Votre sortie officielle "${s.titre}" est validée et publiée ! Les fans peuvent réserver. Le jour J, le fichier officiel sera mis en ligne.`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+      alert('Sortie officielle validée et publiée !');
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const refuserSortie = async (s: any) => {
+    if (!window.confirm(`Refuser la sortie "${s.titre}" ?`)) return;
+    try {
+      await updateDoc(doc(db,'soumissions',s.id), { statut:'refuse' });
+      await addDoc(collection(db,'notifications'), {
+        to: s.artistEmail, type:'refus',
+        text: `Votre demande de sortie officielle "${s.titre}" n'a pas été retenue. Contactez-nous pour plus d'informations.`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const lancerSortie = async (sortie: any, f: File) => {
+    setUploadingSortie(sortie.id);
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) {
+        await updateDoc(doc(db,'sorties',sortie.id), { fichierOfficiel: data.secure_url, statut:'sortie', sortieLe: new Date().toISOString() });
+        const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
+        for (const r of resaSnap.docs) {
+          await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: data.secure_url });
+          await addDoc(collection(db,'notifications'), {
+            to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
+            fichierUrl: data.secure_url, titre: sortie.titre, artistName: sortie.artistName,
+            text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
+            boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
+          });
+        }
+        const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
+        await addDoc(collection(db,'decouvrir'), {
+          publicLinkId, artist: sortie.artistName, artistEmail: sortie.artistEmail,
+          label: sortie.titre, categorie: sortie.categorie, coverUrl: sortie.pochetteUrl || '',
+          files: [{ url: data.secure_url, name: data.secure_url }],
+          publishedAt: new Date().toISOString(),
+        });
+        alert(`Sortie lancée ! ${resaSnap.size} fan(s) notifié(s), téléchargement débloqué.`);
+      }
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+    setUploadingSortie('');
+  };
+
+  const supprimerSortie = async (sortie: any) => {
+    if (!window.confirm(`Supprimer la sortie "${sortie.titre}" ?`)) return;
+    try { await deleteDoc(doc(db,'sorties',sortie.id)); } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const aVenir = sorties.filter(s => s.statut === 'a_venir');
+  const lancees = sorties.filter(s => s.statut === 'sortie');
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:6 }}>Sorties officielles</h2>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:24, lineHeight:1.6 }}>
+        Validez les demandes de sortie officielle des artistes (teaser, pochette, objectifs, prix). Le jour J, uploadez le fichier officiel pour débloquer les téléchargements réservés.
+      </p>
+
+      {/* EN ATTENTE DE VALIDATION */}
+      <div style={{ marginBottom:32 }}>
+        <h3 style={{ fontSize:16, fontWeight:800, color:'#b07a00', marginBottom:14 }}>À valider ({enAttente.length})</h3>
+        {enAttente.length === 0 ? (
+          <p style={{ color:'#8098b8', fontSize:13 }}>Aucune demande de sortie en attente.</p>
+        ) : enAttente.map(s => (
+          <div key={s.id} style={{ ...S.card, marginBottom:12, borderLeft:'3px solid #E0A82E' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+              <div>
+                <p style={{ fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{s.titre}</p>
+                <p style={{ color:'#1a6bff', fontSize:13, margin:'0 0 2px' }}>{s.artistName}</p>
+                <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>
+                  Sortie le {new Date(s.dateSortie).toLocaleDateString('fr')} · {s.prixMusique} F · objectif {(s.objTelech||0).toLocaleString()} téléch.
+                </p>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+              <a href={s.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>▶ Écouter le teaser</a>
+              {s.pochetteUrl && <a href={s.pochetteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>🖼 Voir la pochette</a>}
+            </div>
+            {s.pochetteUrl && <img src={s.pochetteUrl} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginBottom:10 }} />}
+            {canValidate && (
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={() => validerSortie(s)} style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:13, cursor:'pointer' }}>Valider et publier</button>
+                <button onClick={() => refuserSortie(s)} style={{ flex:1, padding:10, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:13, cursor:'pointer' }}>Refuser</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* EN RÉSERVATION (à lancer le jour J) */}
+      <div style={{ marginBottom:32 }}>
+        <h3 style={{ fontSize:16, fontWeight:800, color:'#1a6bff', marginBottom:14 }}>En réservation ({aVenir.length})</h3>
+        {aVenir.length === 0 ? (
+          <p style={{ color:'#8098b8', fontSize:13 }}>Aucune sortie en cours de réservation.</p>
+        ) : aVenir.map(s => {
+          const joursRestants = Math.ceil((new Date(s.dateSortie).getTime() - Date.now()) / (1000*60*60*24));
+          return (
+          <div key={s.id} style={{ ...S.card, marginBottom:12, borderLeft:'3px solid #1a6bff' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+              <div>
+                <p style={{ fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{s.titre}</p>
+                <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 2px' }}>{s.artistName}</p>
+                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Sortie le {new Date(s.dateSortie).toLocaleDateString('fr')} · {(s.reservations||0).toLocaleString()} réservation(s)</p>
+              </div>
+              <span style={{ background:'#eaf1ff', borderRadius:99, padding:'3px 10px', fontSize:10, color:'#1a6bff', fontWeight:700, whiteSpace:'nowrap' }}>
+                {joursRestants > 0 ? `J-${joursRestants}` : 'Jour J'}
+              </span>
+            </div>
+            <div style={{ background:'#fff8e6', borderRadius:8, padding:'10px 12px', marginTop:8 }}>
+              <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Jour J : uploadez le fichier officiel pour débloquer les téléchargements réservés.</p>
+              <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
+                <input type="file" accept="audio/*,video/*" style={{ display:'none' }} onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
+              </label>
+            </div>
+            {canDelete && <button onClick={() => supprimerSortie(s)} style={{ ...S.btnRed, fontSize:11, padding:'4px 10px', marginTop:10 }}>Supprimer</button>}
+          </div>
+          );
+        })}
+      </div>
+
+      {/* DÉJÀ SORTIES */}
+      {lancees.length > 0 && (
+        <div>
+          <h3 style={{ fontSize:16, fontWeight:800, color:'#00a040', marginBottom:14 }}>Déjà sorties ({lancees.length})</h3>
+          {lancees.map(s => (
+            <div key={s.id} style={{ ...S.card, marginBottom:10, borderLeft:'3px solid #00a040' }}>
+              <p style={{ fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{s.titre} <span style={{ color:'#00a040', fontSize:11 }}>✓ sortie</span></p>
+              <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{s.artistName} · {(s.reservations||0).toLocaleString()} téléchargement(s) réservé(s)</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -2824,7 +3008,7 @@ function ProductionTab() {
 // ─────────────────────────────────────────────
 // RESPONSABLES TAB — créer comptes responsables commerciaux
 // ─────────────────────────────────────────────
-function ResponsablesTab() {
+function ResponsablesTab({ canDelete }: { canDelete?: boolean }) {
   const [responsables, setResponsables] = useState<any[]>([]);
   const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
@@ -2899,10 +3083,10 @@ function ResponsablesTab() {
               <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:11, color:'#00a040', fontWeight:700 }}>
                 Actif
               </span>
-              <button onClick={async () => { if (window.confirm('Supprimer ce responsable ?')) await deleteDoc(doc(db, 'responsables', r.id)); }}
+              {canDelete && <button onClick={async () => { if (window.confirm('Supprimer ce responsable ?')) await deleteDoc(doc(db, 'responsables', r.id)); }}
                 style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>
                 Supprimer
-              </button>
+              </button>}
             </div>
           </div>
         </div>
@@ -2914,7 +3098,7 @@ function ResponsablesTab() {
 // ─────────────────────────────────────────────
 // COMMERCIAUX TAB — validation des demandes
 // ─────────────────────────────────────────────
-function CommerciauxtTab({ db }: { db: any }) {
+function CommerciauxtTab({ db, canDelete }: { db: any, canDelete?: boolean }) {
   const [commerciaux, setCommerciaux] = useState<any[]>([]);
   const [responsableEmail, setResponsableEmail] = useState('');
   const [msg, setMsg] = useState('');
@@ -2979,6 +3163,14 @@ function CommerciauxtTab({ db }: { db: any }) {
                   <p style={{ color:'#8098b8', fontSize:12, margin:'2px 0' }}>{c.email}</p>
                   <p style={{ margin:'2px 0 0' }}><WhatsAppLink numero={c.telephone} /></p>
                   <p style={{ color:'#b0c4d8', fontSize:10, marginTop:4 }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                  {(c.methode || c.cible || c.objectif || c.commune) && (
+                    <div style={{ background:'#f5f8ff', borderRadius:10, padding:'8px 10px', marginTop:8 }}>
+                      {c.commune && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 3px' }}><strong>Commune :</strong> {c.commune}</p>}
+                      {c.methode && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 3px' }}><strong>Prospection :</strong> {c.methode}</p>}
+                      {c.cible && <p style={{ fontSize:11, color:'#5a7090', margin:'0 0 3px' }}><strong>Cibles :</strong> {c.cible}</p>}
+                      {c.objectif && <p style={{ fontSize:11, color:'#5a7090', margin:0 }}><strong>Objectif/mois :</strong> {c.objectif} créateurs</p>}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:200 }}>
                   <input
@@ -3017,11 +3209,11 @@ function CommerciauxtTab({ db }: { db: any }) {
                   <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:11, color:'#00a040', fontWeight:700 }}>
                     ✅ Validé
                   </span>
-                  <button onClick={async () => {
+                  {canDelete && <button onClick={async () => {
                     if (window.confirm(`Supprimer ${c.nom} ? Cette action est irréversible.`)) {
                       await deleteDoc(doc(db, 'commerciaux', c.id));
                     }
-                  }} style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Supprimer</button>
+                  }} style={{ ...S.btnRed, fontSize:11, padding:'4px 8px' }}>Supprimer</button>}
                   <button onClick={async () => {
                     await updateDoc(doc(db,'commerciaux',c.id),{ status:'suspendu' });
                   }} style={{ padding:'4px 8px', borderRadius:6, border:'1px solid #f0b84a', background:'rgba(240,184,74,0.1)', color:'#b07a00', fontSize:11, cursor:'pointer' }}>
@@ -4047,7 +4239,23 @@ const pendingPay = payments.filter(p => p.status === 'pending');
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 24 }}>Cette action est irreversible.</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => setConfirmDelete(null)}>Annuler</button>
-              <button style={{ ...S.btnRed, flex: 1, padding: '10px 20px' }} onClick={async () => { await deleteDoc(doc(db, 'qrcodes', confirmDelete)); setConfirmDelete(null); setMsg('QR supprime !'); }}>Supprimer</button>
+              <button style={{ ...S.btnRed, flex: 1, padding: '10px 20px' }} onClick={async () => {
+                try {
+                  // Récupérer le publicLinkId du QR pour nettoyer partout
+                  const qrDoc = qrcodes.find((q:any) => q.id === confirmDelete);
+                  const plId = qrDoc?.publicLinkId;
+                  // 1. Supprimer le QR
+                  await deleteDoc(doc(db, 'qrcodes', confirmDelete));
+                  // 2. Supprimer le contenu lié dans Découvrir + les liens publics
+                  if (plId) {
+                    const decSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',plId)));
+                    for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
+                    const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',plId)));
+                    for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
+                  }
+                  setConfirmDelete(null); setMsg('QR et contenu supprimés partout !');
+                } catch(e:any) { setMsg('Erreur : ' + e.message); setConfirmDelete(null); }
+              }}>Supprimer</button>
             </div>
           </div>
         </div>
@@ -4070,6 +4278,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'qrcodes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
+        <button style={{...tabStyle(tab === 'sorties'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('sorties')}>Sorties officielles</button>
         <button style={{...tabStyle(tab === 'commerciaux'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('commerciaux')}>Commerciaux</button>
         <button style={{...tabStyle(tab === 'responsables'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('responsables')}>Responsables</button>
         <button style={{...tabStyle(tab === 'audience'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('audience')}>
@@ -4206,9 +4415,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
           </>
         )}
 
-        {tab === 'commerciaux' && <CommerciauxtTab db={db} />}
+        {tab === 'commerciaux' && <CommerciauxtTab db={db} canDelete={estSuperAdmin(user?.email)} />}
 
-        {tab === 'responsables' && <ResponsablesTab />}
+        {tab === 'responsables' && <ResponsablesTab canDelete={estSuperAdmin(user?.email)} />}
 
         {/* ────────── ONGLET PRODUCTIONS ────────── */}
         {tab === 'production' && <ProductionTab />}
@@ -4238,7 +4447,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
         {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} canDelete={estSuperAdmin(user?.email)} />}
 
-        {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} />}
+        {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
+        {tab === 'sorties' && <SortiesAdminTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
 
         {tab === 'pubs' && (
           <div>
@@ -4375,8 +4585,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                         </span>
                         <button onClick={() => updateDoc(doc(db,'pubs',p.id),{active:!p.active})}
                           style={{ ...S.btn2, fontSize:11, padding:'3px 8px' }}>{p.active?'Pause':'Activer'}</button>
-                        <button onClick={() => { if (window.confirm('Supprimer cette pub ?')) import('firebase/firestore').then(({deleteDoc,doc:d})=>deleteDoc(d(db,'pubs',p.id))); }}
-                          style={{ ...S.btnRed, fontSize:11, padding:'3px 8px' }}>🗑️</button>
+                        {estSuperAdmin(user?.email) && <button onClick={() => { if (window.confirm('Supprimer cette pub ?')) import('firebase/firestore').then(({deleteDoc,doc:d})=>deleteDoc(d(db,'pubs',p.id))); }}
+                          style={{ ...S.btnRed, fontSize:11, padding:'3px 8px' }}>🗑️</button>}
                       </div>
                     </div>
                     <p style={{ color:'#8098b8', fontSize:11, marginBottom:8 }}>
@@ -4556,7 +4766,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                     <span style={{ color: '#1a6bff', fontWeight: 800, fontSize: 18 }}>{(p.amount || 0).toLocaleString()} FCFA</span>
                     <span style={badgeStyle(p.status)}>{p.status}</span>
                     {p.status === 'pending' && <button style={{ ...S.btn, padding: '8px 14px', fontSize: 12 }} onClick={() => verifyPayment(p)}>Valider</button>}
-                    <button style={{ ...S.btnRed, fontSize: 11 }} onClick={() => deleteDoc(doc(db, 'payments', p.id)).then(() => setMsg('Supprime !'))}>🗑️</button>
+                    {estSuperAdmin(user?.email) && <button style={{ ...S.btnRed, fontSize: 11 }} onClick={() => deleteDoc(doc(db, 'payments', p.id)).then(() => setMsg('Supprime !'))}>🗑️</button>}
                   </div>
                 </div>
               </div>
@@ -4988,6 +5198,24 @@ function ArtistPage() {
                           alert('✅ Contenu publié sur la page Découvrir !');
                         }} style={{ ...S.btn, padding:'8px 14px', fontSize:12, background:'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
                           Publier
+                        </button>
+                        <button onClick={async () => {
+                          if (!window.confirm(`Supprimer définitivement "${link.label}" ? (QR, lien public et publication seront supprimés)`)) return;
+                          try {
+                            const plId = link.publicLinkId;
+                            // Supprimer le QR code lié
+                            const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',plId)));
+                            for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
+                            // Supprimer le lien public
+                            const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',plId)));
+                            for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
+                            // Supprimer de Découvrir
+                            const decSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',plId)));
+                            for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
+                            alert('Contenu supprimé. Actualisez la page.');
+                          } catch(e:any) { alert('Erreur : ' + e.message); }
+                        }} style={{ ...S.btnRed, padding:'8px 14px', fontSize:12 }}>
+                          Supprimer
                         </button>
                       </div>
                     </div>
@@ -6058,7 +6286,7 @@ const TYPES_CONTENU = [
   { id:'tous', label:'Actu & Mood Artistique' },
   { id:'audio', label:'Musique' },
   { id:'video', label:'Vidéo' },
-  { id:'bientot', label:'Bientôt' },
+  { id:'bientot', label:'Sortie officielle' },
 ];
 
 // ─────────────────────────────────────────────
@@ -6169,7 +6397,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         text: `SORTIE PROGRAMMÉE de ${artistName} : "${titre.trim()}" — sortie le ${dateSortie}. À valider.`,
         lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
       });
-      setMsg('✅ Sortie programmée soumise ! Elle sera validée puis publiée dans "Bientôt".');
+      setMsg('✅ Sortie programmée soumise ! Elle sera validée puis publiée dans "Sortie officielle".');
       setTitre(''); setFile(null); setFileUrl(''); setDateSortie(''); setObjTelech(''); setObjCadeaux(''); setPrixMusique('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
   };
@@ -6694,8 +6922,50 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
   );
 }
 
+// Compte à rebours pour les réservations (dans les notifications)
+function CompteRebours({ dateSortie }: { dateSortie?: string }) {
+  const [maintenant, setMaintenant] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (!dateSortie) return (
+    <div style={{ marginTop:8, padding:'8px 12px', borderRadius:8, background:'rgba(240,74,106,0.12)', border:'1px solid rgba(240,74,106,0.3)', display:'inline-block' }}>
+      <span style={{ color:'#ff8095', fontSize:12, fontWeight:700 }}>Réservé — en attente de la sortie</span>
+    </div>
+  );
+  const cible = new Date(dateSortie).getTime();
+  const diff = cible - maintenant;
+  if (diff <= 0) return (
+    <div style={{ marginTop:8, padding:'8px 12px', borderRadius:8, background:'rgba(77,255,154,0.12)', border:'1px solid rgba(77,255,154,0.3)', display:'inline-block' }}>
+      <span style={{ color:'#4dff9a', fontSize:12, fontWeight:700 }}>C'est le jour J ! Votre téléchargement arrive.</span>
+    </div>
+  );
+  const jours = Math.floor(diff / (1000*60*60*24));
+  const heures = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+  const minutes = Math.floor((diff % (1000*60*60)) / (1000*60));
+  const secondes = Math.floor((diff % (1000*60)) / 1000);
+  const Bloc = ({ v, l }: { v:number, l:string }) => (
+    <div style={{ textAlign:'center', background:'rgba(240,74,106,0.15)', borderRadius:8, padding:'6px 8px', minWidth:42 }}>
+      <p style={{ color:'#ff8095', fontSize:18, fontWeight:800, margin:0, lineHeight:1 }}>{String(v).padStart(2,'0')}</p>
+      <p style={{ color:'#8098b8', fontSize:9, margin:'2px 0 0', textTransform:'uppercase' }}>{l}</p>
+    </div>
+  );
+  return (
+    <div style={{ marginTop:10 }}>
+      <p style={{ color:'#ff8095', fontSize:11, fontWeight:700, margin:'0 0 6px' }}>Réservé — disponible dans :</p>
+      <div style={{ display:'flex', gap:6 }}>
+        <Bloc v={jours} l="jours" />
+        <Bloc v={heures} l="h" />
+        <Bloc v={minutes} l="min" />
+        <Bloc v={secondes} l="sec" />
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
-// CARTE SORTIE — rubrique "Bientôt" avec réservation
+// CARTE SORTIE — rubrique "Sortie officielle" avec réservation
 // ─────────────────────────────────────────────
 function CarteSortie({ s }: { s: any }) {
   const [reserve, setReserve] = useState(false);
@@ -6741,7 +7011,7 @@ function CarteSortie({ s }: { s: any }) {
       });
       // Notif perso au fan — bouton rouge (en attente du jour J)
       await addDoc(collection(db,'notifications'), {
-        to: user.email, type:'reservation', sortieId: s.id,
+        to: user.email, type:'reservation', sortieId: s.id, dateSortie: s.dateSortie,
         text: `Réservation confirmée pour "${s.titre}" de ${s.artistName}. Disponible le ${s.dateSortie}.`,
         boutonStatut:'rouge', createdAt: new Date().toISOString(), lu:false,
       });
@@ -6752,9 +7022,9 @@ function CarteSortie({ s }: { s: any }) {
 
   return (
     <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
-      {/* Badge BIENTÔT + compte à rebours */}
+      {/* Badge SORTIE OFFICIELLE + compte à rebours */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(224,168,46,0.12)' }}>
-        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:12, letterSpacing:1 }}>BIENTÔT</span>
+        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
         <span style={{ color:'#E0A82E', fontSize:12, fontWeight:700 }}>
           {joursRestants > 0 ? `J-${joursRestants}` : 'Sortie imminente'}
         </span>
@@ -6822,7 +7092,19 @@ function DecouvrirPage() {
     const unsub = onSnapshot(
       query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
       snap => {
-        setContenus(snap.docs.map(d => ({id:d.id,...d.data()})));
+        const tous = snap.docs.map(d => ({id:d.id,...d.data()})) as any[];
+        // Déduplication : une seule entrée par publicLinkId (et par titre+artiste en secours)
+        const vus = new Set<string>();
+        const uniques = tous.filter((c:any) => {
+          const cle1 = c.publicLinkId || '';
+          const cle2 = `${(c.label||'').toLowerCase().trim()}__${(c.artist||c.artistEmail||'').toLowerCase().trim()}`;
+          if (cle1 && vus.has('id:'+cle1)) return false;
+          if (vus.has('lab:'+cle2)) return false;
+          if (cle1) vus.add('id:'+cle1);
+          vus.add('lab:'+cle2);
+          return true;
+        });
+        setContenus(uniques);
         setLoading(false);
       }
     );
@@ -6863,10 +7145,10 @@ function DecouvrirPage() {
       </div>
 
       {/* FILTRES TYPE */}
-      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
         {TYPES_CONTENU.map(t => (
           <button key={t.id} onClick={() => handleTypeChange(t.id)}
-            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>
+            style={{ padding:'7px 14px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12.5, fontWeight:600, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.2 }}>
             {t.label}
           </button>
         ))}
@@ -7081,12 +7363,8 @@ function NotificationsPage() {
             <div style={{ flex:1 }}>
               <p style={{ fontSize:13, color: n.lu ? '#5a7090' : '#dde4f5', margin:'0 0 4px', lineHeight:1.5 }}>{n.text}</p>
               <p style={{ fontSize:11, color:'#2a3a60', margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</p>
-              {/* Bouton réservation : rouge (en attente) ou vert (disponible) */}
-              {n.type === 'reservation' && (
-                <div style={{ marginTop:8, padding:'8px 12px', borderRadius:8, background:'rgba(240,74,106,0.12)', border:'1px solid rgba(240,74,106,0.3)', display:'inline-block' }}>
-                  <span style={{ color:'#ff8095', fontSize:12, fontWeight:700 }}>Réservé — en attente de la sortie</span>
-                </div>
-              )}
+              {/* Bouton réservation : compte à rebours (rouge) ou disponible (vert) */}
+              {n.type === 'reservation' && <CompteRebours dateSortie={n.dateSortie} />}
               {n.type === 'sortie_dispo' && (
                 <button onClick={async (e) => {
                   e.stopPropagation();
