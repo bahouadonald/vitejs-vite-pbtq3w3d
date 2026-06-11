@@ -2388,6 +2388,33 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
+  const validerSortie = async (s: any) => {
+    if (!window.confirm(`Valider la sortie programmée "${s.titre}" (sortie le ${s.dateSortie}) ?`)) return;
+    try {
+      // Créer l'entrée dans la rubrique Bientôt
+      await addDoc(collection(db,'sorties'), {
+        artistEmail: s.artistEmail, artistName: s.artistName,
+        titre: s.titre, type: s.type, categorie: s.categorie,
+        teaserUrl: s.fileUrl,           // l'extrait (audio/vidéo)
+        fichierOfficiel: '',            // sera uploadé le jour J
+        dateSortie: s.dateSortie,
+        objTelech: s.objTelech || 0,
+        objCadeaux: s.objCadeaux || 0,
+        prixMusique: s.prixMusique,
+        prixOscart: s.prixOscart,
+        reservations: 0,
+        statut: 'a_venir',              // a_venir -> sortie
+        createdAt: new Date().toISOString(),
+      });
+      await updateDoc(doc(db,'soumissions',s.id), { statut:'valide' });
+      await addDoc(collection(db,'notifications'), {
+        to: s.artistEmail, type:'validation',
+        text: `Votre sortie "${s.titre}" est validée et publiée dans "Bientôt" ! Les fans peuvent réserver dès maintenant. Le jour J, uploadez votre fichier officiel.`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
   const refuser = async (s: any) => {
     if (!window.confirm(`Refuser "${s.titre}" ?`)) return;
     await updateDoc(doc(db,'soumissions',s.id), { statut:'refuse' });
@@ -2457,6 +2484,7 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
               <p style={{ fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{s.titre}</p>
               <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 2px' }}>{s.artistName}</p>
               <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{PRIX_PUBLICATION[s.type as keyof typeof PRIX_PUBLICATION]?.label || s.type} · {s.categorie}</p>
+              {s.estSortie && <p style={{ color:'#b07a00', fontSize:11, margin:'2px 0 0', fontWeight:700 }}>SORTIE PROGRAMMÉE — le {s.dateSortie} · objectif {(s.objTelech||0).toLocaleString()} téléch. · {s.prixMusique} F</p>}
             </div>
             <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'3px 10px', fontSize:10, color:'#b07a00', fontWeight:700 }}>En attente</span>
           </div>
@@ -2464,15 +2492,22 @@ function SoumissionsTab({ canValidate }: { canValidate?: boolean }) {
           {/* Lien secret pour écouter */}
           <a href={s.fileUrl} target="_blank" rel="noopener noreferrer"
             style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:8, background:'#eaf1ff', color:'#1a6bff', textDecoration:'none', fontSize:13, fontWeight:700, marginBottom:10 }}>
-            ▶ Écouter / Visionner le contenu
+            ▶ Écouter / Visionner {s.estSortie ? 'le teaser' : 'le contenu'}
           </a>
 
           {canValidate && (
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => { setScansModal(s); setNbScans('1'); }}
-                style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#00a040', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                Valider & générer QR
-              </button>
+              {s.estSortie ? (
+                <button onClick={() => validerSortie(s)}
+                  style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  Valider la sortie
+                </button>
+              ) : (
+                <button onClick={() => { setScansModal(s); setNbScans('1'); }}
+                  style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#00a040', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  Valider & générer QR
+                </button>
+              )}
               <button onClick={() => refuser(s)}
                 style={{ flex:1, padding:10, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:13, cursor:'pointer' }}>
                 Refuser
@@ -2527,6 +2562,8 @@ function ProductionTab() {
   const [demandes, setDemandes] = useState<any[]>([]);
   const [commandes, setCommandes] = useState<any[]>([]);
   const [uploadingCmd, setUploadingCmd] = useState('');
+  const [sorties, setSorties] = useState<any[]>([]);
+  const [uploadingSortie, setUploadingSortie] = useState('');
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db,'demandes_production'), orderBy('createdAt','desc')),
@@ -2536,8 +2573,48 @@ function ProductionTab() {
       query(collection(db,'commandes_pochettes'), orderBy('createdAt','desc')),
       snap => setCommandes(snap.docs.map(d => ({id:d.id,...d.data()})))
     );
-    return () => { unsub(); unsubCmd(); };
+    const unsubSorties = onSnapshot(
+      query(collection(db,'sorties'), orderBy('createdAt','desc')),
+      snap => setSorties(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { unsub(); unsubCmd(); unsubSorties(); };
   }, []);
+
+  // LE JOUR J : uploader le fichier officiel → débloque les téléchargements réservés
+  const lancerSortie = async (sortie: any, f: File) => {
+    setUploadingSortie(sortie.id);
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) {
+        // Marquer la sortie comme sortie (officielle) avec le fichier complet
+        await updateDoc(doc(db,'sorties',sortie.id), { fichierOfficiel: data.secure_url, statut:'sortie', sortieLe: new Date().toISOString() });
+        // Débloquer toutes les réservations + notifier (bouton vert)
+        const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
+        for (const r of resaSnap.docs) {
+          await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: data.secure_url });
+          await addDoc(collection(db,'notifications'), {
+            to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
+            fichierUrl: data.secure_url, titre: sortie.titre, artistName: sortie.artistName,
+            text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
+            boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
+          });
+        }
+        // Publier dans Découvrir (devient un contenu normal)
+        const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
+        await addDoc(collection(db,'decouvrir'), {
+          publicLinkId, artist: sortie.artistName, artistEmail: sortie.artistEmail,
+          label: sortie.titre, categorie: sortie.categorie,
+          files: [{ url: data.secure_url, name: data.secure_url }],
+          publishedAt: new Date().toISOString(),
+        });
+        alert(`Sortie lancée ! ${resaSnap.size} fans notifiés, leur téléchargement est débloqué.`);
+      }
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+    setUploadingSortie('');
+  };
 
   const uploadCrea = async (cmdId: string, f: File) => {
     setUploadingCmd(cmdId);
@@ -2562,6 +2639,39 @@ function ProductionTab() {
 
   return (
     <div>
+      {/* SORTIES PROGRAMMÉES */}
+      {sorties.filter(s => s.statut === 'a_venir').length > 0 && (
+        <div style={{ marginBottom:28 }}>
+          <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:16 }}>Sorties programmées</h2>
+          {sorties.filter(s => s.statut === 'a_venir').map(s => {
+            const joursRestants = Math.ceil((new Date(s.dateSortie).getTime() - Date.now()) / (1000*60*60*24));
+            return (
+            <div key={s.id} style={{ ...S.card, marginBottom:12, borderLeft:'3px solid #E0A82E' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div>
+                  <p style={{ fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{s.titre}</p>
+                  <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 2px' }}>{s.artistName}</p>
+                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Sortie le {new Date(s.dateSortie).toLocaleDateString('fr')} · {s.prixMusique} F · {(s.reservations||0).toLocaleString()} réservation(s)</p>
+                </div>
+                <span style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:99, padding:'3px 10px', fontSize:10, color:'#b07a00', fontWeight:700, whiteSpace:'nowrap' }}>
+                  {joursRestants > 0 ? `J-${joursRestants}` : 'Jour J'}
+                </span>
+              </div>
+              <a href={s.teaserUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', fontSize:12, color:'#1a6bff', marginBottom:10 }}>▶ Écouter le teaser</a>
+              <div style={{ background:'#fff8e6', borderRadius:8, padding:'10px 12px' }}>
+                <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Le jour J : uploadez le fichier officiel complet pour débloquer les téléchargements réservés.</p>
+                <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                  {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
+                  <input type="file" accept="audio/*,video/*" style={{ display:'none' }}
+                    onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
+                </label>
+              </div>
+            </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* COMMANDES DE POCHETTES */}
       {commandes.length > 0 && (
         <div style={{ marginBottom:28 }}>
@@ -5849,6 +5959,7 @@ const TYPES_CONTENU = [
   { id:'tous', label:'Actu & Mood Artistique' },
   { id:'audio', label:'Musique' },
   { id:'video', label:'Vidéo' },
+  { id:'bientot', label:'Bientôt' },
 ];
 
 // ─────────────────────────────────────────────
@@ -5865,6 +5976,7 @@ const PRIX_PUBLICATION = {
 };
 
 function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
+  const [mode, setMode] = useState<'simple'|'sortie'>('simple');
   const [titre, setTitre] = useState('');
   const [type, setType] = useState<'single'|'album'|'video'|'serie'>('single');
   const [categorie, setCategorie] = useState('autres');
@@ -5873,6 +5985,11 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
   const [mesSubmissions, setMesSubmissions] = useState<any[]>([]);
+  // Champs sortie programmée
+  const [dateSortie, setDateSortie] = useState('');
+  const [objTelech, setObjTelech] = useState('');
+  const [objCadeaux, setObjCadeaux] = useState('');
+  const [prixMusique, setPrixMusique] = useState('');
 
   const prix = PRIX_PUBLICATION[type].oscart;
   const estVideo = type === 'video' || type === 'serie';
@@ -5930,12 +6047,60 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
   };
 
+  const soumettreSortie = async () => {
+    if (!titre.trim()) { setMsg('Entrez le titre'); return; }
+    if (!fileUrl) { setMsg('Ajoutez votre teaser (extrait)'); return; }
+    if (!dateSortie) { setMsg('Indiquez la date de sortie officielle'); return; }
+    if (!prixMusique || parseInt(prixMusique) <= 0) { setMsg('Indiquez le prix du téléchargement (en FCFA)'); return; }
+    try {
+      await addDoc(collection(db,'soumissions'), {
+        artistEmail: user.email, artistName, artistUid: user.uid,
+        titre: titre.trim(), type, categorie, fileUrl,
+        estSortie: true,
+        dateSortie,
+        objTelech: parseInt(objTelech) || 0,
+        objCadeaux: parseInt(objCadeaux) || 0,
+        prixMusique: parseInt(prixMusique),
+        prixOscart: Math.round(parseInt(prixMusique) / 10),
+        statut: 'en_attente',
+        createdAt: new Date().toISOString(),
+      });
+      await addDoc(collection(db,'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'soumission',
+        text: `SORTIE PROGRAMMÉE de ${artistName} : "${titre.trim()}" — sortie le ${dateSortie}. À valider.`,
+        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
+      });
+      setMsg('✅ Sortie programmée soumise ! Elle sera validée puis publiée dans "Bientôt".');
+      setTitre(''); setFile(null); setFileUrl(''); setDateSortie(''); setObjTelech(''); setObjCadeaux(''); setPrixMusique('');
+    } catch(e:any) { setMsg('Erreur : ' + e.message); }
+  };
+
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
       <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Enregistrer un contenu</h3>
       <p style={{ color:'#8098b8', fontSize:13, marginBottom:16, lineHeight:1.6 }}>
         Enregistrez votre musique ou vidéo sur la plateforme. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation par notre équipe, votre QR public et votre lien seront générés — vous pourrez alors les partager et publier.
       </p>
+
+      {/* SÉLECTEUR DE MODE */}
+      <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        <button onClick={() => { setMode('simple'); setMsg(''); }}
+          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='simple'?'#1a6bff':'#dce6f7'}`, background:mode==='simple'?'#eaf1ff':'#fff', color:mode==='simple'?'#1a6bff':'#5a7090', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          Enregistrement simple
+        </button>
+        <button onClick={() => { setMode('sortie'); setMsg(''); }}
+          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='sortie'?'#E0A82E':'#dce6f7'}`, background:mode==='sortie'?'#fff8e6':'#fff', color:mode==='sortie'?'#b07a00':'#5a7090', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          Programmer une sortie
+        </button>
+      </div>
+
+      {mode === 'sortie' && (
+        <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
+          <p style={{ color:'#b07a00', fontSize:12, margin:0, lineHeight:1.6 }}>
+            Programmez la sortie officielle de votre œuvre. Vous mettez un teaser (extrait) que les fans découvrent en streaming. Ils réservent leur téléchargement en payant à l'avance. Le jour J, vous uploadez le fichier officiel : tous ceux qui ont réservé le reçoivent automatiquement.
+          </p>
+        </div>
+      )}
 
       <div style={S.card}>
         <label style={S.lbl}>Titre du contenu *</label>
@@ -5961,6 +6126,34 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté</p>}
 
         {/* Coût */}
+        {mode === 'sortie' ? (
+          <div style={{ marginTop:14 }}>
+            <label style={S.lbl}>Date de sortie officielle *</label>
+            <input style={S.inp} type="date" value={dateSortie} onChange={e => setDateSortie(e.target.value)} />
+
+            <div style={{ display:'flex', gap:10 }}>
+              <div style={{ flex:1 }}>
+                <label style={S.lbl}>Objectif téléchargements</label>
+                <input style={S.inp} type="number" min="0" value={objTelech} onChange={e => setObjTelech(e.target.value)} placeholder="Ex: 100000" />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={S.lbl}>Objectif cadeaux</label>
+                <input style={S.inp} type="number" min="0" value={objCadeaux} onChange={e => setObjCadeaux(e.target.value)} placeholder="Ex: 50000" />
+              </div>
+            </div>
+
+            <label style={S.lbl}>Prix du téléchargement (FCFA) *</label>
+            <input style={S.inp} type="number" min="0" value={prixMusique} onChange={e => setPrixMusique(e.target.value)} placeholder="Ex: 2000" />
+            {prixMusique && <p style={{ color:'#8098b8', fontSize:11, margin:'4px 0 0' }}>Soit {Math.round(parseInt(prixMusique||'0')/10)} Oscart par réservation. L'artiste touche 70%.</p>}
+
+            {msg && <p style={{ color: msg.startsWith('✅')||msg.includes('prêt')||msg.includes('ajouté') ? '#00a040' : '#f04a6a', fontSize:12, margin:'12px 0' }}>{msg}</p>}
+
+            <button onClick={soumettreSortie} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:8, background:'linear-gradient(135deg,#E0A82E,#f0c050)', color:'#1a2340' }}>
+              {uploading ? 'Patientez...' : 'Soumettre la sortie programmée'}
+            </button>
+          </div>
+        ) : (
+          <>
         <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', margin:'14px 0' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ color:'#5a7090', fontSize:13 }}>Coût de publication</span>
@@ -5982,6 +6175,8 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           <button onClick={soumettre} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14 }}>
             {uploading ? 'Patientez...' : `Soumettre (${prix} Oscart)`}
           </button>
+        )}
+          </>
         )}
       </div>
 
@@ -6400,9 +6595,125 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
   );
 }
 
+// ─────────────────────────────────────────────
+// CARTE SORTIE — rubrique "Bientôt" avec réservation
+// ─────────────────────────────────────────────
+function CarteSortie({ s }: { s: any }) {
+  const [reserve, setReserve] = useState(false);
+  const [reserving, setReserving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const user = auth.currentUser;
+  const estVideo = /\.(mp4|mov|avi|mkv|webm|m4v)(\?|$)/i.test(s.teaserUrl || '');
+
+  useEffect(() => {
+    if (!user) return;
+    getDocs(query(collection(db,'reservations'), where('sortieId','==',s.id), where('userId','==',user.uid)))
+      .then(snap => { if (!snap.empty) setReserve(true); }).catch(()=>{});
+  }, [user, s.id]);
+
+  // Compte à rebours
+  const joursRestants = Math.ceil((new Date(s.dateSortie).getTime() - Date.now()) / (1000*60*60*24));
+  const progression = s.objTelech > 0 ? Math.min(100, Math.round((s.reservations || 0) / s.objTelech * 100)) : 0;
+
+  const reserver = async () => {
+    if (!user) { window.location.href = '/ziko'; return; }
+    setReserving(true); setMsg('');
+    try {
+      // Vérifier le solde
+      const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      const solde = soldeSnap.empty ? 0 : (soldeSnap.docs[0].data().solde || 0);
+      if (solde < s.prixOscart) { setMsg(`Solde insuffisant. Il vous faut ${s.prixOscart} Oscart.`); setReserving(false); return; }
+      // Débiter
+      await updateDoc(doc(db,'coins_solde',soldeSnap.docs[0].id), { solde: solde - s.prixOscart });
+      // Créer la réservation
+      await addDoc(collection(db,'reservations'), {
+        sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
+        userId: user.uid, userEmail: user.email, userName: user.displayName || user.email,
+        prixOscart: s.prixOscart, statut:'reserve', telecharge:false,
+        createdAt: new Date().toISOString(),
+      });
+      // Incrémenter le compteur de réservations
+      await updateDoc(doc(db,'sorties',s.id), { reservations: (s.reservations || 0) + 1 });
+      // Part artiste 70%
+      const partArtiste = Math.round(s.prixOscart * 0.7);
+      await addDoc(collection(db,'ventes'), {
+        artistEmail: s.artistEmail, type:'reservation', titre: s.titre,
+        montantOscart: partArtiste, createdAt: new Date().toISOString(),
+      });
+      // Notif perso au fan — bouton rouge (en attente du jour J)
+      await addDoc(collection(db,'notifications'), {
+        to: user.email, type:'reservation', sortieId: s.id,
+        text: `Réservation confirmée pour "${s.titre}" de ${s.artistName}. Disponible le ${s.dateSortie}.`,
+        boutonStatut:'rouge', createdAt: new Date().toISOString(), lu:false,
+      });
+      setReserve(true); setMsg('✅ Réservé ! Vous recevrez le contenu le jour de la sortie.');
+    } catch(e:any) { setMsg('Erreur : ' + e.message); }
+    setReserving(false);
+  };
+
+  return (
+    <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
+      {/* Badge BIENTÔT + compte à rebours */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(224,168,46,0.12)' }}>
+        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:12, letterSpacing:1 }}>BIENTÔT</span>
+        <span style={{ color:'#E0A82E', fontSize:12, fontWeight:700 }}>
+          {joursRestants > 0 ? `J-${joursRestants}` : 'Sortie imminente'}
+        </span>
+      </div>
+
+      {/* Teaser */}
+      {estVideo ? (
+        <video src={s.teaserUrl} controls playsInline style={{ width:'100%', maxHeight:260, background:'#000', display:'block' }} />
+      ) : (
+        <div style={{ padding:'14px' }}>
+          <audio src={s.teaserUrl} controls style={{ width:'100%' }} />
+          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>Extrait — version complète le jour de la sortie</p>
+        </div>
+      )}
+
+      <div style={{ padding:'14px' }}>
+        <p style={{ color:'#fff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{s.titre}</p>
+        <p style={{ color:'#E0A82E', fontSize:13, margin:'0 0 10px' }}>{s.artistName}</p>
+
+        <div style={{ display:'flex', gap:14, marginBottom:10, fontSize:12, color:'#cad4e8' }}>
+          <span>Sortie : <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr')}</strong></span>
+          <span>Prix : <strong style={{ color:'#fff' }}>{s.prixMusique} F</strong></span>
+        </div>
+
+        {/* Barre de progression */}
+        {s.objTelech > 0 && (
+          <div style={{ marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#8098b8', marginBottom:4 }}>
+              <span>{(s.reservations || 0).toLocaleString()} réservations</span>
+              <span>Objectif : {s.objTelech.toLocaleString()}</span>
+            </div>
+            <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+              <div style={{ width:`${progression}%`, height:'100%', background:'linear-gradient(90deg,#E0A82E,#f0c050)', borderRadius:99 }} />
+            </div>
+          </div>
+        )}
+
+        {msg && <p style={{ color: msg.startsWith('✅') ? '#4dff9a':'#ff8095', fontSize:12, margin:'0 0 8px' }}>{msg}</p>}
+
+        {reserve ? (
+          <div style={{ padding:12, borderRadius:10, background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.3)', textAlign:'center' }}>
+            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>Réservé — disponible le jour J</p>
+          </div>
+        ) : (
+          <button onClick={reserver} disabled={reserving}
+            style={{ width:'100%', padding:13, borderRadius:10, border:'none', background:'linear-gradient(135deg,#E0A82E,#f0c050)', color:'#1a2340', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+            {reserving ? 'Réservation...' : `Réserver mon téléchargement (${s.prixOscart} Oscart)`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DecouvrirPage() {
   const [contenus, setContenus] = useState<any[]>([]);
   const [motsArtistes, setMotsArtistes] = useState<any[]>([]);
+  const [sorties, setSorties] = useState<any[]>([]);
   const [typeFiltre, setTypeFiltre] = useState('tous');
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
@@ -6420,7 +6731,11 @@ function DecouvrirPage() {
       query(collection(db, 'mots_artiste'), orderBy('createdAt','desc')),
       snap => setMotsArtistes(snap.docs.map(d => ({id:d.id,...d.data()})).filter((m:any) => m.statut === 'valide'))
     );
-    return () => { unsub(); unsubMots(); };
+    const unsubSorties = onSnapshot(
+      query(collection(db, 'sorties'), orderBy('createdAt','desc')),
+      snap => setSorties(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { unsub(); unsubMots(); unsubSorties(); };
   }, []);
 
   // Réinitialiser catégorie quand on change de type
@@ -6472,8 +6787,21 @@ function DecouvrirPage() {
 
       {/* CONTENUS */}
       <div style={{ padding:'0 16px' }}>
+        {/* RUBRIQUE BIENTÔT — sorties programmées */}
+        {typeFiltre === 'bientot' && (
+          !loading && sorties.filter(s => s.statut === 'a_venir').length === 0 ? (
+            <div style={{ textAlign:'center', padding:40 }}>
+              <p style={{ fontSize:36, marginBottom:10 }}>🔜</p>
+              <p style={{ color:'#4a5878', fontSize:14 }}>Aucune sortie programmée pour l'instant</p>
+              <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Les prochaines sorties officielles apparaîtront ici</p>
+            </div>
+          ) : (
+            sorties.filter(s => s.statut === 'a_venir').map(s => <CarteSortie key={s.id} s={s} />)
+          )
+        )}
+
         {/* MOODS — affichés dans le fil uniquement sur l'onglet Actu & Mood */}
-        {!loading && typeFiltre === 'tous' && motsArtistes.map(m => (
+        {typeFiltre !== 'bientot' && !loading && typeFiltre === 'tous' && motsArtistes.map(m => (
           <div key={'mood-'+m.id} style={{ marginBottom:16, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.22)', borderRadius:16, overflow:'hidden', padding:'14px 16px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
               <span style={{ background:'rgba(255,215,0,0.2)', color:'#ffd700', fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:99 }}>MOOD</span>
@@ -6485,7 +6813,7 @@ function DecouvrirPage() {
           </div>
         ))}
 
-        {loading ? (
+        {typeFiltre === 'bientot' ? null : loading ? (
           <div style={{ textAlign:'center', padding:40, color:'#4a5878' }}>Chargement...</div>
         ) : contenusFiltres.length === 0 && !(typeFiltre === 'tous' && motsArtistes.length > 0) ? (
           <div style={{ textAlign:'center', padding:40 }}>
@@ -6654,6 +6982,32 @@ function NotificationsPage() {
             <div style={{ flex:1 }}>
               <p style={{ fontSize:13, color: n.lu ? '#5a7090' : '#dde4f5', margin:'0 0 4px', lineHeight:1.5 }}>{n.text}</p>
               <p style={{ fontSize:11, color:'#2a3a60', margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</p>
+              {/* Bouton réservation : rouge (en attente) ou vert (disponible) */}
+              {n.type === 'reservation' && (
+                <div style={{ marginTop:8, padding:'8px 12px', borderRadius:8, background:'rgba(240,74,106,0.12)', border:'1px solid rgba(240,74,106,0.3)', display:'inline-block' }}>
+                  <span style={{ color:'#ff8095', fontSize:12, fontWeight:700 }}>Réservé — en attente de la sortie</span>
+                </div>
+              )}
+              {n.type === 'sortie_dispo' && (
+                <button onClick={async (e) => {
+                  e.stopPropagation();
+                  // Télécharger + ajouter à la zikothèque
+                  try {
+                    const a = document.createElement('a');
+                    a.href = n.fichierUrl; a.download = (n.titre||'contenu'); a.target = '_blank';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    const u = auth.currentUser;
+                    if (u) {
+                      await addDoc(collection(db,'zikotheque'), {
+                        uid: u.uid, userEmail: u.email, titre: n.titre, artistName: n.artistName,
+                        fileUrl: n.fichierUrl, addedAt: new Date().toISOString(),
+                      });
+                    }
+                  } catch {}
+                }} style={{ marginTop:8, padding:'10px 16px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00a040,#4dff9a)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+                  ⬇ Télécharger maintenant
+                </button>
+              )}
             </div>
             {!n.lu && <div style={{ width:8, height:8, borderRadius:99, background:'#1a6bff', flexShrink:0, marginTop:6 }} />}
           </div>
