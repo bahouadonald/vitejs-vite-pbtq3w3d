@@ -11,7 +11,7 @@ import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup,
   RecaptchaVerifier, signInWithPhoneNumber, updateProfile,
-  sendPasswordResetEmail,
+  sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
@@ -21,6 +21,9 @@ const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
 const SOUS_ADMINS: string[] = [
   'bigb80313@icloud.com',
   'ruthssgoudo@gmail.com',
+  'kboklay13@gmail.com',
+  'w.biastace@gmail.com',
+  'bokobillionaire@gmail.com',
 ];
 
 const GROUPE_WHATSAPP = 'https://chat.whatsapp.com/F3MpBQrjcGx0eDUJmJ3fsP?s=cl&p=a&mlu=4';
@@ -109,6 +112,74 @@ function DocumentLegalModal({ titre, articles, onClose }: { titre: string, artic
           </div>
         ))}
         <button onClick={onClose} style={{ ...S.btn, width:'100%', padding:12, marginTop:8 }}>Fermer</button>
+      </div>
+    </div>
+  );
+}
+
+// Option 3 : l'admin envoie un lien de réinitialisation à un utilisateur
+function BoutonResetAdmin({ email }: { email: string }) {
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState(false);
+  if (!email) return null;
+  return (
+    <button onClick={async (e) => {
+      e.stopPropagation();
+      try { await sendPasswordResetEmail(auth, email); setSent(true); setErr(false); }
+      catch { setErr(true); }
+    }} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:8, border:`1px solid ${sent?'#00a040':err?'#f04a6a':'#dce6f7'}`, background: sent?'#eafff2':'#fff', color: sent?'#00a040':err?'#f04a6a':'#5a7090', fontSize:11, fontWeight:600, cursor:'pointer', marginTop:6 }}>
+      {sent ? '✅ Lien envoyé' : err ? 'Erreur' : '🔑 Réinitialiser mot de passe'}
+    </button>
+  );
+}
+
+// Option 2 : l'utilisateur connecté change son propre mot de passe
+function ChangerMotDePasse() {
+  const [open, setOpen] = useState(false);
+  const [ancien, setAncien] = useState('');
+  const [nouveau, setNouveau] = useState('');
+  const [confirme, setConfirme] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const changer = async () => {
+    setMsg('');
+    if (nouveau.length < 6) { setMsg('Le nouveau mot de passe doit faire au moins 6 caractères'); return; }
+    if (nouveau !== confirme) { setMsg('Les deux mots de passe ne correspondent pas'); return; }
+    const u = auth.currentUser;
+    if (!u || !u.email) { setMsg('Vous devez être connecté'); return; }
+    setLoading(true);
+    try {
+      // Ré-authentifier avec l'ancien mot de passe (exigé par Firebase)
+      const cred = EmailAuthProvider.credential(u.email, ancien);
+      await reauthenticateWithCredential(u, cred);
+      await updatePassword(u, nouveau);
+      setMsg('✅ Mot de passe modifié avec succès');
+      setAncien(''); setNouveau(''); setConfirme('');
+      setTimeout(() => setOpen(false), 1500);
+    } catch(e:any) {
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') setMsg('Ancien mot de passe incorrect');
+      else setMsg('Erreur : ' + (e.message || e.code));
+    }
+    setLoading(false);
+  };
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{ width:'100%', padding:12, borderRadius:10, border:'1px solid #dce6f7', background:'#fff', color:'#1a6bff', fontWeight:700, fontSize:13, cursor:'pointer', marginTop:10 }}>
+      Changer mon mot de passe
+    </button>
+  );
+
+  return (
+    <div style={{ background:'#f5f8ff', border:'1px solid #dce6f7', borderRadius:12, padding:16, marginTop:10 }}>
+      <p style={{ fontWeight:700, fontSize:14, color:'#1a2340', margin:'0 0 12px' }}>Changer mon mot de passe</p>
+      <input type="password" placeholder="Mot de passe actuel" value={ancien} onChange={e => setAncien(e.target.value)} style={S.inp} />
+      <input type="password" placeholder="Nouveau mot de passe (min. 6 caractères)" value={nouveau} onChange={e => setNouveau(e.target.value)} style={S.inp} />
+      <input type="password" placeholder="Confirmer le nouveau mot de passe" value={confirme} onChange={e => setConfirme(e.target.value)} style={S.inp} />
+      {msg && <p style={{ color: msg.startsWith('✅') ? '#00a040' : '#f04a6a', fontSize:12, margin:'8px 0' }}>{msg}</p>}
+      <div style={{ display:'flex', gap:8, marginTop:8 }}>
+        <button onClick={changer} disabled={loading} style={{ ...S.btn, flex:2, padding:11 }}>{loading ? '...' : 'Valider'}</button>
+        <button onClick={() => { setOpen(false); setMsg(''); }} style={{ ...S.btn2, flex:1, padding:11 }}>Annuler</button>
       </div>
     </div>
   );
@@ -1615,6 +1686,15 @@ function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => vo
               style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:13 }}>
               {mode === 'email' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
             </button>
+            {mode === 'email' && (
+              <button onClick={async () => {
+                if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); }
+                catch { setMsg('Email introuvable. Vérifiez votre adresse.'); }
+              }} style={{ width:'100%', padding:'10px', border:'none', background:'transparent', color:'#a78bfa', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
+                Mot de passe oublié ?
+              </button>
+            )}
           </>
         )}
       </div>
@@ -2931,6 +3011,7 @@ function CommerciauxtTab({ db }: { db: any }) {
                   {c.telephone && <p style={{ margin:'2px 0' }}><WhatsAppLink numero={c.telephone} size={12} /></p>}
                   {c.responsableEmail && <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Responsable : {c.responsableEmail}</p>}
                   <p style={{ color:'#b0c4d8', fontSize:10, margin:'2px 0 0' }}>Validé le {new Date(c.validatedAt||c.createdAt).toLocaleDateString('fr')}</p>
+                  <BoutonResetAdmin email={c.email} />
                 </div>
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <span style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:99, padding:'3px 12px', fontSize:11, color:'#00a040', fontWeight:700 }}>
@@ -3066,6 +3147,7 @@ function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[], canD
                     Enregistré le {new Date(a.createdAt).toLocaleDateString('fr')}
                     {a.uid && <span style={{ marginLeft:8, color:'#4dff9a', fontWeight:700 }}>✅ Compte créé</span>}
                   </p>
+                  <BoutonResetAdmin email={a.email} />
                 </div>
               </div>
               <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -4995,6 +5077,13 @@ function ArtistPage() {
           </div>
         )}
 
+        {/* CHANGER MOT DE PASSE (option 2) — visible sur l'onglet Stats */}
+        {dashTab === 'stats' && (
+          <div style={{ marginTop:20 }}>
+            <ChangerMotDePasse />
+          </div>
+        )}
+
         {/* ────────── ONGLET VENTES ────────── */}
         {/* ── PUBLIER UN CONTENU ── */}
         {dashTab === 'publier' && <PublierContenuTab user={user} soldeOscart={soldeOscartArtiste} artistName={stats.artistName || user?.displayName || ''} onRecharge={() => setRechargeModalArtiste(RECHARGES[1])} />}
@@ -5455,6 +5544,16 @@ function UserAuthPage() {
                 onClick={() => { setMode(mode === 'email' ? 'register' : 'email'); setMsg(''); }}>
                 {mode === 'email' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
               </button>
+              {mode === 'email' && (
+                <button style={{ width:'100%', textAlign:'center', padding:'10px', border:'none', background:'transparent', color:'#1a6bff', cursor:'pointer', fontSize:13, textDecoration:'underline', marginTop:4 }}
+                  onClick={async () => {
+                    if (!email) { setMsg('Entrez votre email d\'abord'); return; }
+                    try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); }
+                    catch { setMsg('Email introuvable. Vérifiez votre adresse.'); }
+                  }}>
+                  Mot de passe oublié ?
+                </button>
+              )}
             </>
           )}
         </div>
@@ -7500,6 +7599,7 @@ function ResponsablePage() {
                 Avec 50 commerciaux actifs qui atteignent leurs objectifs, vous pouvez générer <strong style={{ color:'#1a6bff' }}>1 550 000 FCFA/mois</strong>
               </p>
             </div>
+            <ChangerMotDePasse />
           </div>
         )}
 
@@ -8208,6 +8308,7 @@ function CommercialPage() {
                 </div>
               ))}
             </div>
+            <ChangerMotDePasse />
           </div>
         )}
 
