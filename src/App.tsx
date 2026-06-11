@@ -5184,12 +5184,20 @@ function ArtistPage() {
                           // Publier sur la page Découvrir
                           const snap = await getDocs(query(collection(db, 'decouvrir'), where('publicLinkId','==', link.publicLinkId)));
                           if (!snap.empty) { alert('Ce contenu est déjà publié sur Découvrir !'); return; }
+                          // Récupérer les fichiers depuis le QR code lié
+                          let files = link.files || [];
+                          if (files.length === 0) {
+                            const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==', link.publicLinkId)));
+                            if (!qrSnap.empty) files = qrSnap.docs[0].data().files || [];
+                          }
+                          if (files.length === 0) { alert('Ce contenu n\'a pas de fichier audio/vidéo. Impossible de le publier.'); return; }
                           await addDoc(collection(db, 'decouvrir'), {
                             publicLinkId: link.publicLinkId,
                             label: link.label,
                             artist: link.artist || '',
                             coverUrl: link.coverUrl || '',
                             type: link.type || 'single',
+                            files,
                             artistEmail: user.email,
                             publishedAt: new Date().toISOString(),
                             likes: 0,
@@ -7093,9 +7101,12 @@ function DecouvrirPage() {
       query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
       snap => {
         const tous = snap.docs.map(d => ({id:d.id,...d.data()})) as any[];
-        // Déduplication : une seule entrée par publicLinkId (et par titre+artiste en secours)
+        // Déduplication + exclusion des fiches sans fichier média (publications fantômes)
         const vus = new Set<string>();
         const uniques = tous.filter((c:any) => {
+          // Doit avoir un fichier audio/vidéo, sinon c'est une coquille vide
+          const aUnFichier = (c.files && c.files.length > 0 && (c.files[0]?.url || c.files[0]?.name)) || c.fileUrl;
+          if (!aUnFichier) return false;
           const cle1 = c.publicLinkId || '';
           const cle2 = `${(c.label||'').toLowerCase().trim()}__${(c.artist||c.artistEmail||'').toLowerCase().trim()}`;
           if (cle1 && vus.has('id:'+cle1)) return false;
