@@ -6764,10 +6764,10 @@ function DecouvrirPage() {
       </div>
 
       {/* FILTRES TYPE */}
-      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto' }}>
+      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {TYPES_CONTENU.map(t => (
           <button key={t.id} onClick={() => handleTypeChange(t.id)}
-            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap' }}>
+            style={{ padding:'6px 16px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12, fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>
             {t.label}
           </button>
         ))}
