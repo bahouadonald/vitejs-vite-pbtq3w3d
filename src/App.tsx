@@ -2642,6 +2642,108 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
 // PAGE ADMIN DÉDIÉE — SORTIES OFFICIELLES
 // Validation des demandes + lancement le jour J
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PAGE ADMIN — GESTION DE DÉCOUVRIR
+// Voir tout le contenu publié + supprimer
+// ─────────────────────────────────────────────
+function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
+  const [contenus, setContenus] = useState<any[]>([]);
+  const [recherche, setRecherche] = useState('');
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db,'decouvrir'), orderBy('publishedAt','desc')),
+      snap => setContenus(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return unsub;
+  }, []);
+
+  const supprimer = async (c: any) => {
+    if (!window.confirm(`Supprimer "${c.label}" de Découvrir ?\n\n(Le QR code et le lien public liés seront aussi supprimés)`)) return;
+    try {
+      const plId = c.publicLinkId;
+      await deleteDoc(doc(db,'decouvrir',c.id));
+      if (plId) {
+        const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',plId)));
+        for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
+        const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',plId)));
+        for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
+      }
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const retirerDecouvrir = async (c: any) => {
+    if (!window.confirm(`Retirer "${c.label}" de Découvrir uniquement ?\n\n(Le contenu et son QR restent, il disparaît juste du fil Découvrir)`)) return;
+    try { await deleteDoc(doc(db,'decouvrir',c.id)); } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const filtres = contenus.filter(c => {
+    if (!recherche.trim()) return true;
+    const t = recherche.toLowerCase();
+    return (c.label||'').toLowerCase().includes(t) || (c.artist||'').toLowerCase().includes(t) || (c.artistEmail||'').toLowerCase().includes(t);
+  });
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:6 }}>Gestion de Découvrir</h2>
+      <p style={{ color:'#8098b8', fontSize:13, marginBottom:16, lineHeight:1.6 }}>
+        Tout le contenu publié sur la page Découvrir. Vous pouvez retirer un contenu du fil, ou le supprimer entièrement (avec son QR et son lien).
+      </p>
+
+      <input
+        placeholder="Rechercher par titre, artiste ou email..."
+        value={recherche} onChange={e => setRecherche(e.target.value)}
+        style={{ ...S.inp, marginBottom:16 }}
+      />
+
+      <p style={{ color:'#8098b8', fontSize:12, marginBottom:12 }}>{filtres.length} contenu(s) publié(s)</p>
+
+      {filtres.length === 0 ? (
+        <p style={{ color:'#8098b8', fontSize:13 }}>Aucun contenu.</p>
+      ) : filtres.map(c => {
+        const aUnFichier = (c.files && c.files.length > 0 && (c.files[0]?.url || c.files[0]?.name)) || c.fileUrl;
+        return (
+        <div key={c.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${aUnFichier ? '#00a040' : '#f04a6a'}` }}>
+          <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+            {c.coverUrl ? (
+              <img src={c.coverUrl} alt={c.label} style={{ width:54, height:54, objectFit:'cover', borderRadius:8, flexShrink:0 }} />
+            ) : (
+              <div style={{ width:54, height:54, borderRadius:8, background:'#eaf1ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>🎵</div>
+            )}
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{c.label || '(sans titre)'}</p>
+              <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 2px' }}>{c.artist || c.artistEmail || '—'}</p>
+              <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>
+                {c.type || 'single'} · publié le {c.publishedAt ? new Date(c.publishedAt).toLocaleDateString('fr') : '—'}
+              </p>
+              {!aUnFichier && <p style={{ color:'#f04a6a', fontSize:11, fontWeight:700, margin:'4px 0 0' }}>⚠ Pas de fichier audio/vidéo (fiche vide)</p>}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+            {c.publicLinkId && (
+              <a href={`/ecoute/${c.publicLinkId}`} target="_blank" rel="noopener noreferrer"
+                style={{ padding:'6px 12px', borderRadius:8, background:'#eaf1ff', color:'#1a6bff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                Voir la page fan
+              </a>
+            )}
+            <button onClick={() => retirerDecouvrir(c)}
+              style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #f0b84a', background:'#fff8e6', color:'#b07a00', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+              Retirer du fil
+            </button>
+            {canDelete && (
+              <button onClick={() => supprimer(c)}
+                style={{ padding:'6px 12px', borderRadius:8, border:'none', background:'#f04a6a', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                Supprimer tout
+              </button>
+            )}
+          </div>
+        </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, canDelete?: boolean }) {
   const [enAttente, setEnAttente] = useState<any[]>([]);
   const [sorties, setSorties] = useState<any[]>([]);
@@ -4279,6 +4381,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
         <button style={{...tabStyle(tab === 'sorties'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('sorties')}>Sorties officielles</button>
+        <button style={{...tabStyle(tab === 'decouvrir'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('decouvrir')}>Découvrir</button>
         <button style={{...tabStyle(tab === 'commerciaux'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('commerciaux')}>Commerciaux</button>
         <button style={{...tabStyle(tab === 'responsables'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('responsables')}>Responsables</button>
         <button style={{...tabStyle(tab === 'audience'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('audience')}>
@@ -4449,6 +4552,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
         {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
         {tab === 'sorties' && <SortiesAdminTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
+        {tab === 'decouvrir' && <DecouvrirAdminTab canDelete={estSuperAdmin(user?.email)} />}
 
         {tab === 'pubs' && (
           <div>
@@ -6291,10 +6395,10 @@ const CATEGORIES_VIDEO = [
 ];
 
 const TYPES_CONTENU = [
-  { id:'tous', label:'Actu & Mood Artistique' },
-  { id:'audio', label:'Musique' },
-  { id:'video', label:'Vidéo' },
-  { id:'bientot', label:'Sortie officielle' },
+  { id:'tous', label:'Actu & Mood', titre:'Actu & Mood Artistique', icon:'M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h12v4H3v-4z' },
+  { id:'audio', label:'Musique', titre:'Musique', icon:'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z' },
+  { id:'video', label:'Vidéo', titre:'Vidéo', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
+  { id:'bientot', label:'Sorties', titre:'Sorties officielles', icon:'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z' },
 ];
 
 // ─────────────────────────────────────────────
@@ -7101,12 +7205,9 @@ function DecouvrirPage() {
       query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
       snap => {
         const tous = snap.docs.map(d => ({id:d.id,...d.data()})) as any[];
-        // Déduplication + exclusion des fiches sans fichier média (publications fantômes)
+        // Déduplication : une seule entrée par publicLinkId (et par titre+artiste en secours)
         const vus = new Set<string>();
         const uniques = tous.filter((c:any) => {
-          // Doit avoir un fichier audio/vidéo, sinon c'est une coquille vide
-          const aUnFichier = (c.files && c.files.length > 0 && (c.files[0]?.url || c.files[0]?.name)) || c.fileUrl;
-          if (!aUnFichier) return false;
           const cle1 = c.publicLinkId || '';
           const cle2 = `${(c.label||'').toLowerCase().trim()}__${(c.artist||c.artistEmail||'').toLowerCase().trim()}`;
           if (cle1 && vus.has('id:'+cle1)) return false;
@@ -7155,14 +7256,24 @@ function DecouvrirPage() {
         <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
       </div>
 
-      {/* FILTRES TYPE */}
-      <div style={{ display:'flex', gap:8, padding:'12px 16px 8px', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
+      {/* FILTRES TYPE — barre d'icônes style Facebook */}
+      <div style={{ display:'flex', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 8px' }}>
         {TYPES_CONTENU.map(t => (
           <button key={t.id} onClick={() => handleTypeChange(t.id)}
-            style={{ padding:'7px 14px', borderRadius:99, border:`1px solid ${typeFiltre===t.id?'#1a6bff':'rgba(255,255,255,0.1)'}`, background:typeFiltre===t.id?'#1a6bff':'transparent', color:typeFiltre===t.id?'#fff':'#8098b8', cursor:'pointer', fontSize:12.5, fontWeight:600, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.2 }}>
-            {t.label}
+            title={t.titre}
+            style={{ flex:1, padding:'12px 4px', border:'none', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', borderBottom:`2px solid ${typeFiltre===t.id?'#4da6ff':'transparent'}`, transition:'all 0.2s' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={typeFiltre===t.id?'#4da6ff':'#8098b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d={t.icon} />
+            </svg>
           </button>
         ))}
+      </div>
+
+      {/* TITRE EN GRAND de l'onglet actif */}
+      <div style={{ padding:'16px 16px 8px' }}>
+        <h2 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:0, fontFamily:"'DM Sans',sans-serif" }}>
+          {TYPES_CONTENU.find(t => t.id === typeFiltre)?.titre || ''}
+        </h2>
       </div>
 
       {/* FILTRES CATÉGORIE — seulement sur Musique/Vidéo */}
