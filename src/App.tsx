@@ -7697,6 +7697,24 @@ function ProfilPage() {
           )}
         </div>
 
+        {/* INFORMATIONS */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ color:'#4a5878', fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:8, paddingLeft:4 }}>Informations</p>
+          <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:14, overflow:'hidden' }}>
+            {[
+              { label:'À propos de Doniel Zik', path:'/apropos' },
+              { label:"Conditions d'utilisation", path:'/conditions' },
+              { label:'Confidentialité', path:'/privacy' },
+            ].map((it, i) => (
+              <a key={it.path} href={it.path}
+                style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', textDecoration:'none', color:'#dde4f5', fontSize:14, borderTop: i>0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                <span>{it.label}</span>
+                <span style={{ color:'#4a5878', fontSize:18 }}>›</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* Déconnexion */}
         <button onClick={() => signOut(auth).then(() => window.location.href = '/')}
           style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid rgba(240,74,106,0.3)', background:'rgba(240,74,106,0.08)', color:'#f04a6a', fontWeight:700, fontSize:14, cursor:'pointer' }}>
@@ -8833,6 +8851,67 @@ function CommercialPage() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AProposPage() {
+  const sections = [
+    {
+      t: "Qu'est-ce que Doniel Zik ?",
+      c: "Doniel Zik est une plateforme numérique africaine de distribution, de promotion et de monétisation de contenu créatif, conçue et éditée par BDE SARL, basée à Abidjan en Côte d'Ivoire. Elle a été pensée pour répondre à un besoin réel et longtemps ignoré : permettre aux artistes africains de vivre véritablement de leur talent. Là où la plupart des artistes voient leur travail circuler, être écouté, partagé et apprécié sans jamais leur rapporter le moindre revenu, Doniel Zik renverse cette logique en plaçant la rémunération de l'artiste au cœur de son fonctionnement."
+    },
+    {
+      t: "Pour tous les talents créatifs",
+      c: "La plateforme s'adresse à l'ensemble des talents créatifs, et non à la seule musique. Chanteurs, acteurs, vidéastes, danseurs et humoristes peuvent tous y publier leurs contenus, qu'il s'agisse de titres audio, de clips, de vidéos, de séries ou de performances. Chaque création trouve sa place et son public. Doniel Zik n'est pas un réseau social de plus, où l'on accumule des vues sans contrepartie : c'est un outil professionnel, sérieux et structuré, dont la finalité est de faire vivre et de rentabiliser la création."
+    },
+    {
+      t: "Comment l'artiste gagne de l'argent",
+      c: "Le principe de rémunération est simple et transparent. Sur Doniel Zik, le contenu d'un artiste lui rapporte directement et de plusieurs façons. À chaque écoute ou visionnage de son contenu, l'artiste perçoit un revenu. À chaque téléchargement de sa musique ou de sa vidéo, il est payé. À chaque cadeau que lui envoie un fan, il reçoit sa part. Plus son public s'engage, écoute, télécharge et le soutient, plus ses revenus augmentent. L'artiste n'est plus spectateur de son propre succès : il en récolte les fruits."
+    },
+    {
+      t: "Le lien public et le QR code",
+      c: "Chaque artiste dispose d'un lien public et d'un QR code personnel, qu'il peut partager partout : sur ses réseaux sociaux, lors de ses concerts, à ses événements. Toute personne qui ouvre ce lien ou scanne ce code accède instantanément au contenu de l'artiste, peut l'écouter, le regarder et le télécharger, où qu'elle se trouve. L'artiste peut également commander des pochettes physiques intelligentes portant son QR code, à revendre à ses fans : chaque pochette devient à la fois un objet promotionnel et une source de revenus."
+    },
+    {
+      t: "Une communauté de mélomanes",
+      c: "La vie de la plateforme repose sur sa communauté. Les fans, appelés mélomanes, découvrent les contenus, les écoutent, les regardent, les aiment, les commentent, les partagent et soutiennent leurs artistes préférés. Ce partage est un moteur de croissance : plus un contenu circule et est vu, plus l'artiste gagne en visibilité et en revenus. La découverte des talents et le soutien direct du public forment le cœur battant de Doniel Zik."
+    },
+    {
+      t: "Notre engagement",
+      c: "À travers cet écosystème complet, Doniel Zik poursuit un engagement clair : valoriser le talent créatif africain et offrir aux artistes un véritable outil professionnel pour faire connaître, diffuser et rentabiliser leur travail, en toute transparence et au plus près de leur public."
+    },
+  ];
+  return (
+    <div style={{ ...S.bg, minHeight:'100vh' }}>
+      <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
+        <Logo size="sm" />
+        <a href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', fontWeight:700 }}>← Accueil</a>
+      </div>
+      <div style={{ maxWidth:720, margin:'0 auto', padding:'32px 20px 60px' }}>
+        <h1 style={{ fontFamily:'serif', fontSize:30, fontWeight:800, marginBottom:8, color:'#1a6bff' }}>À propos de Doniel Zik</h1>
+        <p style={{ color:'#8098b8', fontSize:14, marginBottom:32, fontStyle:'italic' }}>La plateforme qui fait vivre et rentabilise le talent créatif africain</p>
+        {sections.map((s,i) => (
+          <div key={i} style={{ marginBottom:28 }}>
+            <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, color:'#1a2340', marginBottom:10 }}>{s.t}</h2>
+            <p style={{ color:'#3a4860', fontSize:15, lineHeight:1.75, margin:0 }}>{s.c}</p>
+          </div>
+        ))}
+        <div style={{ marginTop:40, padding:'20px', background:'#f5f8ff', borderRadius:12, textAlign:'center' }}>
+          <p style={{ color:'#1a2340', fontSize:15, fontWeight:700, marginBottom:8 }}>Rejoignez Doniel Zik dès aujourd'hui</p>
+          <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.6, marginBottom:16 }}>
+            Que vous soyez artiste, mélomane ou annonceur, Doniel Zik vous ouvre les portes d'un nouvel écosystème créatif. Faites vivre votre talent, soutenez vos artistes préférés, ou faites connaître votre activité auprès d'une communauté active et engagée.
+          </p>
+          <a href="/decouvrir" style={{ display:'inline-block', padding:'12px 24px', borderRadius:99, background:'#1a6bff', color:'#fff', textDecoration:'none', fontWeight:700, fontSize:14 }}>Découvrir la plateforme</a>
+        </div>
+        <div style={{ marginTop:30, textAlign:'center', display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap' }}>
+          <a href="/conditions" style={{ color:'#8098b8', fontSize:13 }}>Conditions d'utilisation</a>
+          <a href="/privacy" style={{ color:'#8098b8', fontSize:13 }}>Confidentialité</a>
+        </div>
+        <p style={{ color:'#b0c4d8', fontSize:12, textAlign:'center', marginTop:24 }}>
+          Doniel Zik — Édité par BDE SARL · Abidjan, Côte d'Ivoire · doniel.art
+        </p>
       </div>
     </div>
   );
@@ -10575,7 +10654,13 @@ function PublicStreamPage() {
         {/* FOOTER */}
         <div style={{ textAlign: 'center' }}>
           <img src={LOGO_B64} alt="DZ" style={{ width: 36, opacity: 0.35, display: 'block', margin: '0 auto 6px' }} />
-          <p style={{ color: 'rgba(100,140,200,0.2)', fontSize: 9, letterSpacing: 2 }}>LA MUSIQUE. UN SCAN. UN MONDE.</p>
+          <p style={{ color: 'rgba(100,140,200,0.2)', fontSize: 9, letterSpacing: 2, marginBottom: 14 }}>LA MUSIQUE. UN SCAN. UN MONDE.</p>
+          <div style={{ display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap', marginBottom:10 }}>
+            <a href="/apropos" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>À propos</a>
+            <a href="/conditions" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Conditions d'utilisation</a>
+            <a href="/privacy" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Confidentialité</a>
+          </div>
+          <p style={{ color:'rgba(100,140,200,0.3)', fontSize:11 }}>© 2026 Doniel Zik — BDE SARL · Abidjan, Côte d'Ivoire</p>
         </div>
       </div>
     </div>
@@ -10825,6 +10910,8 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/responsable" element={<ResponsablePage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
+        <Route path="/apropos" element={<AProposPage />} />
+        <Route path="/about" element={<AProposPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
