@@ -13,7 +13,7 @@ function copyWellKnown() {
           mkdirSync('dist/.well-known', { recursive: true })
         }
         writeFileSync('dist/.well-known/assetlinks.json', content)
-        console.log('✓ assetlinks.json copié dans dist/.well-known/')
+        console.log('\u2713 assetlinks.json copie dans dist/.well-known/')
       } catch (e) {
         console.error('Erreur copie assetlinks:', e)
       }
@@ -23,4 +23,14 @@ function copyWellKnown() {
 
 export default defineConfig({
   plugins: [react(), copyWellKnown()],
+  build: {
+    // Separer Firebase dans son propre chunk : mieux mis en cache, charge en parallele
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+        },
+      },
+    },
+  },
 })
