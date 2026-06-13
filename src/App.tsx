@@ -605,7 +605,9 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
       )}
 
       {open && (
-        <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
+        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background:'#161b2e', border:'1px solid rgba(255,200,0,0.2)', borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
+          <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
 
           {/* Solde Oscart */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
@@ -655,6 +657,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
               })}
               </div>
           <p style={{ color:'#4a5878', fontSize:10, marginTop:10, textAlign:'center' }}>70% reversé à l'artiste</p>
+        </div>
         </div>
       )}
     </div>
@@ -746,7 +749,9 @@ function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEm
       </button>
 
       {open && (
-        <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:14 }}>
+        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background:'#161b2e', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
+          <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
           {/* Saisie commentaire */}
           <div style={{ display:'flex', gap:8, marginBottom: msg ? 8 : 14 }}>
             <input value={text} onChange={e => { setText(e.target.value); setMsg(''); }}
@@ -808,6 +813,7 @@ function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEm
               </div>
             </div>
           ))}
+        </div>
         </div>
       )}
     </div>
@@ -5237,7 +5243,7 @@ function ArtistPage() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                 <div>
                   <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Votre portefeuille</p>
-                  <p style={{ fontWeight:900, fontSize:24, color:'#ffd700', margin:0 }}>{soldeOscartArtiste} Oscart</p>
+                  <p style={{ fontWeight:900, fontSize:24, color:'#ffd700', margin:0 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:22, height:22, verticalAlign:"-4px", marginRight:5 }} />{soldeOscartArtiste} Oscart</p>
                   <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscartArtiste * 10).toLocaleString()} F CFA</p>
                 </div>
                 <button onClick={() => setRechargeModalArtiste(RECHARGES[1])}
@@ -7702,7 +7708,7 @@ function ProfilPage() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
             <div>
               <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Mon portefeuille</p>
-              <p style={{ fontWeight:900, fontSize:28, color:'#ffd700', margin:0 }}>{soldeOscart} Oscart</p>
+              <p style={{ fontWeight:900, fontSize:28, color:'#ffd700', margin:0 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:24, height:24, verticalAlign:"-4px", marginRight:5 }} />{soldeOscart} Oscart</p>
               <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscart * 10).toLocaleString()} F CFA</p>
             </div>
             <button onClick={() => setRechargeModalProfil(RECHARGES[1])}
@@ -10370,7 +10376,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
       ) : (
         <button onClick={payer} disabled={paying}
           style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-          {paying ? 'Traitement...' : `Télécharger — ${prixOscart} Oscart`}
+          {paying ? 'Traitement...' : (<span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>Télécharger — {prixOscart} Oscart <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:18, height:18 }} /></span>)}
         </button>
       )}
     </div>
@@ -10501,7 +10507,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
           <div>
             <p style={{ fontWeight:800, fontSize:24, color:'#ffd700', margin:'0 0 2px' }}>
-              {Math.ceil(prix / 10)} Oscart
+              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:22, height:22, verticalAlign:"-4px", marginRight:5 }} />{Math.ceil(prix / 10)} Oscart
             </p>
             <p style={{ color:'rgba(255,255,255,0.3)', fontSize:10, margin:0 }}>
               Monnaie de la plateforme · 1 Oscart = 10 F
