@@ -24,11 +24,15 @@ function copyWellKnown() {
 export default defineConfig({
   plugins: [react(), copyWellKnown()],
   build: {
-    // Separer Firebase dans son propre chunk : mieux mis en cache, charge en parallele
     rollupOptions: {
       output: {
-        manualChunks: {
-          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+        // Forme fonction (compatible Vite 8) : Firebase dans son propre chunk
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@firebase') || id.includes('/firebase/')) {
+              return 'firebase'
+            }
+          }
         },
       },
     },
