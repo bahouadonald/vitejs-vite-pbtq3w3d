@@ -1,4 +1,4 @@
-const CACHE_NAME = 'doniel-zik-v2';
+const CACHE_NAME = 'doniel-zik-v3';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 // Installation
@@ -15,10 +15,29 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch — réseau d'abord, cache en fallback
+// Fetch — assets statiques en cache-first (rapide), navigation en reseau-d'abord
+const ASSET_RE = /\.(?:js|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|ico)$/;
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
+  const url = new URL(event.request.url);
+  if (url.pathname.includes('/api/')) return;
+
+  // Cross-origin : seulement les polices Google en cache, le reste au reseau (Firestore, Cloudinary...)
+  if (url.origin !== self.location.origin) {
+    if (/fonts\.(googleapis|gstatic)\.com$/.test(url.host)) {
+      event.respondWith(cacheFirst(event.request));
+    }
+    return;
+  }
+
+  // Assets statiques (JS/CSS/images/polices) -> cache-first = instantane
+  if (ASSET_RE.test(url.pathname)) {
+    event.respondWith(cacheFirst(event.request));
+    return;
+  }
+
+  // Navigation (HTML) -> reseau-d'abord, cache en secours hors-ligne
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -26,11 +45,20 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then((r) => r || caches.match('/')))
   );
 });
 
-// Background Sync — résilience aux mauvaises connexions
+async function cacheFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const res = await fetch(request);
+  if (res && res.status === 200) cache.put(request, res.clone());
+  return res;
+}
+
+// Background Sync — resilience aux mauvaises connexions
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-data') {
     event.waitUntil(
@@ -41,7 +69,7 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-// Periodic Background Sync — données fraîches en arrière-plan
+// Periodic Background Sync — donnees fraiches en arriere-plan
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'update-content') {
     event.waitUntil(
