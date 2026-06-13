@@ -1242,7 +1242,7 @@ function LikeButton({ qrId, compact }: { qrId: string, compact?: boolean }) {
         style={ compact
           ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: liked?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
           : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' } }>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill={liked?'#f04a6a':'none'} stroke={liked?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={liked?'#f04a6a':'none'} stroke={liked?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         {compact ? (count > 0 ? count.toLocaleString() : '') : `Kiff ${count > 0 ? count.toLocaleString() : ''}`}
       </button>
     </div>
