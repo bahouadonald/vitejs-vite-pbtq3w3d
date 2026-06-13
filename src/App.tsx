@@ -2531,7 +2531,7 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       await setDoc(doc(db,'publicLinks',publicLinkId), {
         artist: s.artistName, artistEmail: s.artistEmail,
         label: s.titre, categorie: s.categorie,
-        fileUrl: s.fileUrl, type: s.type,
+        fileUrl: s.fileUrl, type: s.type, coverUrl: s.pochetteUrl || '',
         createdAt: new Date().toISOString(),
       });
       // QR privé à scan limité (visible ADMIN uniquement)
@@ -2539,13 +2539,13 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
         artist: s.artistName, artistEmail: s.artistEmail,
         label: s.titre, categorie: s.categorie,
         totalScans: scans, usedScans: 0, status:'active',
-        publicLinkId, fileUrl: s.fileUrl,
+        publicLinkId, fileUrl: s.fileUrl, coverUrl: s.pochetteUrl || '',
         createdAt: new Date().toISOString(),
       });
       // Ajouter à Découvrir
       await addDoc(collection(db,'decouvrir'), {
         publicLinkId, artist: s.artistName, artistEmail: s.artistEmail,
-        label: s.titre, categorie: s.categorie,
+        label: s.titre, categorie: s.categorie, coverUrl: s.pochetteUrl || '',
         files: [{ url: s.fileUrl, name: s.fileUrl }],
         publishedAt: new Date().toISOString(),
       });
@@ -4989,6 +4989,8 @@ function ArtistPage() {
   const [dashTab, setDashTab] = useState<'stats'|'publier'|'mot'|'pochettes'|'signatures'|'notifs'>('stats');
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
+  const [artistNom, setArtistNom] = useState('');
+  const refParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
 
   // Charger solde Oscart artiste
   useEffect(() => {
@@ -5163,16 +5165,39 @@ function ArtistPage() {
     if (password.length < 8) { setMsg('Le mot de passe doit faire au moins 8 caractères'); return; }
     setLoading(true); setMsg('');
     try {
-      // Vérifier que l'email est dans la liste des artistes enregistrés par l'admin
+      // L'email est-il déjà enregistré comme artiste ?
       const artistSnap = await getDocs(query(collection(db, 'artists'), where('email','==', email)));
-      if (artistSnap.empty) {
-        setMsg('Cet email n\'est pas enregistré comme artiste Doniel Zik. Contactez-nous pour vous enregistrer.');
+      // Pas enregistré ET pas de lien commercial -> bloquer
+      if (artistSnap.empty && !refParam) {
+        setMsg('Cet email n\'est pas enregistré. Inscrivez-vous via le lien de votre commercial Doniel Zik.');
         setLoading(false); return;
+      }
+      if (artistSnap.empty && !artistNom.trim()) {
+        setMsg('Indiquez votre nom d\'artiste.');
+        setLoading(false); return;
+      }
+      // Résoudre le commercial parrain depuis le lien (?ref=)
+      let commercialEmail = '';
+      if (refParam) {
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const cSnap = await getDoc(doc(db, 'commerciaux', refParam));
+          if (cSnap.exists()) commercialEmail = (cSnap.data().email || '').toLowerCase();
+        } catch {}
       }
       // Créer le compte Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      // Mettre à jour l'uid dans le document artiste existant
-      await updateDoc(doc(db, 'artists', artistSnap.docs[0].id), { uid: cred.user.uid });
+      if (artistSnap.empty) {
+        // Auto-inscription via lien commercial : créer la fiche artiste (1er contenu offert)
+        await addDoc(collection(db, 'artists'), {
+          email, uid: cred.user.uid, name: artistNom.trim(), artistName: artistNom.trim(),
+          commercialEmail, premierContenuGratuit: true, status: 'actif',
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        // Déjà enregistré par l'admin : juste lier l'uid
+        await updateDoc(doc(db, 'artists', artistSnap.docs[0].id), { uid: cred.user.uid });
+      }
       setMsg('✅ Compte créé ! Bienvenue.');
     } catch (e: any) {
       if (e.code === 'auth/email-already-in-use') {
@@ -5677,12 +5702,17 @@ function ArtistPage() {
             </>
           ) : (
             <>
-              <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center' }}>Créer mon compte</h2>
+              <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center' }}>Créer mon compte artiste</h2>
               <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
-                Utilisez l'email que vous avez communiqué à Doniel Zik lors de votre enregistrement.
+                {refParam ? "Bienvenue sur Doniel Zik ! Créez votre compte — votre 1er contenu est OFFERT." : "Utilisez l'email que vous avez communiqué à Doniel Zik lors de votre enregistrement."}
               </p>
 
-              <label style={S.lbl}>Email (celui enregistré chez nous) *</label>
+              {refParam && (<>
+                <label style={S.lbl}>Nom d'artiste *</label>
+                <input style={S.inp} value={artistNom} onChange={e => setArtistNom(e.target.value)} placeholder="Votre nom de scène" />
+              </>)}
+
+              <label style={S.lbl}>{refParam ? 'Votre email *' : 'Email (celui enregistré chez nous) *'}</label>
               <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
               <label style={S.lbl}>Choisissez un mot de passe *</label>
               <input style={S.inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="8 caractères minimum" />
@@ -6519,6 +6549,9 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
   const [mesSubmissions, setMesSubmissions] = useState<any[]>([]);
+  const [pochetteUrl, setPochetteUrl] = useState('');
+  const [uploadingPoch, setUploadingPoch] = useState(false);
+  const [premierGratuit, setPremierGratuit] = useState(false);
   // Champs sortie programmée
   const [dateSortie, setDateSortie] = useState('');
   const [objTelech, setObjTelech] = useState('');
@@ -6538,6 +6571,14 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
     return unsub;
   }, [user?.email]);
 
+  // 1er contenu offert ? (artiste parrainé par un commercial)
+  useEffect(() => {
+    if (!user?.email) return;
+    getDocs(query(collection(db,'artists'), where('email','==',user.email))).then(snap => {
+      if (!snap.empty) setPremierGratuit(snap.docs[0].data().premierContenuGratuit === true);
+    }).catch(() => {});
+  }, [user?.email]);
+
   const uploadFichier = async (f: File) => {
     setUploading(true); setMsg('');
     try {
@@ -6552,24 +6593,47 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
     setUploading(false);
   };
 
+  const uploadPochette = async (f: File) => {
+    setUploadingPoch(true); setMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      fd.append('upload_preset', 'doniel_unsigned');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) { setPochetteUrl(data.secure_url); setMsg('Pochette prête.'); }
+      else setMsg('Erreur upload pochette. Réessayez.');
+    } catch { setMsg('Erreur upload pochette. Réessayez.'); }
+    setUploadingPoch(false);
+  };
+
   const soumettre = async () => {
     if (!titre.trim()) { setMsg('Entrez le titre du contenu'); return; }
     if (!fileUrl) { setMsg('Ajoutez votre fichier'); return; }
-    if (soldeOscart < prix) { setMsg(`Solde insuffisant. Il vous faut ${prix} Oscart. Rechargez votre portefeuille.`); return; }
+    const coutReel = premierGratuit ? 0 : prix;
+    if (!premierGratuit && soldeOscart < prix) { setMsg(`Solde insuffisant. Il vous faut ${prix} Oscart. Rechargez votre portefeuille.`); return; }
     try {
-      // Débiter les Oscart
-      const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
-      if (!soldeSnap.empty) {
-        const docRef = soldeSnap.docs[0];
-        await updateDoc(doc(db,'coins_solde',docRef.id), { solde: (docRef.data().solde||0) - prix });
+      // Débiter les Oscart (sauf 1er contenu offert)
+      if (!premierGratuit) {
+        const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+        if (!soldeSnap.empty) {
+          const docRef = soldeSnap.docs[0];
+          await updateDoc(doc(db,'coins_solde',docRef.id), { solde: (docRef.data().solde||0) - prix });
+        }
       }
       // Créer la soumission (statut en attente)
       await addDoc(collection(db,'soumissions'), {
         artistEmail: user.email, artistName, artistUid: user.uid,
-        titre: titre.trim(), type, categorie, fileUrl,
-        prixPaye: prix, statut: 'en_attente',
+        titre: titre.trim(), type, categorie, fileUrl, pochetteUrl,
+        prixPaye: coutReel, gratuit: premierGratuit, statut: 'en_attente',
         createdAt: new Date().toISOString(),
       });
+      // 1er contenu offert : on désactive la gratuité pour la suite
+      if (premierGratuit) {
+        const aSnap = await getDocs(query(collection(db,'artists'), where('email','==',user.email)));
+        if (!aSnap.empty) await updateDoc(doc(db,'artists',aSnap.docs[0].id), { premierContenuGratuit: false });
+        setPremierGratuit(false);
+      }
       // Notifier l'admin
       await addDoc(collection(db,'notifications'), {
         to: 'bdonaldservices@gmail.com', type:'soumission',
@@ -6577,7 +6641,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
       });
       setMsg('✅ Soumis ! Votre contenu sera écouté et validé sous peu.');
-      setTitre(''); setFile(null); setFileUrl('');
+      setTitre(''); setFile(null); setFileUrl(''); setPochetteUrl('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
   };
 
@@ -6659,6 +6723,13 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
         {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté</p>}
 
+        <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
+        <input type="file" accept="image/*"
+          onChange={e => e.target.files?.[0] && uploadPochette(e.target.files[0])}
+          style={{ ...S.inp, padding:8 }} />
+        {uploadingPoch && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload pochette...</p>}
+        {pochetteUrl && <img src={pochetteUrl} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginTop:6 }} />}
+
         {/* Coût */}
         {mode === 'sortie' ? (
           <div style={{ marginTop:14 }}>
@@ -6691,7 +6762,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', margin:'14px 0' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ color:'#5a7090', fontSize:13 }}>Coût de publication</span>
-            <span style={{ color:'#1a6bff', fontWeight:800, fontSize:16 }}>{prix} Oscart</span>
+            <span style={{ color:'#1a6bff', fontWeight:800, fontSize:16 }}>{premierGratuit ? 'OFFERT' : prix+' Oscart'}</span>
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6 }}>
             <span style={{ color:'#8098b8', fontSize:11 }}>Votre solde</span>
@@ -6701,13 +6772,13 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
 
         {msg && <p style={{ color: msg.startsWith('✅')||msg.includes('prêt')||msg.includes('ajouté') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
 
-        {soldeOscart < prix ? (
+        {(!premierGratuit && soldeOscart < prix) ? (
           <button onClick={onRecharge} style={{ ...S.btn, width:'100%', padding:14, background:'#ffd700', color:'#1a2340' }}>
             Recharger mes Oscart ({prix} requis)
           </button>
         ) : (
-          <button onClick={soumettre} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14 }}>
-            {uploading ? 'Patientez...' : `Soumettre (${prix} Oscart)`}
+          <button onClick={soumettre} disabled={uploading || uploadingPoch} style={{ ...S.btn, width:'100%', padding:14 }}>
+            {uploading ? 'Patientez...' : premierGratuit ? 'Soumettre — 1er contenu OFFERT' : `Soumettre (${prix} Oscart)`}
           </button>
         )}
           </>
@@ -8795,6 +8866,26 @@ function CommercialPage() {
 
         {tab === 'stats' && (
           <div>
+            {monDocId && (
+              <div style={{ ...S.card, background:'linear-gradient(135deg,#eef4ff,#dbe8ff)', marginBottom:20 }}>
+                <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', margin:'0 0 6px' }}>Mon lien de parrainage artiste</p>
+                <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 10px', lineHeight:1.5 }}>Partagez ce lien a vos artistes. Ils s'inscrivent eux-memes (vous n'avez plus besoin de l'admin) et leur 1er contenu est offert. Vous etes credite automatiquement.</p>
+                <div style={{ background:'#fff', border:'1px solid #c8d8ef', borderRadius:10, padding:'8px 12px', marginBottom:10 }}>
+                  <span style={{ fontSize:12, color:'#1a6bff', wordBreak:'break-all', fontWeight:600 }}>{BASE_URL}/artiste?ref={monDocId}</span>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => { navigator.clipboard?.writeText(`${BASE_URL}/artiste?ref=${monDocId}`); setMsg('Lien copie !'); }}
+                    style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Copier le lien
+                  </button>
+                  <a href={`https://wa.me/?text=${encodeURIComponent('Rejoins Doniel Zik et publie ta musique ! Ton 1er contenu est offert : ' + BASE_URL + '/artiste?ref=' + monDocId)}`} target="_blank" rel="noopener noreferrer"
+                    style={{ flex:1, padding:'10px', borderRadius:10, background:'#25D366', color:'#fff', fontWeight:700, fontSize:13, textAlign:'center', textDecoration:'none' }}>
+                    Partager WhatsApp
+                  </a>
+                </div>
+                {msg && <p style={{ color:'#00a040', fontSize:12, marginTop:8 }}>{msg}</p>}
+              </div>
+            )}
             <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>Mes commissions</h2>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
               {[
