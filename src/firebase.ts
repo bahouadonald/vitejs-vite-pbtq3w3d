@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -12,10 +12,16 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Firestore avec cache local persistant (IndexedDB) :
+// les donnees s'affichent instantanement au retour + lecture hors-ligne.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
 export const auth = getAuth(app);
 
-// Session persistante — le fan reste connecté
+// Session persistante — le fan reste connecte
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
 export default app;
