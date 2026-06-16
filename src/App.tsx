@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import { db, auth } from './firebase';
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
+  collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
   onSnapshot, query, orderBy, where, getDocs
 } from 'firebase/firestore';
 import {
@@ -56,6 +56,26 @@ async function logTx(uid: string, type: string, oscartDelta: number, kiffsDelta:
       createdAt: new Date().toISOString(),
     });
   } catch (e) { /* silencieux */ }
+}
+// Donner UN kiff (Option A) : dépense le stock du donneur, compte les offerts, crédite l'artiste
+async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Promise<'ok'|'vide'|'erreur'> {
+  try {
+    const sSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',uid)));
+    if (sSnap.empty) return 'vide';
+    const sDoc = sSnap.docs[0];
+    const dispo = sDoc.data().kiffsDispo || 0;
+    if (dispo <= 0) return 'vide';
+    await updateDoc(doc(db,'coins_solde',sDoc.id), {
+      kiffsDispo: dispo - 1,
+      kiffsOfferts: (sDoc.data().kiffsOfferts || 0) + 1,
+    });
+    await setDoc(doc(db,'kiffs_compteur', qrId), { qrId, artistEmail: artistEmail || '', total: increment(1) }, { merge: true });
+    if (artistEmail) {
+      await setDoc(doc(db,'kiffs_artiste', artistEmail), { artistEmail, total: increment(1) }, { merge: true });
+    }
+    logTx(uid, 'kiff_donne', 0, -1, 'Kiff offert');
+    return 'ok';
+  } catch (e) { console.error(e); return 'erreur'; }
 }
 const MSG_INVIT_ARTISTE = (lien: string) => `🎤 Ton talent mérite d'être entendu ET payé.
 
@@ -1089,7 +1109,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   qrId: string, artistEmail?: string, buzz: number, tutoStep: number, onTutoNext: () => void
 }) {
   const [kiffs, setKiffs] = useState(0);
-  const [kiffed, setKiffed] = useState(false);
+  const [justKiffed, setJustKiffed] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showKiffements, setShowKiffements] = useState(false);
   const [totalCoins, setTotalCoins] = useState(0);
@@ -1100,9 +1120,8 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   const user = auth.currentUser;
 
   useEffect(() => {
-    const unsub1 = onSnapshot(query(collection(db,'likes'),where('qrId','==',qrId)), snap => {
-      setKiffs(snap.size);
-      if (user) setKiffed(snap.docs.some(d => d.data().userId === user.uid));
+    const unsub1 = onSnapshot(doc(db,'kiffs_compteur', qrId), snap => {
+      setKiffs(snap.exists() ? (snap.data().total || 0) : 0);
     });
     const unsub2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), snap => setCommentCount(snap.size));
     const unsub3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), snap => {
@@ -1115,26 +1134,14 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     return () => { unsub1(); unsub2(); unsub3(); };
   }, [qrId, user]);
 
-  const toggleKiff = async () => {
+  const tapKiff = async () => {
     if (!user) { setShowLoginModal('Connectez-vous pour kiffer votre artiste'); return; }
-    if (kiffed) {
-      const snap = await getDocs(query(collection(db,'likes'),where('qrId','==',qrId),where('userId','==',user.uid)));
-      for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
-    } else {
-      await addDoc(collection(db,'likes'),{ qrId, userId:user.uid, createdAt:new Date().toISOString() });
-      // Notification à l'artiste
-      if (artistEmail) {
-        await addDoc(collection(db,'notifications'), {
-          to: artistEmail,
-          type: 'kiff',
-          text: `${user.displayName || 'Un fan'} a kiffé votre contenu`,
-          qrId, from: user.displayName || user.email,
-          createdAt: new Date().toISOString(),
-          lu: false,
-        });
-      }
+    const r = await donnerKiff(user.uid, qrId, artistEmail);
+    if (r === 'vide') { setShowKiffements(true); return; }
+    if (r === 'ok') {
+      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 280);
+      if (tutoStep === 3) onTutoNext();
     }
-    if (tutoStep === 3) onTutoNext();
   };
 
   const btnStyle = (active?: boolean, color?: string) => ({
@@ -1159,8 +1166,8 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       {/* Barre principale */}
       <div id="action-bar" style={{ display:'flex', gap:6, marginBottom:8 }}>
         {/* KIFF */}
-        <button id="btn-like" onClick={toggleKiff} style={btnStyle(kiffed, '240,74,106')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={kiffed?'#f04a6a':'none'} stroke={kiffed?'#f04a6a':'#8098b8'} strokeWidth="2">
+        <button id="btn-like" onClick={tapKiff} style={btnStyle(justKiffed, '240,74,106')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'#8098b8'} strokeWidth="2">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
           <span style={{ fontSize:10, fontWeight:700 }}>Kiff {kiffs > 0 ? kiffs : ''}</span>
@@ -1228,8 +1235,8 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 // ─────────────────────────────────────────────
 // LIKE BUTTON — like sur un contenu
 // ─────────────────────────────────────────────
-function LikeButton({ qrId, compact }: { qrId: string, compact?: boolean }) {
-  const [liked, setLiked] = useState(false);
+function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: boolean, artistEmail?: string }) {
+  const [justKiffed, setJustKiffed] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const user = auth.currentUser;
@@ -1237,38 +1244,31 @@ function LikeButton({ qrId, compact }: { qrId: string, compact?: boolean }) {
   useEffect(() => {
     if (!qrId) return;
     // Charger le nombre de likes
-    const unsub = onSnapshot(
-      query(collection(db, 'likes'), where('qrId','==', qrId)),
-      snap => {
-        setCount(snap.size);
-        if (user) setLiked(snap.docs.some(d => d.data().userId === user.uid));
-      }
-    );
+    const unsub = onSnapshot(doc(db,'kiffs_compteur', qrId), snap => {
+      setCount(snap.exists() ? (snap.data().total || 0) : 0);
+    });
     return unsub;
   }, [qrId, user]);
 
-  const toggle = async () => {
-    if (!user) { alert('Connectez-vous pour liker ce contenu'); return; }
+  const tap = async () => {
+    if (!user) { alert('Connectez-vous pour kiffer ce contenu'); return; }
     if (loading) return;
     setLoading(true);
     try {
-      if (liked) {
-        const snap = await getDocs(query(collection(db, 'likes'), where('qrId','==',qrId), where('userId','==',user.uid)));
-        for (const d of snap.docs) await deleteDoc(doc(db,'likes',d.id));
-      } else {
-        await addDoc(collection(db, 'likes'), { qrId, userId: user.uid, createdAt: new Date().toISOString() });
-      }
+      const r = await donnerKiff(user.uid, qrId, artistEmail);
+      if (r === 'vide') { alert('Offre un kiffement pour obtenir des kiffs à donner.'); }
+      else if (r === 'ok') { setJustKiffed(true); setTimeout(() => setJustKiffed(false), 280); }
     } catch(e) { console.error(e); }
     setLoading(false);
   };
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      <button onClick={toggle} title="Kiff"
+      <button onClick={tap} title="Kiff"
         style={ compact
-          ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: liked?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
-          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${liked?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: liked?'rgba(240,74,106,0.1)':'transparent', color: liked?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' } }>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill={liked?'#f04a6a':'none'} stroke={liked?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: justKiffed?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: justKiffed?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
+          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${justKiffed?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: justKiffed?'rgba(240,74,106,0.1)':'transparent', color: justKiffed?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' } }>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         {compact ? (count > 0 ? count.toLocaleString() : '') : `Kiff ${count > 0 ? count.toLocaleString() : ''}`}
       </button>
     </div>
@@ -6509,7 +6509,7 @@ function DiscouvrirStat({ qrId, buzz, partages }: { qrId: string, buzz: number, 
   useEffect(() => {
     if (!qrId) return;
     // getDocs au lieu de onSnapshot pour éviter les requêtes temps réel
-    getDocs(query(collection(db,'likes'),where('qrId','==',qrId))).then(s => setKiffs(s.size));
+    getDoc(doc(db,'kiffs_compteur', qrId)).then(s => setKiffs(s.exists() ? (s.data().total || 0) : 0));
     getDocs(query(collection(db,'commentaires'),where('qrId','==',qrId))).then(s => setComments(s.size));
     getDocs(query(collection(db,'cadeaux'),where('qrId','==',qrId))).then(s => {
       setCoins(s.docs.reduce((t,d) => t+(d.data().coins||0),0));
@@ -7571,7 +7571,7 @@ function DecouvrirPage() {
               </div>
               {/* Actions — une seule ligne, tout compact et visible */}
               <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                <LikeButton qrId={c.publicLinkId} compact />
+                <LikeButton qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
                 <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
                 <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
                 <button onClick={async () => {
