@@ -1110,6 +1110,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 }) {
   const [kiffs, setKiffs] = useState(0);
   const [justKiffed, setJustKiffed] = useState(false);
+  const [flyHearts, setFlyHearts] = useState<{id:number,dx:number}[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [showKiffements, setShowKiffements] = useState(false);
   const [totalCoins, setTotalCoins] = useState(0);
@@ -1139,7 +1140,10 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     const r = await donnerKiff(user.uid, qrId, artistEmail);
     if (r === 'vide') { setShowKiffements(true); return; }
     if (r === 'ok') {
-      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 280);
+      const fid = Date.now() + Math.random();
+      setFlyHearts(h => [...h, { id: fid, dx: (Math.random() - 0.5) * 36 }]);
+      setTimeout(() => setFlyHearts(h => h.filter(x => x.id !== fid)), 900);
+      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 220);
       if (tutoStep === 3) onTutoNext();
     }
   };
@@ -1161,13 +1165,17 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 
   return (
     <div style={{ marginBottom:16 }}>
+      <style>{`@keyframes heartFly{0%{opacity:0;transform:translateX(-50%) scale(.4)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-48px) scale(1.35)}}@keyframes heartPop{0%{transform:scale(1)}40%{transform:scale(1.55)}100%{transform:scale(1)}}`}</style>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       {showSignatures && <SignatureShowcase onClose={() => setShowSignatures(false)} />}
       {/* Barre principale */}
       <div id="action-bar" style={{ display:'flex', gap:6, marginBottom:8 }}>
         {/* KIFF */}
-        <button id="btn-like" onClick={tapKiff} style={btnStyle(justKiffed, '240,74,106')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'#8098b8'} strokeWidth="2">
+        <button id="btn-like" onClick={tapKiff} style={{ ...btnStyle(justKiffed, '240,74,106'), position:'relative', overflow:'visible' }}>
+          {flyHearts.map(h => (
+            <span key={h.id} style={{ position:'absolute', left:`calc(50% + ${h.dx}px)`, bottom:'55%', transform:'translateX(-50%)', pointerEvents:'none', color:'#f04a6a', fontSize:18, animation:'heartFly .9s ease-out forwards', zIndex:5 }}>&#9829;</span>
+          ))}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'#8098b8'} strokeWidth="2" style={{ animation: justKiffed ? 'heartPop .25s ease' : 'none' }}>
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
           <span style={{ fontSize:10, fontWeight:700 }}>Kiff {kiffs > 0 ? kiffs : ''}</span>
@@ -1268,7 +1276,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
         style={ compact
           ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: justKiffed?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: justKiffed?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
           : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:`1px solid ${justKiffed?'rgba(240,74,106,0.5)':'rgba(255,255,255,0.1)'}`, background: justKiffed?'rgba(240,74,106,0.1)':'transparent', color: justKiffed?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600, transition:'all .2s' } }>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={justKiffed?'#f04a6a':'none'} stroke={justKiffed?'#f04a6a':'currentColor'} strokeWidth="2" style={{ transform: justKiffed?'scale(1.4)':'scale(1)', transition:'transform .15s ease' }}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         {compact ? (count > 0 ? count.toLocaleString() : '') : `Kiff ${count > 0 ? count.toLocaleString() : ''}`}
       </button>
     </div>
