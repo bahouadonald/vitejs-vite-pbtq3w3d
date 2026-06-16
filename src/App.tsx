@@ -48,6 +48,15 @@ const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.art';
+// Journal des transactions (audit anti-triche) : trace chaque mouvement de solde
+async function logTx(uid: string, type: string, oscartDelta: number, kiffsDelta: number, raison: string) {
+  try {
+    await addDoc(collection(db, 'transactions'), {
+      uid, type, oscartDelta, kiffsDelta, raison,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) { /* silencieux */ }
+}
 const MSG_INVIT_ARTISTE = (lien: string) => `🎤 Ton talent mérite d'être entendu ET payé.
 
 Rejoins Doniel Zik : on duplique, on monétise et on fait la promotion de tes œuvres. Publie ton 1er contenu gratuitement.
@@ -471,7 +480,12 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
       // Débiter les Oscart
       const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       if (!snap.empty) {
-        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: soldeCoins - kiffement.coins });
+        const curSolde = snap.docs[0].data();
+        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), {
+          solde: soldeCoins - kiffement.coins,
+          kiffsDispo: (curSolde.kiffsDispo || 0) + kiffement.coins * 250,
+        });
+        logTx(user.uid, 'kiffement', -kiffement.coins, kiffement.coins * 250, `Kiffement ${kiffement.label}`);
       }
       // Enregistrer le kiffement
       // Répartition kiffement : Artiste 70% / Entreprise 20% / Commercial 10%
@@ -500,7 +514,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
           lu: false,
         });
       }
-      setMsg(`Kiffement envoyé ! ${kiffement.coins} Oscart débités.`);
+      setMsg(`Kiffement envoyé ! ${kiffement.coins} Oscart débités. +${(kiffement.coins*250).toLocaleString()} kiffs à offrir.`);
       setTimeout(() => setMsg(''), 3000);
     } catch(e) { console.error(e); }
     setSending(null);
@@ -6655,6 +6669,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         if (!soldeSnap.empty) {
           const docRef = soldeSnap.docs[0];
           await updateDoc(doc(db,'coins_solde',docRef.id), { solde: (docRef.data().solde||0) - prix });
+          logTx(user.uid, 'publication', -prix, 0, 'Publication de contenu');
         }
       }
       // Créer la soumission (statut en attente)
@@ -7309,6 +7324,7 @@ function CarteSortie({ s }: { s: any }) {
       if (solde < s.prixOscart) { setMsg(`Solde insuffisant. Il vous faut ${s.prixOscart} Oscart.`); setReserving(false); return; }
       // Débiter
       await updateDoc(doc(db,'coins_solde',soldeSnap.docs[0].id), { solde: solde - s.prixOscart });
+      logTx(user.uid, 'reservation', -s.prixOscart, 0, 'Réservation de sortie');
       // Créer la réservation
       await addDoc(collection(db,'reservations'), {
         sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
@@ -7752,6 +7768,8 @@ function ProfilPage() {
   const [user, setUser] = useState<any>(null);
   const [likes, setLikes] = useState(0);
   const [kiffements, setKiffements] = useState(0);
+  const [kiffsDispo, setKiffsDispo] = useState(0);
+  const [kiffsOfferts, setKiffsOfferts] = useState(0);
   const [soldeOscart, setSoldeOscart] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showProjet, setShowProjet] = useState(false);
@@ -7770,7 +7788,10 @@ function ProfilPage() {
       ]);
       setLikes(likesSnap.size);
       setKiffements(kiffSnap.size);
-      setSoldeOscart(soldeSnap.empty ? 0 : soldeSnap.docs[0].data().solde || 0);
+      const sd = soldeSnap.empty ? {} : soldeSnap.docs[0].data();
+      setSoldeOscart(sd.solde || 0);
+      setKiffsDispo(sd.kiffsDispo || 0);
+      setKiffsOfferts(sd.kiffsOfferts || 0);
       setLoading(false);
     });
   }, []);
@@ -7817,6 +7838,7 @@ function ProfilPage() {
               <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Mon portefeuille</p>
               <p style={{ fontWeight:900, fontSize:28, color:'#ffd700', margin:0 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:24, height:24, verticalAlign:"-4px", marginRight:5 }} />{soldeOscart} Oscart</p>
               <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscart * 10).toLocaleString()} F CFA</p>
+              <p style={{ color:'#f04a6a', fontSize:13, fontWeight:700, margin:'6px 0 0' }}>&#9829; {kiffsDispo.toLocaleString()} kiffs disponibles</p>
             </div>
             <button onClick={() => setRechargeModalProfil(RECHARGES[1])}
               style={{ padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:12, fontWeight:700, cursor:'pointer' }}>
@@ -7865,8 +7887,8 @@ function ProfilPage() {
         {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
           <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:16, textAlign:'center' }}>
-            <p style={{ fontWeight:900, fontSize:24, color:'#f04a6a', marginBottom:4 }}>{likes}</p>
-            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffs envoyés</p>
+            <p style={{ fontWeight:900, fontSize:24, color:'#f04a6a', marginBottom:4 }}>{kiffsOfferts.toLocaleString()}</p>
+            <p style={{ color:'#4a5878', fontSize:12 }}>Kiffs offerts</p>
           </div>
           <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:16, textAlign:'center' }}>
             <p style={{ fontWeight:900, fontSize:24, color:'#ffd700', marginBottom:4 }}>{kiffements}</p>
@@ -10427,6 +10449,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     try {
       const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       if (!snap.empty) await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: solde - prixOscart });
+      logTx(user.uid, 'telechargement', -prixOscart, 0, 'Téléchargement');
       const artSnap = await getDocs(query(collection(db,'artists'), where('email','==',artistEmail)));
       const commercialEmail = artSnap.empty ? '' : (artSnap.docs[0].data().commercialEmail || '');
       await addDoc(collection(db,'ventes'), {
@@ -11081,6 +11104,7 @@ export default function App() {
               uid: u.uid, solde: 50, bienvenue: true,
               createdAt: new Date().toISOString(),
             });
+            logTx(u.uid, 'bienvenue', 50, 0, 'Oscart de bienvenue');
             if (u.email) {
               await addDoc(collection(db,'notifications'), {
                 to: u.email, type: 'bienvenue',
