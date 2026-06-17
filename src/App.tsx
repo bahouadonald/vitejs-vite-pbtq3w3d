@@ -1327,7 +1327,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -1454,6 +1454,12 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
           </p>
           <p style={{ color: C.textSoft, fontSize: 10, margin: 0 }}>{formatTime(ct)} / {formatTime(dur)}{files.length > 1 ? `  ·  ${idx + 1}/${files.length}` : ''}</p>
         </div>
+
+        {/* Petit bouton télécharger (rond, près du play) */}
+        {onDownload && (
+          <button onClick={onDownload} title="Télécharger"
+            style={{ background: 'rgba(10,132,255,0.15)', border: '1px solid '+C.border, borderRadius: 99, width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: C.blueLite, fontSize: 16 }}>⬇</button>
+        )}
 
         {/* Hamburger playlist (si plusieurs pistes) */}
         {files.length > 1 && (
@@ -11085,7 +11091,9 @@ function PublicStreamPage() {
         {/* ── LECTEUR AUDIO ── */}
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <AudioPlayer files={audioFiles} onStream={recordPublicStream} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
+            <AudioPlayer files={audioFiles} onStream={recordPublicStream}
+              onDownload={() => { document.getElementById('zone-telecharger')?.scrollIntoView({ behavior:'smooth', block:'center' }); }}
+              onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
 
@@ -11097,6 +11105,7 @@ function PublicStreamPage() {
           tutoStep={0}
           onTutoNext={() => {}}
         />
+        <div id="zone-telecharger">
         {(() => {
           // QR privé (duplication) = totalScans défini ET pas de publicLinkId → téléchargement GRATUIT
           // QR public (lien partagé) → téléchargement PAYANT via AchatWidget
@@ -11128,6 +11137,7 @@ function PublicStreamPage() {
             />
           );
         })()}
+        </div>
 
         {/* ── VIDÉOS ── */}
         {videoFiles.length > 0 && (
