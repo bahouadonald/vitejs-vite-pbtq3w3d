@@ -2027,7 +2027,7 @@ function FanPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0c14', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -2064,7 +2064,7 @@ function FanPage() {
       {/* PUB MAISON — supprimée sur FanPage, remplacée par tuto */}
 
           {/* POCHETTE — grande, visible, centrée en haut */}
-          <div style={{ position:'relative', width:'100%', background:'#0a0c14' }}>
+          <div style={{ position:'relative', width:'100%', background:C.bgDeep }}>
             {qrData.coverUrl ? (
               <img
                 src={qrData.coverUrl}
@@ -2077,7 +2077,7 @@ function FanPage() {
               </div>
             )}
             {/* dégradé bas pour accrocher le texte */}
-            <div style={{ position:'absolute', bottom:0, left:0, right:0, height:120, background:'linear-gradient(transparent,#0a0c14)' }} />
+            <div style={{ position:'absolute', bottom:0, left:0, right:0, height:120, background:`linear-gradient(transparent,${C.bgDeep})` }} />
           </div>
 
           {/* TITRE + ARTISTE */}
@@ -6229,7 +6229,7 @@ function ZikothequePage({ user }: { user: any }) {
   const logout = async () => { await signOut(auth); };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#1a1f35 0%,#1e2540 50%,#1a1f35 100%)', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
@@ -10328,7 +10328,7 @@ function HomePage() {
   const notes = ['🎵','🎶','🎸','🥁','🎹','🎺','🎻','🎤'];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #060d2a 0%, #091840 40%, #040e28 100%)', color: '#fff', fontFamily: "'Segoe UI', sans-serif", overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'Segoe UI', sans-serif", overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
@@ -11004,14 +11004,14 @@ function PublicStreamPage() {
   };
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#0a0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ width: 44, height: 44, border: '3px solid #1e6fff', borderTopColor: 'transparent', borderRadius: 99, animation: 'spin .8s linear infinite' }} />
     </div>
   );
 
   if (!data) return (
-    <div style={{ minHeight: '100vh', background: '#0a0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dde4f5' }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text }}>
       <div style={{ textAlign: 'center' }}><p style={{ fontSize: 48, marginBottom: 12 }}>🎵</p><p style={{ color: '#4a5878' }}>Contenu non trouvé</p></div>
     </div>
   );
@@ -11020,7 +11020,7 @@ function PublicStreamPage() {
   const videoFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i));
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0c14', color: '#dde4f5', fontFamily: "'DM Sans', sans-serif", paddingBottom: 40 }}>
+    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: 40 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -11047,7 +11047,7 @@ function PublicStreamPage() {
           </div>
         )}
         {/* dégradé bas */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: 'linear-gradient(transparent, #0a0c14)' }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
@@ -11340,7 +11340,7 @@ export default function App() {
   }, []);
 
   if (authLoading) return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#1a1f35 0%,#1e2540 100%)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
