@@ -14,24 +14,24 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // ─────────────────────────────────────────────
-// PALETTE — Thème CLAIR (couleurs du logo : bleu électrique + gris métallique + blanc)
+// PALETTE — Gris électrique + bleu électrique (couleurs du logo)
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#F4F7FB',   // fond principal (blanc cassé / gris très clair)
-  bgSecond: '#EAF0F7',   // fond secondaire
-  card:     '#FFFFFF',   // cartes (blanc pur)
-  cardHi:   '#F0F4FA',   // carte surélevée
+  bgDeep:   '#D9DEE7',   // fond principal (gris électrique clair, pas blanc pur)
+  bgSecond: '#C9D0DC',   // fond secondaire (gris un peu plus marqué)
+  card:     '#E8ECF2',   // cartes (gris clair, lisible)
+  cardHi:   '#F0F3F8',   // carte surélevée
   blue:     '#0078F0',   // bleu électrique du logo
   blueLite: '#3D9CFF',   // bleu clair
-  gold:     '#E8A91C',   // or (récompenses / Oscart) — un peu plus foncé pour rester lisible sur blanc
-  success:  '#00A878',
-  alert:    '#E8455F',
-  text:     '#1A2740',   // texte principal (gris-bleu foncé, lisible sur clair)
-  textSoft: '#6B7A94',   // texte secondaire (gris métallique)
-  border:   'rgba(26,39,64,0.1)',
+  gold:     '#C8861A',   // or (récompenses / Oscart) — foncé pour rester lisible sur gris
+  success:  '#00956B',
+  alert:    '#D63A52',
+  text:     '#1A2333',   // texte principal (gris-bleu très foncé, bien visible)
+  textSoft: '#566075',   // texte secondaire (gris métallique foncé)
+  border:   'rgba(26,35,51,0.14)',
 };
-// Halo lumineux discret en haut (bleu électrique très léger sur fond clair)
-const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(0,120,240,0.1), transparent 55%)';
+// Halo lumineux discret en haut (bleu électrique léger)
+const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(0,120,240,0.14), transparent 55%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -547,6 +547,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
       if (artistEmail) {
         await addDoc(collection(db,'notifications'), {
           to: artistEmail,
+          role: 'artiste',
           type: 'kiffement',
           text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.coins} Oscart — ${kiffement.label}`,
           qrId, from: user.displayName || user.email,
@@ -790,6 +791,7 @@ function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEm
       if (artistEmail) {
         await addDoc(collection(db, 'notifications'), {
           to: artistEmail,
+          role: 'artiste',
           type: 'commentaire',
           text: `${user.displayName || 'Un fan'} a commenté votre contenu`,
           qrId,
@@ -2572,7 +2574,7 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       await updateDoc(doc(db,'mots_artiste',m.id), { statut:'valide' });
       // Notification perso à l'artiste
       await addDoc(collection(db,'notifications'), {
-        to: m.artistEmail, type:'mot_valide',
+        to: m.artistEmail, role:'artiste', type:'mot_valide',
         text: `Votre message est validé et publié dans "Actu & Mood Artistique".`,
         createdAt: new Date().toISOString(), lu: false,
       });
@@ -2588,7 +2590,7 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
     if (!window.confirm('Refuser ce message ?')) return;
     await updateDoc(doc(db,'mots_artiste',m.id), { statut:'refuse' });
     await addDoc(collection(db,'notifications'), {
-      to: m.artistEmail, type:'mot_refuse',
+      to: m.artistEmail, role:'artiste', type:'mot_refuse',
       text: `Votre message n'a pas été validé car il ne correspond pas à nos conditions (uniquement professionnel).`,
       createdAt: new Date().toISOString(), lu: false,
     });
@@ -6503,9 +6505,14 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
     const unsub = onSnapshot(
       query(collection(db, 'notifications'), where('to','==', userEmail), orderBy('createdAt','desc')),
       async snap => {
-        setNotifs(snap.docs.map(d => ({id:d.id,...d.data()})));
-        // Marquer comme lus
-        for (const d of snap.docs) {
+        // Côté ARTISTE : on montre les notifs destinées à l'artiste
+        // (role 'artiste', ou anciennes notifs sans role pour ne rien perdre)
+        const docs = snap.docs.filter(d => {
+          const r = d.data().role;
+          return r === 'artiste' || r === undefined || r === null;
+        });
+        setNotifs(docs.map(d => ({id:d.id,...d.data()})));
+        for (const d of docs) {
           if (!d.data().lu) await updateDoc(doc(db,'notifications',d.id),{lu:true});
         }
       }
@@ -7722,7 +7729,14 @@ function NotificationsPage() {
       setUser(u);
       const unsubP = onSnapshot(
         query(collection(db,'notifications'), where('to','==',u.email), orderBy('createdAt','desc')),
-        snap => { setNotifsPerso(snap.docs.map(d => ({id:d.id,...d.data()}))); setLoading(false); }
+        snap => {
+          // Côté MÉLOMANE : on EXCLUT les notifs destinées au compte artiste
+          // (même email, mais interfaces séparées : un kiff/Oscart reçu en tant
+          //  qu'artiste ne doit PAS apparaître dans les notifs mélomane)
+          const docs = snap.docs.filter(d => d.data().role !== 'artiste');
+          setNotifsPerso(docs.map(d => ({id:d.id,...d.data()})));
+          setLoading(false);
+        }
       );
       const unsubG = onSnapshot(
         query(collection(db,'notifications'), where('to','==','all'), orderBy('createdAt','desc')),
