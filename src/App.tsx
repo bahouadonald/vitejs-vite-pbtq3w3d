@@ -10931,6 +10931,7 @@ function PublicStreamPage() {
   const { publicLinkId } = useParams<{ publicLinkId: string }>();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showTitres, setShowTitres] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
 
@@ -11065,10 +11066,9 @@ function PublicStreamPage() {
 
       <div style={{ padding: '0 16px', maxWidth: 500, margin: '0 auto' }}>
 
-        {/* ── ÉCOUTER EN STREAMING ── */}
+        {/* ── LECTEUR AUDIO ── */}
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Écouter en streaming</p>
             <AudioPlayer files={audioFiles} onStream={recordPublicStream} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
@@ -11099,26 +11099,29 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── LISTE TITRES ── */}
-        {(data.files || []).length > 0 && (
+        {/* ── TITRES (déroulant, discret) ── */}
+        {(data.files || []).length > 1 && (
           <div style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>💿 Titres</p>
-              <span style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 99, padding: '2px 10px', fontSize: 11, fontWeight: 700, color: '#4da6ff' }}>{data.files.length}</span>
-            </div>
-            <div style={{ background: '#0f1322', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {data.files.map((f: any, i: number) => (
-                <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < data.files.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background .15s' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <button onClick={() => setShowTitres(!showTitres)}
+              style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:12, border:'1px solid '+C.border, background:'transparent', cursor:'pointer' }}>
+              <span style={{ color: C.textSoft, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Titres ({data.files.length})</span>
+              <span style={{ color: C.textSoft, fontSize:15, transform: showTitres?'rotate(90deg)':'none', transition:'transform .2s' }}>›</span>
+            </button>
+            {showTitres && (
+              <div style={{ marginTop: 8, background: 'rgba(20,28,48,0.5)', borderRadius: 14, overflow: 'hidden', border: '1px solid '+C.border }}>
+                {data.files.map((f: any, i: number) => (
+                  <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < data.files.length - 1 ? '1px solid '+C.border : 'none' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
+                      <p style={{ color: C.textSoft, fontSize: 10, margin: '2px 0 0' }}>{formatSize(f.size || 0)}</p>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#dde4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
-                    <p style={{ color: '#4a5878', fontSize: 10, margin: '2px 0 0' }}>{formatSize(f.size || 0)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
