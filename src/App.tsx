@@ -13,6 +13,26 @@ import {
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
+// ─────────────────────────────────────────────
+// PALETTE — "Creative Tech Africa" (version éclairée)
+// ─────────────────────────────────────────────
+const C = {
+  bgDeep:   '#0D1526',   // fond principal (bleu nuit, un peu plus clair/éclairé)
+  bgSecond: '#141F36',   // fond secondaire
+  card:     '#1A2740',   // cartes
+  cardHi:   '#22314F',   // carte surélevée
+  blue:     '#2F80FF',   // bleu principal
+  blueLite: '#5BA8FF',   // bleu lumineux
+  gold:     '#F5C84C',   // or premium (récompenses / Oscart)
+  success:  '#00C48C',
+  alert:    '#FF647C',
+  text:     '#FFFFFF',
+  textSoft: '#A6B5CC',   // texte secondaire (plus clair = plus lisible)
+  border:   'rgba(255,255,255,0.08)',
+};
+// Halo lumineux radial en haut des écrans (plus présent = plus éclairé)
+const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(47,128,255,0.28), transparent 55%)';
+
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
 // SOUS-ADMINS : font tout SAUF supprimer, bannir, créer comptes. Ajoute les emails ici.
@@ -7475,7 +7495,7 @@ function DecouvrirPage() {
   });
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
 
       {/* HEADER */}
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
@@ -7676,7 +7696,7 @@ function NotificationsPage() {
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
         <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
@@ -7814,13 +7834,13 @@ function ProfilPage() {
   };
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
       <p style={{ color:'#4a5878' }}>Chargement...</p>
     </div>
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
       </div>
@@ -9712,7 +9732,7 @@ function DzStudioPage() {
 
   // ── LOGIN ──
   if (view !== 'dashboard') return (
-    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
@@ -9766,7 +9786,7 @@ function DzStudioPage() {
 
   // ── DASHBOARD ──
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -11182,7 +11202,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
