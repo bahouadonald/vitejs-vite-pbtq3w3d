@@ -17,10 +17,10 @@ import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 // PALETTE — Bleu électrique + Gris électrique (ADN du logo, SANS blanc)
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#2A3344',   // fond principal (gris électrique foncé, métallique)
-  bgSecond: '#333D52',   // fond secondaire
-  card:     '#3A475F',   // cartes (gris électrique un peu plus clair)
-  cardHi:   '#44536E',   // carte surélevée
+  bgDeep:   '#252E3E',   // fond principal (gris électrique foncé, -10% éclairage)
+  bgSecond: '#2E3749',   // fond secondaire
+  card:     '#343F55',   // cartes
+  cardHi:   '#3D4A63',   // carte surélevée
   blue:     '#0A84FF',   // bleu électrique vif (du logo)
   blueLite: '#4DA6FF',   // bleu clair lumineux
   gold:     '#F5C84C',   // or (récompenses / Oscart)
@@ -28,10 +28,10 @@ const C = {
   alert:    '#FF647C',
   text:     '#EAF0F8',   // texte (gris très clair, lisible sur fond gris foncé)
   textSoft: '#9DB0CC',   // texte secondaire (gris bleuté)
-  border:   'rgba(120,160,220,0.18)',
+  border:   'rgba(120,160,220,0.16)',
 };
-// Halo bleu électrique en haut (donne la profondeur et la couleur du logo)
-const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(10,132,255,0.32), transparent 58%)';
+// Halo bleu électrique en haut (-10% intensité)
+const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(10,132,255,0.26), transparent 58%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -1341,6 +1341,7 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [pendingNext, setPendingNext] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
 
   // Pub pendant lecture audio — 3 fois par piste, sans son, passable après 5s
   const [showPubDuringPlay, setShowPubDuringPlay] = useState(false);
@@ -1409,12 +1410,10 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
   if (!files || files.length === 0) return null;
 
   return (
-    <div style={{ background: 'rgba(15,20,40,0.95)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(30,111,255,0.18)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+    <div style={{ background: 'rgba(20,28,48,0.92)', borderRadius: 16, padding: '12px 14px', border: '1px solid '+C.border, boxShadow: '0 6px 24px rgba(0,0,0,0.4)' }}>
 
       {/* PUB plein écran après arrêt/fin */}
       {showPubAfter && <PubOverlay trigger="track" onDone={afterPub} />}
-
-      {/* PUB plein écran pendant lecture — musique continue en arrière-plan */}
       {showPubDuringPlay && (
         <PubOverlay trigger="audio_during" silent={true} onDone={() => setShowPubDuringPlay(false)} />
       )}
@@ -1432,51 +1431,58 @@ function AudioPlayer({ files, onStream, onPlay }: { files: any[], onStream?: (tr
         }}
         preload="metadata" />
 
-      {/* SPECTROGRAMME CSS PUR */}
-      <div style={{ marginBottom: 14 }}>
+      {/* SPECTROGRAMME fin (au-dessus, suit la lecture) */}
+      <div style={{ marginBottom: 8, opacity: playing ? 1 : 0.4, transition: 'opacity .3s' }}>
         <Spectrogram playing={playing} />
       </div>
 
-      {/* TITRE */}
-      <div style={{ textAlign: 'center', marginBottom: 14 }}>
-        <p style={{ fontWeight: 700, fontSize: 14, color: '#e8f0ff', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 8px' }}>
-          {cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}
-        </p>
-        <p style={{ color: 'rgba(100,140,220,0.5)', fontSize: 11 }}>{idx + 1} / {files.length}</p>
-      </div>
-
-      {/* BARRE DE PROGRESSION */}
-      <div
-        onClick={(e) => { if (!ref.current || !ref.current.duration) return; const r = e.currentTarget.getBoundingClientRect(); ref.current.currentTime = ((e.clientX - r.left) / r.width) * ref.current.duration; }}
-        style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, marginBottom: 6, cursor: 'pointer' }}>
-        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, #1e6fff, #4da6ff)', borderRadius: 99, transition: 'width .1s', boxShadow: '0 0 8px rgba(30,111,255,0.5)' }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(100,140,220,0.45)', marginBottom: 18 }}>
-        <span>{formatTime(ct)}</span><span>{formatTime(dur)}</span>
-      </div>
-
-      {/* CONTRÔLES */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 28 }}>
+      {/* LIGNE COMPACTE : play + titre + hamburger */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={prev} disabled={idx === 0}
-          style={{ background: 'none', border: 'none', color: idx === 0 ? 'rgba(100,140,220,0.18)' : 'rgba(100,140,220,0.6)', fontSize: 22, cursor: idx === 0 ? 'default' : 'pointer', padding: 4 }}>⏮</button>
+          style={{ background: 'none', border: 'none', color: idx === 0 ? 'rgba(120,160,220,0.2)' : C.textSoft, fontSize: 16, cursor: idx === 0 ? 'default' : 'pointer', padding: 2, flexShrink: 0 }}>⏮</button>
         <button id="btn-play" onClick={toggle}
-          style={{ width: 58, height: 58, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 24px rgba(30,111,255,0.55)', flexShrink: 0 }}>
+          style={{ width: 42, height: 42, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, '+C.blue+', #0050d0)', color: '#fff', fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 14px rgba(10,132,255,0.5)', flexShrink: 0 }}>
           {playing ? '⏸' : '▶'}
         </button>
         <button onClick={next} disabled={idx === files.length - 1}
-          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? 'rgba(100,140,220,0.18)' : 'rgba(100,140,220,0.6)', fontSize: 22, cursor: idx === files.length - 1 ? 'default' : 'pointer', padding: 4 }}>⏭</button>
+          style={{ background: 'none', border: 'none', color: idx === files.length - 1 ? 'rgba(120,160,220,0.2)' : C.textSoft, fontSize: 16, cursor: idx === files.length - 1 ? 'default' : 'pointer', padding: 2, flexShrink: 0 }}>⏭</button>
+
+        {/* Titre + temps */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: 13, color: C.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cur?.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (idx + 1)}
+          </p>
+          <p style={{ color: C.textSoft, fontSize: 10, margin: 0 }}>{formatTime(ct)} / {formatTime(dur)}{files.length > 1 ? `  ·  ${idx + 1}/${files.length}` : ''}</p>
+        </div>
+
+        {/* Hamburger playlist (si plusieurs pistes) */}
+        {files.length > 1 && (
+          <button onClick={() => setShowPlaylist(!showPlaylist)}
+            style={{ background: showPlaylist ? 'rgba(10,132,255,0.18)' : 'transparent', border: '1px solid '+C.border, borderRadius: 8, width: 34, height: 34, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, flexShrink: 0 }}>
+            <span style={{ width: 14, height: 2, background: C.textSoft, borderRadius: 2 }} />
+            <span style={{ width: 14, height: 2, background: C.textSoft, borderRadius: 2 }} />
+            <span style={{ width: 14, height: 2, background: C.textSoft, borderRadius: 2 }} />
+          </button>
+        )}
       </div>
 
-      {/* LISTE PISTES */}
-      {files.length > 1 && (
-        <div style={{ marginTop: 16, borderTop: '1px solid rgba(30,111,255,0.1)', paddingTop: 12 }}>
+      {/* BARRE DE PROGRESSION fine */}
+      <div
+        onClick={(e) => { if (!ref.current || !ref.current.duration) return; const r = e.currentTarget.getBoundingClientRect(); ref.current.currentTime = ((e.clientX - r.left) / r.width) * ref.current.duration; }}
+        style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, marginTop: 10, cursor: 'pointer' }}>
+        <div style={{ height: '100%', width: progress + '%', background: 'linear-gradient(90deg, '+C.blue+', '+C.blueLite+')', borderRadius: 99, transition: 'width .1s' }} />
+      </div>
+
+      {/* PLAYLIST déroulante (hamburger) */}
+      {showPlaylist && files.length > 1 && (
+        <div style={{ marginTop: 12, borderTop: '1px solid '+C.border, paddingTop: 10, maxHeight: 200, overflowY: 'auto' }}>
           {files.map((f, i) => (
             <div key={i} onClick={() => { setIdx(i); setPlaying(true); streamStart.current = Date.now() / 1000; }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer', background: i === idx ? 'rgba(30,111,255,0.15)' : 'transparent', marginBottom: 2, transition: 'background 0.2s' }}>
-              <span style={{ color: i === idx ? '#4da6ff' : 'rgba(100,140,220,0.35)', fontSize: 12, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: i === idx ? 'rgba(10,132,255,0.15)' : 'transparent', marginBottom: 2 }}>
+              <span style={{ color: i === idx ? C.blueLite : C.textSoft, fontSize: 12, fontWeight: 700, minWidth: 18, textAlign: 'center' }}>
                 {i === idx && playing ? '▶' : (i + 1)}
               </span>
-              <span style={{ fontSize: 12, color: i === idx ? '#e8f0ff' : 'rgba(180,200,240,0.55)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 12, color: i === idx ? C.text : C.textSoft, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}
               </span>
             </div>
@@ -2160,10 +2166,9 @@ function FanPage() {
               );
             })()}
 
-            {/* ── ÉCOUTER EN STREAMING ── */}
+            {/* ── LECTEUR AUDIO ── */}
             {qrData.files?.some((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
               <div style={{ marginBottom:20 }}>
-                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Écouter en streaming</p>
                 <AudioPlayer
                   files={qrData.files.filter((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))}
                   onStream={recordStream}
@@ -7628,14 +7633,12 @@ function DecouvrirPage() {
             ) : (
               <div style={{ width:'100%', height:'100%', background:'linear-gradient(135deg,'+C.blue+',#0a1535)' }} />
             )}
-            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(13,21,38,0.96) 0%, rgba(13,21,38,0.3) 55%, transparent 100%)' }} />
-            <div style={{ position:'absolute', top:14, left:14, padding:'5px 12px', borderRadius:99, background:'rgba(47,128,255,0.92)' }}>
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(13,21,38,0.85) 0%, transparent 45%)' }} />
+            <div style={{ position:'absolute', top:14, left:14, padding:'5px 12px', borderRadius:99, background:'rgba(10,132,255,0.92)' }}>
               <span style={{ color:'#fff', fontSize:11, fontWeight:700, letterSpacing:0.5 }}>À LA UNE</span>
             </div>
-            <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'18px' }}>
-              <p style={{ color:'#fff', fontWeight:900, fontSize:23, margin:'0 0 4px', lineHeight:1.1, textShadow:'0 2px 12px rgba(0,0,0,0.6)' }}>{hero.label}</p>
-              <p style={{ color:'rgba(255,255,255,0.85)', fontSize:14, margin:'0 0 12px', fontWeight:600 }}>{hero.artist || hero.artistEmail || ''}</p>
-              <div style={{ display:'inline-block', padding:'9px 20px', borderRadius:99, background:'#fff' }}>
+            <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'18px', display:'flex', justifyContent:'flex-end' }}>
+              <div style={{ display:'inline-block', padding:'9px 22px', borderRadius:99, background:'#fff' }}>
                 <span style={{ color:'#0D1526', fontSize:13, fontWeight:800 }}>Écouter</span>
               </div>
             </div>
