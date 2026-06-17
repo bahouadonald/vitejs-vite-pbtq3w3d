@@ -14,24 +14,24 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // ─────────────────────────────────────────────
-// PALETTE — "Creative Tech Africa" (version TRÈS éclairée)
+// PALETTE — Thème CLAIR (couleurs du logo : bleu électrique + gris métallique + blanc)
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#1B2740',   // fond principal (bleu nuit clair)
-  bgSecond: '#243150',   // fond secondaire
-  card:     '#2C3B5E',   // cartes (plus claires)
-  cardHi:   '#35466B',   // carte surélevée
-  blue:     '#3D8BFF',   // bleu principal
-  blueLite: '#6FB4FF',   // bleu lumineux
-  gold:     '#F5C84C',   // or premium (récompenses / Oscart)
-  success:  '#00D49A',
-  alert:    '#FF647C',
-  text:     '#FFFFFF',
-  textSoft: '#B9C6DD',   // texte secondaire (clair = lisible)
-  border:   'rgba(255,255,255,0.1)',
+  bgDeep:   '#F4F7FB',   // fond principal (blanc cassé / gris très clair)
+  bgSecond: '#EAF0F7',   // fond secondaire
+  card:     '#FFFFFF',   // cartes (blanc pur)
+  cardHi:   '#F0F4FA',   // carte surélevée
+  blue:     '#0078F0',   // bleu électrique du logo
+  blueLite: '#3D9CFF',   // bleu clair
+  gold:     '#E8A91C',   // or (récompenses / Oscart) — un peu plus foncé pour rester lisible sur blanc
+  success:  '#00A878',
+  alert:    '#E8455F',
+  text:     '#1A2740',   // texte principal (gris-bleu foncé, lisible sur clair)
+  textSoft: '#6B7A94',   // texte secondaire (gris métallique)
+  border:   'rgba(26,39,64,0.1)',
 };
-// Halo lumineux radial en haut des écrans (plus présent et plus large = plus clair)
-const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(61,139,255,0.4), transparent 60%)';
+// Halo lumineux discret en haut (bleu électrique très léger sur fond clair)
+const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(0,120,240,0.1), transparent 55%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -1284,6 +1284,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
   const [justKiffed, setJustKiffed] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState('');
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -1296,7 +1297,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
   }, [qrId, user]);
 
   const tap = async () => {
-    if (!user) { alert('Connectez-vous pour kiffer ce contenu'); return; }
+    if (!user) { setShowLoginModal('Connectez-vous pour kiffer ce contenu'); return; }
     if (loading) return;
     setLoading(true);
     try {
@@ -1309,6 +1310,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       <button onClick={tap} title="Kiff"
         style={ compact
           ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background: justKiffed?'rgba(240,74,106,0.15)':'rgba(255,255,255,0.06)', color: justKiffed?'#f04a6a':'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
@@ -7535,7 +7537,7 @@ function DecouvrirPage() {
 
       {/* TITRE EN GRAND de l'onglet actif */}
       <div style={{ padding:'16px 16px 8px' }}>
-        <h2 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:0, fontFamily:"'DM Sans',sans-serif" }}>
+        <h2 style={{ fontSize:24, fontWeight:800, color:C.text, margin:0, fontFamily:"'DM Sans',sans-serif" }}>
           {TYPES_CONTENU.find(t => t.id === typeFiltre)?.titre || ''}
         </h2>
       </div>
