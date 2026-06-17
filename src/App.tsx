@@ -14,24 +14,24 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // ─────────────────────────────────────────────
-// PALETTE — "Creative Tech Africa" (version éclairée)
+// PALETTE — "Creative Tech Africa" (version TRÈS éclairée)
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#0D1526',   // fond principal (bleu nuit, un peu plus clair/éclairé)
-  bgSecond: '#141F36',   // fond secondaire
-  card:     '#1A2740',   // cartes
-  cardHi:   '#22314F',   // carte surélevée
-  blue:     '#2F80FF',   // bleu principal
-  blueLite: '#5BA8FF',   // bleu lumineux
+  bgDeep:   '#1B2740',   // fond principal (bleu nuit clair)
+  bgSecond: '#243150',   // fond secondaire
+  card:     '#2C3B5E',   // cartes (plus claires)
+  cardHi:   '#35466B',   // carte surélevée
+  blue:     '#3D8BFF',   // bleu principal
+  blueLite: '#6FB4FF',   // bleu lumineux
   gold:     '#F5C84C',   // or premium (récompenses / Oscart)
-  success:  '#00C48C',
+  success:  '#00D49A',
   alert:    '#FF647C',
   text:     '#FFFFFF',
-  textSoft: '#A6B5CC',   // texte secondaire (plus clair = plus lisible)
-  border:   'rgba(255,255,255,0.08)',
+  textSoft: '#B9C6DD',   // texte secondaire (clair = lisible)
+  border:   'rgba(255,255,255,0.1)',
 };
-// Halo lumineux radial en haut des écrans (plus présent = plus éclairé)
-const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(47,128,255,0.28), transparent 55%)';
+// Halo lumineux radial en haut des écrans (plus présent et plus large = plus clair)
+const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(61,139,255,0.4), transparent 60%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -7525,7 +7525,15 @@ function DecouvrirPage() {
 
       {/* HERO CARD — contenu à la une (onglet Actu uniquement) */}
       {typeFiltre === 'tous' && !loading && contenusFiltres.length > 0 && (() => {
-        const hero = contenusFiltres[0];
+        // Rotation intelligente : on pioche au hasard parmi les meilleurs contenus
+        // (mélange : récents + populaires en kiffs/buzz), pas juste le dernier.
+        const candidats = [...contenusFiltres]
+          .map(c => ({ c, score: (c.kiffs || 0) * 2 + (c.buzz || 0) }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, Math.min(6, contenusFiltres.length))  // top 6 meilleurs
+          .map(x => x.c);
+        const pool = candidats.length > 0 ? candidats : contenusFiltres.slice(0, 6);
+        const hero = pool[Math.floor(Math.random() * pool.length)];
         return (
           <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210, boxShadow:'0 12px 40px rgba(0,0,0,0.5)' }}>
             {hero.coverUrl ? (
