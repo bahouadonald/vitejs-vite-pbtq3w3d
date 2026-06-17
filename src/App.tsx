@@ -14,24 +14,24 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // ─────────────────────────────────────────────
-// PALETTE — Gris électrique + bleu électrique (couleurs du logo)
+// PALETTE — Bleu électrique + Gris électrique (ADN du logo, SANS blanc)
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#D9DEE7',   // fond principal (gris électrique clair, pas blanc pur)
-  bgSecond: '#C9D0DC',   // fond secondaire (gris un peu plus marqué)
-  card:     '#E8ECF2',   // cartes (gris clair, lisible)
-  cardHi:   '#F0F3F8',   // carte surélevée
-  blue:     '#0078F0',   // bleu électrique du logo
-  blueLite: '#3D9CFF',   // bleu clair
-  gold:     '#C8861A',   // or (récompenses / Oscart) — foncé pour rester lisible sur gris
-  success:  '#00956B',
-  alert:    '#D63A52',
-  text:     '#1A2333',   // texte principal (gris-bleu très foncé, bien visible)
-  textSoft: '#566075',   // texte secondaire (gris métallique foncé)
-  border:   'rgba(26,35,51,0.14)',
+  bgDeep:   '#2A3344',   // fond principal (gris électrique foncé, métallique)
+  bgSecond: '#333D52',   // fond secondaire
+  card:     '#3A475F',   // cartes (gris électrique un peu plus clair)
+  cardHi:   '#44536E',   // carte surélevée
+  blue:     '#0A84FF',   // bleu électrique vif (du logo)
+  blueLite: '#4DA6FF',   // bleu clair lumineux
+  gold:     '#F5C84C',   // or (récompenses / Oscart)
+  success:  '#00D49A',
+  alert:    '#FF647C',
+  text:     '#EAF0F8',   // texte (gris très clair, lisible sur fond gris foncé)
+  textSoft: '#9DB0CC',   // texte secondaire (gris bleuté)
+  border:   'rgba(120,160,220,0.18)',
 };
-// Halo lumineux discret en haut (bleu électrique léger)
-const GLOW_TOP = 'radial-gradient(circle at 50% -8%, rgba(0,120,240,0.14), transparent 55%)';
+// Halo bleu électrique en haut (donne la profondeur et la couleur du logo)
+const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(10,132,255,0.32), transparent 58%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
