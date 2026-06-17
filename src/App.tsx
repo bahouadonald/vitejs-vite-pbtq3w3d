@@ -10754,20 +10754,12 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
       )}
 
       {solde < prixOscart ? (
-        <div>
-          <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>
-            Solde insuffisant — {prixOscart} Oscart requis · Votre solde : {solde} Oscart
-          </p>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-            {RECHARGES.filter(r => r.oscart >= prixOscart).slice(0,2).map(r => (
-              <button key={r.oscart} onClick={() => setRechargeModal(r)}
-                style={{ padding:'12px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.08)', cursor:'pointer', textAlign:'center' }}>
-                <p style={{ color:'#ffd700', fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
-                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F CFA</p>
-              </button>
-            ))}
-          </div>
-        </div>
+        <button onClick={() => { const r = RECHARGES.filter(x => x.oscart >= prixOscart)[0] || RECHARGES[0]; setRechargeModal(r); }}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid rgba(255,200,0,0.35)', background:'rgba(255,200,0,0.08)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span style={{ color:'#ffd700', fontWeight:800, fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}>
+            Télécharger — {prixOscart} <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:16, height:16 }} />
+          </span>
+        </button>
       ) : (
         <button onClick={payer} disabled={paying}
           style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
@@ -11081,15 +11073,37 @@ function PublicStreamPage() {
           tutoStep={0}
           onTutoNext={() => {}}
         />
-        {(data.price > 0 || data.files?.length > 0) && (
-          <AchatWidget
-            qrId={data.publicLinkId || publicLinkId || ''}
-            albumLabel={data.label || ''}
-            artistEmail={data.artistEmail || ''}
-            prix={data.price || 0}
-            files={data.files || []}
-          />
-        )}
+        {(() => {
+          // QR privé (duplication) = totalScans défini ET pas de publicLinkId → téléchargement GRATUIT
+          // QR public (lien partagé) → téléchargement PAYANT via AchatWidget
+          const isPrivateQR = (data.totalScans > 0) && !data.publicLinkId;
+          const dlsRestants = (data.totalScans || 0) - (data.usedScans || 0);
+          const dlsEpuises = isPrivateQR && dlsRestants <= 0;
+
+          if (isPrivateQR && !dlsEpuises) {
+            // Téléchargement GRATUIT (QR privé)
+            return (
+              <div style={{ marginBottom: 20 }}>
+                <a href={(data.files?.[0]?.url || '').replace('/upload/','/upload/fl_attachment/')} download target="_blank" rel="noreferrer"
+                  style={{ width:'100%', boxSizing:'border-box', padding:'14px 18px', borderRadius:14, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, textDecoration:'none', boxShadow:'0 4px 18px rgba(10,132,255,0.45)' }}>
+                  <span style={{ fontSize:18 }}>⬇</span>
+                  Télécharger gratuitement
+                </a>
+                <p style={{ color:C.textSoft, fontSize:11, textAlign:'center', margin:'8px 0 0' }}>{dlsRestants} téléchargement{dlsRestants>1?'s':''} gratuit{dlsRestants>1?'s':''} restant{dlsRestants>1?'s':''}</p>
+              </div>
+            );
+          }
+          // Téléchargement PAYANT (QR public)
+          return (data.price > 0 || data.files?.length > 0) && (
+            <AchatWidget
+              qrId={data.publicLinkId || publicLinkId || ''}
+              albumLabel={data.label || ''}
+              artistEmail={data.artistEmail || ''}
+              prix={data.price || 0}
+              files={data.files || []}
+            />
+          );
+        })()}
 
         {/* ── VIDÉOS ── */}
         {videoFiles.length > 0 && (
