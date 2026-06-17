@@ -1132,7 +1132,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 }) {
   const [kiffs, setKiffs] = useState(0);
   const [justKiffed, setJustKiffed] = useState(false);
-  const [flyHearts, setFlyHearts] = useState<{id:number,dx:number,size:number,dur:number}[]>([]);
+  const [flyHearts, setFlyHearts] = useState<{id:number,dx:number,size:number,dur:number,sway:number}[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [showKiffements, setShowKiffements] = useState(false);
   const [totalCoins, setTotalCoins] = useState(0);
@@ -1162,18 +1162,18 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     const r = await donnerKiff(user.uid, qrId, artistEmail);
     if (r === 'vide') { setShowKiffements(true); return; }
     if (r === 'ok') {
-      // Jaillissement de plusieurs cœurs de tailles/positions variées (effet TikTok)
-      const nb = 3 + Math.floor(Math.random() * 2); // 3 à 4 cœurs par tap
-      const news = Array.from({ length: nb }).map((_, i) => ({
-        id: Date.now() + Math.random() + i,
-        dx: (Math.random() - 0.5) * 70,        // dispersion horizontale
-        size: 30 + Math.random() * 22,          // taille 30-52px (gros)
-        dur: 0.8 + Math.random() * 0.5,         // durée variée
-      }));
+      // 1 tap = 1 cœur qui s'envole (comme TikTok). Plein de taps = pluie de cœurs.
+      const id = Date.now() + Math.random();
+      const news = [{
+        id,
+        dx: (Math.random() - 0.5) * 50,      // léger décalage horizontal
+        size: 26 + Math.random() * 20,        // 26-46px
+        dur: 1.1 + Math.random() * 0.6,       // 1.1-1.7s (montée visible)
+        sway: (Math.random() - 0.5) * 80,     // balancement courbe
+      }];
       setFlyHearts(h => [...h, ...news]);
-      const ids = news.map(n => n.id);
-      setTimeout(() => setFlyHearts(h => h.filter(x => !ids.includes(x.id))), 1300);
-      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 300);
+      setTimeout(() => setFlyHearts(h => h.filter(x => x.id !== id)), 1800);
+      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 250);
       if (tutoStep === 3) onTutoNext();
     }
   };
@@ -1197,13 +1197,13 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     <div style={{ marginBottom:16 }}>
       <style>{`
         @keyframes heartFly {
-          0%   { opacity:0; transform:translateX(-50%) scale(.3) rotate(0deg); }
-          12%  { opacity:1; transform:translateX(-50%) scale(1.5) rotate(-8deg); }
-          100% { opacity:0; transform:translate(-50%,-130px) scale(.7) rotate(8deg); }
+          0%   { opacity:0; transform:translateX(-50%) translateY(0) scale(.3) rotate(0deg); }
+          10%  { opacity:1; transform:translateX(-50%) translateY(-10px) scale(1.4) rotate(-6deg); }
+          50%  { opacity:1; }
+          100% { opacity:0; transform:translateX(calc(-50% + var(--sway))) translateY(-240px) scale(.85) rotate(10deg); }
         }
         @keyframes heartPop { 0%{transform:scale(1)} 35%{transform:scale(1.7)} 100%{transform:scale(1)} }
         @keyframes countPop { 0%{transform:scale(1)} 30%{transform:scale(1.45); color:#ff3b6b} 100%{transform:scale(1)} }
-        @keyframes barGlow { 0%,100%{box-shadow:0 0 6px rgba(255,59,107,0.5)} 50%{box-shadow:0 0 18px rgba(255,59,107,0.9)} }
       `}</style>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
       {showSignatures && <SignatureShowcase onClose={() => setShowSignatures(false)} />}
@@ -1212,7 +1212,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
         {/* KIFF */}
         <button id="btn-like" onClick={tapKiff} style={{ ...btnStyle(justKiffed, '240,74,106'), position:'relative', overflow:'visible' }}>
           {flyHearts.map(h => (
-            <span key={h.id} style={{ position:'absolute', left:`calc(50% + ${h.dx}px)`, bottom:'60%', transform:'translateX(-50%)', pointerEvents:'none', color:'#ff3b6b', fontSize:h.size, lineHeight:1, textShadow:'0 2px 8px rgba(255,59,107,0.6)', animation:`heartFly ${h.dur}s ease-out forwards`, zIndex:20 }}>&#10084;</span>
+            <span key={h.id} style={{ position:'absolute', left:`calc(50% + ${h.dx}px)`, bottom:'70%', ['--sway' as any]:`${h.sway}px`, transform:'translateX(-50%)', pointerEvents:'none', color:'#ff3b6b', fontSize:h.size, lineHeight:1, textShadow:'0 2px 10px rgba(255,59,107,0.7)', animation:`heartFly ${h.dur}s ease-out forwards`, zIndex:30 }}>&#10084;</span>
           ))}
           <svg width="20" height="20" viewBox="0 0 24 24" fill={justKiffed?'#ff3b6b':'none'} stroke={justKiffed?'#ff3b6b':'#8098b8'} strokeWidth="2" style={{ animation: justKiffed ? 'heartPop .3s ease' : 'none' }}>
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
