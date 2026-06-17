@@ -13,7 +13,7 @@ import {
   RecaptchaVerifier, signInWithPhoneNumber, updateProfile,
   sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
 } from 'firebase/auth';
-import { Coins, Heart, Gift } from 'lucide-react';
+import { Coins, Heart, Gift, Star } from 'lucide-react';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
@@ -7269,7 +7269,7 @@ function DecouvrirPage() {
   });
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
 
       {/* HEADER */}
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
@@ -7296,6 +7296,41 @@ function DecouvrirPage() {
           {TYPES_CONTENU.find(t => t.id === typeFiltre)?.titre || ''}
         </h2>
       </div>
+
+      {/* HERO CARD — contenu mis en avant (onglet Actu uniquement) */}
+      {typeFiltre === 'tous' && !loading && contenusFiltres.length > 0 && (() => {
+        const hero = contenusFiltres[0];
+        const heroFile = hero.files?.[0];
+        const heroUrl = heroFile?.url || heroFile?.name || hero.fileUrl || '';
+        const heroVideo = /\.(mp4|mov|webm|m4v)(\?|$)/i.test(heroUrl);
+        return (
+          <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:220, boxShadow:'0 12px 40px rgba(0,0,0,0.5)' }}>
+            {hero.coverUrl ? (
+              <img src={hero.coverUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+            ) : heroUrl && !heroVideo ? (
+              <img src={heroUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            ) : (
+              <div style={{ width:'100%', height:'100%', background:'linear-gradient(135deg,'+C.blue+',#0a1535)' }} />
+            )}
+            {/* overlay dégradé */}
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(7,11,20,0.95) 0%, rgba(7,11,20,0.3) 50%, transparent 100%)' }} />
+            {/* badge */}
+            <div style={{ position:'absolute', top:14, left:14, display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:99, background:'rgba(47,128,255,0.9)', backdropFilter:'blur(4px)' }}>
+              <Star size={12} color="#fff" fill="#fff" />
+              <span style={{ color:'#fff', fontSize:11, fontWeight:700, letterSpacing:0.5 }}>À LA UNE</span>
+            </div>
+            {/* titre par-dessus */}
+            <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'18px' }}>
+              <p style={{ color:'#fff', fontWeight:900, fontSize:24, margin:'0 0 4px', lineHeight:1.1, textShadow:'0 2px 12px rgba(0,0,0,0.6)' }}>{hero.label}</p>
+              <p style={{ color:'rgba(255,255,255,0.85)', fontSize:14, margin:'0 0 12px', fontWeight:600 }}>{hero.artist || hero.artistEmail || ''}</p>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 18px', borderRadius:99, background:'#fff' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#070B14"><path d="M8 5v14l11-7z"/></svg>
+                <span style={{ color:'#070B14', fontSize:13, fontWeight:800 }}>Écouter</span>
+              </div>
+            </div>
+          </a>
+        );
+      })()}
 
       {/* FILTRES CATÉGORIE — seulement sur Musique/Vidéo */}
       {typeFiltre !== 'tous' && (
@@ -7469,7 +7504,7 @@ function NotificationsPage() {
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
         <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
@@ -7593,29 +7628,70 @@ function ProfilPage() {
   };
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
       <p style={{ color:'#4a5878' }}>Chargement...</p>
     </div>
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
       </div>
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'24px 16px' }}>
-        {/* Avatar */}
-        <div style={{ textAlign:'center', marginBottom:24 }}>
+        {/* Avatar + identité */}
+        <div style={{ textAlign:'center', marginBottom:20 }}>
           {user?.photoURL ? (
-            <img src={user.photoURL} alt="Avatar" style={{ width:80, height:80, borderRadius:99, border:'3px solid #1a6bff', marginBottom:12 }} />
+            <img src={user.photoURL} alt="Avatar" style={{ width:84, height:84, borderRadius:99, border:'3px solid '+C.blue, marginBottom:12 }} />
           ) : (
-            <div style={{ width:80, height:80, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, margin:'0 auto 12px' }}>
-              {user?.displayName?.[0] || user?.email?.[0] || '?'}
+            <div style={{ width:84, height:84, borderRadius:99, background:'linear-gradient(135deg,'+C.blue+',#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, fontWeight:800, color:'#fff', margin:'0 auto 12px', boxShadow:'0 6px 24px rgba(47,128,255,0.35)' }}>
+              {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
             </div>
           )}
-          <p style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{user?.displayName || 'Mélomane'}</p>
-          <p style={{ color:'#4a5878', fontSize:13 }}>{user?.email}</p>
+          <p style={{ fontWeight:800, fontSize:20, marginBottom:4, color:'#fff' }}>{user?.displayName || 'Mélomane'}</p>
+          {/* badge de niveau */}
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 12px', borderRadius:99, background:'rgba(245,200,76,0.12)', border:'1px solid rgba(245,200,76,0.3)', marginBottom:6 }}>
+            <Star size={13} color={C.gold} fill={C.gold} />
+            <span style={{ color:C.gold, fontSize:12, fontWeight:700 }}>Niveau {Math.max(1, Math.floor((likes + kiffements) / 10) + 1)}</span>
+          </div>
+          <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>Membre depuis 2026</p>
+        </div>
+
+        {/* VOTRE IMPACT */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Votre impact</p>
+          <div style={{ display:'flex', gap:10 }}>
+            {[
+              { ic:<Heart size={18} color="#FF647C" fill="#FF647C" />, val:likes, lab:'Kiffs offerts' },
+              { ic:<Gift size={18} color={C.blueLite} />, val:kiffements, lab:'Kiffements' },
+              { ic:<Coins size={18} color={C.gold} />, val:soldeOscart, lab:'Oscart' },
+            ].map((s,i) => (
+              <div key={i} style={{ flex:1, background:C.card, border:'1px solid '+C.border, borderRadius:14, padding:'14px 8px', textAlign:'center' }}>
+                <div style={{ marginBottom:6, display:'flex', justifyContent:'center' }}>{s.ic}</div>
+                <p style={{ fontWeight:900, fontSize:22, color:'#fff', margin:0, lineHeight:1 }}>{s.val}</p>
+                <p style={{ color:C.textSoft, fontSize:10, margin:'4px 0 0' }}>{s.lab}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* VOS BADGES */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Vos badges</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {[
+              { lab:'Premier soutien', ok: kiffements >= 1, ic:'🎁' },
+              { lab:'Mélomane actif', ok: likes >= 5, ic:'🎧' },
+              { lab:'Découvreur', ok: likes >= 20, ic:'🔍' },
+              { lab:'Ambassadeur', ok: kiffements >= 10, ic:'⭐' },
+            ].map((b,i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:99, background: b.ok ? 'rgba(0,196,140,0.12)' : 'rgba(255,255,255,0.03)', border:'1px solid '+(b.ok ? 'rgba(0,196,140,0.3)' : C.border), opacity: b.ok ? 1 : 0.5 }}>
+                <span style={{ fontSize:14 }}>{b.ic}</span>
+                <span style={{ color: b.ok ? C.success : C.textSoft, fontSize:12, fontWeight:600 }}>{b.lab}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* PORTEFEUILLE OSCART — carte premium */}
@@ -9473,7 +9549,7 @@ function DzStudioPage() {
 
   // ── LOGIN ──
   if (view !== 'dashboard') return (
-    <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .35s ease' }}>
         <div style={{ textAlign:'center', marginBottom:28 }}>
@@ -9527,7 +9603,7 @@ function DzStudioPage() {
 
   // ── DASHBOARD ──
   return (
-    <div style={{ minHeight:'100vh', background:'#161b27', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -10941,7 +11017,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
           authLoading ? (
-            <div style={{ minHeight:'100vh', background:'#161b27', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
               <div style={{ width:48, height:48, border:'3px solid #1e6fff', borderTopColor:'transparent', borderRadius:99, animation:'spin .8s linear infinite' }} />
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
