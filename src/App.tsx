@@ -1863,6 +1863,7 @@ function FanPage() {
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
+  const [showDlList, setShowDlList] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
@@ -2191,28 +2192,31 @@ function FanPage() {
               </div>
             )}
 
-            {/* ── LISTE TITRES ── */}
+            {/* ── BOUTON TÉLÉCHARGER (déroule la liste des titres) ── */}
             {qrData.files?.length > 0 && (
               <div style={{ marginBottom:20 }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                  <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}>💿 Titres</p>
-                  <span style={{ background:'rgba(30,111,255,0.15)', border:'1px solid rgba(30,111,255,0.3)', borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700, color:'#4da6ff' }}>{qrData.files.length}</span>
-                </div>
-                <div style={{ background:'#0f1322', borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)' }}>
-                  {qrData.files.map((f:any, i:number) => (
-                    <div key={i} className="fp-row" style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i<qrData.files.length-1?'1px solid rgba(255,255,255,0.04)':'none', transition:'background .15s' }}>
-                      <div style={{ width:34, height:34, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:15 }}>
-                        {f.name?.match(/\.(mp4|mov|avi|mkv)$/i)?'🎬':'🎵'}
+                <button onClick={() => setShowDlList(!showDlList)}
+                  style={{ width:'100%', padding:'14px 18px', borderRadius:14, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, boxShadow:'0 4px 18px rgba(10,132,255,0.45)' }}>
+                  <span style={{ fontSize:18 }}>⬇</span>
+                  Télécharger {qrData.files.length > 1 ? `(${qrData.files.length} titres)` : ''}
+                </button>
+                {showDlList && (
+                  <div style={{ marginTop:10, background:'rgba(20,28,48,0.6)', borderRadius:14, overflow:'hidden', border:'1px solid '+C.border }}>
+                    {qrData.files.map((f:any, i:number) => (
+                      <div key={i} className="fp-row" style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i<qrData.files.length-1?'1px solid '+C.border:'none' }}>
+                        <div style={{ width:34, height:34, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:15 }}>
+                          {f.name?.match(/\.(mp4|mov|avi|mkv)$/i)?'🎬':'🎵'}
+                        </div>
+                        <div style={{ flex:1, overflow:'hidden' }}>
+                          <p style={{ fontSize:13, fontWeight:600, color:C.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', margin:0 }}>{f.name?.replace(/\.[^/.]+$/,'')||'Piste '+(i+1)}</p>
+                          <p style={{ color:C.textSoft, fontSize:10, margin:'2px 0 0' }}>{formatSize(f.size||0)}</p>
+                        </div>
+                        <a href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
+                          style={{ color:C.blueLite, fontSize:18, textDecoration:'none', padding:'4px 6px' }}>⬇</a>
                       </div>
-                      <div style={{ flex:1, overflow:'hidden' }}>
-                        <p style={{ fontSize:13, fontWeight:600, color:'#dde4f5', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', margin:0 }}>{f.name?.replace(/\.[^/.]+$/,'')||'Piste '+(i+1)}</p>
-                        <p style={{ color:'#4a5878', fontSize:10, margin:'2px 0 0' }}>{formatSize(f.size||0)}</p>
-                      </div>
-                      <a href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                        style={{ color:'rgba(30,111,255,0.7)', fontSize:18, textDecoration:'none', padding:'4px 6px' }}>⬇</a>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
