@@ -549,7 +549,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
           to: artistEmail,
           role: 'artiste',
           type: 'kiffement',
-          text: `${user.displayName || 'Un fan'} vous a envoyé ${kiffement.coins} Oscart — ${kiffement.label}`,
+          text: `${user.displayName || 'Un fan'} vous a envoyé un kiffement — ${kiffement.label}`,
           qrId, from: user.displayName || user.email,
           createdAt: new Date().toISOString(),
           lu: false,
@@ -6500,16 +6500,18 @@ function ZikothequePage({ user }: { user: any }) {
 // ─────────────────────────────────────────────
 function NotificationsTab({ userEmail }: { userEmail: string }) {
   const [notifs, setNotifs] = useState<any[]>([]);
+  const [cadeaux, setCadeaux] = useState<any[]>([]);
+  const [openFan, setOpenFan] = useState<string | null>(null);
 
   useEffect(() => {
+    // Notifs classiques (commentaires, mots validés...) — SAUF kiffements (gérés à part, groupés)
     const unsub = onSnapshot(
       query(collection(db, 'notifications'), where('to','==', userEmail), orderBy('createdAt','desc')),
       async snap => {
-        // Côté ARTISTE : on montre les notifs destinées à l'artiste
-        // (role 'artiste', ou anciennes notifs sans role pour ne rien perdre)
         const docs = snap.docs.filter(d => {
           const r = d.data().role;
-          return r === 'artiste' || r === undefined || r === null;
+          const okRole = (r === 'artiste' || r === undefined || r === null);
+          return okRole && d.data().type !== 'kiffement'; // kiffements regroupés plus bas
         });
         setNotifs(docs.map(d => ({id:d.id,...d.data()})));
         for (const d of docs) {
@@ -6517,8 +6519,25 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
         }
       }
     );
-    return unsub;
+    // Kiffements (cadeaux) reçus — pour regroupement par mélomane
+    const unsub2 = onSnapshot(
+      query(collection(db, 'cadeaux'), where('artistEmail','==', userEmail)),
+      snap => setCadeaux(snap.docs.map(d => ({id:d.id,...d.data()})))
+    );
+    return () => { unsub(); unsub2(); };
   }, [userEmail]);
+
+  // Regrouper les cadeaux par mélomane
+  const parFan: Record<string, { nom:string, total:number, types:Record<string,number>, dernier:string }> = {};
+  for (const c of cadeaux) {
+    const nom = c.userName || 'Un fan';
+    if (!parFan[nom]) parFan[nom] = { nom, total:0, types:{}, dernier:c.createdAt };
+    parFan[nom].total += 1;
+    const lab = c.kiffementLabel || 'Cadeau';
+    parFan[nom].types[lab] = (parFan[nom].types[lab] || 0) + 1;
+    if (c.createdAt > parFan[nom].dernier) parFan[nom].dernier = c.createdAt;
+  }
+  const fans = Object.values(parFan).sort((a,b) => (b.dernier > a.dernier ? 1 : -1));
 
   const getIcon = (type: string) => {
     if (type === 'commentaire') return '💬';
@@ -6527,27 +6546,69 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
     return '🔔';
   };
 
+  const rien = notifs.length === 0 && fans.length === 0;
+
   return (
     <div>
-      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20 }}>🔔 Notifications</h2>
-      {notifs.length === 0 ? (
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:C.text }}>Notifications</h2>
+
+      {/* KIFFEMENTS REÇUS — groupés par mélomane */}
+      {fans.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
+          {fans.map((f, i) => (
+            <div key={i} style={{ ...S.card, marginBottom:10, cursor:'pointer' }}
+              onClick={() => setOpenFan(openFan === f.nom ? null : f.nom)}>
+              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <span style={{ fontSize:24, flexShrink:0 }}>🎁</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{f.nom} vous a envoyé des kiffements</p>
+                  <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>{f.total} kiffement{f.total>1?'s':''} au total · touchez pour voir le détail</p>
+                </div>
+                <span style={{ color:C.textSoft, fontSize:16, transform: openFan === f.nom ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}>›</span>
+              </div>
+              {/* Déroulé : détail par type de cadeau */}
+              {openFan === f.nom && (
+                <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid '+C.border }}>
+                  {Object.entries(f.types).sort((a,b)=>b[1]-a[1]).map(([lab, nb], j) => (
+                    <div key={j} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0' }}>
+                      <span style={{ color:C.text, fontSize:13 }}>{lab}</span>
+                      <span style={{ color:C.blue, fontSize:14, fontWeight:800 }}>×{nb}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* AUTRES NOTIFS (commentaires, mots validés...) */}
+      {notifs.length > 0 && (
+        <div>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
+          {notifs.map(n => (
+            <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
+              <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px', color:C.text }}>{n.text}</p>
+                  {n.from && <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
+                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+                </div>
+                {!n.lu && <span style={{ width:8, height:8, borderRadius:99, background:C.blue, flexShrink:0, marginTop:4 }} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {rien && (
         <div style={{ textAlign:'center', padding:40 }}>
           <p style={{ fontSize:36, marginBottom:10 }}>🔔</p>
-          <p style={{ color:'#8098b8', fontSize:14 }}>Aucune notification pour l'instant</p>
+          <p style={{ color:C.textSoft, fontSize:14 }}>Aucune notification pour l'instant</p>
         </div>
-      ) : notifs.map(n => (
-        <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':'#1a6bff'}`, opacity: n.lu ? 0.7 : 1 }}>
-          <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
-            <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
-            <div style={{ flex:1 }}>
-              <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px' }}>{n.text}</p>
-              {n.from && <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
-              <p style={{ color:'#b0c4d8', fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
-            </div>
-            {!n.lu && <span style={{ width:8, height:8, borderRadius:99, background:'#1a6bff', flexShrink:0, marginTop:4 }} />}
-          </div>
-        </div>
-      ))}
+      )}
     </div>
   );
 }
