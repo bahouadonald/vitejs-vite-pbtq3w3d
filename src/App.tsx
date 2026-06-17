@@ -10657,7 +10657,6 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
-  const [showDetail, setShowDetail] = useState(false);
   const user = auth.currentUser;
   const prixOscart = Math.ceil(prix / 10);
 
@@ -10760,42 +10759,18 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
         </div>
       )}
 
-      {/* Modal détail prix (apparaît au clic sur Télécharger) */}
-      {showDetail && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-          onClick={() => setShowDetail(false)}>
-          <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
-            <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 6px' }}>Télécharger {albumLabel || ''}</p>
-            <p style={{ color:C.gold, fontWeight:800, fontSize:22, margin:'0 0 4px', display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center' }}>
-              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:22, height:22 }} />{prixOscart} Oscart
-            </p>
-            <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>Votre solde : {solde} Oscart</p>
-            {solde < prixOscart ? (
-              <button onClick={() => { setShowDetail(false); const r = RECHARGES.filter(x => x.oscart >= prixOscart)[0] || RECHARGES[0]; setRechargeModal(r); }}
-                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-                Recharger pour télécharger
-              </button>
-            ) : (
-              <button onClick={() => { setShowDetail(false); payer(); }} disabled={paying}
-                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-                {paying ? 'Traitement...' : 'Confirmer le téléchargement'}
-              </button>
-            )}
-            <button onClick={() => setShowDetail(false)}
-              style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer', marginTop:8 }}>
-              Annuler
-            </button>
-          </div>
-        </div>
+      {/* Bouton paiement direct (utilisé dans le modal de AchatWidget) */}
+      {solde < prixOscart ? (
+        <button onClick={() => { const r = RECHARGES.filter(x => x.oscart >= prixOscart)[0] || RECHARGES[0]; setRechargeModal(r); }}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          Recharger pour télécharger
+        </button>
+      ) : (
+        <button onClick={payer} disabled={paying}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          {paying ? 'Traitement...' : 'Confirmer le téléchargement'}
+        </button>
       )}
-
-      {/* Bouton Télécharger simple (le prix apparaît au clic) */}
-      <button onClick={() => setShowDetail(true)}
-        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-        <span style={{ fontSize:18 }}>⬇</span> Télécharger
-      </button>
     </div>
   );
 }
@@ -10810,6 +10785,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   const [errMsg, setErrMsg] = useState('');
   const [dlActive, setDlActive] = useState(false);
   const [venteId, setVenteId] = useState('');
+  const [showDetail, setShowDetail] = useState(false);
 
   const [showPubAfterPay, setShowPubAfterPay] = useState(false);
 
@@ -10916,32 +10892,33 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   );
 
   return (
-    <div style={{ marginBottom:20 }}>
-      <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>Télécharger</p>
-
-      {/* Prix en Oscart */}
-      <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-          <div>
-            <p style={{ fontWeight:800, fontSize:24, color:'#ffd700', margin:'0 0 2px' }}>
-              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:22, height:22, verticalAlign:"-4px", marginRight:5 }} />{Math.ceil(prix / 10)} Oscart
+    <div id="zone-telecharger" style={{ marginBottom:20 }}>
+      {/* Modal détail prix (apparaît au clic) */}
+      {showDetail && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setShowDetail(false)}>
+          <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
+            <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 8px' }}>Télécharger {albumLabel || ''}</p>
+            <p style={{ color:C.gold, fontWeight:800, fontSize:24, margin:'0 0 4px', display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center' }}>
+              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:24, height:24 }} />{Math.ceil(prix / 10)} Oscart
             </p>
-            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:10, margin:0 }}>
-              Monnaie de la plateforme · 1 Oscart = 10 F
-            </p>
+            <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>1 Oscart = 10 F CFA</p>
+            <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
+            <button onClick={() => setShowDetail(false)}
+              style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer', marginTop:10 }}>
+              Annuler
+            </button>
           </div>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="1.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-          </svg>
         </div>
+      )}
 
-        {/* Bouton selon solde */}
-        <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
-      </div>
-
-      <p style={{ color:'#2a3a60', fontSize:10, textAlign:'center', marginTop:8 }}>
-        Rechargez vos Oscart pour télécharger ce contenu
-      </p>
+      {/* Petit bouton Télécharger (le prix apparaît au clic) */}
+      <button onClick={() => setShowDetail(true)}
+        style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+        <span style={{ fontSize:18 }}>⬇</span> Télécharger
+      </button>
     </div>
   );
 }
