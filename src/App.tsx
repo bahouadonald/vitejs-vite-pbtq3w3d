@@ -7523,6 +7523,31 @@ function DecouvrirPage() {
         </h2>
       </div>
 
+      {/* HERO CARD — contenu à la une (onglet Actu uniquement) */}
+      {typeFiltre === 'tous' && !loading && contenusFiltres.length > 0 && (() => {
+        const hero = contenusFiltres[0];
+        return (
+          <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210, boxShadow:'0 12px 40px rgba(0,0,0,0.5)' }}>
+            {hero.coverUrl ? (
+              <img src={hero.coverUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+            ) : (
+              <div style={{ width:'100%', height:'100%', background:'linear-gradient(135deg,'+C.blue+',#0a1535)' }} />
+            )}
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(13,21,38,0.96) 0%, rgba(13,21,38,0.3) 55%, transparent 100%)' }} />
+            <div style={{ position:'absolute', top:14, left:14, padding:'5px 12px', borderRadius:99, background:'rgba(47,128,255,0.92)' }}>
+              <span style={{ color:'#fff', fontSize:11, fontWeight:700, letterSpacing:0.5 }}>À LA UNE</span>
+            </div>
+            <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'18px' }}>
+              <p style={{ color:'#fff', fontWeight:900, fontSize:23, margin:'0 0 4px', lineHeight:1.1, textShadow:'0 2px 12px rgba(0,0,0,0.6)' }}>{hero.label}</p>
+              <p style={{ color:'rgba(255,255,255,0.85)', fontSize:14, margin:'0 0 12px', fontWeight:600 }}>{hero.artist || hero.artistEmail || ''}</p>
+              <div style={{ display:'inline-block', padding:'9px 20px', borderRadius:99, background:'#fff' }}>
+                <span style={{ color:'#0D1526', fontSize:13, fontWeight:800 }}>Écouter</span>
+              </div>
+            </div>
+          </a>
+        );
+      })()}
+
       {/* FILTRES CATÉGORIE — seulement sur Musique/Vidéo */}
       {typeFiltre !== 'tous' && (
         <div style={{ display:'flex', gap:6, padding:'0 16px 12px', overflowX:'auto' }}>
@@ -7846,32 +7871,90 @@ function ProfilPage() {
       </div>
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'24px 16px' }}>
-        {/* Avatar */}
-        <div style={{ textAlign:'center', marginBottom:24 }}>
+        {/* Avatar + identité */}
+        <div style={{ textAlign:'center', marginBottom:20 }}>
           {user?.photoURL ? (
-            <img src={user.photoURL} alt="Avatar" style={{ width:80, height:80, borderRadius:99, border:'3px solid #1a6bff', marginBottom:12 }} />
+            <img src={user.photoURL} alt="Avatar" style={{ width:84, height:84, borderRadius:99, border:'3px solid '+C.blue, marginBottom:12 }} />
           ) : (
-            <div style={{ width:80, height:80, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, margin:'0 auto 12px' }}>
-              {user?.displayName?.[0] || user?.email?.[0] || '?'}
+            <div style={{ width:84, height:84, borderRadius:99, background:'linear-gradient(135deg,'+C.blue+',#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, fontWeight:800, color:'#fff', margin:'0 auto 12px', boxShadow:'0 6px 24px rgba(47,128,255,0.35)' }}>
+              {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
             </div>
           )}
-          <p style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{user?.displayName || 'Mélomane'}</p>
-          <p style={{ color:'#4a5878', fontSize:13 }}>{user?.email}</p>
+          <p style={{ fontWeight:800, fontSize:20, marginBottom:4, color:'#fff' }}>{user?.displayName || 'Mélomane'}</p>
+          <div style={{ display:'inline-block', padding:'4px 14px', borderRadius:99, background:'rgba(245,200,76,0.12)', border:'1px solid rgba(245,200,76,0.3)', marginBottom:6 }}>
+            <span style={{ color:C.gold, fontSize:12, fontWeight:700 }}>Niveau {Math.max(1, Math.floor((likes + kiffements) / 10) + 1)}</span>
+          </div>
+          <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>Membre depuis 2026</p>
         </div>
 
-        {/* PORTEFEUILLE OSCART */}
-        <div style={{ background:'linear-gradient(135deg,#1a2340,#1e2a50)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:16, padding:'18px 20px', marginBottom:16 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <div>
-              <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Mon portefeuille</p>
-              <p style={{ fontWeight:900, fontSize:28, color:'#ffd700', margin:0 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:24, height:24, verticalAlign:"-4px", marginRight:5 }} />{soldeOscart} Oscart</p>
-              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, margin:0 }}>{(soldeOscart * 10).toLocaleString()} F CFA</p>
-              <p style={{ color:'#f04a6a', fontSize:13, fontWeight:700, margin:'6px 0 0' }}>&#9829; {kiffsDispo.toLocaleString()} kiffs disponibles</p>
+        {/* VOTRE IMPACT */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Votre impact</p>
+          <div style={{ display:'flex', gap:10 }}>
+            {[
+              { val:kiffsOfferts, lab:'Kiffs offerts', col:'#FF647C' },
+              { val:kiffements, lab:'Kiffements', col:C.blueLite },
+              { val:soldeOscart, lab:'Oscart', col:C.gold },
+            ].map((s,i) => (
+              <div key={i} style={{ flex:1, background:C.card, border:'1px solid '+C.border, borderRadius:14, padding:'14px 8px', textAlign:'center' }}>
+                <p style={{ fontWeight:900, fontSize:24, color:s.col, margin:0, lineHeight:1 }}>{s.val}</p>
+                <p style={{ color:C.textSoft, fontSize:10, margin:'5px 0 0' }}>{s.lab}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* VOS BADGES */}
+        <div style={{ marginBottom:16 }}>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Vos badges</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {[
+              { lab:'Premier soutien', ok: kiffements >= 1 },
+              { lab:'Mélomane actif', ok: likes >= 5 },
+              { lab:'Découvreur', ok: likes >= 20 },
+              { lab:'Ambassadeur', ok: kiffements >= 10 },
+            ].map((b,i) => (
+              <div key={i} style={{ padding:'8px 14px', borderRadius:99, background: b.ok ? 'rgba(0,196,140,0.12)' : 'rgba(255,255,255,0.03)', border:'1px solid '+(b.ok ? 'rgba(0,196,140,0.3)' : C.border), opacity: b.ok ? 1 : 0.45 }}>
+                <span style={{ color: b.ok ? C.success : C.textSoft, fontSize:12, fontWeight:600 }}>{b.lab}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* PORTEFEUILLE OSCART — carte premium */}
+        <div style={{
+          position:'relative', borderRadius:20, padding:'22px 22px 20px', marginBottom:16, overflow:'hidden',
+          background:'linear-gradient(135deg, #1e2d4d 0%, #16223c 60%, #111b30 100%)',
+          border:'1px solid rgba(245,200,76,0.3)',
+          boxShadow:'0 10px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)'
+        }}>
+          {/* reflets lumineux */}
+          <div style={{ position:'absolute', top:-60, right:-40, width:200, height:200, borderRadius:'50%', background:'radial-gradient(circle, rgba(245,200,76,0.2), transparent 70%)', pointerEvents:'none' }} />
+          <div style={{ position:'absolute', bottom:-80, left:-50, width:220, height:220, borderRadius:'50%', background:'radial-gradient(circle, rgba(47,128,255,0.18), transparent 70%)', pointerEvents:'none' }} />
+
+          <div style={{ position:'relative', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:30, height:30 }} />
+              <span style={{ color:'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, letterSpacing:0.5 }}>Mon portefeuille</span>
             </div>
             <button onClick={() => setRechargeModalProfil(RECHARGES[1])}
-              style={{ padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+              style={{ padding:'8px 16px', borderRadius:99, border:'none', background:'linear-gradient(135deg,#F5C84C,#e0b03a)', color:'#1a1208', fontSize:12, fontWeight:800, cursor:'pointer', boxShadow:'0 2px 10px rgba(245,200,76,0.35)' }}>
               Recharger
             </button>
+          </div>
+
+          {/* CHIFFRE GÉANT */}
+          <div style={{ position:'relative', marginTop:18 }}>
+            <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+              <span style={{ fontWeight:900, fontSize:52, color:'#fff', lineHeight:1, letterSpacing:-1 }}>{soldeOscart}</span>
+              <span style={{ fontWeight:800, fontSize:18, color:'#F5C84C', letterSpacing:1 }}>OSCART</span>
+            </div>
+            <p style={{ color:'rgba(255,255,255,0.45)', fontSize:13, margin:'6px 0 0' }}>&#8776; {(soldeOscart * 10).toLocaleString()} FCFA</p>
+          </div>
+
+          {/* Kiffs disponibles */}
+          <div style={{ position:'relative', marginTop:16, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+            <span style={{ color:'#FF647C', fontSize:14, fontWeight:700 }}>&#9829; {kiffsDispo.toLocaleString()} kiffs disponibles</span>
           </div>
         </div>
 
