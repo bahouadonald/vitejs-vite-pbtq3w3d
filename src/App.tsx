@@ -13,7 +13,6 @@ import {
   RecaptchaVerifier, signInWithPhoneNumber, updateProfile,
   sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
 } from 'firebase/auth';
-} from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // Icônes SVG maison (remplacent lucide-react, sans dépendance externe)
