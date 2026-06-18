@@ -1355,6 +1355,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     }
   };
   const loopRunning = useRef<boolean>(false);
+  const smoothLevel = useRef<number>(0);
   const startLevelLoop = () => {
     if (!analyserRef.current || loopRunning.current) return;
     loopRunning.current = true;
@@ -1365,15 +1366,24 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
         audioCtxRef.current.resume();
       }
       analyserRef.current.getByteFrequencyData(data);
-      let sum = 0; const n = Math.min(24, data.length);
+      // Niveau brut (basses + médiums)
+      let sum = 0; const n = Math.min(20, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      const level = (sum / n) / 255; // 0 → 1
+      const raw = (sum / n) / 255; // 0 → 1
+      // Lissage asymétrique : monte vite (attaque), retombe doucement (release)
+      // → la pochette POUSSE sur les beats puis REDESCEND (elle danse)
+      if (raw > smoothLevel.current) {
+        smoothLevel.current = smoothLevel.current * 0.4 + raw * 0.6; // attaque rapide
+      } else {
+        smoothLevel.current = smoothLevel.current * 0.85 + raw * 0.15; // release douce
+      }
+      const level = smoothLevel.current;
       const img = document.getElementById('cover-reactive');
       const glow = document.getElementById('cover-glow');
-      // Zoom pochette (12% — test de réactivité)
+      // Marge de jeu musical : zoom de 0% (silence) à 12% (grosse caisse saturée)
+      // La pochette danse dans cet intervalle selon la force du son
       if (img) {
         img.style.transform = `scale(${1 + level * 0.12})`;
-        // Contour intérieur lumineux (subtil, pas trop dense)
         img.style.boxShadow = `inset 0 0 ${12 + level * 30}px ${2 + level * 7}px rgba(10,132,255,${0.3 + level * 0.45})`;
       }
       // Halo extérieur léger qui retombe avec la musique
@@ -11083,17 +11093,17 @@ function PublicStreamPage() {
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '16px 16px 0' }}>
         {/* Glow néon derrière (rayonne autour) */}
         <div id="cover-glow" style={{ position:'absolute', top:16, left:16, right:16, bottom:0, pointerEvents:'none', opacity:0, borderRadius:8, willChange:'box-shadow, opacity', zIndex:0 }} />
-        <div style={{ position:'relative', overflow:'hidden', borderRadius:8, zIndex:2 }}>
+        <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2 }}>
           {data.coverUrl ? (
             <img
               id="cover-reactive"
               src={data.coverUrl}
               alt={data.label}
-              style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
+              style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block', borderRadius: 8,
                 transition: 'transform .06s ease-out', willChange: 'transform' }}
             />
           ) : (
-            <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
               <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
             </div>
           )}
