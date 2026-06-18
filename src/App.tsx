@@ -1319,7 +1319,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onLevel }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, onLevel?: (level: number) => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1330,6 +1330,48 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   const streamStart = useRef<number>(0);
   const stopTimer = useRef<any>(null);
   const cur = files[idx];
+
+  // ── Analyseur audio (avec protection : si échec, le son continue) ──
+  const audioCtxRef = useRef<any>(null);
+  const analyserRef = useRef<any>(null);
+  const rafRef = useRef<any>(null);
+  const analyserFailed = useRef<boolean>(false);
+  const setupAnalyser = () => {
+    if (!ref.current || audioCtxRef.current || analyserFailed.current) return;
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) { analyserFailed.current = true; return; }
+      const ctx = new AC();
+      const src = ctx.createMediaElementSource(ref.current);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      src.connect(analyser);
+      analyser.connect(ctx.destination); // IMPORTANT : reconnecte le son aux HP
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+    } catch (e) {
+      // Échec (CORS non autorisé) → on abandonne l'analyse, le son continue normalement
+      analyserFailed.current = true;
+    }
+  };
+  const startLevelLoop = () => {
+    if (!analyserRef.current) return;
+    const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+    const tick = () => {
+      if (!analyserRef.current) return;
+      analyserRef.current.getByteFrequencyData(data);
+      let sum = 0; const n = Math.min(24, data.length);
+      for (let i = 0; i < n; i++) sum += data[i];
+      onLevel?.((sum / n) / 255);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    tick();
+  };
+  const stopLevelLoop = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    onLevel?.(0);
+  };
+  useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
@@ -1365,6 +1407,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause();
       setPlaying(false);
+      stopLevelLoop();
       // Timer 7s — si pas de reprise → pub plein écran
       stopTimer.current = setTimeout(() => {
         setPendingNext(false);
@@ -1373,9 +1416,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     } else {
       if (stopTimer.current) clearTimeout(stopTimer.current);
       streamStart.current = Date.now() / 1000;
+      setupAnalyser();
+      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
-      // Déclencher tuto cascade au premier play
+      startLevelLoop();
       if (onPlay) onPlay();
     }
   };
@@ -1411,7 +1456,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
         <PubOverlay trigger="audio_during" silent={true} onDone={() => setShowPubDuringPlay(false)} />
       )}
 
-      <audio ref={ref} src={cur?.url}
+      <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
         onEnded={() => {
@@ -10931,6 +10976,7 @@ function PublicStreamPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
   const [coverPlaying, setCoverPlaying] = useState(false);
+  const [coverLevel, setCoverLevel] = useState(0);
 
   // Déclencher tuto cascade après play
   // (déclenché depuis recordPublicStream)
@@ -11038,9 +11084,9 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — pulse doucement pendant la lecture ── */}
+      {/* ── POCHETTE — réagit au son (spectrogramme) ou pulse si analyse indispo ── */}
       <style>{`
-        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.035)} }
         @keyframes ringBeat { 0%,100%{box-shadow:inset 0 0 30px 2px rgba(10,132,255,0.2)} 50%{box-shadow:inset 0 0 70px 6px rgba(10,132,255,0.5)} }
       `}</style>
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
@@ -11049,16 +11095,21 @@ function PublicStreamPage() {
             src={data.coverUrl}
             alt={data.label}
             style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              animation: coverPlaying ? 'coverBeat 1.4s ease-in-out infinite' : 'none' }}
+              transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.08})` : undefined,
+              transition: coverLevel > 0.01 ? 'transform .07s ease-out' : 'none',
+              animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, animation: coverPlaying ? 'coverBeat 1.4s ease-in-out infinite' : 'none' }} />
+            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.15})` : undefined, animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }} />
           </div>
         )}
-        {/* anneau lumineux qui bat pendant la lecture */}
+        {/* anneau lumineux : intensité = niveau du son (ou battement simple) */}
         {coverPlaying && (
-          <div style={{ position:'absolute', inset:0, pointerEvents:'none', animation:'ringBeat 1.4s ease-in-out infinite' }} />
+          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+            boxShadow: coverLevel > 0.01 ? `inset 0 0 ${30 + coverLevel * 90}px ${coverLevel * 8}px rgba(10,132,255,${0.2 + coverLevel * 0.5})` : undefined,
+            transition: coverLevel > 0.01 ? 'box-shadow .07s ease-out' : 'none',
+            animation: coverLevel <= 0.01 ? 'ringBeat 0.7s ease-in-out infinite' : 'none' }} />
         )}
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
@@ -11078,6 +11129,7 @@ function PublicStreamPage() {
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
               onDownload={() => setDlOpen(true)}
               onPlayingChange={setCoverPlaying}
+              onLevel={setCoverLevel}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
