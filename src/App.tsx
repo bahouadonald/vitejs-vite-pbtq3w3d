@@ -1370,47 +1370,19 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const level = (sum / n) / 255; // 0 → 1
       const img = document.getElementById('cover-reactive');
       const glow = document.getElementById('cover-glow');
-      if (img) img.style.transform = `scale(${1 + level * 0.05})`;
-      // Halo extérieur léger (accompagne le spectre)
-      if (glow) {
-        const b = 0.35 + level * 0.45;
-        glow.style.boxShadow = `0 0 ${30 + level * 50}px ${8 + level * 18}px rgba(10,132,255,${b})`;
-        glow.style.opacity = String(0.4 + level * 0.5);
+      // Zoom pochette (12% — test de réactivité)
+      if (img) {
+        img.style.transform = `scale(${1 + level * 0.12})`;
+        // Contour intérieur lumineux (subtil, pas trop dense)
+        img.style.boxShadow = `inset 0 0 ${12 + level * 30}px ${2 + level * 7}px rgba(10,132,255,${0.3 + level * 0.45})`;
       }
-      // ── SPECTRE CIRCULAIRE (canvas) — barres qui rayonnent autour ──
-      const canvas = document.getElementById('cover-spectrum') as HTMLCanvasElement | null;
-      if (canvas) {
-        const ctx2 = canvas.getContext('2d');
-        if (ctx2) {
-          const W = canvas.width, H = canvas.height;
-          ctx2.clearRect(0, 0, W, H);
-          const cx = W / 2, cy = H / 2;
-          // rayon du cercle de base = autour de la pochette (carrée), donc au coin
-          const baseR = Math.min(W, H) * 0.34;
-          const NB = 72; // nombre de barres autour
-          ctx2.lineCap = 'round';
-          for (let i = 0; i < NB; i++) {
-            const fi = Math.floor((i / NB) * Math.min(data.length, 60));
-            const v = data[fi] / 255; // 0 → 1
-            const ang = (i / NB) * Math.PI * 2 - Math.PI / 2;
-            const cosA = Math.cos(ang), sinA = Math.sin(ang);
-            const inLen = v * baseR * 0.35;  // vers l'intérieur
-            const outLen = v * baseR * 0.7;  // vers l'extérieur
-            const x1 = cx + cosA * (baseR - inLen);
-            const y1 = cy + sinA * (baseR - inLen);
-            const x2 = cx + cosA * (baseR + outLen);
-            const y2 = cy + sinA * (baseR + outLen);
-            const alpha = 0.35 + v * 0.65;
-            ctx2.strokeStyle = `rgba(10,132,255,${alpha})`;
-            ctx2.shadowColor = 'rgba(10,132,255,0.9)';
-            ctx2.shadowBlur = 8 + v * 14;
-            ctx2.lineWidth = 2.5 + v * 2;
-            ctx2.beginPath();
-            ctx2.moveTo(x1, y1);
-            ctx2.lineTo(x2, y2);
-            ctx2.stroke();
-          }
-        }
+      // Halo extérieur léger qui retombe avec la musique
+      if (glow) {
+        const b = 0.3 + level * 0.5;
+        glow.style.boxShadow =
+          `0 0 ${20 + level * 35}px ${5 + level * 12}px rgba(10,132,255,${b}), ` +
+          `0 0 ${45 + level * 75}px ${10 + level * 22}px rgba(10,132,255,${b * 0.6})`;
+        glow.style.opacity = String(0.35 + level * 0.55);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1423,8 +1395,6 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     const glow = document.getElementById('cover-glow');
     if (img) { img.style.transform = 'scale(1)'; img.style.boxShadow = 'none'; }
     if (glow) { glow.style.boxShadow = 'none'; glow.style.opacity = '0'; }
-    const canvas = document.getElementById('cover-spectrum') as HTMLCanvasElement | null;
-    if (canvas) { const c = canvas.getContext('2d'); if (c) c.clearRect(0,0,canvas.width,canvas.height); }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -1439,17 +1409,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   const [pendingNext, setPendingNext] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
 
-  // Pub pendant lecture audio — 3 fois par piste, sans son, passable après 5s
-  const [showPubDuringPlay, setShowPubDuringPlay] = useState(false);
-  const pubIntervalRef = useRef<any>(null);
-  const pubCountRef = useRef(0);
-
-  useEffect(() => {
-    // Pub pendant lecture DÉSACTIVÉE — la pub ne vient plus qu'APRÈS la lecture complète
-    pubCountRef.current = 0;
-    if (pubIntervalRef.current) clearInterval(pubIntervalRef.current);
-    return () => { if (pubIntervalRef.current) clearInterval(pubIntervalRef.current); };
-  }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pub pendant lecture SUPPRIMÉE — la pub vient uniquement APRÈS la lecture complète
 
   const toggle = () => {
     if (!ref.current) return;
@@ -1501,11 +1461,8 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   return (
     <div style={{ background: 'rgba(20,28,48,0.92)', borderRadius: 16, padding: '12px 14px', border: '1px solid '+C.border, boxShadow: '0 6px 24px rgba(0,0,0,0.4)' }}>
 
-      {/* PUB plein écran après arrêt/fin */}
+      {/* PUB plein écran APRÈS arrêt/fin uniquement */}
       {showPubAfter && <PubOverlay trigger="track" onDone={afterPub} />}
-      {showPubDuringPlay && (
-        <PubOverlay trigger="audio_during" silent={true} onDone={() => setShowPubDuringPlay(false)} />
-      )}
 
       <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
@@ -1692,7 +1649,7 @@ function TutoCascade({ onDone }: { onDone: () => void }) {
 // ─────────────────────────────────────────────
 function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
   const [idx, setIdx] = useState(0);
-  const [showPubBefore, setShowPubBefore] = useState(true);
+  const [showPubBefore, setShowPubBefore] = useState(false);
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [pendingIdx, setPendingIdx] = useState<number|null>(null);
@@ -1730,10 +1687,7 @@ function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
         </div>
       )}
 
-      {/* Pub avant lecture vidéo */}
-      {showPubBefore && countdown === 0 && (
-        <PubOverlay trigger="play" onDone={() => { setShowPubBefore(false); ref.current?.play(); if (onPlay) onPlay(); }} />
-      )}
+      {/* Pub avant lecture vidéo SUPPRIMÉE — pub seulement après */}
 
       {/* Pub après fin vidéo */}
       {showPubAfter && (
@@ -4085,16 +4039,7 @@ function PubBanner() {
 
   return (
     <>
-      {/* Pub ouverture page */}
-      {shown && !done && <PubOverlay trigger="page" onDone={() => setDone(true)} />}
-      {/* Pub page inactive */}
-      {showInactive && !inactiveDone && (
-        <PubOverlay trigger="page" onDone={() => {
-          setInactiveDone(true);
-          setShowInactive(false);
-          resetInactiveTimer(); // relancer le timer après la pub
-        }} />
-      )}
+      {/* Pubs d'ouverture et d'inactivité SUPPRIMÉES — pub seulement après lecture */}
     </>
   );
 }
@@ -11134,12 +11079,10 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — avec spectre circulaire Avee Player autour ── */}
-      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '40px 40px 0' }}>
-        {/* Glow néon derrière */}
-        <div id="cover-glow" style={{ position:'absolute', top:40, left:40, right:40, bottom:0, pointerEvents:'none', opacity:0, borderRadius:8, willChange:'box-shadow, opacity', zIndex:0 }} />
-        {/* Canvas du spectre circulaire (déborde autour de la pochette) */}
-        <canvas id="cover-spectrum" width="600" height="600" style={{ position:'absolute', top:'50%', left:'50%', width:'calc(100% + 60px)', transform:'translate(-50%,-50%)', pointerEvents:'none', zIndex:1 }} />
+      {/* ── POCHETTE — halo glow lumineux qui réagit à la musique ── */}
+      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '16px 16px 0' }}>
+        {/* Glow néon derrière (rayonne autour) */}
+        <div id="cover-glow" style={{ position:'absolute', top:16, left:16, right:16, bottom:0, pointerEvents:'none', opacity:0, borderRadius:8, willChange:'box-shadow, opacity', zIndex:0 }} />
         <div style={{ position:'relative', overflow:'hidden', borderRadius:8, zIndex:2 }}>
           {data.coverUrl ? (
             <img
