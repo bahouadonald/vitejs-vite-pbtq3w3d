@@ -1371,10 +1371,13 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const level = (sum / n) / 255; // 0 → 1, sans amplification brutale
       const img = document.getElementById('cover-reactive');
       const halo = document.getElementById('cover-halo');
-      if (img) img.style.transform = `scale(${1 + level * 0.08})`;
+      if (img) img.style.transform = `scale(${1 + level * 0.20})`; // zoom normal (20%)
       if (halo) {
-        halo.style.boxShadow = `inset 0 0 ${30 + level * 90}px ${level * 8}px rgba(60,150,255,${0.2 + level * 0.5})`;
-        halo.style.opacity = String(0.3 + level * 0.5);
+        // GLOW lumineux : halo interne + rayonnement externe + cœur lumineux
+        halo.style.boxShadow =
+          `inset 0 0 ${50 + level * 140}px ${8 + level * 26}px rgba(91,176,255,${0.35 + level * 0.55}), ` +
+          `0 0 ${30 + level * 70}px ${level * 20}px rgba(60,150,255,${0.3 + level * 0.5})`;
+        halo.style.opacity = String(0.4 + level * 0.6);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
