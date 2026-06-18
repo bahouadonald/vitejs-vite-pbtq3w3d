@@ -674,7 +674,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
 
       {open && (
         <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
-        <div onClick={e => e.stopPropagation()} style={{ background:'#161b2e', border:'1px solid rgba(255,200,0,0.2)', borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background:C.bgSecond, border:'1px solid '+C.border, borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
           <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
 
           {/* Solde Oscart */}
@@ -710,20 +710,24 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
           {msg && <p style={{ color:'#ffd700', fontSize:12, marginBottom:8 }}>{msg}</p>}
 
           {/* Kiffements */}
-          <p style={{ color:'#8098b8', fontSize:11, marginBottom:8 }}>Choisissez un kiffement</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {KIFFEMENTS.map(k => {
-                const canSend = soldeCoins >= k.coins;
-                return (
-                  <button key={k.id} onClick={() => handleClick(k)} disabled={sending === k.id}
-                    style={{ padding:'14px 8px', borderRadius:14, border:`1px solid ${canSend?'rgba(255,200,0,0.4)':'rgba(255,255,255,0.05)'}`, background: canSend?'rgba(255,200,0,0.08)':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.4, transition:'all .2s' }}>
-                    <img src={k.image} alt={k.label} style={{ width:54, height:54, objectFit:"contain", margin:"0 auto 6px", display:"block", filter:"drop-shadow(0 4px 8px rgba(0,0,0,0.4))" }} />
-                    <p style={{ color: canSend?'#dde4f5':'#4a5878', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>{k.label}</p>
-                    <p style={{ color:'#ffd700', fontSize:11, margin:0 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:14, height:14, verticalAlign:"-2px", marginRight:3 }} />{k.coins} Oscart</p>
-                  </button>
-                );
-              })}
-              </div>
+          <p style={{ color:C.textSoft, fontSize:11, marginBottom:10 }}>Choisissez un kiffement</p>
+          <style>{`
+            @keyframes kifFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+            .kif-card:active { transform:scale(0.92); }
+          `}</style>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          {KIFFEMENTS.map((k, ki) => {
+            const canSend = soldeCoins >= k.coins;
+            return (
+              <button key={k.id} className="kif-card" onClick={() => handleClick(k)} disabled={sending === k.id}
+                style={{ padding:'12px 4px 10px', borderRadius:14, border:`1px solid ${canSend?'rgba(60,150,255,0.35)':'rgba(255,255,255,0.05)'}`, background: canSend?'linear-gradient(160deg,rgba(60,150,255,0.12),rgba(60,150,255,0.04))':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.45, transition:'transform .12s' }}>
+                <img src={k.image} alt={k.label} style={{ width:46, height:46, objectFit:'contain', margin:'0 auto 5px', display:'block', filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.4))', animation: canSend?`kifFloat 3s ease-in-out ${ki*0.2}s infinite`:'none' }} />
+                <p style={{ color: canSend?C.text:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{k.label}</p>
+                <p style={{ color:C.gold, fontSize:10, margin:0, display:'inline-flex', alignItems:'center', gap:2, justifyContent:'center' }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:11, height:11 }} />{k.coins}</p>
+              </button>
+            );
+          })}
+          </div>
         </div>
         </div>
       )}
