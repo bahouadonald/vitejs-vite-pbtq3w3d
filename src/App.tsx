@@ -400,38 +400,37 @@ const SIGNATURES = [
 
 function SignatureShowcase({ onClose }: { onClose: () => void }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:9995, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:9995 }}
       onClick={onClose}>
-      <div style={{ background:'linear-gradient(160deg,#1a1f35,#1e2540)', borderRadius:'24px 24px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'80vh', overflowY:'auto' }}
+      <div style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'16px 16px 18px', width:'92%', maxWidth:440, maxHeight:'62vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
-        <p style={{ fontWeight:900, fontSize:18, color:'#fff', textAlign:'center', marginBottom:4 }}>
+        <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}} @keyframes sigFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
+        <p style={{ fontWeight:900, fontSize:16, color:C.text, textAlign:'center', marginBottom:4 }}>
           Envoyez des kiffements
         </p>
-        <p style={{ color:'rgba(255,255,255,0.5)', fontSize:13, textAlign:'center', marginBottom:20 }}>
-          Votre artiste peut vous offrir en retour
+        <p style={{ color:C.textSoft, fontSize:12, textAlign:'center', marginBottom:16 }}>
+          Votre artiste peut vous offrir une signature en retour
         </p>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
-          {SIGNATURES.map(s => (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+          {SIGNATURES.map((s, si) => (
             <div key={s.id} style={{
               background:`linear-gradient(135deg,${s.color}22,${s.color}11)`,
               border:`1px solid ${s.color}44`,
-              borderRadius:16, padding:'14px 12px', textAlign:'center',
-              boxShadow:`0 4px 16px ${s.color}22`,
+              borderRadius:14, padding:'12px 6px', textAlign:'center',
             }}>
-              <div style={{ fontSize:28, marginBottom:8 }}>{s.icon}</div>
-              <p style={{ fontWeight:800, fontSize:13, color:'#fff', margin:'0 0 4px' }}>{s.label}</p>
-              <p style={{ color:'rgba(255,255,255,0.45)', fontSize:10, lineHeight:1.5, margin:0 }}>{s.desc}</p>
+              <div style={{ fontSize:24, marginBottom:6, animation:`sigFloat 3s ease-in-out ${si*0.2}s infinite` }}>{s.icon}</div>
+              <p style={{ fontWeight:800, fontSize:11, color:C.text, margin:'0 0 2px' }}>{s.label}</p>
+              <p style={{ color:C.textSoft, fontSize:9, lineHeight:1.4, margin:0 }}>{s.desc}</p>
             </div>
           ))}
         </div>
-        <div style={{ background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', borderRadius:14, padding:'12px 16px', marginBottom:16 }}>
-          <p style={{ color:'#ffd700', fontSize:13, fontWeight:700, textAlign:'center', margin:0 }}>
+        <div style={{ background:'rgba(10,132,255,0.12)', border:'1px solid rgba(10,132,255,0.3)', borderRadius:12, padding:'10px 14px', marginBottom:14 }}>
+          <p style={{ color:C.blueLite, fontSize:12, fontWeight:600, textAlign:'center', margin:0 }}>
             Plus vous envoyez de kiffements, plus vos chances d'obtenir une signature augmentent
           </p>
         </div>
         <button onClick={onClose}
-          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>
           Envoyer un kiffement maintenant
         </button>
       </div>
@@ -1320,9 +1319,10 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onLevel }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, onLevel?: (level: number) => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
   const [progress, setProgress] = useState(0);
   const [dur, setDur] = useState(0);
   const [ct, setCt] = useState(0);
@@ -1330,6 +1330,45 @@ function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], on
   const streamStart = useRef<number>(0);
   const stopTimer = useRef<any>(null);
   const cur = files[idx];
+
+  // ── VRAI analyseur audio (Web Audio API) — fait réagir la pochette à la vraie musique ──
+  const audioCtxRef = useRef<any>(null);
+  const analyserRef = useRef<any>(null);
+  const rafRef = useRef<any>(null);
+  const setupAnalyser = () => {
+    if (!ref.current || audioCtxRef.current) return;
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AC();
+      const src = ctx.createMediaElementSource(ref.current);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      analyser.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+    } catch (e) { /* déjà connecté ou non supporté */ }
+  };
+  const startLevelLoop = () => {
+    if (!analyserRef.current) return;
+    const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+    const tick = () => {
+      if (!analyserRef.current) return;
+      analyserRef.current.getByteFrequencyData(data);
+      // moyenne des basses/médiums (les plus "ressenties")
+      let sum = 0; const n = Math.min(40, data.length);
+      for (let i = 0; i < n; i++) sum += data[i];
+      const level = (sum / n) / 255; // 0 → 1
+      onLevel?.(level);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    tick();
+  };
+  const stopLevelLoop = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    onLevel?.(0);
+  };
+  useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
@@ -1365,6 +1404,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], on
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause();
       setPlaying(false);
+      stopLevelLoop();
       // Timer 7s — si pas de reprise → pub plein écran
       stopTimer.current = setTimeout(() => {
         setPendingNext(false);
@@ -1373,8 +1413,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], on
     } else {
       if (stopTimer.current) clearTimeout(stopTimer.current);
       streamStart.current = Date.now() / 1000;
+      setupAnalyser();
+      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
+      startLevelLoop();
       // Déclencher tuto cascade au premier play
       if (onPlay) onPlay();
     }
@@ -1423,11 +1466,6 @@ function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], on
           } else { setPlaying(false); }
         }}
         preload="metadata" />
-
-      {/* SPECTROGRAMME fin (au-dessus, suit la lecture) */}
-      <div style={{ marginBottom: 8, opacity: playing ? 1 : 0.4, transition: 'opacity .3s' }}>
-        <Spectrogram playing={playing} />
-      </div>
 
       {/* LIGNE COMPACTE : play + titre + hamburger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -10935,6 +10973,8 @@ function PublicStreamPage() {
   const [dlOpen, setDlOpen] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
+  const [coverPlaying, setCoverPlaying] = useState(false);
+  const [coverLevel, setCoverLevel] = useState(0);
 
   // Déclencher tuto cascade après play
   // (déclenché depuis recordPublicStream)
@@ -11042,18 +11082,26 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — grande, visible, pleine largeur ── */}
-      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease' }}>
+      {/* ── POCHETTE — réagit à la VRAIE musique ── */}
+      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
         {data.coverUrl ? (
           <img
             src={data.coverUrl}
             alt={data.label}
-            style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
+              transform: `scale(${1 + coverLevel * 0.06})`,
+              transition: 'transform .08s ease-out' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35 }} />
+            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: `scale(${1 + coverLevel * 0.12})`, transition: 'transform .08s ease-out' }} />
           </div>
+        )}
+        {/* anneau lumineux dont l'intensité suit le son */}
+        {coverPlaying && (
+          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+            boxShadow:`inset 0 0 ${30 + coverLevel * 80}px ${coverLevel * 8}px rgba(10,132,255,${0.2 + coverLevel * 0.5})`,
+            transition:'box-shadow .08s ease-out' }} />
         )}
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
@@ -11072,6 +11120,8 @@ function PublicStreamPage() {
           <div style={{ marginBottom: 20 }}>
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
               onDownload={() => setDlOpen(true)}
+              onPlayingChange={setCoverPlaying}
+              onLevel={setCoverLevel}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
