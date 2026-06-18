@@ -31,7 +31,7 @@ const C = {
   border:   'rgba(150,185,235,0.2)',
 };
 // Halo bleu électrique lumineux en haut
-const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(60,150,255,0.35), transparent 60%)';
+const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(60,150,255,0.08), transparent 55%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -4046,8 +4046,6 @@ function PubOscartTab({ user }: { user: any }) {
   const [solde, setSolde] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [vidLoading, setVidLoading] = useState(false);
-  const [confirmVider, setConfirmVider] = useState(false);
 
   useEffect(() => { if (user?.email) setEmailCible(user.email); }, [user]);
 
@@ -4066,24 +4064,45 @@ function PubOscartTab({ user }: { user: any }) {
     const m = parseInt(montant, 10);
     if (!m || m <= 0) { setMsg('Entrez un montant valide.'); return; }
     const cible = (emailCible || '').trim().toLowerCase();
-    if (!cible) { setMsg('Entrez l email du compte melomane a crediter.'); return; }
+    if (!cible) { setMsg('Entrez l email du compte a crediter.'); return; }
     if (!user) return;
     setLoading(true);
     try {
       const monCompte = cible === (user.email || '').toLowerCase();
-      // chercher par uid si c est mon propre compte, sinon par email
-      let snap;
+      let docId: string | null = null;
+      let cur: any = null;
+      let uidCible: string | null = monCompte ? user.uid : null;
+
+      // Si c'est mon propre compte : chercher par uid
       if (monCompte) {
-        snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
-      } else {
-        snap = await getDocs(query(collection(db,'coins_solde'), where('email','==',cible)));
+        const s = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
       }
-      if (!snap.empty) {
-        const cur = snap.docs[0].data();
-        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: (cur.solde||0) + m, email: cur.email || cible });
+      // Sinon, si pas trouve, chercher coins_solde par email
+      if (!docId) {
+        const s = await getDocs(query(collection(db,'coins_solde'), where('email','==',cible)));
+        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
+      }
+      // Toujours rien : retrouver l'uid de l'artiste via la collection artists, puis chercher par uid
+      if (!docId) {
+        const art = await getDocs(query(collection(db,'artists'), where('email','==',cible)));
+        if (!art.empty && art.docs[0].data().uid) {
+          uidCible = art.docs[0].data().uid;
+          const s = await getDocs(query(collection(db,'coins_solde'), where('uid','==',uidCible)));
+          if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
+        }
+      }
+
+      // Mettre à jour le portefeuille existant, ou en créer un (avec email ET uid si connu)
+      if (docId) {
+        await updateDoc(doc(db,'coins_solde',docId), {
+          solde: (cur?.solde || 0) + m,
+          email: cur?.email || cible,
+          ...(uidCible && !cur?.uid ? { uid: uidCible } : {}),
+        });
       } else {
         const nouveau: any = { email: cible, solde: m, createdAt: new Date().toISOString() };
-        if (monCompte) nouveau.uid = user.uid;
+        if (uidCible) nouveau.uid = uidCible;
         await addDoc(collection(db,'coins_solde'), nouveau);
       }
       logTx(user.uid, 'pub_oscart_admin', m, 0, `Credit Oscart pub vers ${cible}`);
@@ -4094,36 +4113,14 @@ function PubOscartTab({ user }: { user: any }) {
     setLoading(false);
   };
 
-  const viderTousLesOscart = async () => {
-    setVidLoading(true);
-    setMsg('');
-    try {
-      const all = await getDocs(collection(db,'coins_solde'));
-      let n = 0, preserves = 0;
-      for (const d of all.docs) {
-        const data = d.data();
-        if ((data.solde || 0) !== 0) {
-          // Portefeuille unique : on NE vide PAS les comptes qui ont des gains d'artiste
-          // (le solde contient leurs gains). On vide seulement les purs mélomanes.
-          const aDesGains = (data.gainsArtisteTotal || 0) > 0 || (data.kiffsRecus || 0) > 0;
-          if (aDesGains) { preserves++; continue; }
-          await updateDoc(doc(db,'coins_solde',d.id), { solde: 0 });
-          n++;
-        }
-      }
-      setConfirmVider(false);
-      setMsg(`\u2705 ${n} compte(s) melomane(s) remis a 0. ${preserves} compte(s) artiste preserve(s) (gains intacts).`);
-      chargerSolde();
-    } catch(e) { console.error(e); setMsg('Erreur lors du vidage.'); }
-    setVidLoading(false);
-  };
 
   return (
     <div style={S.card}>
       <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83D\uDCB0 Oscart pour la publicite</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
-        Creditez un compte melomane en Oscart pour envoyer des kiffements et cadeaux aux artistes
-        en demonstration. Par defaut votre propre compte (meme email) est pre-rempli.
+        Creditez n importe quel compte (melomane ou artiste) en Oscart. Mettez l email du
+        tableau de bord de l artiste pour qu il puisse publier ses contenus. Par defaut votre
+        propre compte est pre-rempli.
       </p>
 
       <div style={{ background:'#eaf1ff', borderRadius:12, padding:'14px 16px', marginBottom:18 }}>
@@ -4134,7 +4131,7 @@ function PubOscartTab({ user }: { user: any }) {
         <span style={{ color:'#8098b8', fontSize:11 }}>~ {solde === null ? '...' : (solde * 10).toLocaleString()} F CFA</span>
       </div>
 
-      <label style={S.lbl}>Email du compte melomane a crediter</label>
+      <label style={S.lbl}>Email du compte a crediter (melomane ou artiste)</label>
       <input style={S.inp} type="email" placeholder="email@exemple.com" value={emailCible} onChange={e => setEmailCible(e.target.value)} />
 
       <label style={S.lbl}>Montant a ajouter (en Oscart)</label>
@@ -4148,32 +4145,6 @@ function PubOscartTab({ user }: { user: any }) {
         {loading ? 'Credit en cours...' : 'Crediter ce compte'}
       </button>
       {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
-
-      {/* ZONE DANGER — vider tous les Oscart melomanes */}
-      <div style={{ marginTop:24, paddingTop:18, borderTop:'1px solid #f0d0d8' }}>
-        <p style={{ color:'#e04060', fontSize:13, fontWeight:700, margin:'0 0 4px' }}>Vider tous les Oscart melomanes</p>
-        <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 12px', lineHeight:1.5 }}>
-          Remet a 0 le solde Oscart des comptes purement melomanes. Les comptes artistes
-          (ceux qui ont des gains ou des kiffs recus) sont automatiquement preserves. Action irreversible.
-        </p>
-        {!confirmVider ? (
-          <button onClick={() => setConfirmVider(true)} style={{ ...S.btnRed, width:'100%', padding:12 }}>
-            Vider tous les Oscart melomanes
-          </button>
-        ) : (
-          <div style={{ background:'#fff0f3', borderRadius:12, padding:14 }}>
-            <p style={{ color:'#e04060', fontSize:13, fontWeight:700, textAlign:'center', margin:'0 0 12px' }}>
-              Confirmer ? Tous les soldes melomanes seront remis a 0.
-            </p>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={viderTousLesOscart} disabled={vidLoading} style={{ ...S.btnRed, flex:1, padding:12, opacity: vidLoading ? 0.6 : 1 }}>
-                {vidLoading ? 'Vidage...' : 'Oui, tout vider'}
-              </button>
-              <button onClick={() => setConfirmVider(false)} style={{ ...S.btn2, flex:1, padding:12 }}>Annuler</button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
