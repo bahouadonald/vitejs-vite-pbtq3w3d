@@ -1345,12 +1345,12 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const src = ctx.createMediaElementSource(ref.current);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.75; // lissage pour un mouvement continu
       src.connect(analyser);
-      analyser.connect(ctx.destination); // IMPORTANT : reconnecte le son aux HP
+      analyser.connect(ctx.destination); // reconnecte le son aux HP
       audioCtxRef.current = ctx;
       analyserRef.current = analyser;
     } catch (e) {
-      // Échec (CORS non autorisé) → on abandonne l'analyse, le son continue normalement
       analyserFailed.current = true;
     }
   };
@@ -1361,8 +1361,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     const data = new Uint8Array(analyserRef.current.frequencyBinCount);
     const tick = () => {
       if (!loopRunning.current || !analyserRef.current) return;
+      // Réveiller le contexte s'il s'est suspendu (cause #1 du figeage sur mobile)
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
       analyserRef.current.getByteFrequencyData(data);
-      // On capte surtout les BASSES (les "boom")
       let sum = 0; const n = Math.min(8, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
       let level = (sum / n) / 255;
