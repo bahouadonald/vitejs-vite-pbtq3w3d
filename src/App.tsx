@@ -554,19 +554,21 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
         status: 'paid',
         createdAt: new Date().toISOString(),
       });
-      // CRÉDITER LE SOLDE DE L'ARTISTE (60% en Oscart + les kiffs)
+      // CRÉDITER LE PORTEFEUILLE UNIQUE DE L'ARTISTE (60% en Oscart va dans 'solde' + on garde le total des gains et les kiffs)
       if (artistEmail) {
         const artSnap = await getDocs(query(collection(db,'coins_solde'), where('email','==',artistEmail)));
         if (!artSnap.empty) {
           const a = artSnap.docs[0].data();
           await updateDoc(doc(db,'coins_solde',artSnap.docs[0].id), {
-            soldeArtiste: (a.soldeArtiste || 0) + partArtisteOscart,
+            solde: (a.solde || 0) + partArtisteOscart,
+            gainsArtisteTotal: (a.gainsArtisteTotal || 0) + partArtisteOscart,
             kiffsRecus: (a.kiffsRecus || 0) + kiffement.coins * 250,
           });
         } else {
           await addDoc(collection(db,'coins_solde'), {
             email: artistEmail,
-            soldeArtiste: partArtisteOscart,
+            solde: partArtisteOscart,
+            gainsArtisteTotal: partArtisteOscart,
             kiffsRecus: kiffement.coins * 250,
           });
         }
@@ -4097,17 +4099,20 @@ function PubOscartTab({ user }: { user: any }) {
     setMsg('');
     try {
       const all = await getDocs(collection(db,'coins_solde'));
-      let n = 0;
+      let n = 0, preserves = 0;
       for (const d of all.docs) {
         const data = d.data();
         if ((data.solde || 0) !== 0) {
-          // on remet a 0 UNIQUEMENT le solde melomane, sans toucher aux gains artiste (soldeArtiste, kiffsRecus)
+          // Portefeuille unique : on NE vide PAS les comptes qui ont des gains d'artiste
+          // (le solde contient leurs gains). On vide seulement les purs mélomanes.
+          const aDesGains = (data.gainsArtisteTotal || 0) > 0 || (data.kiffsRecus || 0) > 0;
+          if (aDesGains) { preserves++; continue; }
           await updateDoc(doc(db,'coins_solde',d.id), { solde: 0 });
           n++;
         }
       }
       setConfirmVider(false);
-      setMsg(`\u2705 ${n} compte(s) melomane(s) remis a 0 Oscart.`);
+      setMsg(`\u2705 ${n} compte(s) melomane(s) remis a 0. ${preserves} compte(s) artiste preserve(s) (gains intacts).`);
       chargerSolde();
     } catch(e) { console.error(e); setMsg('Erreur lors du vidage.'); }
     setVidLoading(false);
@@ -4148,8 +4153,8 @@ function PubOscartTab({ user }: { user: any }) {
       <div style={{ marginTop:24, paddingTop:18, borderTop:'1px solid #f0d0d8' }}>
         <p style={{ color:'#e04060', fontSize:13, fontWeight:700, margin:'0 0 4px' }}>Vider tous les Oscart melomanes</p>
         <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 12px', lineHeight:1.5 }}>
-          Remet a 0 le solde Oscart de TOUS les comptes melomanes. Les gains des artistes
-          (solde artiste, kifs recus) ne sont PAS touches. Action irreversible.
+          Remet a 0 le solde Oscart des comptes purement melomanes. Les comptes artistes
+          (ceux qui ont des gains ou des kiffs recus) sont automatiquement preserves. Action irreversible.
         </p>
         {!confirmVider ? (
           <button onClick={() => setConfirmVider(true)} style={{ ...S.btnRed, width:'100%', padding:12 }}>
@@ -4226,9 +4231,9 @@ function ConcoursConfigTab() {
 
   return (
     <div style={S.card}>
-      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83C\uDFC6 Paliers du Concours Kifs</h3>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83C\uDFC6 Paliers du Concours Kiffs</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
-        Modifiez librement les paliers de kifs et les prix associes. Les artistes voient ces recompenses
+        Modifiez librement les paliers de kiffs et les prix associes. Les artistes voient ces recompenses
         dans leur tableau de bord. Type "cash" = montant en FCFA, Type "objet" = recompense physique.
       </p>
 
@@ -4244,7 +4249,7 @@ function ConcoursConfigTab() {
               <input style={S.inp} value={p.icone} onChange={e => majPalier(i, 'icone', e.target.value)} placeholder="trophee" />
             </div>
             <div>
-              <label style={S.lbl}>Nombre de kifs</label>
+              <label style={S.lbl}>Nombre de kiffs</label>
               <input style={S.inp} type="number" value={p.kifs} onChange={e => majPalier(i, 'kifs', parseInt(e.target.value,10) || 0)} />
             </div>
             <div>
@@ -5741,7 +5746,7 @@ function ArtistPage() {
               <p style={{ color:'#8098b8', fontSize:11 }}>Revenus streaming · 1 F CFA / écoute · retrait disponible à partir de 15 000 F</p>
             </div>
 
-            {/* SOLDE ARTISTE — Oscart + sélecteur devise */}
+            {/* SOLDE ARTISTE — portefeuille unique en Oscart + sélecteur devise */}
             <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#1a2340,#1e2a50)' }}>
               {/* Sélecteur devise */}
               <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:12 }}>
@@ -5752,25 +5757,25 @@ function ArtistPage() {
                   </button>
                 ))}
               </div>
-              {/* Solde en Oscart */}
+              {/* Solde en Oscart (portefeuille unique) */}
               <p style={{ fontSize:32, fontWeight:900, color:'#ffd700', marginBottom:2 }}>
-                {Math.round((stats.soldeDL||0) / 10).toLocaleString()} Oscart
+                {soldeOscartArtiste.toLocaleString()} Oscart
               </p>
               {/* Équivalent dans la devise choisie */}
               <p style={{ fontSize:18, fontWeight:700, color:'#dde4f5', marginBottom:4 }}>
-                {devise === 'fcfa' && `${(stats.soldeDL||0).toLocaleString()} F CFA`}
-                {devise === 'eur' && `${((stats.soldeDL||0) * 0.0015).toFixed(2)} €`}
-                {devise === 'usd' && `${((stats.soldeDL||0) * 0.0016).toFixed(2)} $`}
+                {devise === 'fcfa' && `${(soldeOscartArtiste * OSCART_TO_FCFA).toLocaleString()} F CFA`}
+                {devise === 'eur' && `${(soldeOscartArtiste * OSCART_TO_EUR).toFixed(2)} €`}
+                {devise === 'usd' && `${(soldeOscartArtiste * OSCART_TO_USD).toFixed(2)} $`}
               </p>
-              <p style={{ color:'#8098b8', fontSize:11, marginBottom:(stats.soldeDL||0) >= 15000 ? 12 : 4 }}>
-                Solde disponible — retrait à partir de 15 000 F CFA
+              <p style={{ color:'#8098b8', fontSize:11, marginBottom:(soldeOscartArtiste * OSCART_TO_FCFA) >= 15000 ? 12 : 4 }}>
+                Portefeuille unique — gains, achats et crédits · retrait à partir de 15 000 F CFA
               </p>
-              {(stats.soldeDL||0) >= 15000 && (
-                <RetraitModal montant={stats.soldeDL} oscart={Math.round((stats.soldeDL||0)/10)} artistEmail={user?.email||''} />
+              {(soldeOscartArtiste * OSCART_TO_FCFA) >= 15000 && (
+                <RetraitModal montant={soldeOscartArtiste * OSCART_TO_FCFA} oscart={soldeOscartArtiste} artistEmail={user?.email||''} />
               )}
-              {(stats.soldeDL||0) < 15000 && (stats.soldeDL||0) > 0 && (
+              {(soldeOscartArtiste * OSCART_TO_FCFA) < 15000 && soldeOscartArtiste > 0 && (
                 <p style={{ color:'#4a5878', fontSize:11, marginTop:4 }}>
-                  {(15000-(stats.soldeDL||0)).toLocaleString()} F CFA restants avant retrait
+                  {(15000-(soldeOscartArtiste * OSCART_TO_FCFA)).toLocaleString()} F CFA restants avant retrait
                 </p>
               )}
             </div>
@@ -6859,11 +6864,11 @@ function ConcoursKifsArtiste({ kifsRecus, gainsKiffementsOscart, gainsTelecharge
       {/* CONCOURS KIFS — paliers de prix */}
       <div style={{ ...S.card, padding:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-          <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:0 }}>🏆 Concours Kifs</p>
-          <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{kifsRecus.toLocaleString()} kifs</span>
+          <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:0 }}>🏆 Concours Kiffs</p>
+          <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{kifsRecus.toLocaleString()} kiffs</span>
         </div>
         <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 16px' }}>
-          Galvanisez votre communauté ! Plus vous recevez de kifs, plus vous gagnez de prix.
+          Galvanisez votre communauté ! Plus vous recevez de kiffs, plus vous gagnez de prix.
         </p>
 
         {/* Barre de progression vers le prochain palier */}
@@ -6877,7 +6882,7 @@ function ConcoursKifsArtiste({ kifsRecus, gainsKiffementsOscart, gainsTelecharge
               <div style={{ height:'100%', width:`${Math.min(100, (kifsRecus / prochain.kifs) * 100)}%`, background:'linear-gradient(90deg,#1a6bff,#5BB0FF)', borderRadius:99 }} />
             </div>
             <p style={{ color:'#8098b8', fontSize:10, margin:'6px 0 0' }}>
-              Plus que {(prochain.kifs - kifsRecus).toLocaleString()} kifs pour débloquer ce prix
+              Plus que {(prochain.kifs - kifsRecus).toLocaleString()} kiffs pour débloquer ce prix
             </p>
           </div>
         )}
@@ -6895,7 +6900,7 @@ function ConcoursKifsArtiste({ kifsRecus, gainsKiffementsOscart, gainsTelecharge
                 <span style={{ fontSize:26, flexShrink:0 }}>{p.icone}</span>
                 <div style={{ flex:1 }}>
                   <p style={{ color:'#1a2340', fontSize:14, fontWeight:700, margin:'0 0 2px' }}>{p.label}</p>
-                  <p style={{ color:'#5a7090', fontSize:11, margin:0 }}>{p.kifs.toLocaleString()} kifs</p>
+                  <p style={{ color:'#5a7090', fontSize:11, margin:0 }}>{p.kifs.toLocaleString()} kiffs</p>
                 </div>
                 {atteint
                   ? <span style={{ color:'#34c759', fontSize:12, fontWeight:800 }}>✓ Atteint</span>
@@ -11434,7 +11439,7 @@ function PublicStreamPage() {
   const videoFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i));
 
   return (
-    <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: 40 }}>
+    <div style={{ minHeight: '100vh', background: C.bgDeep, color: C.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: 40 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -11759,6 +11764,19 @@ export default function App() {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       // Oscart de bienvenue SUPPRIMÉ — les nouveaux comptes démarrent à 0 Oscart
+      // Portefeuille unique : si un doc coins_solde existe avec cet email mais sans uid
+      // (créé par l'admin via crédit Oscart), on lie l'uid pour que l'utilisateur le retrouve.
+      if (u && u.email) {
+        try {
+          const byUid = await getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid)));
+          if (byUid.empty) {
+            const byEmail = await getDocs(query(collection(db,'coins_solde'), where('email','==',u.email.toLowerCase())));
+            if (!byEmail.empty) {
+              await updateDoc(doc(db,'coins_solde',byEmail.docs[0].id), { uid: u.uid });
+            }
+          }
+        } catch(e) { console.error('lien uid solde', e); }
+      }
       setProgress(100);
       setTimeout(() => {
         setAuthLoading(false);
