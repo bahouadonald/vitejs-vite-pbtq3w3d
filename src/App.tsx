@@ -453,6 +453,16 @@ const OSCART_TO_FCFA = 10;
 const OSCART_TO_EUR = 0.015;
 const OSCART_TO_USD = 0.016;
 
+// ── CONCOURS KIFS — paliers de récompenses par défaut (configurables depuis l'admin) ──
+// type 'cash' = montant en FCFA · type 'objet' = récompense physique (voiture...)
+const PALIERS_CONCOURS_DEFAUT = [
+  { kifs: 10000000,   type: 'cash',  valeur: 100000,  label: '100 000 F CFA', icone: '🥉' },
+  { kifs: 50000000,   type: 'cash',  valeur: 500000,  label: '500 000 F CFA', icone: '🥈' },
+  { kifs: 100000000,  type: 'cash',  valeur: 1000000, label: '1 000 000 F CFA', icone: '🥇' },
+  { kifs: 500000000,  type: 'objet', valeur: 0,       label: 'Voiture berline', icone: '🚗' },
+  { kifs: 1000000000, type: 'objet', valeur: 0,       label: 'Voiture 4×4', icone: '🚙' },
+];
+
 const formatOscart = (oscart: number, devise: 'fcfa'|'eur'|'usd' = 'fcfa') => {
   if (devise === 'eur') return `${(oscart * OSCART_TO_EUR).toFixed(2)} €`;
   if (devise === 'usd') return `${(oscart * OSCART_TO_USD).toFixed(2)} $`;
@@ -527,21 +537,40 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
         logTx(user.uid, 'kiffement', -kiffement.coins, kiffement.coins * 250, `Kiffement ${kiffement.label}`);
       }
       // Enregistrer le kiffement
-      // Répartition kiffement : Artiste 70% / Entreprise 20% / Commercial 10%
+      // Répartition : Artiste 60% / Structure 40%
       const montantKiff = kiffement.coins * 100;
+      const partArtisteOscart = Math.round(kiffement.coins * 0.60); // 60% en Oscart pour l'artiste
       await addDoc(collection(db,'cadeaux'), {
         qrId, artistEmail,
         kiffementId: kiffement.id,
         kiffementLabel: kiffement.label,
         coins: kiffement.coins,
-        partArtiste: Math.round(montantKiff * 0.70),
-        partEntreprise: Math.round(montantKiff * 0.20),
-        partCommercial: Math.round(montantKiff * 0.10),
+        partArtiste: Math.round(montantKiff * 0.60),
+        partStructure: Math.round(montantKiff * 0.40),
+        partArtisteOscart,
+        kiffs: kiffement.coins * 250,
         userId: user.uid,
         userName: user.displayName || user.email?.split('@')[0],
         status: 'paid',
         createdAt: new Date().toISOString(),
       });
+      // CRÉDITER LE SOLDE DE L'ARTISTE (60% en Oscart + les kiffs)
+      if (artistEmail) {
+        const artSnap = await getDocs(query(collection(db,'coins_solde'), where('email','==',artistEmail)));
+        if (!artSnap.empty) {
+          const a = artSnap.docs[0].data();
+          await updateDoc(doc(db,'coins_solde',artSnap.docs[0].id), {
+            soldeArtiste: (a.soldeArtiste || 0) + partArtisteOscart,
+            kiffsRecus: (a.kiffsRecus || 0) + kiffement.coins * 250,
+          });
+        } else {
+          await addDoc(collection(db,'coins_solde'), {
+            email: artistEmail,
+            soldeArtiste: partArtisteOscart,
+            kiffsRecus: kiffement.coins * 250,
+          });
+        }
+      }
       // Notification artiste
       if (artistEmail) {
         await addDoc(collection(db,'notifications'), {
@@ -4005,6 +4034,184 @@ function PubBanner() {
 }
 
 
+// ─────────────────────────────────────────────
+// PUB OSCART — l'admin s'auto-crédite en Oscart pour la publicité
+// (envoyer des cadeaux/kiffements aux artistes en démonstration)
+// ─────────────────────────────────────────────
+function PubOscartTab({ user }: { user: any }) {
+  const [montant, setMontant] = useState('');
+  const [solde, setSolde] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const chargerSolde = async () => {
+    if (!user) return;
+    try {
+      const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!snap.empty) setSolde(snap.docs[0].data().solde || 0);
+      else setSolde(0);
+    } catch(e) { console.error(e); }
+  };
+
+  useEffect(() => { chargerSolde(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const crediter = async () => {
+    const m = parseInt(montant, 10);
+    if (!m || m <= 0) { setMsg('Entrez un montant valide.'); return; }
+    if (!user) return;
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!snap.empty) {
+        const cur = snap.docs[0].data();
+        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: (cur.solde||0) + m });
+      } else {
+        await addDoc(collection(db,'coins_solde'), { uid: user.uid, email: user.email, solde: m, createdAt: new Date().toISOString() });
+      }
+      logTx(user.uid, 'pub_oscart_admin', m, 0, `Crédit Oscart publicité (admin)`);
+      setMsg(`✅ ${m.toLocaleString()} Oscart ajoutés à votre compte.`);
+      setMontant('');
+      chargerSolde();
+    } catch(e) { console.error(e); setMsg('Erreur lors du crédit.'); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.card}>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>💰 Oscart pour la publicité</h3>
+      <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
+        Créditez votre compte en Oscart pour envoyer des kiffements et cadeaux aux artistes
+        en démonstration. Ce solde alimente votre compte mélomane (même email) et sert uniquement
+        à la promotion de la plateforme.
+      </p>
+
+      <div style={{ background:'#eaf1ff', borderRadius:12, padding:'14px 16px', marginBottom:18 }}>
+        <span style={{ color:'#5a7090', fontSize:12 }}>Votre solde actuel</span>
+        <div style={{ color:'#1a6bff', fontWeight:800, fontSize:24 }}>
+          {solde === null ? '...' : solde.toLocaleString()} <span style={{ fontSize:14, fontWeight:600 }}>Oscart</span>
+        </div>
+        <span style={{ color:'#8098b8', fontSize:11 }}>≈ {solde === null ? '...' : (solde * 10).toLocaleString()} F CFA</span>
+      </div>
+
+      <label style={S.lbl}>Montant à ajouter (en Oscart)</label>
+      <input style={S.inp} type="number" min="1" placeholder="Ex : 5000" value={montant} onChange={e => setMontant(e.target.value)} />
+      <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+        {[1000, 5000, 10000].map(v => (
+          <button key={v} onClick={() => setMontant(String(v))} style={S.btn2}>+{v.toLocaleString()}</button>
+        ))}
+      </div>
+      <button onClick={crediter} disabled={loading} style={{ ...S.btn, width:'100%', padding:13, opacity: loading ? 0.6 : 1 }}>
+        {loading ? 'Crédit en cours...' : 'Créditer mon compte'}
+      </button>
+      {msg && <p style={{ color: msg.startsWith('✅') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// CONFIG CONCOURS — l'admin modifie les paliers de prix (sans coder)
+// ─────────────────────────────────────────────
+function ConcoursConfigTab() {
+  const [paliers, setPaliers] = useState(PALIERS_CONCOURS_DEFAUT);
+  const [docId, setDocId] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'config'), where('cle','==','concours_paliers')));
+        if (!snap.empty) {
+          setDocId(snap.docs[0].id);
+          const data = snap.docs[0].data();
+          if (Array.isArray(data.paliers) && data.paliers.length > 0) setPaliers(data.paliers);
+        }
+      } catch(e) { console.error(e); }
+    })();
+  }, []);
+
+  const majPalier = (i: number, champ: string, valeur: any) => {
+    setPaliers(prev => prev.map((p, idx) => idx === i ? { ...p, [champ]: valeur } : p));
+  };
+  const ajouterPalier = () => {
+    setPaliers(prev => [...prev, { kifs: 0, type: 'cash', valeur: 0, label: '', icone: '\uD83C\uDF81' }]);
+  };
+  const supprimerPalier = (i: number) => {
+    setPaliers(prev => prev.filter((_, idx) => idx !== i));
+  };
+
+  const enregistrer = async () => {
+    setLoading(true);
+    try {
+      const tries = [...paliers].sort((a, b) => a.kifs - b.kifs);
+      if (docId) {
+        await updateDoc(doc(db, 'config', docId), { paliers: tries, maj: new Date().toISOString() });
+      } else {
+        const ref = await addDoc(collection(db, 'config'), { cle: 'concours_paliers', paliers: tries, maj: new Date().toISOString() });
+        setDocId(ref.id);
+      }
+      setPaliers(tries);
+      setMsg('\u2705 Paliers enregistres. Ils sont maintenant visibles par les artistes.');
+      setTimeout(() => setMsg(''), 4000);
+    } catch(e) { console.error(e); setMsg('Erreur lors de l enregistrement.'); }
+    setLoading(false);
+  };
+
+  const reset = () => setPaliers(PALIERS_CONCOURS_DEFAUT);
+
+  return (
+    <div style={S.card}>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83C\uDFC6 Paliers du Concours Kifs</h3>
+      <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
+        Modifiez librement les paliers de kifs et les prix associes. Les artistes voient ces recompenses
+        dans leur tableau de bord. Type "cash" = montant en FCFA, Type "objet" = recompense physique.
+      </p>
+
+      {paliers.map((p, i) => (
+        <div key={i} style={{ background:'#f7f9fc', borderRadius:12, padding:14, marginBottom:12, border:'1px solid #eef2f9' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:'#1a2340' }}>Palier {i + 1}</span>
+            <button onClick={() => supprimerPalier(i)} style={S.btnRed}>Supprimer</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div>
+              <label style={S.lbl}>Icone</label>
+              <input style={S.inp} value={p.icone} onChange={e => majPalier(i, 'icone', e.target.value)} placeholder="trophee" />
+            </div>
+            <div>
+              <label style={S.lbl}>Nombre de kifs</label>
+              <input style={S.inp} type="number" value={p.kifs} onChange={e => majPalier(i, 'kifs', parseInt(e.target.value,10) || 0)} />
+            </div>
+            <div>
+              <label style={S.lbl}>Type</label>
+              <select style={S.inp} value={p.type} onChange={e => majPalier(i, 'type', e.target.value)}>
+                <option value="cash">Cash (FCFA)</option>
+                <option value="objet">Objet (voiture...)</option>
+              </select>
+            </div>
+            <div>
+              <label style={S.lbl}>Valeur (si cash, en FCFA)</label>
+              <input style={S.inp} type="number" value={p.valeur} onChange={e => majPalier(i, 'valeur', parseInt(e.target.value,10) || 0)} />
+            </div>
+          </div>
+          <label style={S.lbl}>Libelle affiche</label>
+          <input style={S.inp} value={p.label} onChange={e => majPalier(i, 'label', e.target.value)} placeholder="Ex : 100 000 F CFA ou Voiture berline" />
+        </div>
+      ))}
+
+      <button onClick={ajouterPalier} style={{ ...S.btn2, width:'100%', padding:12, marginBottom:12 }}>+ Ajouter un palier</button>
+
+      <div style={{ display:'flex', gap:10 }}>
+        <button onClick={enregistrer} disabled={loading} style={{ ...S.btn, flex:1, padding:13, opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Enregistrement...' : 'Enregistrer les paliers'}
+        </button>
+        <button onClick={reset} style={{ ...S.btn2, padding:13 }}>Reinitialiser</button>
+      </div>
+      {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
+    </div>
+  );
+}
+
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -4556,6 +4763,8 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       {/* TABS */}
       <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 12px', display: 'flex', background: '#ffffff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         <button style={{...tabStyle(tab === 'qrcodes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
+        <button style={{...tabStyle(tab === 'puboscart'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('puboscart')}>💰 Pub Oscart</button>
+        <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Concours</button>
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
         <button style={{...tabStyle(tab === 'sorties'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('sorties')}>Sorties officielles</button>
@@ -4751,6 +4960,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         )}
 
         {tab === 'artistes' && <ArtistesTab db={db} qrcodes={qrcodes} canDelete={estSuperAdmin(user?.email)} />}
+
+        {tab === 'puboscart' && <PubOscartTab user={user} />}
+        {tab === 'concours' && <ConcoursConfigTab />}
 
         {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
         {tab === 'sorties' && <SortiesAdminTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
@@ -5265,7 +5477,17 @@ function ArtistPage() {
     // Lien public de streaming
     const publicLinks = await getDocs(query(collection(db, 'publicLinks'), where('artistEmail', '==', email)));
     const linksList = publicLinks.docs.map(d => ({ id: d.id, ...d.data() }));
-    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues, artistName: artistName || email, notLinked: false, publicLinks: linksList });
+    // Kifs reçus + gains kiffements (60% des Oscart de chaque cadeau)
+    let kifsRecus = 0, gainsKiffementsOscart = 0;
+    try {
+      const cadeauxSnap = await getDocs(query(collection(db, 'cadeaux'), where('artistEmail', '==', email)));
+      cadeauxSnap.docs.forEach(d => {
+        const c = d.data();
+        kifsRecus += (c.kiffs !== undefined ? c.kiffs : (c.coins || 0) * 250);
+        gainsKiffementsOscart += (c.partArtisteOscart !== undefined ? c.partArtisteOscart : Math.round((c.coins || 0) * 0.60));
+      });
+    } catch(e) { /* pas de cadeaux */ }
+    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues, artistName: artistName || email, notLinked: false, publicLinks: linksList, kifsRecus, gainsKiffementsOscart });
   };
 
   const register = async () => {
@@ -5487,6 +5709,14 @@ function ArtistPage() {
                 </p>
               )}
             </div>
+
+            {/* CONCOURS KIFS + ESTIMATION DES GAINS */}
+            <ConcoursKifsArtiste
+              kifsRecus={stats.kifsRecus || 0}
+              gainsKiffementsOscart={stats.gainsKiffementsOscart || 0}
+              gainsTelechargementsOscart={Math.round((stats.soldeDL||0)/10)}
+              devise={devise}
+            />
 
             {/* LIENS PUBLICS */}
             {stats.publicLinks && stats.publicLinks.length > 0 && (
@@ -6507,6 +6737,119 @@ function ZikothequePage({ user }: { user: any }) {
 // ─────────────────────────────────────────────
 // NOTIFICATIONS TAB — pour artiste et mélomane
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// CONCOURS KIFS — paliers de prix + estimation des gains de l'artiste
+// ─────────────────────────────────────────────
+function ConcoursKifsArtiste({ kifsRecus, gainsKiffementsOscart, gainsTelechargementsOscart, devise }: {
+  kifsRecus: number,
+  gainsKiffementsOscart: number,
+  gainsTelechargementsOscart: number,
+  devise: 'fcfa'|'eur'|'usd',
+}) {
+  const [paliers, setPaliers] = useState(PALIERS_CONCOURS_DEFAUT);
+
+  useEffect(() => {
+    // Charger les paliers configurés par l'admin (sinon valeurs par défaut)
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'config'), where('cle','==','concours_paliers')));
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          if (Array.isArray(data.paliers) && data.paliers.length > 0) setPaliers(data.paliers);
+        }
+      } catch(e) { /* valeurs par défaut */ }
+    })();
+  }, []);
+
+  const conv = (oscart: number) => {
+    if (devise === 'eur') return `${(oscart * OSCART_TO_EUR).toFixed(2)} €`;
+    if (devise === 'usd') return `${(oscart * OSCART_TO_USD).toFixed(2)} $`;
+    return `${(oscart * OSCART_TO_FCFA).toLocaleString()} F CFA`;
+  };
+
+  // Prochain palier non atteint
+  const prochain = paliers.find(p => kifsRecus < p.kifs);
+  const dernierAtteint = [...paliers].reverse().find(p => kifsRecus >= p.kifs);
+
+  return (
+    <div style={{ marginBottom:20 }}>
+      {/* ESTIMATION DES GAINS (kiffements + téléchargements) */}
+      <div style={{ ...S.card, padding:20, marginBottom:16, background:'linear-gradient(135deg,#fff8e6,#fff)' }}>
+        <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, letterSpacing:0.5, marginBottom:14, textTransform:'uppercase' }}>Estimation de vos gains</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div style={{ textAlign:'center', padding:'10px 6px', background:'#fffdf5', borderRadius:12 }}>
+            <p style={{ fontSize:20, fontWeight:900, color:'#1a2340', margin:'0 0 2px' }}>{conv(gainsKiffementsOscart)}</p>
+            <p style={{ color:'#5a7090', fontSize:11, margin:0 }}>🎁 Kiffements reçus</p>
+          </div>
+          <div style={{ textAlign:'center', padding:'10px 6px', background:'#fffdf5', borderRadius:12 }}>
+            <p style={{ fontSize:20, fontWeight:900, color:'#1a2340', margin:'0 0 2px' }}>{conv(gainsTelechargementsOscart)}</p>
+            <p style={{ color:'#5a7090', fontSize:11, margin:0 }}>⬇️ Téléchargements</p>
+          </div>
+        </div>
+        <p style={{ color:'#8098b8', fontSize:10, textAlign:'center', marginTop:10, marginBottom:0 }}>
+          Vous touchez 60% de chaque Oscart reçu · 1 Oscart = 10 F CFA
+        </p>
+      </div>
+
+      {/* CONCOURS KIFS — paliers de prix */}
+      <div style={{ ...S.card, padding:20 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+          <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:0 }}>🏆 Concours Kifs</p>
+          <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{kifsRecus.toLocaleString()} kifs</span>
+        </div>
+        <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 16px' }}>
+          Galvanisez votre communauté ! Plus vous recevez de kifs, plus vous gagnez de prix.
+        </p>
+
+        {/* Barre de progression vers le prochain palier */}
+        {prochain && (
+          <div style={{ marginBottom:18 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ color:'#5a7090', fontSize:11 }}>Prochain prix : {prochain.icone} {prochain.label}</span>
+              <span style={{ color:'#1a6bff', fontSize:11, fontWeight:700 }}>{Math.min(100, Math.round((kifsRecus / prochain.kifs) * 100))}%</span>
+            </div>
+            <div style={{ height:8, background:'#eef2f9', borderRadius:99, overflow:'hidden' }}>
+              <div style={{ height:'100%', width:`${Math.min(100, (kifsRecus / prochain.kifs) * 100)}%`, background:'linear-gradient(90deg,#1a6bff,#5BB0FF)', borderRadius:99 }} />
+            </div>
+            <p style={{ color:'#8098b8', fontSize:10, margin:'6px 0 0' }}>
+              Plus que {(prochain.kifs - kifsRecus).toLocaleString()} kifs pour débloquer ce prix
+            </p>
+          </div>
+        )}
+
+        {/* Liste des paliers */}
+        <div>
+          {paliers.map((p, i) => {
+            const atteint = kifsRecus >= p.kifs;
+            return (
+              <div key={i} style={{
+                display:'flex', alignItems:'center', gap:12, padding:'10px 12px', marginBottom:8, borderRadius:12,
+                background: atteint ? '#eaf7ee' : '#f7f9fc',
+                border: atteint ? '1px solid #34c759' : '1px solid #eef2f9',
+              }}>
+                <span style={{ fontSize:26, flexShrink:0 }}>{p.icone}</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ color:'#1a2340', fontSize:14, fontWeight:700, margin:'0 0 2px' }}>{p.label}</p>
+                  <p style={{ color:'#5a7090', fontSize:11, margin:0 }}>{p.kifs.toLocaleString()} kifs</p>
+                </div>
+                {atteint
+                  ? <span style={{ color:'#34c759', fontSize:12, fontWeight:800 }}>✓ Atteint</span>
+                  : <span style={{ color:'#b0bccd', fontSize:11 }}>🔒</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {dernierAtteint && (
+          <p style={{ color:'#34c759', fontSize:12, fontWeight:700, textAlign:'center', marginTop:12, marginBottom:0 }}>
+            🎉 Vous avez débloqué : {dernierAtteint.icone} {dernierAtteint.label}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NotificationsTab({ userEmail }: { userEmail: string }) {
   const [notifs, setNotifs] = useState<any[]>([]);
   const [cadeaux, setCadeaux] = useState<any[]>([]);
@@ -6559,29 +6902,29 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:C.text }}>Notifications</h2>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:"#1a2340" }}>Notifications</h2>
 
       {/* KIFFEMENTS REÇUS — groupés par mélomane */}
       {fans.length > 0 && (
         <div style={{ marginBottom:20 }}>
-          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
+          <p style={{ color:"#5a7090", fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
           {fans.map((f, i) => (
             <div key={i} style={{ ...S.card, marginBottom:10, cursor:'pointer' }}
               onClick={() => setOpenFan(openFan === f.nom ? null : f.nom)}>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
                 <span style={{ fontSize:24, flexShrink:0 }}>🎁</span>
                 <div style={{ flex:1 }}>
-                  <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{f.nom} vous a envoyé des kiffements</p>
-                  <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>{f.total} kiffement{f.total>1?'s':''} au total · touchez pour voir le détail</p>
+                  <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:"#1a2340" }}>{f.nom} vous a envoyé des kiffements</p>
+                  <p style={{ color:"#5a7090", fontSize:12, margin:0 }}>{f.total} kiffement{f.total>1?'s':''} au total · touchez pour voir le détail</p>
                 </div>
-                <span style={{ color:C.textSoft, fontSize:16, transform: openFan === f.nom ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}>›</span>
+                <span style={{ color:"#5a7090", fontSize:16, transform: openFan === f.nom ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}>›</span>
               </div>
               {/* Déroulé : détail par type de cadeau */}
               {openFan === f.nom && (
                 <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid '+C.border }}>
                   {Object.entries(f.types).sort((a,b)=>b[1]-a[1]).map(([lab, nb], j) => (
                     <div key={j} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0' }}>
-                      <span style={{ color:C.text, fontSize:13 }}>{lab}</span>
+                      <span style={{ color:"#1a2340", fontSize:13 }}>{lab}</span>
                       <span style={{ color:C.blue, fontSize:14, fontWeight:800 }}>×{nb}</span>
                     </div>
                   ))}
@@ -6595,15 +6938,15 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
       {/* AUTRES NOTIFS (commentaires, mots validés...) */}
       {notifs.length > 0 && (
         <div>
-          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
+          <p style={{ color:"#5a7090", fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
           {notifs.map(n => (
             <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
               <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
                 <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
                 <div style={{ flex:1 }}>
-                  <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px', color:C.text }}>{n.text}</p>
-                  {n.from && <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
-                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+                  <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px', color:"#1a2340" }}>{n.text}</p>
+                  {n.from && <p style={{ color:"#5a7090", fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
+                  <p style={{ color:"#5a7090", fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
                 {!n.lu && <span style={{ width:8, height:8, borderRadius:99, background:C.blue, flexShrink:0, marginTop:4 }} />}
               </div>
@@ -6615,7 +6958,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
       {rien && (
         <div style={{ textAlign:'center', padding:40 }}>
           <p style={{ fontSize:36, marginBottom:10 }}>🔔</p>
-          <p style={{ color:C.textSoft, fontSize:14 }}>Aucune notification pour l'instant</p>
+          <p style={{ color:"#5a7090", fontSize:14 }}>Aucune notification pour l'instant</p>
         </div>
       )}
     </div>
@@ -11350,26 +11693,7 @@ export default function App() {
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
-      // Oscart de bienvenue — 50 Oscart au premier login (toutes méthodes)
-      if (u) {
-        try {
-          const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid)));
-          if (soldeSnap.empty) {
-            await addDoc(collection(db,'coins_solde'), {
-              uid: u.uid, solde: 50, bienvenue: true,
-              createdAt: new Date().toISOString(),
-            });
-            logTx(u.uid, 'bienvenue', 50, 0, 'Oscart de bienvenue');
-            if (u.email) {
-              await addDoc(collection(db,'notifications'), {
-                to: u.email, type: 'bienvenue',
-                text: 'Bienvenue sur Doniel Zik ! Vous recevez 50 Oscart offerts pour découvrir la plateforme.',
-                createdAt: new Date().toISOString(), lu: false,
-              });
-            }
-          }
-        } catch(e) { console.error('welcome oscart', e); }
-      }
+      // Oscart de bienvenue SUPPRIMÉ — les nouveaux comptes démarrent à 0 Oscart
       setProgress(100);
       setTimeout(() => {
         setAuthLoading(false);
