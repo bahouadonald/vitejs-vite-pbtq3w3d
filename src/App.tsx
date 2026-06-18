@@ -741,11 +741,11 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
 // ─────────────────────────────────────────────
 // SECTION COMMENTAIRES — style TikTok
 // ─────────────────────────────────────────────
-function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEmail?: string, compact?: boolean }) {
+function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void }) {
   const [comments, setComments] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen || false);
   const [loading, setLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState('');
   const [msg, setMsg] = useState('');
@@ -815,18 +815,20 @@ function CommentSection({ qrId, artistEmail, compact }: { qrId: string, artistEm
   return (
     <div style={{ marginBottom: compact ? 0 : 16, display: compact ? 'inline-block' : 'block' }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
-      <button onClick={() => setOpen(!open)} title="Commenter"
-        style={ compact
-          ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background:'rgba(255,255,255,0.06)', color:'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
-          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 } }>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        {compact ? (count > 0 ? count : '') : `Commenter ${count > 0 ? count : ''}`}
-      </button>
+      {!autoOpen && (
+        <button onClick={() => setOpen(!open)} title="Commenter"
+          style={ compact
+            ? { display:'inline-flex', alignItems:'center', gap:4, padding:'0 10px', height:40, borderRadius:99, border:'none', background:'rgba(255,255,255,0.06)', color:'#8098b8', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }
+            : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', cursor:'pointer', fontSize:14, fontWeight:600 } }>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          {compact ? (count > 0 ? count : '') : `Commenter ${count > 0 ? count : ''}`}
+        </button>
+      )}
 
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
-        <div onClick={e => e.stopPropagation()} style={{ background:'#161b2e', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
-          <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
+        <div onClick={() => { setOpen(false); onClose?.(); }} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.4)' }}>
+        <div onClick={e => e.stopPropagation()} style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'14px 14px 16px', width:'92%', maxWidth:440, maxHeight:'60vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}>
+          <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}}`}</style>
           {/* Saisie commentaire */}
           <div style={{ display:'flex', gap:8, marginBottom: msg ? 8 : 14 }}>
             <input value={text} onChange={e => { setText(e.target.value); setMsg(''); }}
@@ -1262,7 +1264,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       </div>
 
       {/* Section commentaires dépliable */}
-      {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} />}
+      {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowComments(false)} />}
 
       {/* Section kiffements dépliable */}
       {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowKiffements(false)} />}
