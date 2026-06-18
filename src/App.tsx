@@ -1379,20 +1379,10 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       }
       const level = smoothLevel.current;
       const img = document.getElementById('cover-reactive');
-      const glow = document.getElementById('cover-glow');
       // Marge de jeu musical : zoom de 0% (silence) à 12% (grosse caisse saturée)
-      // La pochette danse dans cet intervalle selon la force du son
+      // La pochette danse dans cet intervalle selon la force du son (PAS de halo)
       if (img) {
         img.style.transform = `scale(${1 + level * 0.12})`;
-        img.style.boxShadow = `inset 0 0 ${12 + level * 30}px ${2 + level * 7}px rgba(10,132,255,${0.3 + level * 0.45})`;
-      }
-      // Halo extérieur léger qui retombe avec la musique
-      if (glow) {
-        const b = 0.3 + level * 0.5;
-        glow.style.boxShadow =
-          `0 0 ${20 + level * 35}px ${5 + level * 12}px rgba(10,132,255,${b}), ` +
-          `0 0 ${45 + level * 75}px ${10 + level * 22}px rgba(10,132,255,${b * 0.6})`;
-        glow.style.opacity = String(0.35 + level * 0.55);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1402,9 +1392,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
-    const glow = document.getElementById('cover-glow');
-    if (img) { img.style.transform = 'scale(1)'; img.style.boxShadow = 'none'; }
-    if (glow) { glow.style.boxShadow = 'none'; glow.style.opacity = '0'; }
+    if (img) { img.style.transform = 'scale(1)'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -4010,48 +3998,10 @@ function PubOverlay({ trigger, onDone, silent }: { trigger: 'page'|'play'|'downl
 }
 
 // ─────────────────────────────────────────────
-// PUB BANNER — ouverture page + page inactive
+// PUB BANNER — DÉSACTIVÉ (plus de pub ouverture/inactivité)
 // ─────────────────────────────────────────────
 function PubBanner() {
-  const [shown, setShown] = useState(false);
-  const [done, setDone] = useState(false);
-  const [showInactive, setShowInactive] = useState(false);
-  const [inactiveDone, setInactiveDone] = useState(false);
-  const inactiveTimer = useRef<any>(null);
-  // Délai aléatoire entre 45 et 60 secondes
-  const getInactiveDelay = () => (45 + Math.random() * 15) * 1000;
-
-  // Pub d'ouverture de page
-  useEffect(() => {
-    const t = setTimeout(() => setShown(true), 800);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Pub page inactive — se déclenche après 5 min sans activité
-  const resetInactiveTimer = () => {
-    if (inactiveTimer.current) clearTimeout(inactiveTimer.current);
-    inactiveTimer.current = setTimeout(() => {
-      setInactiveDone(false);
-      setShowInactive(true);
-    }, getInactiveDelay());
-  };
-
-  useEffect(() => {
-    // Écouter les événements d'activité
-    const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
-    events.forEach(e => window.addEventListener(e, resetInactiveTimer));
-    resetInactiveTimer(); // démarrer le timer dès le montage
-    return () => {
-      events.forEach(e => window.removeEventListener(e, resetInactiveTimer));
-      if (inactiveTimer.current) clearTimeout(inactiveTimer.current);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <>
-      {/* Pubs d'ouverture et d'inactivité SUPPRIMÉES — pub seulement après lecture */}
-    </>
-  );
+  return null;
 }
 
 
@@ -11089,10 +11039,8 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — halo glow lumineux qui réagit à la musique ── */}
+      {/* ── POCHETTE — zoom qui danse avec la musique ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '16px 16px 0' }}>
-        {/* Glow néon derrière (rayonne autour) */}
-        <div id="cover-glow" style={{ position:'absolute', top:16, left:16, right:16, bottom:0, pointerEvents:'none', opacity:0, borderRadius:8, willChange:'box-shadow, opacity', zIndex:0 }} />
         <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2 }}>
           {data.coverUrl ? (
             <img
