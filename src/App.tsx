@@ -1371,15 +1371,17 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const img = document.getElementById('cover-reactive');
       const glow = document.getElementById('cover-glow');
       if (img) img.style.transform = `scale(${1 + level * 0.07})`;
-      // HALO NÉON bleu électrique PUR qui rayonne (aucun blanc)
+      // CONTOUR INTÉRIEUR lumineux (sur les bords de la pochette)
+      if (img) {
+        img.style.boxShadow = `inset 0 0 ${15 + level * 35}px ${3 + level * 10}px rgba(10,132,255,${0.4 + level * 0.5})`;
+      }
+      // HALO EXTÉRIEUR léger qui rayonne autour (bleu électrique pur)
       if (glow) {
-        const b = 0.5 + level * 0.5;
+        const b = 0.4 + level * 0.5;
         glow.style.boxShadow =
-          `0 0 ${15 + level * 25}px ${3 + level * 6}px rgba(10,132,255,${b}), ` +
-          `0 0 ${35 + level * 60}px ${8 + level * 18}px rgba(10,132,255,${b}), ` +
-          `0 0 ${70 + level * 120}px ${16 + level * 35}px rgba(10,132,255,${b * 0.9}), ` +
-          `0 0 ${120 + level * 180}px ${24 + level * 50}px rgba(10,132,255,${b * 0.55})`;
-        glow.style.opacity = String(0.5 + level * 0.5);
+          `0 0 ${20 + level * 30}px ${5 + level * 10}px rgba(10,132,255,${b}), ` +
+          `0 0 ${50 + level * 90}px ${12 + level * 28}px rgba(10,132,255,${b * 0.7})`;
+        glow.style.opacity = String(0.45 + level * 0.55);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1390,7 +1392,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
     const glow = document.getElementById('cover-glow');
-    if (img) img.style.transform = 'scale(1)';
+    if (img) { img.style.transform = 'scale(1)'; img.style.boxShadow = 'none'; }
     if (glow) { glow.style.boxShadow = 'none'; glow.style.opacity = '0'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
