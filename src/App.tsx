@@ -11120,31 +11120,31 @@ function PublicStreamPage() {
             <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* Barres d'égaliseur fines et lumineuses — bas de la pochette (subtiles) */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:36, display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
+        {/* Barres égaliseur — GLOW NÉON intense (bas) */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:42, display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
           {Array.from({ length: 28 }).map((_, i) => (
             <div key={'b'+i} className="eq-bar" style={{
               flex:1, height:'100%', maxWidth:'4px',
               transformOrigin:'bottom',
-              transform:'scaleY(0.1)', opacity:0.25,
+              transform:'scaleY(0.1)', opacity:0.4,
               borderRadius:'2px',
-              background:'linear-gradient(to top, #0A84FF, #7DC8FF)',
-              boxShadow:'0 0 6px 1px rgba(91,176,255,0.9)',
+              background:'#BFE8FF',
+              boxShadow:'0 0 4px 1px #5BB0FF, 0 0 10px 2px #0A84FF, 0 0 18px 4px rgba(10,132,255,0.8), 0 0 30px 6px rgba(10,132,255,0.5)',
               transition:'transform .06s ease-out, opacity .06s ease-out',
               willChange:'transform, opacity',
             }} />
           ))}
         </div>
-        {/* Barres d'égaliseur fines — haut de la pochette (miroir) */}
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:36, display:'flex', alignItems:'flex-start', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
+        {/* Barres égaliseur — GLOW NÉON intense (haut) */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:42, display:'flex', alignItems:'flex-start', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
           {Array.from({ length: 28 }).map((_, i) => (
             <div key={'t'+i} className="eq-bar" style={{
               flex:1, height:'100%', maxWidth:'4px',
               transformOrigin:'top',
-              transform:'scaleY(0.1)', opacity:0.25,
+              transform:'scaleY(0.1)', opacity:0.4,
               borderRadius:'2px',
-              background:'linear-gradient(to bottom, #0A84FF, #7DC8FF)',
-              boxShadow:'0 0 6px 1px rgba(91,176,255,0.9)',
+              background:'#BFE8FF',
+              boxShadow:'0 0 4px 1px #5BB0FF, 0 0 10px 2px #0A84FF, 0 0 18px 4px rgba(10,132,255,0.8), 0 0 30px 6px rgba(10,132,255,0.5)',
               transition:'transform .06s ease-out, opacity .06s ease-out',
               willChange:'transform, opacity',
             }} />
