@@ -9,58 +9,98 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Doniel Zik" />
     <meta name="theme-color" content="#0E2A52" />
-    <meta name="description" content="Doniel Zik — Créer. Diffuser. Monétiser." />
+    <meta name="description" content="Doniel Zik — l'écosystème des créateurs africains. Musique, cinéma, humour, publicité." />
     <link rel="manifest" href="/manifest.json" />
     <meta property="og:title" content="Doniel Zik" />
-    <meta property="og:description" content="Créer. Diffuser. Monétiser." />
+    <meta property="og:description" content="L'économie créative africaine. Créer. Diffuser. Monétiser." />
     <meta property="og:image" content="/icon-512x512.png" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://doniel.art" />
-    <title>Doniel Zik</title>
+    <title>Doniel Zik — Créer. Diffuser. Monétiser.</title>
 
+    <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4756659920177596"
          crossorigin="anonymous"></script>
 
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0E2A52; }
-      #root { opacity: 1; }
+      html, body { background: #0E2A52 !important; }
+      #root { background: #0E2A52; min-height: 100vh; opacity: 1; }
+
       #splash {
-        position: fixed; inset: 0; z-index: 99999;
-        background: radial-gradient(circle at 50% 40%, rgba(60,150,255,0.25), transparent 55%), #0E2A52;
+        position: fixed; inset: 0;
+        background:
+          radial-gradient(circle at 50% 38%, rgba(60,150,255,0.28), transparent 55%),
+          linear-gradient(165deg, #0A2148 0%, #0E2A52 50%, #143665 100%);
         display: flex; flex-direction: column; align-items: center; justify-content: center;
+        z-index: 99999; opacity: 1; transition: opacity 0.5s ease;
         font-family: -apple-system, 'DM Sans', sans-serif;
-        transition: opacity 0.5s ease;
       }
-      #splash.hide { opacity: 0; pointer-events: none; }
-      .sp-line { font-size: 30px; font-weight: 800; letter-spacing: 0.5px; line-height: 1.3; opacity: 0; animation: spUp 0.6s ease forwards; }
-      .sp-line:nth-child(1) { color: #EAF2FF; animation-delay: 0.15s; }
-      .sp-line:nth-child(2) { color: #5BB0FF; animation-delay: 0.4s; }
-      .sp-line:nth-child(3) { color: #F5C84C; animation-delay: 0.65s; }
-      @keyframes spUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      .sp-bar { width: 160px; height: 3px; background: rgba(255,255,255,0.12); border-radius: 99px; margin-top: 28px; overflow: hidden; }
-      .sp-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#0A84FF,#5BB0FF); border-radius: 99px; animation: spFill 1.6s ease forwards; }
-      @keyframes spFill { to { width: 100%; } }
+      #splash.hiding { opacity: 0; pointer-events: none; }
+
+      #logo-wrap { position: relative; margin-bottom: 38px; display: flex; align-items: center; justify-content: center; }
+      #logo-glow {
+        position: absolute; width: 230px; height: 230px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(60,150,255,0.4), rgba(91,176,255,0.15) 45%, transparent 70%);
+        filter: blur(10px); animation: glowPulse 3.5s ease-in-out infinite;
+      }
+      #logo-img {
+        position: relative; width: 120px; height: 120px; object-fit: contain;
+        animation: breathe 3.5s ease-in-out infinite;
+        filter: drop-shadow(0 8px 28px rgba(0,0,0,0.45));
+      }
+      @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+      @keyframes glowPulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+
+      #splash-title { text-align: center; margin-bottom: 30px; }
+      #splash-title .line {
+        font-size: 26px; font-weight: 800; color: #ffffff;
+        letter-spacing: 0.5px; line-height: 1.25; opacity: 0;
+        animation: fadeUp 0.7s ease forwards;
+      }
+      #splash-title .line:nth-child(1) { animation-delay: 0.2s; }
+      #splash-title .line:nth-child(2) { animation-delay: 0.45s; color: #5BB0FF; }
+      #splash-title .line:nth-child(3) { animation-delay: 0.7s; color: #F5C84C; }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+      #splash-bar-wrap { width: 200px; background: rgba(255,255,255,0.1); border-radius: 99px; height: 4px; overflow: hidden; margin-bottom: 16px; }
+      #splash-bar-inner {
+        width: 0%; height: 100%;
+        background: linear-gradient(90deg, #0A84FF, #5BB0FF);
+        border-radius: 99px; animation: barFill 1.8s ease forwards;
+        box-shadow: 0 0 12px rgba(91,176,255,0.7);
+      }
+      @keyframes barFill { to { width: 100%; } }
+      #splash-tagline {
+        position: absolute; bottom: 42px; color: rgba(170,190,220,0.6);
+        font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 600;
+      }
     </style>
   </head>
 
   <body>
     <div id="splash">
-      <div style="text-align:center">
-        <div class="sp-line">Créer.</div>
-        <div class="sp-line">Diffuser.</div>
-        <div class="sp-line">Monétiser.</div>
+      <div id="logo-wrap">
+        <div id="logo-glow"></div>
+        <img id="logo-img" src="/icon-512x512.png" alt="Doniel Zik" />
       </div>
-      <div class="sp-bar"><i></i></div>
+      <div id="splash-title">
+        <div class="line">Créer.</div>
+        <div class="line">Diffuser.</div>
+        <div class="line">Monétiser.</div>
+      </div>
+      <div id="splash-bar-wrap"><div id="splash-bar-inner"></div></div>
+      <div id="splash-tagline">L'économie créative africaine</div>
     </div>
 
     <div id="root"></div>
 
     <script>
+      // SÉCURITÉ ANTI-BLOCAGE : le splash se cache TOUJOURS après 2,2s, quoi qu'il arrive
       setTimeout(function() {
         var s = document.getElementById('splash');
-        if (s) { s.classList.add('hide'); setTimeout(function(){ if(s.parentNode) s.remove(); }, 500); }
-      }, 2000);
+        if (s) { s.classList.add('hiding'); setTimeout(function(){ if(s.parentNode) s.remove(); }, 500); }
+      }, 2200);
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
