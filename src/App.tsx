@@ -31,7 +31,7 @@ const C = {
   border:   'rgba(150,185,235,0.2)',
 };
 // Halo bleu électrique lumineux en haut
-const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(60,150,255,0.08), transparent 55%)';
+const GLOW_TOP = 'linear-gradient(transparent, transparent)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -4067,49 +4067,59 @@ function PubOscartTab({ user }: { user: any }) {
     if (!cible) { setMsg('Entrez l email du compte a crediter.'); return; }
     if (!user) return;
     setLoading(true);
+    setMsg('');
     try {
       const monCompte = cible === (user.email || '').toLowerCase();
       let docId: string | null = null;
       let cur: any = null;
       let uidCible: string | null = monCompte ? user.uid : null;
+      let trouveVia = '';
 
-      // Si c'est mon propre compte : chercher par uid
+      // 1. Mon propre compte : chercher par uid
       if (monCompte) {
         const s = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
-        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
+        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); trouveVia = 'uid'; }
       }
-      // Sinon, si pas trouve, chercher coins_solde par email
+      // 2. Chercher coins_solde par email
       if (!docId) {
         const s = await getDocs(query(collection(db,'coins_solde'), where('email','==',cible)));
-        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
+        if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); trouveVia = 'email'; }
       }
-      // Toujours rien : retrouver l'uid de l'artiste via la collection artists, puis chercher par uid
+      // 3. Retrouver l'uid via la fiche artiste, puis chercher coins_solde par uid
       if (!docId) {
         const art = await getDocs(query(collection(db,'artists'), where('email','==',cible)));
-        if (!art.empty && art.docs[0].data().uid) {
-          uidCible = art.docs[0].data().uid;
-          const s = await getDocs(query(collection(db,'coins_solde'), where('uid','==',uidCible)));
-          if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); }
+        if (!art.empty) {
+          const uidArt = art.docs[0].data().uid;
+          if (uidArt) {
+            uidCible = uidArt;
+            const s = await getDocs(query(collection(db,'coins_solde'), where('uid','==',uidArt)));
+            if (!s.empty) { docId = s.docs[0].id; cur = s.docs[0].data(); trouveVia = 'artiste-uid'; }
+          }
         }
       }
 
-      // Mettre à jour le portefeuille existant, ou en créer un (avec email ET uid si connu)
+      // Mettre a jour le portefeuille existant, sinon en creer un (avec email + uid si connu)
       if (docId) {
-        await updateDoc(doc(db,'coins_solde',docId), {
-          solde: (cur?.solde || 0) + m,
-          email: cur?.email || cible,
-          ...(uidCible && !cur?.uid ? { uid: uidCible } : {}),
-        });
+        const maj: any = { solde: (cur?.solde || 0) + m, email: cur?.email || cible };
+        if (uidCible && !cur?.uid) maj.uid = uidCible;
+        await updateDoc(doc(db,'coins_solde',docId), maj);
       } else {
         const nouveau: any = { email: cible, solde: m, createdAt: new Date().toISOString() };
         if (uidCible) nouveau.uid = uidCible;
         await addDoc(collection(db,'coins_solde'), nouveau);
+        trouveVia = uidCible ? 'nouveau-avec-uid' : 'nouveau-email-seul';
       }
-      logTx(user.uid, 'pub_oscart_admin', m, 0, `Credit Oscart pub vers ${cible}`);
-      setMsg(`\u2705 ${m.toLocaleString()} Oscart ajoutes au compte ${cible}.`);
+      try { logTx(user.uid, 'pub_oscart_admin', m, 0, `Credit Oscart pub vers ${cible}`); } catch(_) {}
+      const note = (trouveVia === 'nouveau-email-seul')
+        ? ' (l artiste verra ses Oscart des sa prochaine connexion)'
+        : '';
+      setMsg(`\u2705 ${m.toLocaleString()} Oscart ajoutes au compte ${cible}.${note}`);
       setMontant('');
       chargerSolde();
-    } catch(e) { console.error(e); setMsg('Erreur lors du credit.'); }
+    } catch(e: any) {
+      console.error(e);
+      setMsg('Erreur : ' + (e?.message || e?.code || 'credit impossible') + '. Verifiez que l email est correct.');
+    }
     setLoading(false);
   };
 
