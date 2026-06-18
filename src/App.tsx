@@ -1370,11 +1370,10 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const nbBars = bars.length;
       if (nbBars > 0) {
         for (let i = 0; i < nbBars; i++) {
-          // chaque barre lit une fréquence différente → elles dansent indépendamment
           const fi = Math.floor((i / nbBars) * Math.min(data.length, 48));
           const v = data[fi] / 255; // 0 → 1
           const bar = bars[i] as HTMLElement;
-          bar.style.transform = `scaleY(${0.15 + v * 1})`;
+          bar.style.transform = `scaleY(${0.1 + v * 0.7})`; // reste subtil (max 70%)
           bar.style.opacity = String(0.3 + v * 0.7);
         }
       }
@@ -11121,17 +11120,32 @@ function PublicStreamPage() {
             <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* Barres d'égaliseur lumineuses qui dansent (sur le bas de la pochette) */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'40%', display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'2px', padding:'0 6px 8px', pointerEvents:'none', zIndex:3 }}>
-          {Array.from({ length: 40 }).map((_, i) => (
-            <div key={i} className="eq-bar" style={{
-              flex:1, height:'100%', maxWidth:'7px',
+        {/* Barres d'égaliseur fines et lumineuses — bas de la pochette (subtiles) */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:36, display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
+          {Array.from({ length: 28 }).map((_, i) => (
+            <div key={'b'+i} className="eq-bar" style={{
+              flex:1, height:'100%', maxWidth:'4px',
               transformOrigin:'bottom',
-              transform:'scaleY(0.15)', opacity:0.2,
-              borderRadius:'3px 3px 0 0',
-              background:'linear-gradient(to top, #0A84FF, #5BB0FF, #BFE0FF)',
-              boxShadow:'0 0 8px rgba(91,176,255,0.8)',
-              transition:'transform .05s ease-out, opacity .05s ease-out',
+              transform:'scaleY(0.1)', opacity:0.25,
+              borderRadius:'2px',
+              background:'linear-gradient(to top, #0A84FF, #7DC8FF)',
+              boxShadow:'0 0 6px 1px rgba(91,176,255,0.9)',
+              transition:'transform .06s ease-out, opacity .06s ease-out',
+              willChange:'transform, opacity',
+            }} />
+          ))}
+        </div>
+        {/* Barres d'égaliseur fines — haut de la pochette (miroir) */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:36, display:'flex', alignItems:'flex-start', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
+          {Array.from({ length: 28 }).map((_, i) => (
+            <div key={'t'+i} className="eq-bar" style={{
+              flex:1, height:'100%', maxWidth:'4px',
+              transformOrigin:'top',
+              transform:'scaleY(0.1)', opacity:0.25,
+              borderRadius:'2px',
+              background:'linear-gradient(to bottom, #0A84FF, #7DC8FF)',
+              boxShadow:'0 0 6px 1px rgba(91,176,255,0.9)',
+              transition:'transform .06s ease-out, opacity .06s ease-out',
               willChange:'transform, opacity',
             }} />
           ))}
