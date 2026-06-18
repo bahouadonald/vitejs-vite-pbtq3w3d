@@ -1365,25 +1365,25 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
         audioCtxRef.current.resume();
       }
       analyserRef.current.getByteFrequencyData(data);
-      // Moyenne large (rendu doux qui suit la musique sans être brutal)
+      // Piloter les barres d'égaliseur autour de la pochette (chacune une fréquence)
+      const bars = document.querySelectorAll('.eq-bar');
+      const nbBars = bars.length;
+      if (nbBars > 0) {
+        for (let i = 0; i < nbBars; i++) {
+          // chaque barre lit une fréquence différente → elles dansent indépendamment
+          const fi = Math.floor((i / nbBars) * Math.min(data.length, 48));
+          const v = data[fi] / 255; // 0 → 1
+          const bar = bars[i] as HTMLElement;
+          bar.style.transform = `scaleY(${0.15 + v * 1})`;
+          bar.style.opacity = String(0.3 + v * 0.7);
+        }
+      }
+      // léger pouls de la pochette
       let sum = 0; const n = Math.min(24, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      const level = (sum / n) / 255; // 0 → 1
+      const level = (sum / n) / 255;
       const img = document.getElementById('cover-reactive');
-      const ring = document.getElementById('cover-ring');
-      const ring2 = document.getElementById('cover-ring2');
-      if (img) img.style.transform = `scale(${1 + level * 0.14})`;
-      // Cercle lumineux net qui pulse (grossit + brille avec le son)
-      if (ring) {
-        ring.style.transform = `translate(-50%,-50%) scale(${0.7 + level * 0.5})`;
-        ring.style.opacity = String(0.3 + level * 0.7);
-        ring.style.borderColor = `rgba(91,176,255,${0.5 + level * 0.5})`;
-        ring.style.boxShadow = `0 0 ${10 + level * 40}px ${level * 10}px rgba(91,176,255,${0.4 + level * 0.5})`;
-      }
-      if (ring2) {
-        ring2.style.transform = `translate(-50%,-50%) scale(${0.9 + level * 0.7})`;
-        ring2.style.opacity = String(0.15 + level * 0.4);
-      }
+      if (img) img.style.transform = `scale(${1 + level * 0.06})`;
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -1392,11 +1392,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
-    const ring = document.getElementById('cover-ring');
-    const ring2 = document.getElementById('cover-ring2');
     if (img) img.style.transform = 'scale(1)';
-    if (ring) { ring.style.opacity = '0'; }
-    if (ring2) { ring2.style.opacity = '0'; }
+    document.querySelectorAll('.eq-bar').forEach(b => {
+      (b as HTMLElement).style.transform = 'scaleY(0.15)';
+      (b as HTMLElement).style.opacity = '0.2';
+    });
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -11121,11 +11121,23 @@ function PublicStreamPage() {
             <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* Cercles lumineux qui pulsent avec la musique */}
-        <div id="cover-ring" style={{ position:'absolute', top:'50%', left:'50%', width:'55%', aspectRatio:'1', borderRadius:'50%', border:'3px solid rgba(91,176,255,0.6)', transform:'translate(-50%,-50%) scale(0.7)', opacity:0, pointerEvents:'none', willChange:'transform, opacity' }} />
-        <div id="cover-ring2" style={{ position:'absolute', top:'50%', left:'50%', width:'55%', aspectRatio:'1', borderRadius:'50%', border:'2px solid rgba(91,176,255,0.4)', transform:'translate(-50%,-50%) scale(0.9)', opacity:0, pointerEvents:'none', willChange:'transform, opacity' }} />
+        {/* Barres d'égaliseur lumineuses qui dansent (sur le bas de la pochette) */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'40%', display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'2px', padding:'0 6px 8px', pointerEvents:'none', zIndex:3 }}>
+          {Array.from({ length: 40 }).map((_, i) => (
+            <div key={i} className="eq-bar" style={{
+              flex:1, height:'100%', maxWidth:'7px',
+              transformOrigin:'bottom',
+              transform:'scaleY(0.15)', opacity:0.2,
+              borderRadius:'3px 3px 0 0',
+              background:'linear-gradient(to top, #0A84FF, #5BB0FF, #BFE0FF)',
+              boxShadow:'0 0 8px rgba(91,176,255,0.8)',
+              transition:'transform .05s ease-out, opacity .05s ease-out',
+              willChange:'transform, opacity',
+            }} />
+          ))}
+        </div>
         {/* dégradé bas */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})`, zIndex:1 }} />
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
