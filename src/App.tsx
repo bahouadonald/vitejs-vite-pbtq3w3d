@@ -1319,7 +1319,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onLevel }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, onLevel?: (level: number) => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1365,15 +1365,25 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onL
       for (let i = 0; i < n; i++) sum += data[i];
       let level = (sum / n) / 255; // 0 → 1
       // Amplification : on accentue les pics (courbe puissance) pour un effet brutal
-      level = Math.min(1, Math.pow(level, 0.7) * 1.6);
-      onLevel?.(level);
+      level = Math.min(1, Math.pow(level, 0.7) * 1.7);
+      // Écrire DIRECTEMENT dans le DOM (pas de state React → pas de blocage)
+      const img = document.getElementById('cover-reactive');
+      const halo = document.getElementById('cover-halo');
+      if (img) img.style.transform = `scale(${1 + level * 0.2})`;
+      if (halo) {
+        halo.style.boxShadow = `inset 0 0 ${40 + level * 180}px ${6 + level * 30}px rgba(60,150,255,${0.3 + level * 0.65})`;
+        halo.style.opacity = String(0.4 + level * 0.6);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
   };
   const stopLevelLoop = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    onLevel?.(0);
+    const img = document.getElementById('cover-reactive');
+    const halo = document.getElementById('cover-halo');
+    if (img) img.style.transform = 'scale(1)';
+    if (halo) { halo.style.boxShadow = 'none'; halo.style.opacity = '0'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -10980,7 +10990,6 @@ function PublicStreamPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
   const [coverPlaying, setCoverPlaying] = useState(false);
-  const [coverLevel, setCoverLevel] = useState(0);
 
   // Déclencher tuto cascade après play
   // (déclenché depuis recordPublicStream)
@@ -11088,39 +11097,29 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — réagit au son (spectrogramme) ou pulse si analyse indispo ── */}
+      {/* ── POCHETTE — réagit au son en direct (DOM, pas de re-render) ── */}
       <style>{`
-        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.035)} }
-        @keyframes ringBeat { 0%,100%{box-shadow:inset 0 0 30px 2px rgba(10,132,255,0.2)} 50%{box-shadow:inset 0 0 70px 6px rgba(10,132,255,0.5)} }
+        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+        @keyframes ringBeat { 0%,100%{box-shadow:inset 0 0 40px 4px rgba(60,150,255,0.3); opacity:0.5} 50%{box-shadow:inset 0 0 90px 10px rgba(60,150,255,0.7); opacity:1} }
       `}</style>
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
         {data.coverUrl ? (
           <img
+            id="cover-reactive"
             src={data.coverUrl}
             alt={data.label}
             style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.18})` : undefined,
-              transition: coverLevel > 0.01 ? 'transform .05s ease-out' : 'none',
-              animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }}
+              transition: 'transform .05s ease-out',
+              animation: (coverPlaying) ? undefined : 'none' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.25})` : undefined, animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }} />
+            <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .05s ease-out' }} />
           </div>
         )}
-        {/* halo lumineux bleu INTENSE qui frappe avec le son */}
-        {coverPlaying && (
-          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-            boxShadow: coverLevel > 0.01 ? `inset 0 0 ${40 + coverLevel * 160}px ${5 + coverLevel * 25}px rgba(60,150,255,${0.25 + coverLevel * 0.65})` : undefined,
-            transition: coverLevel > 0.01 ? 'box-shadow .05s ease-out' : 'none',
-            animation: coverLevel <= 0.01 ? 'ringBeat 0.7s ease-in-out infinite' : 'none' }} />
-        )}
-        {/* flash lumineux en bordure sur les gros beats */}
-        {coverPlaying && coverLevel > 0.5 && (
-          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-            boxShadow:`inset 0 0 0 ${coverLevel * 6}px rgba(91,176,255,${coverLevel * 0.7})`,
-            transition:'box-shadow .04s ease-out' }} />
-        )}
+        {/* halo lumineux bleu réactif (piloté en direct par le son) */}
+        <div id="cover-halo" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0,
+          animation: (coverPlaying) ? 'ringBeat 0.6s ease-in-out infinite' : 'none' }} />
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
       </div>
@@ -11139,7 +11138,6 @@ function PublicStreamPage() {
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
               onDownload={() => setDlOpen(true)}
               onPlayingChange={setCoverPlaying}
-              onLevel={setCoverLevel}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
