@@ -1319,7 +1319,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onLevel }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, onLevel?: (level: number) => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1330,45 +1330,6 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onL
   const streamStart = useRef<number>(0);
   const stopTimer = useRef<any>(null);
   const cur = files[idx];
-
-  // ── VRAI analyseur audio (Web Audio API) — fait réagir la pochette à la vraie musique ──
-  const audioCtxRef = useRef<any>(null);
-  const analyserRef = useRef<any>(null);
-  const rafRef = useRef<any>(null);
-  const setupAnalyser = () => {
-    if (!ref.current || audioCtxRef.current) return;
-    try {
-      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AC();
-      const src = ctx.createMediaElementSource(ref.current);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      src.connect(analyser);
-      analyser.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
-    } catch (e) { /* déjà connecté ou non supporté */ }
-  };
-  const startLevelLoop = () => {
-    if (!analyserRef.current) return;
-    const data = new Uint8Array(analyserRef.current.frequencyBinCount);
-    const tick = () => {
-      if (!analyserRef.current) return;
-      analyserRef.current.getByteFrequencyData(data);
-      // moyenne des basses/médiums (les plus "ressenties")
-      let sum = 0; const n = Math.min(40, data.length);
-      for (let i = 0; i < n; i++) sum += data[i];
-      const level = (sum / n) / 255; // 0 → 1
-      onLevel?.(level);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    tick();
-  };
-  const stopLevelLoop = () => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    onLevel?.(0);
-  };
-  useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
@@ -1404,7 +1365,6 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onL
       if (elapsed > 2 && onStream) onStream(cur?.name || 'Piste ' + (idx + 1), elapsed);
       ref.current.pause();
       setPlaying(false);
-      stopLevelLoop();
       // Timer 7s — si pas de reprise → pub plein écran
       stopTimer.current = setTimeout(() => {
         setPendingNext(false);
@@ -1413,11 +1373,8 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onL
     } else {
       if (stopTimer.current) clearTimeout(stopTimer.current);
       streamStart.current = Date.now() / 1000;
-      setupAnalyser();
-      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
       ref.current.play().catch(() => setPlaying(false));
       setPlaying(true);
-      startLevelLoop();
       // Déclencher tuto cascade au premier play
       if (onPlay) onPlay();
     }
@@ -10974,7 +10931,6 @@ function PublicStreamPage() {
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
   const [coverPlaying, setCoverPlaying] = useState(false);
-  const [coverLevel, setCoverLevel] = useState(0);
 
   // Déclencher tuto cascade après play
   // (déclenché depuis recordPublicStream)
@@ -11082,26 +11038,27 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — réagit à la VRAIE musique ── */}
+      {/* ── POCHETTE — pulse doucement pendant la lecture ── */}
+      <style>{`
+        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+        @keyframes ringBeat { 0%,100%{box-shadow:inset 0 0 30px 2px rgba(10,132,255,0.2)} 50%{box-shadow:inset 0 0 70px 6px rgba(10,132,255,0.5)} }
+      `}</style>
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
         {data.coverUrl ? (
           <img
             src={data.coverUrl}
             alt={data.label}
             style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              transform: `scale(${1 + coverLevel * 0.06})`,
-              transition: 'transform .08s ease-out' }}
+              animation: coverPlaying ? 'coverBeat 1.4s ease-in-out infinite' : 'none' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: `scale(${1 + coverLevel * 0.12})`, transition: 'transform .08s ease-out' }} />
+            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, animation: coverPlaying ? 'coverBeat 1.4s ease-in-out infinite' : 'none' }} />
           </div>
         )}
-        {/* anneau lumineux dont l'intensité suit le son */}
+        {/* anneau lumineux qui bat pendant la lecture */}
         {coverPlaying && (
-          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-            boxShadow:`inset 0 0 ${30 + coverLevel * 80}px ${coverLevel * 8}px rgba(10,132,255,${0.2 + coverLevel * 0.5})`,
-            transition:'box-shadow .08s ease-out' }} />
+          <div style={{ position:'absolute', inset:0, pointerEvents:'none', animation:'ringBeat 1.4s ease-in-out infinite' }} />
         )}
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
@@ -11121,7 +11078,6 @@ function PublicStreamPage() {
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
               onDownload={() => setDlOpen(true)}
               onPlayingChange={setCoverPlaying}
-              onLevel={setCoverLevel}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
