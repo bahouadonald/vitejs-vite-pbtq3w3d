@@ -482,8 +482,8 @@ const KIFFEMENTS = [
   { id:"univers",  label:"Univers DZ",       coins:5000, partArtiste:350000, desc:"Distinction ultime Doniel Zik",   image:KIF_UNIVERS_B64 },
 ];
 
-function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artistEmail?: string, compact?: boolean }) {
-  const [open, setOpen] = useState(false);
+function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void }) {
+  const [open, setOpen] = useState(autoOpen || false);
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const [soldeCoins, setSoldeCoins] = useState(0);
@@ -607,13 +607,15 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
         </div>
       )}
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
-      <button onClick={() => setOpen(!open)} title="Kiffement"
-        style={ compact
-          ? { display:'inline-flex', alignItems:'center', gap:5, padding:'0 12px', height:40, borderRadius:99, border:'none', background:'rgba(255,200,0,0.12)', color:'#ffd700', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0, whiteSpace:'nowrap' }
-          : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 } }>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-        Kiffement
-      </button>
+      {!autoOpen && (
+        <button onClick={() => setOpen(!open)} title="Kiffement"
+          style={ compact
+            ? { display:'inline-flex', alignItems:'center', gap:5, padding:'0 12px', height:40, borderRadius:99, border:'none', background:'rgba(255,200,0,0.12)', color:'#ffd700', cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0, whiteSpace:'nowrap' }
+            : { display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:99, border:'1px solid rgba(255,200,0,0.3)', background:'rgba(255,200,0,0.05)', color:'#ffd700', cursor:'pointer', fontSize:14, fontWeight:600 } }>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+          Kiffement
+        </button>
+      )}
       {/* Modal recharge stylé */}
       {rechargeModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
@@ -673,7 +675,7 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
       )}
 
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.4)' }}>
+        <div onClick={() => { setOpen(false); onClose?.(); }} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.4)' }}>
         <div onClick={e => e.stopPropagation()} style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'14px 14px 16px', width:'92%', maxWidth:440, maxHeight:'56vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}>
           <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}}`}</style>
           <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
@@ -1263,7 +1265,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} />}
 
       {/* Section kiffements dépliable */}
-      {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} />}
+      {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowKiffements(false)} />}
     </div>
   );
 }
