@@ -1361,21 +1361,20 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     const data = new Uint8Array(analyserRef.current.frequencyBinCount);
     const tick = () => {
       if (!loopRunning.current || !analyserRef.current) return;
-      // Réveiller le contexte s'il s'est suspendu (cause #1 du figeage sur mobile)
       if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
       }
       analyserRef.current.getByteFrequencyData(data);
-      let sum = 0; const n = Math.min(8, data.length);
+      // Moyenne large (rendu doux qui suit la musique sans être brutal)
+      let sum = 0; const n = Math.min(24, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      let level = (sum / n) / 255;
-      level = Math.min(1, Math.pow(level, 0.7) * 1.7); // amplification brutale
+      const level = (sum / n) / 255; // 0 → 1, sans amplification brutale
       const img = document.getElementById('cover-reactive');
       const halo = document.getElementById('cover-halo');
-      if (img) img.style.transform = `scale(${1 + level * 0.2})`;
+      if (img) img.style.transform = `scale(${1 + level * 0.08})`;
       if (halo) {
-        halo.style.boxShadow = `inset 0 0 ${40 + level * 180}px ${6 + level * 30}px rgba(60,150,255,${0.3 + level * 0.65})`;
-        halo.style.opacity = String(0.35 + level * 0.65);
+        halo.style.boxShadow = `inset 0 0 ${30 + level * 90}px ${level * 8}px rgba(60,150,255,${0.2 + level * 0.5})`;
+        halo.style.opacity = String(0.3 + level * 0.5);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
