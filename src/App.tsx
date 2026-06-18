@@ -673,8 +673,9 @@ function KiffementSection({ qrId, artistEmail, compact }: { qrId: string, artist
       )}
 
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
-        <div onClick={e => e.stopPropagation()} style={{ background:C.bgSecond, border:'1px solid '+C.border, borderRadius:'20px 20px 0 0', padding:'8px 14px 28px', width:'100%', maxWidth:520, maxHeight:'82vh', overflowY:'auto' }}>
+        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.4)' }}>
+        <div onClick={e => e.stopPropagation()} style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'14px 14px 16px', width:'92%', maxWidth:440, maxHeight:'56vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}>
+          <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}}`}</style>
           <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
 
           {/* Solde Oscart */}
@@ -1260,22 +1261,6 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 
       {/* Section commentaires dépliable */}
       {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} />}
-
-      {/* Kiffements reçus — détail par type */}
-      {showKiffements && byTypeRecu.length > 0 && (
-        <div style={{ marginTop:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,200,0,0.15)', borderRadius:14, padding:14 }}>
-          <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, margin:'0 0 10px' }}>Kiffements reçus</p>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
-            {byTypeRecu.map(t => (
-              <div key={t.id} style={{ width:74, textAlign:'center', background:'rgba(255,200,0,0.06)', border:'1px solid rgba(255,200,0,0.18)', borderRadius:12, padding:'10px 4px' }}>
-                <img src={t.image} alt={t.label} style={{ width:38, height:38, objectFit:'contain', display:'block', margin:'0 auto 4px' }} />
-                <p style={{ color:'#ffd700', fontWeight:800, fontSize:13, margin:'0 0 2px' }}>×{t.count}</p>
-                <p style={{ color:'#8098b8', fontSize:9, lineHeight:1.2, margin:0 }}>{t.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Section kiffements dépliable */}
       {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} />}
