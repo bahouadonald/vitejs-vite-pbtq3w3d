@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Doniel Zik" />
     <meta name="theme-color" content="#0E2A52" />
-    <meta name="description" content="Doniel Zik — distribution musicale et écosystème créatif africain." />
+    <meta name="description" content="Doniel Zik — Créer. Diffuser. Monétiser." />
     <link rel="manifest" href="/manifest.json" />
     <meta property="og:title" content="Doniel Zik" />
     <meta property="og:description" content="Créer. Diffuser. Monétiser." />
@@ -18,18 +18,51 @@
     <meta property="og:url" content="https://doniel.art" />
     <title>Doniel Zik</title>
 
-    <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4756659920177596"
          crossorigin="anonymous"></script>
 
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #0E2A52; }
+      #root { opacity: 1; }
+      #splash {
+        position: fixed; inset: 0; z-index: 99999;
+        background: radial-gradient(circle at 50% 40%, rgba(60,150,255,0.25), transparent 55%), #0E2A52;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: -apple-system, 'DM Sans', sans-serif;
+        transition: opacity 0.5s ease;
+      }
+      #splash.hide { opacity: 0; pointer-events: none; }
+      .sp-line { font-size: 30px; font-weight: 800; letter-spacing: 0.5px; line-height: 1.3; opacity: 0; animation: spUp 0.6s ease forwards; }
+      .sp-line:nth-child(1) { color: #EAF2FF; animation-delay: 0.15s; }
+      .sp-line:nth-child(2) { color: #5BB0FF; animation-delay: 0.4s; }
+      .sp-line:nth-child(3) { color: #F5C84C; animation-delay: 0.65s; }
+      @keyframes spUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .sp-bar { width: 160px; height: 3px; background: rgba(255,255,255,0.12); border-radius: 99px; margin-top: 28px; overflow: hidden; }
+      .sp-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#0A84FF,#5BB0FF); border-radius: 99px; animation: spFill 1.6s ease forwards; }
+      @keyframes spFill { to { width: 100%; } }
     </style>
   </head>
 
   <body>
+    <div id="splash">
+      <div style="text-align:center">
+        <div class="sp-line">Créer.</div>
+        <div class="sp-line">Diffuser.</div>
+        <div class="sp-line">Monétiser.</div>
+      </div>
+      <div class="sp-bar"><i></i></div>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      setTimeout(function() {
+        var s = document.getElementById('splash');
+        if (s) { s.classList.add('hide'); setTimeout(function(){ if(s.parentNode) s.remove(); }, 500); }
+      }, 2000);
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
