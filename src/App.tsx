@@ -1354,31 +1354,32 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       analyserFailed.current = true;
     }
   };
+  const loopRunning = useRef<boolean>(false);
   const startLevelLoop = () => {
-    if (!analyserRef.current) return;
+    if (!analyserRef.current || loopRunning.current) return;
+    loopRunning.current = true;
     const data = new Uint8Array(analyserRef.current.frequencyBinCount);
     const tick = () => {
-      if (!analyserRef.current) return;
+      if (!loopRunning.current || !analyserRef.current) return;
       analyserRef.current.getByteFrequencyData(data);
-      // On capte surtout les BASSES (les "boom") — les premières fréquences
+      // On capte surtout les BASSES (les "boom")
       let sum = 0; const n = Math.min(8, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      let level = (sum / n) / 255; // 0 → 1
-      // Amplification : on accentue les pics (courbe puissance) pour un effet brutal
-      level = Math.min(1, Math.pow(level, 0.7) * 1.7);
-      // Écrire DIRECTEMENT dans le DOM (pas de state React → pas de blocage)
+      let level = (sum / n) / 255;
+      level = Math.min(1, Math.pow(level, 0.7) * 1.7); // amplification brutale
       const img = document.getElementById('cover-reactive');
       const halo = document.getElementById('cover-halo');
       if (img) img.style.transform = `scale(${1 + level * 0.2})`;
       if (halo) {
         halo.style.boxShadow = `inset 0 0 ${40 + level * 180}px ${6 + level * 30}px rgba(60,150,255,${0.3 + level * 0.65})`;
-        halo.style.opacity = String(0.4 + level * 0.6);
+        halo.style.opacity = String(0.35 + level * 0.65);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
   };
   const stopLevelLoop = () => {
+    loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
     const halo = document.getElementById('cover-halo');
@@ -1386,6 +1387,12 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     if (halo) { halo.style.boxShadow = 'none'; halo.style.opacity = '0'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
+  useEffect(() => {
+    if (playing && analyserRef.current && !loopRunning.current) {
+      startLevelLoop();
+    }
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
@@ -11098,10 +11105,6 @@ function PublicStreamPage() {
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
       {/* ── POCHETTE — réagit au son en direct (DOM, pas de re-render) ── */}
-      <style>{`
-        @keyframes coverBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
-        @keyframes ringBeat { 0%,100%{box-shadow:inset 0 0 40px 4px rgba(60,150,255,0.3); opacity:0.5} 50%{box-shadow:inset 0 0 90px 10px rgba(60,150,255,0.7); opacity:1} }
-      `}</style>
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
         {data.coverUrl ? (
           <img
@@ -11109,17 +11112,15 @@ function PublicStreamPage() {
             src={data.coverUrl}
             alt={data.label}
             style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              transition: 'transform .05s ease-out',
-              animation: (coverPlaying) ? undefined : 'none' }}
+              transition: 'transform .06s ease-out', willChange: 'transform' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .05s ease-out' }} />
+            <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* halo lumineux bleu réactif (piloté en direct par le son) */}
-        <div id="cover-halo" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0,
-          animation: (coverPlaying) ? 'ringBeat 0.6s ease-in-out infinite' : 'none' }} />
+        {/* halo lumineux bleu réactif — piloté UNIQUEMENT par le son (pas d'animation CSS) */}
+        <div id="cover-halo" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0, willChange:'box-shadow, opacity' }} />
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
       </div>
