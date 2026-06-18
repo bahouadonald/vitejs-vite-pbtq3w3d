@@ -1371,14 +1371,14 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const img = document.getElementById('cover-reactive');
       const glow = document.getElementById('cover-glow');
       if (img) img.style.transform = `scale(${1 + level * 0.07})`;
-      // HALO NÉON qui RAYONNE vers l'extérieur (brille dans le fond sombre)
+      // HALO NÉON bleu électrique PUR qui rayonne (aucun blanc)
       if (glow) {
         const b = 0.5 + level * 0.5;
         glow.style.boxShadow =
-          `0 0 ${15 + level * 25}px ${3 + level * 6}px rgba(191,232,255,${b}), ` +
-          `0 0 ${35 + level * 60}px ${8 + level * 18}px rgba(91,176,255,${b}), ` +
+          `0 0 ${15 + level * 25}px ${3 + level * 6}px rgba(10,132,255,${b}), ` +
+          `0 0 ${35 + level * 60}px ${8 + level * 18}px rgba(10,132,255,${b}), ` +
           `0 0 ${70 + level * 120}px ${16 + level * 35}px rgba(10,132,255,${b * 0.9}), ` +
-          `0 0 ${120 + level * 180}px ${24 + level * 50}px rgba(10,132,255,${b * 0.6})`;
+          `0 0 ${120 + level * 180}px ${24 + level * 50}px rgba(10,132,255,${b * 0.55})`;
         glow.style.opacity = String(0.5 + level * 0.5);
       }
       rafRef.current = requestAnimationFrame(tick);
