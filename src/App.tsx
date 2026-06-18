@@ -1365,24 +1365,21 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
         audioCtxRef.current.resume();
       }
       analyserRef.current.getByteFrequencyData(data);
-      // Piloter les barres d'égaliseur autour de la pochette (chacune une fréquence)
-      const bars = document.querySelectorAll('.eq-bar');
-      const nbBars = bars.length;
-      if (nbBars > 0) {
-        for (let i = 0; i < nbBars; i++) {
-          const fi = Math.floor((i / nbBars) * Math.min(data.length, 48));
-          const v = data[fi] / 255; // 0 → 1
-          const bar = bars[i] as HTMLElement;
-          bar.style.transform = `scaleY(${0.1 + v * 0.7})`; // reste subtil (max 70%)
-          bar.style.opacity = String(0.3 + v * 0.7);
-        }
-      }
-      // léger pouls de la pochette
       let sum = 0; const n = Math.min(24, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      const level = (sum / n) / 255;
+      const level = (sum / n) / 255; // 0 → 1
       const img = document.getElementById('cover-reactive');
-      if (img) img.style.transform = `scale(${1 + level * 0.06})`;
+      const glow = document.getElementById('cover-glow');
+      if (img) img.style.transform = `scale(${1 + level * 0.07})`;
+      // HALO NÉON lumineux qui pulse avec la musique (plusieurs couches de lumière)
+      if (glow) {
+        const b = 0.4 + level * 0.6; // intensité
+        glow.style.boxShadow =
+          `inset 0 0 ${20 + level * 30}px ${4 + level * 8}px rgba(191,232,255,${b}), ` +
+          `inset 0 0 ${50 + level * 80}px ${10 + level * 20}px rgba(91,176,255,${b}), ` +
+          `inset 0 0 ${90 + level * 140}px ${16 + level * 30}px rgba(10,132,255,${b * 0.85})`;
+        glow.style.opacity = String(0.45 + level * 0.55);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -1391,11 +1388,9 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
+    const glow = document.getElementById('cover-glow');
     if (img) img.style.transform = 'scale(1)';
-    document.querySelectorAll('.eq-bar').forEach(b => {
-      (b as HTMLElement).style.transform = 'scaleY(0.15)';
-      (b as HTMLElement).style.opacity = '0.2';
-    });
+    if (glow) { glow.style.boxShadow = 'none'; glow.style.opacity = '0'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -11120,36 +11115,8 @@ function PublicStreamPage() {
             <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* Barres égaliseur — GLOW NÉON intense (bas) */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, height:42, display:'flex', alignItems:'flex-end', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
-          {Array.from({ length: 28 }).map((_, i) => (
-            <div key={'b'+i} className="eq-bar" style={{
-              flex:1, height:'100%', maxWidth:'4px',
-              transformOrigin:'bottom',
-              transform:'scaleY(0.1)', opacity:0.4,
-              borderRadius:'2px',
-              background:'#BFE8FF',
-              boxShadow:'0 0 4px 1px #5BB0FF, 0 0 10px 2px #0A84FF, 0 0 18px 4px rgba(10,132,255,0.8), 0 0 30px 6px rgba(10,132,255,0.5)',
-              transition:'transform .06s ease-out, opacity .06s ease-out',
-              willChange:'transform, opacity',
-            }} />
-          ))}
-        </div>
-        {/* Barres égaliseur — GLOW NÉON intense (haut) */}
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:42, display:'flex', alignItems:'flex-start', justifyContent:'center', gap:'3px', padding:'0 10px', pointerEvents:'none', zIndex:4 }}>
-          {Array.from({ length: 28 }).map((_, i) => (
-            <div key={'t'+i} className="eq-bar" style={{
-              flex:1, height:'100%', maxWidth:'4px',
-              transformOrigin:'top',
-              transform:'scaleY(0.1)', opacity:0.4,
-              borderRadius:'2px',
-              background:'#BFE8FF',
-              boxShadow:'0 0 4px 1px #5BB0FF, 0 0 10px 2px #0A84FF, 0 0 18px 4px rgba(10,132,255,0.8), 0 0 30px 6px rgba(10,132,255,0.5)',
-              transition:'transform .06s ease-out, opacity .06s ease-out',
-              willChange:'transform, opacity',
-            }} />
-          ))}
-        </div>
+        {/* HALO NÉON lumineux tout autour de la pochette (pulse avec la musique) */}
+        <div id="cover-glow" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0, willChange:'box-shadow, opacity', zIndex:3 }} />
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})`, zIndex:1 }} />
       </div>
