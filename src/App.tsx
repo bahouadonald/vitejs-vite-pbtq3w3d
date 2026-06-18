@@ -1360,9 +1360,13 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, onL
     const tick = () => {
       if (!analyserRef.current) return;
       analyserRef.current.getByteFrequencyData(data);
-      let sum = 0; const n = Math.min(24, data.length);
+      // On capte surtout les BASSES (les "boom") — les premières fréquences
+      let sum = 0; const n = Math.min(8, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      onLevel?.((sum / n) / 255);
+      let level = (sum / n) / 255; // 0 → 1
+      // Amplification : on accentue les pics (courbe puissance) pour un effet brutal
+      level = Math.min(1, Math.pow(level, 0.7) * 1.6);
+      onLevel?.(level);
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -11095,21 +11099,27 @@ function PublicStreamPage() {
             src={data.coverUrl}
             alt={data.label}
             style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.08})` : undefined,
-              transition: coverLevel > 0.01 ? 'transform .07s ease-out' : 'none',
+              transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.18})` : undefined,
+              transition: coverLevel > 0.01 ? 'transform .05s ease-out' : 'none',
               animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }}
           />
         ) : (
           <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.15})` : undefined, animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }} />
+            <img src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transform: coverLevel > 0.01 ? `scale(${1 + coverLevel * 0.25})` : undefined, animation: (coverPlaying && coverLevel <= 0.01) ? 'coverBeat 0.7s ease-in-out infinite' : 'none' }} />
           </div>
         )}
-        {/* anneau lumineux : intensité = niveau du son (ou battement simple) */}
+        {/* halo lumineux bleu INTENSE qui frappe avec le son */}
         {coverPlaying && (
           <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-            boxShadow: coverLevel > 0.01 ? `inset 0 0 ${30 + coverLevel * 90}px ${coverLevel * 8}px rgba(10,132,255,${0.2 + coverLevel * 0.5})` : undefined,
-            transition: coverLevel > 0.01 ? 'box-shadow .07s ease-out' : 'none',
+            boxShadow: coverLevel > 0.01 ? `inset 0 0 ${40 + coverLevel * 160}px ${5 + coverLevel * 25}px rgba(60,150,255,${0.25 + coverLevel * 0.65})` : undefined,
+            transition: coverLevel > 0.01 ? 'box-shadow .05s ease-out' : 'none',
             animation: coverLevel <= 0.01 ? 'ringBeat 0.7s ease-in-out infinite' : 'none' }} />
+        )}
+        {/* flash lumineux en bordure sur les gros beats */}
+        {coverPlaying && coverLevel > 0.5 && (
+          <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+            boxShadow:`inset 0 0 0 ${coverLevel * 6}px rgba(91,176,255,${coverLevel * 0.7})`,
+            transition:'box-shadow .04s ease-out' }} />
         )}
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
