@@ -14,24 +14,24 @@ import {
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 // ─────────────────────────────────────────────
-// PALETTE — Bleu électrique + Gris électrique (ADN du logo, SANS blanc)
+// PALETTE — Bleu électrique (fond) + Gris électrique (accents) — ADN logo
 // ─────────────────────────────────────────────
 const C = {
-  bgDeep:   '#252E3E',   // fond principal (gris électrique foncé, -10% éclairage)
-  bgSecond: '#2E3749',   // fond secondaire
-  card:     '#343F55',   // cartes
-  cardHi:   '#3D4A63',   // carte surélevée
-  blue:     '#0A84FF',   // bleu électrique vif (du logo)
-  blueLite: '#4DA6FF',   // bleu clair lumineux
+  bgDeep:   '#0E2A52',   // fond principal (bleu électrique profond)
+  bgSecond: '#143665',   // fond secondaire
+  card:     '#1A4179',   // cartes (bleu électrique plus clair)
+  cardHi:   '#215089',   // carte surélevée (bleu électrique clair)
+  blue:     '#0A84FF',   // bleu électrique vif
+  blueLite: '#5BB0FF',   // bleu clair lumineux
   gold:     '#F5C84C',   // or (récompenses / Oscart)
   success:  '#00D49A',
   alert:    '#FF647C',
-  text:     '#EAF0F8',   // texte (gris très clair, lisible sur fond gris foncé)
-  textSoft: '#9DB0CC',   // texte secondaire (gris bleuté)
-  border:   'rgba(120,160,220,0.16)',
+  text:     '#EAF2FF',   // texte clair
+  textSoft: '#A9BEDC',   // gris électrique bleuté (texte secondaire)
+  border:   'rgba(150,185,235,0.2)',
 };
-// Halo bleu électrique en haut (-10% intensité)
-const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(10,132,255,0.26), transparent 58%)';
+// Halo bleu électrique lumineux en haut
+const GLOW_TOP = 'radial-gradient(circle at 50% -5%, rgba(60,150,255,0.35), transparent 60%)';
 
 const ADMIN_EMAIL = 'bdonaldservices@gmail.com'; // SUPER ADMIN — tous les pouvoirs
 const RESPONSABLES_AUTORISES = ['dramanecherif681@gmail.com'];
@@ -1455,10 +1455,15 @@ function AudioPlayer({ files, onStream, onPlay, onDownload }: { files: any[], on
           <p style={{ color: C.textSoft, fontSize: 10, margin: 0 }}>{formatTime(ct)} / {formatTime(dur)}{files.length > 1 ? `  ·  ${idx + 1}/${files.length}` : ''}</p>
         </div>
 
-        {/* Petit bouton télécharger (rond, près du play) */}
+        {/* Bouton télécharger (près du play, reconnaissable) */}
         {onDownload && (
           <button onClick={onDownload} title="Télécharger"
-            style={{ background: 'rgba(10,132,255,0.15)', border: '1px solid '+C.border, borderRadius: 99, width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: C.blueLite, fontSize: 16 }}>⬇</button>
+            style={{ background: 'linear-gradient(135deg,'+C.blue+',#0050d0)', border: 'none', borderRadius: 10, height: 34, padding:'0 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap:6, flexShrink: 0, color: '#fff', fontSize: 12, fontWeight:700, boxShadow:'0 2px 10px rgba(10,132,255,0.4)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v12M7 11l5 5 5-5M5 21h14"/>
+            </svg>
+            Télécharger
+          </button>
         )}
 
         {/* Hamburger playlist (si plusieurs pistes) */}
@@ -10778,8 +10783,9 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
 // TÉLÉCHARGER WIDGET — paiement Wave automatique
 // Flux : clic → session Wave créée côté serveur → redirection Wave → webhook → DL actif
 // ─────────────────────────────────────────────
-function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
+function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen, onExternalClose, hideButton }: {
   qrId: string; albumLabel: string; artistEmail: string; prix: number; files: any[];
+  externalOpen?: boolean; onExternalClose?: () => void; hideButton?: boolean;
 }) {
   const [state, setState] = useState<'idle'|'loading'|'done'|'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
@@ -10892,11 +10898,11 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
   );
 
   return (
-    <div id="zone-telecharger" style={{ marginBottom:20 }}>
-      {/* Modal détail prix (apparaît au clic) */}
-      {showDetail && (
+    <div id="zone-telecharger" style={{ marginBottom: hideButton ? 0 : 20 }}>
+      {/* Modal détail prix (apparaît au clic ou depuis le lecteur) */}
+      {(showDetail || externalOpen) && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-          onClick={() => setShowDetail(false)}>
+          onClick={() => { setShowDetail(false); onExternalClose?.(); }}>
           <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
@@ -10906,7 +10912,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
             </p>
             <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>1 Oscart = 10 F CFA</p>
             <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
-            <button onClick={() => setShowDetail(false)}
+            <button onClick={() => { setShowDetail(false); onExternalClose?.(); }}
               style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer', marginTop:10 }}>
               Annuler
             </button>
@@ -10914,11 +10920,13 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files }: {
         </div>
       )}
 
-      {/* Petit bouton Télécharger (le prix apparaît au clic) */}
-      <button onClick={() => setShowDetail(true)}
-        style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-        <span style={{ fontSize:18 }}>⬇</span> Télécharger
-      </button>
+      {/* Bouton Télécharger (masqué si déclenché depuis le lecteur) */}
+      {!hideButton && (
+        <button onClick={() => setShowDetail(true)}
+          style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span style={{ fontSize:18 }}>⬇</span> Télécharger
+        </button>
+      )}
     </div>
   );
 }
@@ -10931,6 +10939,7 @@ function PublicStreamPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showTitres, setShowTitres] = useState(false);
+  const [dlOpen, setDlOpen] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
 
@@ -11069,7 +11078,7 @@ function PublicStreamPage() {
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
-              onDownload={() => { document.getElementById('zone-telecharger')?.scrollIntoView({ behavior:'smooth', block:'center' }); }}
+              onDownload={() => setDlOpen(true)}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
@@ -11103,7 +11112,7 @@ function PublicStreamPage() {
               </div>
             );
           }
-          // Téléchargement PAYANT (QR public)
+          // Téléchargement PAYANT (QR public) — bouton masqué, ouvert depuis le lecteur
           return (data.price > 0 || data.files?.length > 0) && (
             <AchatWidget
               qrId={data.publicLinkId || publicLinkId || ''}
@@ -11111,6 +11120,9 @@ function PublicStreamPage() {
               artistEmail={data.artistEmail || ''}
               prix={data.price || 0}
               files={data.files || []}
+              hideButton={true}
+              externalOpen={dlOpen}
+              onExternalClose={() => setDlOpen(false)}
             />
           );
         })()}
