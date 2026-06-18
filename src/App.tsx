@@ -1368,16 +1368,21 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       // Moyenne large (rendu doux qui suit la musique sans être brutal)
       let sum = 0; const n = Math.min(24, data.length);
       for (let i = 0; i < n; i++) sum += data[i];
-      const level = (sum / n) / 255; // 0 → 1, sans amplification brutale
+      const level = (sum / n) / 255; // 0 → 1
       const img = document.getElementById('cover-reactive');
-      const halo = document.getElementById('cover-halo');
-      if (img) img.style.transform = `scale(${1 + level * 0.20})`; // zoom normal (20%)
-      if (halo) {
-        // GLOW lumineux : halo interne + rayonnement externe + cœur lumineux
-        halo.style.boxShadow =
-          `inset 0 0 ${50 + level * 140}px ${8 + level * 26}px rgba(91,176,255,${0.35 + level * 0.55}), ` +
-          `0 0 ${30 + level * 70}px ${level * 20}px rgba(60,150,255,${0.3 + level * 0.5})`;
-        halo.style.opacity = String(0.4 + level * 0.6);
+      const ring = document.getElementById('cover-ring');
+      const ring2 = document.getElementById('cover-ring2');
+      if (img) img.style.transform = `scale(${1 + level * 0.14})`;
+      // Cercle lumineux net qui pulse (grossit + brille avec le son)
+      if (ring) {
+        ring.style.transform = `translate(-50%,-50%) scale(${0.7 + level * 0.5})`;
+        ring.style.opacity = String(0.3 + level * 0.7);
+        ring.style.borderColor = `rgba(91,176,255,${0.5 + level * 0.5})`;
+        ring.style.boxShadow = `0 0 ${10 + level * 40}px ${level * 10}px rgba(91,176,255,${0.4 + level * 0.5})`;
+      }
+      if (ring2) {
+        ring2.style.transform = `translate(-50%,-50%) scale(${0.9 + level * 0.7})`;
+        ring2.style.opacity = String(0.15 + level * 0.4);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1387,9 +1392,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
-    const halo = document.getElementById('cover-halo');
+    const ring = document.getElementById('cover-ring');
+    const ring2 = document.getElementById('cover-ring2');
     if (img) img.style.transform = 'scale(1)';
-    if (halo) { halo.style.boxShadow = 'none'; halo.style.opacity = '0'; }
+    if (ring) { ring.style.opacity = '0'; }
+    if (ring2) { ring2.style.opacity = '0'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -1410,19 +1417,9 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   const pubCountRef = useRef(0);
 
   useEffect(() => {
-    pubCountRef.current = 0; // reset à chaque nouvelle piste
+    // Pub pendant lecture DÉSACTIVÉE — la pub ne vient plus qu'APRÈS la lecture complète
+    pubCountRef.current = 0;
     if (pubIntervalRef.current) clearInterval(pubIntervalRef.current);
-    if (playing) {
-      // Pub après 20s, 40s, 60s (3 fois max par piste)
-      pubIntervalRef.current = setInterval(() => {
-        if (playing && pubCountRef.current < 3) {
-          pubCountRef.current++;
-          setShowPubDuringPlay(true);
-        } else {
-          clearInterval(pubIntervalRef.current);
-        }
-      }, 60000);
-    }
     return () => { if (pubIntervalRef.current) clearInterval(pubIntervalRef.current); };
   }, [playing, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -11124,8 +11121,9 @@ function PublicStreamPage() {
             <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
           </div>
         )}
-        {/* halo lumineux bleu réactif — piloté UNIQUEMENT par le son (pas d'animation CSS) */}
-        <div id="cover-halo" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0, willChange:'box-shadow, opacity' }} />
+        {/* Cercles lumineux qui pulsent avec la musique */}
+        <div id="cover-ring" style={{ position:'absolute', top:'50%', left:'50%', width:'55%', aspectRatio:'1', borderRadius:'50%', border:'3px solid rgba(91,176,255,0.6)', transform:'translate(-50%,-50%) scale(0.7)', opacity:0, pointerEvents:'none', willChange:'transform, opacity' }} />
+        <div id="cover-ring2" style={{ position:'absolute', top:'50%', left:'50%', width:'55%', aspectRatio:'1', borderRadius:'50%', border:'2px solid rgba(91,176,255,0.4)', transform:'translate(-50%,-50%) scale(0.9)', opacity:0, pointerEvents:'none', willChange:'transform, opacity' }} />
         {/* dégradé bas */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})` }} />
       </div>
