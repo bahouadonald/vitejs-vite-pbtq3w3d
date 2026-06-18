@@ -1371,14 +1371,15 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const img = document.getElementById('cover-reactive');
       const glow = document.getElementById('cover-glow');
       if (img) img.style.transform = `scale(${1 + level * 0.07})`;
-      // HALO NÉON lumineux qui pulse avec la musique (plusieurs couches de lumière)
+      // HALO NÉON qui RAYONNE vers l'extérieur (brille dans le fond sombre)
       if (glow) {
-        const b = 0.4 + level * 0.6; // intensité
+        const b = 0.5 + level * 0.5;
         glow.style.boxShadow =
-          `inset 0 0 ${20 + level * 30}px ${4 + level * 8}px rgba(191,232,255,${b}), ` +
-          `inset 0 0 ${50 + level * 80}px ${10 + level * 20}px rgba(91,176,255,${b}), ` +
-          `inset 0 0 ${90 + level * 140}px ${16 + level * 30}px rgba(10,132,255,${b * 0.85})`;
-        glow.style.opacity = String(0.45 + level * 0.55);
+          `0 0 ${15 + level * 25}px ${3 + level * 6}px rgba(191,232,255,${b}), ` +
+          `0 0 ${35 + level * 60}px ${8 + level * 18}px rgba(91,176,255,${b}), ` +
+          `0 0 ${70 + level * 120}px ${16 + level * 35}px rgba(10,132,255,${b * 0.9}), ` +
+          `0 0 ${120 + level * 180}px ${24 + level * 50}px rgba(10,132,255,${b * 0.6})`;
+        glow.style.opacity = String(0.5 + level * 0.5);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -11100,25 +11101,27 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — réagit au son en direct (DOM, pas de re-render) ── */}
-      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', overflow:'hidden' }}>
-        {data.coverUrl ? (
-          <img
-            id="cover-reactive"
-            src={data.coverUrl}
-            alt={data.label}
-            style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
-              transition: 'transform .06s ease-out', willChange: 'transform' }}
-          />
-        ) : (
-          <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
-          </div>
-        )}
-        {/* HALO NÉON lumineux tout autour de la pochette (pulse avec la musique) */}
-        <div id="cover-glow" style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0, willChange:'box-shadow, opacity', zIndex:3 }} />
+      {/* ── POCHETTE — avec halo néon qui RAYONNE autour (brille) ── */}
+      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '14px 14px 0' }}>
+        {/* Glow néon DERRIÈRE la pochette qui rayonne vers l'extérieur */}
+        <div id="cover-glow" style={{ position:'absolute', top:14, left:14, right:14, bottom:0, pointerEvents:'none', opacity:0, borderRadius:8, willChange:'box-shadow, opacity', zIndex:0 }} />
+        <div style={{ position:'relative', overflow:'hidden', borderRadius:8, zIndex:2 }}>
+          {data.coverUrl ? (
+            <img
+              id="cover-reactive"
+              src={data.coverUrl}
+              alt={data.label}
+              style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block',
+                transition: 'transform .06s ease-out', willChange: 'transform' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
+            </div>
+          )}
+        </div>
         {/* dégradé bas */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})`, zIndex:1 }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})`, zIndex:3, pointerEvents:'none' }} />
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
