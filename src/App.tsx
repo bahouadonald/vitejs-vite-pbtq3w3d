@@ -8025,7 +8025,7 @@ function DecouvrirPage() {
         const pool = candidats.length > 0 ? candidats : contenusFiltres.slice(0, 6);
         const hero = pool[Math.floor(Math.random() * pool.length)];
         return (
-          <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210, boxShadow:'0 12px 40px rgba(0,0,0,0.5)' }}>
+          <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210 }}>
             {hero.coverUrl ? (
               <img src={hero.coverUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
             ) : (
