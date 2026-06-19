@@ -2161,8 +2161,6 @@ function FanPage() {
                 <img src={LOGO_B64} alt="DZ" style={{ width:100, opacity:0.35 }} />
               </div>
             )}
-            {/* dégradé bas pour accrocher le texte */}
-            <div style={{ position:'absolute', bottom:0, left:0, right:0, height:120, background:`linear-gradient(transparent,${C.bgDeep})` }} />
           </div>
 
           {/* TITRE + ARTISTE */}
@@ -11450,8 +11448,7 @@ function PublicStreamPage() {
             </div>
           )}
         </div>
-        {/* dégradé bas */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(transparent, ${C.bgDeep})`, zIndex:3, pointerEvents:'none' }} />
+        {/* dégradé bas retiré */}
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
