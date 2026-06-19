@@ -2164,7 +2164,7 @@ function FanPage() {
           </div>
 
           {/* TITRE + ARTISTE */}
-          <div style={{ padding:'0 18px', marginTop:-16, marginBottom:20 }}>
+          <div style={{ padding:'14px 18px 0', marginBottom:20 }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:26, fontWeight:900, color:'#fff', marginBottom:4, lineHeight:1.1 }}>{qrData.label}</h1>
             <p style={{ color:'#6a88aa', fontSize:13 }}>par <strong style={{ color:'#4da6ff' }}>{qrData.artist}</strong></p>
           </div>
@@ -4261,6 +4261,80 @@ function ConcoursConfigTab() {
   );
 }
 
+// ─────────────────────────────────────────────
+// INSCRIPTIONS ARTISTES — liste des demandes via /rejoindre
+// ─────────────────────────────────────────────
+function InscriptionsTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'inscriptions_artistes'), orderBy('createdAt', 'desc')),
+      s => { setItems(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
+      () => setLoading(false)
+    );
+    return unsub;
+  }, []);
+
+  const supprimer = async (id: string) => {
+    if (!window.confirm('Supprimer cette inscription ?')) return;
+    try { await deleteDoc(doc(db, 'inscriptions_artistes', id)); } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  const marquerTraite = async (id: string, statut: string) => {
+    try { await updateDoc(doc(db, 'inscriptions_artistes', id), { statut }); } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  if (loading) return <div style={S.card}><p style={{ color:'#5a7090', textAlign:'center' }}>Chargement...</p></div>;
+
+  return (
+    <div>
+      <div style={{ ...S.card, marginBottom:12 }}>
+        <h3 style={{ margin:'0 0 4px', color:'#1a2340', fontSize:18 }}>\uD83D\uDCDD Inscriptions artistes</h3>
+        <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>{items.length} demande(s) recue(s) via la page /rejoindre</p>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={S.card}><p style={{ color:'#5a7090', textAlign:'center' }}>Aucune inscription pour le moment.</p></div>
+      ) : items.map(it => (
+        <div key={it.id} style={{ ...S.card, marginBottom:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+            <div>
+              <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:'0 0 2px' }}>{it.nom}</p>
+              <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>{it.typeContenu}{it.ville ? ' \u00b7 ' + it.ville : ''}</p>
+            </div>
+            <span style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:99,
+              background: it.statut === 'traite' ? '#eaf7ee' : '#fff4e0',
+              color: it.statut === 'traite' ? '#1a9e54' : '#b07a00' }}>
+              {it.statut === 'traite' ? 'Traite' : 'Nouveau'}
+            </span>
+          </div>
+
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+            <a href={`tel:+${(it.tel||'').replace(/[^0-9]/g,'')}`} style={{ ...S.btn2, textDecoration:'none', fontSize:13 }}>\uD83D\uDCDE {it.tel}</a>
+            <a href={`https://wa.me/${(it.tel||'').replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer" style={{ background:'#25D366', color:'#fff', padding:'8px 14px', borderRadius:10, textDecoration:'none', fontSize:13, fontWeight:700 }}>WhatsApp</a>
+          </div>
+
+          {it.message && <p style={{ color:'#5a7090', fontSize:13, fontStyle:'italic', margin:'0 0 10px', padding:'8px 12px', background:'#f7f9fc', borderRadius:8 }}>\u00ab {it.message} \u00bb</p>}
+
+          <p style={{ color:'#8098b8', fontSize:11, margin:'0 0 10px' }}>
+            Engagements coches : {Array.isArray(it.engagements) ? it.engagements.filter((e:boolean)=>e).length : 0}/5
+            {it.createdAt ? ' \u00b7 ' + new Date(it.createdAt).toLocaleDateString('fr-FR') : ''}
+          </p>
+
+          <div style={{ display:'flex', gap:8 }}>
+            {it.statut !== 'traite'
+              ? <button onClick={() => marquerTraite(it.id, 'traite')} style={{ ...S.btn, flex:1, padding:10, fontSize:13 }}>Marquer traite</button>
+              : <button onClick={() => marquerTraite(it.id, 'nouveau')} style={{ ...S.btn2, flex:1, padding:10, fontSize:13 }}>Remettre nouveau</button>}
+            <button onClick={() => supprimer(it.id)} style={{ ...S.btnRed, padding:10, fontSize:13 }}>Supprimer</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -4814,6 +4888,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'qrcodes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={{...tabStyle(tab === 'puboscart'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('puboscart')}>💰 Pub Oscart</button>
         <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Concours</button>
+        <button style={{...tabStyle(tab === 'inscriptions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('inscriptions')}>📝 Inscriptions</button>
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
         <button style={{...tabStyle(tab === 'sorties'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('sorties')}>Sorties officielles</button>
@@ -5012,6 +5087,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
 
         {tab === 'puboscart' && <PubOscartTab user={user} />}
         {tab === 'concours' && <ConcoursConfigTab />}
+        {tab === 'inscriptions' && <InscriptionsTab />}
 
         {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
         {tab === 'sorties' && <SortiesAdminTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
@@ -9748,6 +9824,222 @@ function CommercialPage() {
   );
 }
 
+// ─────────────────────────────────────────────
+// PAGE REJOINDRE — inscription artiste (/rejoindre, lien à partager)
+// ─────────────────────────────────────────────
+function RejoindrePage() {
+  const CONTACT_TEL = '2250720008993';
+  const [nom, setNom] = useState('');
+  const [tel, setTel] = useState('');
+  const [typeContenu, setTypeContenu] = useState('');
+  const [ville, setVille] = useState('');
+  const [message, setMessage] = useState('');
+  const [engagements, setEngagements] = useState<boolean[]>([false, false, false, false, false]);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+
+  const QUESTIONS = [
+    'Je suis prêt(e) à distribuer mes pochettes reçues.',
+    'Je suis prêt(e) à partager mes liens pour faire écouter et télécharger au maximum de mélomanes.',
+    'Je suis prêt(e) à inciter ma communauté à m\u2019envoyer un maximum de cadeaux.',
+    'Je vais challenger pour atteindre les millions de Kiffs et obtenir des récompenses (cash, voiture\u2026).',
+    'Je suis prêt(e) à programmer des sorties officielles et inciter ma communauté à télécharger au maximum.',
+  ];
+
+  const toggleEngagement = (i: number) => {
+    setEngagements(prev => prev.map((v, idx) => idx === i ? !v : v));
+  };
+
+  const tousEngages = engagements.every(e => e);
+
+  const enregistrer = async () => {
+    setErr('');
+    if (!nom.trim()) { setErr('Indiquez votre nom d\u2019artiste.'); return; }
+    if (!tel.trim()) { setErr('Indiquez votre numéro de téléphone.'); return; }
+    if (!typeContenu) { setErr('Choisissez votre type de contenu.'); return; }
+    if (!tousEngages) { setErr('Merci de cocher tous les engagements pour continuer.'); return; }
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'inscriptions_artistes'), {
+        nom: nom.trim(),
+        tel: tel.trim(),
+        typeContenu,
+        ville: ville.trim(),
+        message: message.trim(),
+        engagements,
+        statut: 'nouveau',
+        createdAt: new Date().toISOString(),
+      });
+      setDone(true);
+    } catch(e:any) {
+      console.error(e);
+      setErr('Erreur lors de l\u2019enregistrement. Réessayez ou contactez-nous directement.');
+    }
+    setLoading(false);
+  };
+
+  const waLink = `https://wa.me/${CONTACT_TEL}?text=${encodeURIComponent('Bonjour, je viens de m\u2019inscrire sur Doniel Zik (' + (nom || 'artiste') + '). Je souhaite prendre rendez-vous.')}`;
+
+  // ── ÉCRAN DE CONFIRMATION ──
+  if (done) {
+    return (
+      <div style={{ minHeight:'100vh', background:C.bgDeep, color:C.text, fontFamily:"'DM Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+        <div style={{ maxWidth:440, width:'100%', textAlign:'center' }}>
+          <div style={{ fontSize:60, marginBottom:16 }}>🎉</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:28, fontWeight:900, color:'#fff', marginBottom:12 }}>Inscription enregistrée !</h1>
+          <p style={{ color:C.textSoft, fontSize:15, lineHeight:1.6, marginBottom:8 }}>
+            Merci {nom.trim()} ! Ta demande est bien reçue. Prochaine étape : <strong style={{ color:C.gold }}>prends rendez-vous</strong> avec notre équipe pour finaliser ton intégration.
+          </p>
+          <div style={{ background:C.card, borderRadius:16, padding:20, margin:'20px 0' }}>
+            <p style={{ color:C.textSoft, fontSize:13, marginBottom:14 }}>Contacte-nous maintenant pour ton rendez-vous :</p>
+            <a href={waLink} target="_blank" rel="noopener noreferrer"
+              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', padding:'15px', borderRadius:14, background:'#25D366', color:'#fff', fontWeight:800, fontSize:16, textDecoration:'none', marginBottom:12 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.737-.961z"/></svg>
+              Prendre rendez-vous sur WhatsApp
+            </a>
+            <p style={{ color:C.textSoft, fontSize:13 }}>
+              Ou appelle le <a href={`tel:+${CONTACT_TEL}`} style={{ color:C.blueLite, fontWeight:700, textDecoration:'none' }}>+{CONTACT_TEL}</a>
+            </p>
+          </div>
+          <a href="/decouvrir" style={{ color:C.textSoft, fontSize:13, textDecoration:'none' }}>← Découvrir la plateforme</a>
+        </div>
+      </div>
+    );
+  }
+
+  // ── FORMULAIRE ──
+  const inpStyle: React.CSSProperties = {
+    width:'100%', boxSizing:'border-box', padding:'13px 16px', borderRadius:12,
+    border:`1px solid ${C.border}`, background:C.bgSecond, color:C.text, fontSize:15,
+    marginBottom:14, outline:'none',
+  };
+  const labelStyle: React.CSSProperties = { display:'block', color:C.textSoft, fontSize:13, fontWeight:600, marginBottom:6 };
+
+  return (
+    <div style={{ minHeight:'100vh', background:C.bgDeep, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:40 }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap');`}</style>
+
+      <div style={{ maxWidth:480, margin:'0 auto', padding:'0 18px' }}>
+
+        {/* HERO PROMO */}
+        <div style={{ textAlign:'center', paddingTop:40, marginBottom:28 }}>
+          <p style={{ fontSize:32, marginBottom:10 }}>🎵</p>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:27, fontWeight:900, color:'#fff', lineHeight:1.2, marginBottom:10 }}>
+            Le monde attend ta voix.<br/>Ensemble, on te propulse.
+          </h1>
+          <p style={{ color:C.textSoft, fontSize:15, lineHeight:1.6 }}>
+            Rejoins Doniel Zik et transforme ta passion en revenus.
+          </p>
+        </div>
+
+        {/* OFFRE */}
+        <div style={{ background:`linear-gradient(135deg,${C.card},${C.cardHi})`, borderRadius:18, padding:22, marginBottom:16, border:`1px solid ${C.border}` }}>
+          <div style={{ display:'inline-block', background:C.gold, color:'#3a2c00', fontWeight:800, fontSize:13, padding:'5px 14px', borderRadius:99, marginBottom:14 }}>
+            Pour seulement 25 000 FCFA
+          </div>
+          <p style={{ color:C.text, fontSize:15, fontWeight:700, marginBottom:12 }}>Tu bénéficies de :</p>
+          {[
+            ['🎚️', 'Un single produit fini', '(si besoin)'],
+            ['📀', '100 pochettes musicales', 'prêtes à être distribuées'],
+          ].map(([ic, t, s], i) => (
+            <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:10 }}>
+              <span style={{ fontSize:22 }}>{ic}</span>
+              <div>
+                <p style={{ color:C.text, fontSize:15, fontWeight:700, margin:0 }}>{t}</p>
+                <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>{s}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* AVANTAGES PLATEFORME */}
+        <div style={{ background:C.card, borderRadius:18, padding:22, marginBottom:16, border:`1px solid ${C.border}` }}>
+          <p style={{ color:C.text, fontSize:15, fontWeight:700, marginBottom:12 }}>Sur notre plateforme :</p>
+          {[
+            ['💰', 'Sois rémunéré à chaque écoute et visionnage'],
+            ['🏆', 'Obtiens des lots exclusifs grâce aux Kiffs reçus de tes fans'],
+            ['📺', 'Bientôt clip et promotion TV'],
+          ].map(([ic, t], i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+              <span style={{ fontSize:20 }}>{ic}</span>
+              <p style={{ color:C.textSoft, fontSize:14, margin:0 }}>{t}</p>
+            </div>
+          ))}
+          <p style={{ color:C.gold, fontSize:15, fontWeight:800, textAlign:'center', marginTop:14, marginBottom:0 }}>
+            Tu distribues. Tu partages. Tu grandis.
+          </p>
+          <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', marginTop:4 }}>
+            Et nous, on t'accompagne à chaque étape.
+          </p>
+        </div>
+
+        {/* ENGAGEMENTS */}
+        <div style={{ background:C.card, borderRadius:18, padding:22, marginBottom:16, border:`1px solid ${C.border}` }}>
+          <p style={{ color:C.text, fontSize:16, fontWeight:800, marginBottom:6 }}>Tes engagements</p>
+          <p style={{ color:C.textSoft, fontSize:13, marginBottom:16 }}>Coche pour confirmer ta motivation :</p>
+          {QUESTIONS.map((q, i) => (
+            <div key={i} onClick={() => toggleEngagement(i)}
+              style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'12px', borderRadius:12, marginBottom:10, cursor:'pointer',
+                background: engagements[i] ? 'rgba(0,212,154,0.12)' : C.bgSecond,
+                border: `1px solid ${engagements[i] ? C.success : C.border}` }}>
+              <div style={{ flexShrink:0, width:24, height:24, borderRadius:7, marginTop:1,
+                background: engagements[i] ? C.success : 'transparent',
+                border: `2px solid ${engagements[i] ? C.success : C.textSoft}`,
+                display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {engagements[i] && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+              <p style={{ color:C.text, fontSize:14, margin:0, lineHeight:1.4 }}>{q}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* FORMULAIRE */}
+        <div style={{ background:C.card, borderRadius:18, padding:22, marginBottom:16, border:`1px solid ${C.border}` }}>
+          <p style={{ color:C.text, fontSize:16, fontWeight:800, marginBottom:16 }}>Tes informations</p>
+
+          <label style={labelStyle}>Nom d'artiste *</label>
+          <input style={inpStyle} value={nom} onChange={e => setNom(e.target.value)} placeholder="Ton nom de scène" />
+
+          <label style={labelStyle}>Téléphone / WhatsApp *</label>
+          <input style={inpStyle} type="tel" value={tel} onChange={e => setTel(e.target.value)} placeholder="Ex : 07 00 00 00 00" />
+
+          <label style={labelStyle}>Type de contenu *</label>
+          <select style={inpStyle} value={typeContenu} onChange={e => setTypeContenu(e.target.value)}>
+            <option value="">Choisir...</option>
+            <option value="musique">Musique</option>
+            <option value="gospel">Gospel</option>
+            <option value="humour">Humour</option>
+            <option value="cinema">Cinéma / Vidéo</option>
+            <option value="autre">Autre</option>
+          </select>
+
+          <label style={labelStyle}>Ville</label>
+          <input style={inpStyle} value={ville} onChange={e => setVille(e.target.value)} placeholder="Ex : Abidjan" />
+
+          <label style={labelStyle}>Message (optionnel)</label>
+          <textarea style={{ ...inpStyle, minHeight:70, resize:'vertical' }} value={message} onChange={e => setMessage(e.target.value)} placeholder="Parle-nous de ton projet..." />
+
+          {err && <p style={{ color:C.alert, fontSize:13, marginBottom:12, textAlign:'center' }}>{err}</p>}
+
+          <button onClick={enregistrer} disabled={loading}
+            style={{ width:'100%', padding:'16px', borderRadius:14, border:'none', cursor:'pointer',
+              background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:16,
+              opacity: loading ? 0.6 : 1 }}>
+            {loading ? 'Enregistrement...' : 'M\u2019inscrire maintenant'}
+          </button>
+        </div>
+
+        {/* CONTACT */}
+        <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', lineHeight:1.6 }}>
+          Places limitées — Inscris-toi maintenant.<br/>
+          Contact : <a href={`tel:+${CONTACT_TEL}`} style={{ color:C.blueLite, fontWeight:700, textDecoration:'none' }}>+{CONTACT_TEL}</a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AProposPage() {
   const sections = [
     {
@@ -11452,7 +11744,7 @@ function PublicStreamPage() {
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
-      <div style={{ padding: '0 18px', marginTop: -14, marginBottom: 22 }}>
+      <div style={{ padding: '20px 18px 0', marginBottom: 22 }}>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 26, fontWeight: 900, color: '#fff', marginBottom: 4, lineHeight: 1.1 }}>{data.label}</h1>
         <p style={{ color: '#6a88aa', fontSize: 13 }}>par <strong style={{ color: '#4da6ff' }}>{data.artist}</strong></p>
       </div>
@@ -11833,6 +12125,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/responsable" element={<ResponsablePage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
         <Route path="/apropos" element={<AProposPage />} />
+        <Route path="/rejoindre" element={<RejoindrePage />} />
         <Route path="/about" element={<AProposPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/admin" element={<AdminPage />} />
