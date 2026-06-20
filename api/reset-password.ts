@@ -2,12 +2,31 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 
 // ── Initialiser Firebase Admin une seule fois (via service account en Base64) ──
+let initError = '';
 if (!admin.apps.length) {
-  const saBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '';
-  const saJson = JSON.parse(Buffer.from(saBase64, 'base64').toString('utf-8'));
-  admin.initializeApp({
-    credential: admin.credential.cert(saJson),
-  });
+  try {
+    const saBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '';
+    if (!saBase64) {
+      initError = 'Variable FIREBASE_SERVICE_ACCOUNT_BASE64 absente ou vide';
+    } else {
+      const decoded = Buffer.from(saBase64, 'base64').toString('utf-8');
+      let saJson;
+      try {
+        saJson = JSON.parse(decoded);
+      } catch (e) {
+        initError = `Decodage invalide. Longueur Base64=${saBase64.length}, longueur decodee=${decoded.length}, debut decode="${decoded.slice(0, 40)}"`;
+      }
+      if (saJson) {
+        if (!saJson.private_key || !saJson.client_email) {
+          initError = 'JSON decode mais champs private_key/client_email manquants';
+        } else {
+          admin.initializeApp({ credential: admin.credential.cert(saJson) });
+        }
+      }
+    }
+  } catch (e: any) {
+    initError = 'Init exception: ' + (e?.message || String(e));
+  }
 }
 
 // ── Générer un mot de passe temporaire lisible ──
@@ -22,6 +41,8 @@ function genererMotDePasse(longueur = 10): string {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
+
+  if (initError) return res.status(500).json({ error: 'CONFIG: ' + initError });
 
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email manquant' });
