@@ -4388,7 +4388,7 @@ function MotsDePasseTab({ user }: { user: any }) {
         setMsg(`\u2705 Mot de passe redefini pour ${cible}. Communiquez-lui : ${nouveauMdp}`);
         setEmailCible('');
       } else {
-        setMsg('Erreur : ' + (data.error || 'action impossible'));
+        setMsg(`Erreur (${resp.status}) : ` + (data.error || 'action impossible'));
       }
     } catch(e:any) {
       setMsg('Erreur : ' + (e?.message || 'reseau'));
