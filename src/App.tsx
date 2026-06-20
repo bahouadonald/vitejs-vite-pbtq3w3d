@@ -63,6 +63,24 @@ const estSuperAdmin = (email?: string|null) => (email||'').toLowerCase() === ADM
 const estSousAdmin = (email?: string|null) => SOUS_ADMINS.map(e=>e.toLowerCase()).includes((email||'').toLowerCase());
 const estAdmin = (email?: string|null) => estSuperAdmin(email) || estSousAdmin(email);
 const peutSupprimer = (email?: string|null) => estSuperAdmin(email); // SEUL le super admin supprime/bannit
+
+// ── Réinitialisation du mot de passe via notre fonction Vercel (Resend) ──
+// Remplace l'ancien sendPasswordResetEmail de Firebase (qui ne délivrait pas les emails)
+async function demanderResetPassword(email: string): Promise<{ok: boolean, error?: string}> {
+  try {
+    const resp = await fetch('/api/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: (email || '').trim().toLowerCase() }),
+    });
+    if (resp.ok) return { ok: true };
+    const data = await resp.json().catch(() => ({}));
+    return { ok: false, error: data.error || 'Envoi impossible' };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Erreur réseau' };
+  }
+}
+
 const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
 
 const CLOUDINARY_CLOUD = 'drjp8ht84';
@@ -202,7 +220,7 @@ function BoutonResetAdmin({ email }: { email: string }) {
   return (
     <button onClick={async (e) => {
       e.stopPropagation();
-      try { await sendPasswordResetEmail(auth, email); setSent(true); setErr(false); }
+      try { const r = await demanderResetPassword(email); if (r.ok) { setSent(true); setErr(false); } else { setErr(true); } }
       catch { setErr(true); }
     }} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:8, border:`1px solid ${sent?'#00a040':err?'#f04a6a':'#dce6f7'}`, background: sent?'#eafff2':'#fff', color: sent?'#00a040':err?'#f04a6a':'#5a7090', fontSize:11, fontWeight:600, cursor:'pointer', marginTop:6 }}>
       {sent ? '✅ Lien envoyé' : err ? 'Erreur' : '🔑 Réinitialiser mot de passe'}
@@ -1921,7 +1939,7 @@ function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => vo
             {mode === 'email' && (
               <button onClick={async () => {
                 if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); }
+                try { const r = await demanderResetPassword(email); if (r.ok) setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); else setMsg('Erreur : ' + (r.error||'')); }
                 catch { setMsg('Email introuvable. Vérifiez votre adresse.'); }
               }} style={{ width:'100%', padding:'10px', border:'none', background:'transparent', color:'#a78bfa', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
                 Mot de passe oublié ?
@@ -4335,6 +4353,72 @@ function InscriptionsTab() {
   );
 }
 
+// ─────────────────────────────────────────────
+// MOTS DE PASSE — l'admin redéfinit le mot de passe d'un compte
+// ─────────────────────────────────────────────
+function MotsDePasseTab({ user }: { user: any }) {
+  const [emailCible, setEmailCible] = useState('');
+  const [nouveauMdp, setNouveauMdp] = useState('');
+  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const genererMdp = () => {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let p = '';
+    for (let i = 0; i < 10; i++) p += chars.charAt(Math.floor(Math.random() * chars.length));
+    setNouveauMdp(p);
+  };
+
+  const definir = async () => {
+    setMsg('');
+    const cible = (emailCible || '').trim().toLowerCase();
+    if (!cible) { setMsg('Entrez l email du compte.'); return; }
+    if (!nouveauMdp || nouveauMdp.length < 6) { setMsg('Le mot de passe doit faire au moins 6 caracteres.'); return; }
+    if (!user) return;
+    setLoading(true);
+    try {
+      const idToken = await user.getIdToken();
+      const resp = await fetch('/api/admin-set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken, targetEmail: cible, newPassword: nouveauMdp }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok) {
+        setMsg(`\u2705 Mot de passe redefini pour ${cible}. Communiquez-lui : ${nouveauMdp}`);
+        setEmailCible('');
+      } else {
+        setMsg('Erreur : ' + (data.error || 'action impossible'));
+      }
+    } catch(e:any) {
+      setMsg('Erreur : ' + (e?.message || 'reseau'));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.card}>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83D\uDD11 Redefinir un mot de passe</h3>
+      <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
+        Definissez directement un nouveau mot de passe pour le compte d un utilisateur,
+        puis communiquez-le lui. Reserve au super administrateur.
+      </p>
+
+      <label style={S.lbl}>Email du compte</label>
+      <input style={S.inp} type="email" placeholder="email@exemple.com" value={emailCible} onChange={e => setEmailCible(e.target.value)} />
+
+      <label style={S.lbl}>Nouveau mot de passe</label>
+      <input style={S.inp} value={nouveauMdp} onChange={e => setNouveauMdp(e.target.value)} placeholder="Min. 6 caracteres" />
+      <button onClick={genererMdp} style={{ ...S.btn2, marginBottom:12 }}>Generer un mot de passe</button>
+
+      <button onClick={definir} disabled={loading} style={{ ...S.btn, width:'100%', padding:13, opacity: loading ? 0.6 : 1 }}>
+        {loading ? 'En cours...' : 'Redefinir le mot de passe'}
+      </button>
+      {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center', wordBreak:'break-word' }}>{msg}</p>}
+    </div>
+  );
+}
+
 function AdminPage() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -4690,7 +4774,7 @@ function AdminPage() {
           <button onClick={async () => {
             if (!email) { setMsg('Entrez votre email d\'abord'); return; }
             try {
-              await sendPasswordResetEmail(auth, email);
+              await demanderResetPassword(email);
               setMsg('✅ Email de réinitialisation envoyé à ' + email);
             } catch(e:any) {
               setMsg('Erreur: ' + (e.code === 'auth/user-not-found' ? 'Email introuvable' : e.message));
@@ -4889,6 +4973,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'puboscart'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('puboscart')}>💰 Pub Oscart</button>
         <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Concours</button>
         <button style={{...tabStyle(tab === 'inscriptions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('inscriptions')}>📝 Inscriptions</button>
+        {estSuperAdmin(user?.email) && <button style={{...tabStyle(tab === 'motsdepasse'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('motsdepasse')}>🔑 Mots de passe</button>}
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
         <button style={{...tabStyle(tab === 'sorties'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('sorties')}>Sorties officielles</button>
@@ -5088,6 +5173,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         {tab === 'puboscart' && <PubOscartTab user={user} />}
         {tab === 'concours' && <ConcoursConfigTab />}
         {tab === 'inscriptions' && <InscriptionsTab />}
+        {tab === 'motsdepasse' && estSuperAdmin(user?.email) && <MotsDePasseTab user={user} />}
 
         {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
         {tab === 'sorties' && <SortiesAdminTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
@@ -6146,7 +6232,7 @@ function ArtistPage() {
               <button onClick={async () => {
                 if (!email) { setMsg('Entrez votre email d\'abord'); return; }
                 try {
-                  await sendPasswordResetEmail(auth, email);
+                  await demanderResetPassword(email);
                   setMsg('✅ Email de réinitialisation envoyé à ' + email);
                 } catch(e:any) { setMsg('Email introuvable'); }
               }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
@@ -6476,7 +6562,7 @@ function UserAuthPage() {
                 <button style={{ width:'100%', textAlign:'center', padding:'10px', border:'none', background:'transparent', color:'#1a6bff', cursor:'pointer', fontSize:13, textDecoration:'underline', marginTop:4 }}
                   onClick={async () => {
                     if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-                    try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); }
+                    try { const r = await demanderResetPassword(email); if (r.ok) setMsg('✅ Email de réinitialisation envoyé. Vérifiez aussi vos spams.'); else setMsg('Erreur : ' + (r.error||'')); }
                     catch { setMsg('Email introuvable. Vérifiez votre adresse.'); }
                   }}>
                   Mot de passe oublié ?
@@ -8848,7 +8934,7 @@ function ResponsablePage() {
 
               <button onClick={async () => {
                 if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+                try { const r = await demanderResetPassword(email); if (r.ok) setMsg('✅ Email de réinitialisation envoyé'); else setMsg('Erreur : ' + (r.error||'')); }
                 catch { setMsg('Email introuvable'); }
               }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
                 Mot de passe oublié ?
@@ -9558,7 +9644,7 @@ function CommercialPage() {
 
               <button onClick={async () => {
                 if (!email) { setMsg('Entrez votre email d\'abord'); return; }
-                try { await sendPasswordResetEmail(auth, email); setMsg('✅ Email de réinitialisation envoyé'); }
+                try { const r = await demanderResetPassword(email); if (r.ok) setMsg('✅ Email de réinitialisation envoyé'); else setMsg('Erreur : ' + (r.error||'')); }
                 catch { setMsg('Email introuvable'); }
               }} style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:'#8098b8', cursor:'pointer', fontSize:12, textDecoration:'underline', marginTop:4 }}>
                 Mot de passe oublié ?
@@ -10638,7 +10724,7 @@ function DzStudioPage() {
             <button onClick={async () => {
               if (!loginEmail) { setLoginMsg('Entrez votre email d\'abord'); return; }
               try {
-                await sendPasswordResetEmail(auth, loginEmail);
+                await demanderResetPassword(loginEmail);
                 setLoginMsg('✅ Email de réinitialisation envoyé à ' + loginEmail);
               } catch(e:any) {
                 setLoginMsg('Email introuvable');
