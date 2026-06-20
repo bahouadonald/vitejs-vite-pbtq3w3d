@@ -1,14 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 
-// ── Initialiser Firebase Admin une seule fois ──
+// ── Initialiser Firebase Admin une seule fois (via service account en Base64) ──
 if (!admin.apps.length) {
+  const saBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '';
+  const saJson = JSON.parse(Buffer.from(saBase64, 'base64').toString('utf-8'));
   admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    }),
+    credential: admin.credential.cert(saJson),
   });
 }
 
