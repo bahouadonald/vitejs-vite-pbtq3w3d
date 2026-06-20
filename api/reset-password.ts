@@ -1,4 +1,92 @@
- "type": "service_account",
-  "project_id": "drop-platform-68cbc",
-  "private_key_id": "e7f862eeadaaba6db790001901e148458a43be76",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDByVqfCkBbuK3e\nygOudhrjW8w+Sipm+WTr5F4Mkupuo3p1kNZnzp2aYyHhTiD70gx6zAN62pi1UV2k\nzvB80ggof7uN3FFMQOqgCUW0YvHjbbk6hFLPh6Dk2A+YtVhHiwruStHWx4zR5u/l\nTddfaVQFh/HbsQFvKS4NHze5jLaEhV0UspFKR65xs7xGRHVfxnU5htwtteELgOFk\nxbUQimzSE1XBM72m8/OnTD7bX4Rzf9j3oaAMnURf5CJaeUHxqTLQpcQffYRc5yfU\n3wckCXPf5m6iGx9et/I4Q3FYfdxV08sbtTjYEUE842zH1CrI3YFQ78BrTAIlOEeh\nj8NorbGdAgMBAAECggEAKLK0x0N0Jj84Ntq24Lg5p+ey0p8pXhSBA0CkFuBw/zjy\noke/m7ALLe4lYqfRqglgaRa5IV9Q5H2Y3ODAJXrHz1eaKG4tncXhcKhZ3QtNsT2t\nQdKiAKdDnWQaDHCDgIz9R/PrM4AXvUqStdX+BjH8/SdinkjDnBiqLQPSJHQereBl\nv9f4EzaHDTwI5VkcHGiPhkcnRVxaFPAZNrmEt79/a6G5OFrO6El6H8XNTSKMs5HD\ngQItYYYhYkj6H8f6NDOPGTllbduwobucDdxU8s9MMpCXrfE5yHKqux/mPdH0rpYE\nhGOoZmaM4XpezIVVK48oqElC/S7kpEwwKuA9dSqiyQKBgQDnOz4VNfw0LVXzbl5y\nFqWoS6vLD8lqWVJJmc+sj9w5IyIHtVipfHBe4/XTw8f8ChzB/xrZ4R/7yX1pAPUe\ndLmYyly0Uy/4Vf6jFtlhPTKpfpUJx1PIeJqZmCTyu6m4mFbWMsYjKesdlpbDUpCA\nGEuJ5cCiuoGSuncPBdjaz11KBQKBgQDWi0840K3Ff1ujddr3J1t+I7/WDuzs0Qtu\nqJIeCTh8lP+G6b+OSgYZxfdUzA1wS4twrkrK4ZHdnkROo5nfXR3Q6BpfuGrxnVxG\n6JR8skRy6w0/9jEKlOHDhWmPciAAq35zuAvbhd9c1C9CmYkkVnCV413jiQ4RCgfi\n4H9ZnvikuQKBgEGh9Ss8GYwN2jmweCpV90tfvzFyF6+SDuNJP0MxykaFjGE3viTN\nZ2/nsJ0dEySdEjCWYl65ocRsGqa1WN3+L7gIqGueuRz5+776+1S4dCrb/R27cDKU\n2P0DzGkBj1kQFIXT/513hn7tgXmLc+yH+Nj5V8ZYvfKR7r1a4YSqG0apAoGBAIqC\nwC/XEglq0vfyU96zCy+h1u1VD4NI5w+XR1aa71wHOf2ZFbHAerXTCH43iwmPzEOA\nUwsunGSvFDyNBP+e92vzHWvk/S5mQLgK2iqzUNu8gv5jbH//ZM49aMxSivTDw0zk\nastcX7tnxedChrbuE5vBgdEvn+RCTJseAzoSF0cJAoGAPwkxTbNAbP8VwUA9lA3z\nOjSShpaNxuubLoXMdCgcQTmRZ96U5sIFiC+OWBdKxaNmwWqJKTz6D2CrNwPhypiD\nFaBR2s8CSh2Cv/5tkqpwL9CvjLP4bloJ9N62mkwP86eBLOCrSdx8UVRGHZ7glJFX\nxYXhNfCw6/S6cLCQmj8WLmM=\n-----END PRIVATE KEY-----\n"
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import admin from 'firebase-admin';
+
+// ── Initialiser Firebase Admin une seule fois (via service account en Base64) ──
+if (!admin.apps.length) {
+  const saBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '';
+  const saJson = JSON.parse(Buffer.from(saBase64, 'base64').toString('utf-8'));
+  admin.initializeApp({
+    credential: admin.credential.cert(saJson),
+  });
+}
+
+// ── Générer un mot de passe temporaire lisible ──
+function genererMotDePasse(longueur = 10): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let mdp = '';
+  for (let i = 0; i < longueur; i++) {
+    mdp += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return mdp;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email manquant' });
+
+  const emailClean = String(email).trim().toLowerCase();
+
+  try {
+    // 1. Vérifier que le compte existe
+    let user;
+    try {
+      user = await admin.auth().getUserByEmail(emailClean);
+    } catch (e) {
+      // Sécurité : on renvoie un succès même si l'email n'existe pas
+      // (pour ne pas révéler quels emails sont inscrits)
+      return res.status(200).json({ ok: true });
+    }
+
+    // 2. Générer un mot de passe temporaire
+    const tempPassword = genererMotDePasse(10);
+
+    // 3. Appliquer ce mot de passe au compte
+    await admin.auth().updateUser(user.uid, { password: tempPassword });
+
+    // 4. Envoyer l'email via Resend
+    const emailResp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Doniel Zik <onboarding@resend.dev>',
+        to: [emailClean],
+        subject: 'Votre mot de passe temporaire — Doniel Zik',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0E2A52;color:#EAF2FF;border-radius:16px;">
+            <h1 style="color:#5BB0FF;font-size:22px;margin-bottom:8px;">Doniel Zik</h1>
+            <p style="font-size:15px;line-height:1.6;color:#A9BEDC;">Bonjour,</p>
+            <p style="font-size:15px;line-height:1.6;color:#A9BEDC;">
+              Vous avez demandé à réinitialiser votre mot de passe. Voici votre mot de passe temporaire :
+            </p>
+            <div style="background:#143665;border-radius:12px;padding:18px;text-align:center;margin:20px 0;">
+              <span style="font-size:26px;font-weight:bold;letter-spacing:2px;color:#F5C84C;">${tempPassword}</span>
+            </div>
+            <p style="font-size:14px;line-height:1.6;color:#A9BEDC;">
+              Connectez-vous avec ce mot de passe, puis changez-le dans vos paramètres pour en choisir un nouveau.
+            </p>
+            <p style="font-size:13px;color:#7088aa;margin-top:24px;">
+              Si vous n'êtes pas à l'origine de cette demande, contactez-nous immédiatement.
+            </p>
+            <p style="font-size:13px;color:#7088aa;">— L'équipe Doniel Zik</p>
+          </div>
+        `,
+      }),
+    });
+
+    if (!emailResp.ok) {
+      const errText = await emailResp.text();
+      console.error('Resend error:', errText);
+      return res.status(500).json({ error: 'Email non envoyé' });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (err: any) {
+    console.error('reset-password error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+}
