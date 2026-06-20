@@ -555,16 +555,16 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
         logTx(user.uid, 'kiffement', -kiffement.coins, kiffement.coins * 250, `Kiffement ${kiffement.label}`);
       }
       // Enregistrer le kiffement
-      // Répartition : Artiste 60% / Structure 40%
+      // Répartition : Artiste 70% / Structure 30%
       const montantKiff = kiffement.coins * 100;
-      const partArtisteOscart = Math.round(kiffement.coins * 0.60); // 60% en Oscart pour l'artiste
+      const partArtisteOscart = Math.round(kiffement.coins * 0.70); // 70% en Oscart pour l'artiste
       await addDoc(collection(db,'cadeaux'), {
         qrId, artistEmail,
         kiffementId: kiffement.id,
         kiffementLabel: kiffement.label,
         coins: kiffement.coins,
-        partArtiste: Math.round(montantKiff * 0.60),
-        partStructure: Math.round(montantKiff * 0.40),
+        partArtiste: Math.round(montantKiff * 0.70),
+        partStructure: Math.round(montantKiff * 0.30),
         partArtisteOscart,
         kiffs: kiffement.coins * 250,
         userId: user.uid,
@@ -572,7 +572,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
         status: 'paid',
         createdAt: new Date().toISOString(),
       });
-      // CRÉDITER LE PORTEFEUILLE UNIQUE DE L'ARTISTE (60% en Oscart va dans 'solde' + on garde le total des gains et les kiffs)
+      // CRÉDITER LE PORTEFEUILLE UNIQUE DE L'ARTISTE (70% en Oscart va dans 'solde' + on garde le total des gains et les kiffs)
       if (artistEmail) {
         const artSnap = await getDocs(query(collection(db,'coins_solde'), where('email','==',artistEmail)));
         if (!artSnap.empty) {
@@ -676,47 +676,18 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
 
-            {/* Option Wave/Orange Money */}
-            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:12 }}>
-              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:6 }}>Wave · Orange Money · MTN MoMo</p>
-              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.8, margin:0 }}>
-                Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
-                <span style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Les instructions vous seront communiquées par notre équipe</span>
+            {/* PAIEMENT EN MAINTENANCE */}
+            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
+              <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+              <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
+              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
+                La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
               </p>
             </div>
 
-            {/* Option Visa/Stripe */}
-            <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:14, padding:16, marginBottom:16 }}>
-              <p style={{ color:'#4da6ff', fontSize:12, fontWeight:700, marginBottom:8 }}>Visa · Mastercard · Carte bancaire</p>
-              <button onClick={async () => {
-                try {
-                  const res = await fetch('/api/create-checkout', {
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                      amount: rechargeModal.fcfa,
-                      oscart: rechargeModal.oscart,
-                      email: auth.currentUser?.email || '',
-                      userId: auth.currentUser?.uid || ''
-                    })
-                  });
-                  const data = await res.json();
-                  if (data.url) window.location.href = data.url;
-                } catch(e) { alert('Erreur paiement carte. Réessayez.'); }
-              }}
-                style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                Payer {rechargeModal.fcfa.toLocaleString()} F CFA par carte
-              </button>
-              <p style={{ color:'rgba(255,255,255,0.2)', fontSize:10, textAlign:'center', marginTop:6 }}>Paiement sécurisé Stripe</p>
-            </div>
-
-            <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, textAlign:'center', marginBottom:16 }}>
-              Vos Oscart seront crédités automatiquement après confirmation
-            </p>
             <button onClick={() => setRechargeModal(null)}
               style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-              J'ai effectué le paiement Wave/Orange
+              Fermer
             </button>
           </div>
         </div>
@@ -1216,23 +1187,24 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 
   const tapKiff = async () => {
     if (!user) { setShowLoginModal('Connectez-vous pour kiffer votre artiste'); return; }
-    const r = await donnerKiff(user.uid, qrId, artistEmail);
-    if (r === 'vide') { setShowKiffements(true); return; }
-    if (r === 'ok') {
-      // 1 tap = 1 cœur qui s'envole (comme TikTok). Plein de taps = pluie de cœurs.
-      const id = Date.now() + Math.random();
-      const news = [{
-        id,
-        dx: (Math.random() - 0.5) * 50,      // léger décalage horizontal
-        size: 26 + Math.random() * 20,        // 26-46px
-        dur: 1.1 + Math.random() * 0.6,       // 1.1-1.7s (montée visible)
-        sway: (Math.random() - 0.5) * 80,     // balancement courbe
-      }];
-      setFlyHearts(h => [...h, ...news]);
-      setTimeout(() => setFlyHearts(h => h.filter(x => x.id !== id)), 1800);
-      setJustKiffed(true); setTimeout(() => setJustKiffed(false), 250);
-      if (tutoStep === 3) onTutoNext();
-    }
+    // Réaction IMMÉDIATE : cœur qui s'envole tout de suite (comme TikTok), sans attendre le réseau
+    const id = Date.now() + Math.random();
+    const news = [{
+      id,
+      dx: (Math.random() - 0.5) * 50,
+      size: 26 + Math.random() * 20,
+      dur: 1.1 + Math.random() * 0.6,
+      sway: (Math.random() - 0.5) * 80,
+    }];
+    setFlyHearts(h => [...h, ...news]);
+    setTimeout(() => setFlyHearts(h => h.filter(x => x.id !== id)), 1800);
+    setJustKiffed(true); setTimeout(() => setJustKiffed(false), 250);
+    if (tutoStep === 3) onTutoNext();
+    // Enregistrement en arrière-plan : si plus de kiffs disponibles, on propose d'en offrir
+    try {
+      const r = await donnerKiff(user.uid, qrId, artistEmail);
+      if (r === 'vide') { setShowKiffements(true); }
+    } catch(e) { console.error(e); }
   };
 
   const btnStyle = (active?: boolean, color?: string) => ({
@@ -1342,11 +1314,14 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
   const tap = async () => {
     if (!user) { setShowLoginModal('Connectez-vous pour kiffer ce contenu'); return; }
     if (loading) return;
+    // Animation IMMÉDIATE (avant le réseau) pour une réaction instantanée
+    setJustKiffed(true);
+    setTimeout(() => setJustKiffed(false), 280);
     setLoading(true);
+    // Enregistrement en arrière-plan (ne bloque pas l'animation)
     try {
       const r = await donnerKiff(user.uid, qrId, artistEmail);
       if (r === 'vide') { alert('Offre un kiffement pour obtenir des kiffs à donner.'); }
-      else if (r === 'ok') { setJustKiffed(true); setTimeout(() => setJustKiffed(false), 280); }
     } catch(e) { console.error(e); }
     setLoading(false);
   };
@@ -1429,9 +1404,19 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const level = smoothLevel.current;
       const img = document.getElementById('cover-reactive');
       // Marge de jeu musical : zoom de 0% (silence) à 12% (grosse caisse saturée)
-      // La pochette danse dans cet intervalle selon la force du son (PAS de halo)
+      // + FLASH lumineux : la pochette s'illumine et un halo lumineux pulse en rythme
+      // Tout est piloté ici dans la même boucle audio → AUCUNE latence
       if (img) {
-        img.style.transform = `scale(${1 + level * 0.12})`;
+        const zoom = 1 + level * 0.12;
+        // Halo lumineux blanc/doré qui flashe avec l'intensité (rayon + opacité suivent le son)
+        const glowRadius = Math.round(level * 55);          // 0 → 55px
+        const glowOpacity = Math.min(0.9, level * 1.1);      // 0 → 0.9
+        const glow2 = Math.round(level * 110);               // halo large secondaire
+        // Éclat de lumière (brightness) : flash bref sur les beats forts
+        const brightness = 1 + level * 0.35;                 // 1 → 1.35
+        img.style.transform = `scale(${zoom})`;
+        img.style.boxShadow = `0 0 ${glowRadius}px ${Math.round(glowRadius/2)}px rgba(255,245,210,${glowOpacity}), 0 0 ${glow2}px ${Math.round(glow2/3)}px rgba(255,220,130,${glowOpacity * 0.5})`;
+        img.style.filter = `brightness(${brightness})`;
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -1441,7 +1426,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
-    if (img) { img.style.transform = 'scale(1)'; }
+    if (img) { img.style.transform = 'scale(1)'; img.style.boxShadow = 'none'; img.style.filter = 'none'; }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -4447,6 +4432,8 @@ function AdminPage() {
   const [editPrice, setEditPrice] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editFiles, setEditFiles] = useState<any[]>([]);
+  const [editCover, setEditCover] = useState('');
+  const [editCoverUploading, setEditCoverUploading] = useState(false);
   const [addFiles, setAddFiles] = useState<FileList | null>(null);
   const [editUploading, setEditUploading] = useState(false);
   const [editUploadMsg, setEditUploadMsg] = useState('');
@@ -4656,6 +4643,22 @@ function AdminPage() {
   const openEdit = (q: any) => {
     setEditModal(q); setEditPrice(String(q.price)); setEditScans(String(q.totalScans));
     setEditWhatsapp(q.whatsapp || ''); setEditFiles(q.files || []); setAddFiles(null); setEditUploadMsg('');
+    setEditCover(q.coverUrl || ''); setEditCoverUploading(false);
+  };
+
+  // Upload d'une nouvelle image de pochette (change juste l'image, garde tout le reste)
+  const uploadEditCover = async (file: File) => {
+    if (!file) return;
+    setEditCoverUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', 'doniel_unsigned');
+      const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.secure_url) setEditCover(d.secure_url);
+    } catch(e) { console.error('cover', e); alert('Erreur upload image. Réessayez.'); }
+    setEditCoverUploading(false);
   };
 
   const uploadEditFiles = async () => {
@@ -4675,15 +4678,16 @@ function AdminPage() {
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
       price: newPriceVal, totalScans: newTotal,
       files: editFiles, fileCount: editFiles.length, whatsapp: editWhatsapp,
+      coverUrl: editCover,
       status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
     });
-    // Synchroniser prix dans publicLinks via publicLinkId du qrcode
+    // Synchroniser prix ET image dans publicLinks + decouvrir via publicLinkId du qrcode
     const pid = editModal.publicLinkId || editModal.qrId;
     if (pid) {
       const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',pid)));
-      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { price: newPriceVal });
+      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { price: newPriceVal, coverUrl: editCover });
       const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',pid)));
-      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { price: newPriceVal });
+      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { price: newPriceVal, coverUrl: editCover });
     }
     setEditModal(null); setMsg('QR mis à jour !');
   };
@@ -4872,6 +4876,24 @@ const pendingPay = payments.filter(p => p.status === 'pending');
             {parseInt(editScans) > (editModal.usedScans || 0) && (editModal.usedScans || 0) >= editModal.totalScans && (
               <div style={{ background: '#eaf1ff', border: '1px solid #4da6ff', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: '#1a6bff' }}>✓ QR sera reactive</div>
             )}
+
+            {/* CHANGER L'IMAGE DE POCHETTE (sans rien supprimer d'autre) */}
+            <label style={{ ...S.lbl, marginBottom: 8 }}>Image de la pochette</label>
+            <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
+              {editCover ? (
+                <img src={editCover} alt="pochette" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 70, height: 70, borderRadius: 10, background: '#dce6f7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 24 }}>🎵</div>
+              )}
+              <div style={{ flex: 1 }}>
+                <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadEditCover(e.target.files[0])} style={{ display: 'none' }} id="editCoverInput" />
+                <label htmlFor="editCoverInput" style={{ ...S.btn2, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block' }}>
+                  {editCover ? '🖼️ Changer l\u2019image' : '🖼️ Ajouter une image'}
+                </label>
+                {editCoverUploading && <p style={{ color: '#1a6bff', fontSize: 12, marginTop: 6 }}>Envoi de l\u2019image...</p>}
+              </div>
+            </div>
+
             <label style={{ ...S.lbl, marginBottom: 10 }}>Fichiers ({editFiles.length})</label>
             <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 12, marginBottom: 14 }}>
               {editFiles.length === 0 ? <p style={{ color: '#8098b8', fontSize: 13, textAlign: 'center' }}>Aucun fichier</p> :
@@ -5534,6 +5556,26 @@ function ArtistPage() {
   }, [user]);
   const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
 
+  // Basculer une publication Public ⇄ Privé (masquer/afficher dans le fil Découvrir)
+  // NE TOUCHE PAS aux données (scans, écoutes, kiffs) — change juste la visibilité dans le fil
+  const [togglingPrive, setTogglingPrive] = useState<string | null>(null);
+  const basculerPrive = async (q: any, rendrePrive: boolean) => {
+    const pid = q.publicLinkId || q.qrId || q.id;
+    if (!pid) return;
+    setTogglingPrive(q.id);
+    try {
+      // decouvrir : toutes les entrées de cette publication
+      const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',pid)));
+      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { masque: rendrePrive });
+      // publicLinks : on garde la cohérence
+      const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',pid)));
+      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { masque: rendrePrive });
+      // qrcode : pour refléter l'état dans le tableau de bord
+      if (q.id) await updateDoc(doc(db,'qrcodes',q.id), { masque: rendrePrive });
+    } catch(e) { console.error('basculerPrive', e); alert('Erreur. Réessayez.'); }
+    setTogglingPrive(null);
+  };
+
   // Ventes / chat mélomane
   const [ventes, setVentes] = useState<any[]>([]);
   const [chatVenteId, setChatVenteId] = useState<string|null>(null);
@@ -5695,7 +5737,7 @@ function ArtistPage() {
       cadeauxSnap.docs.forEach(d => {
         const c = d.data();
         kifsRecus += (c.kiffs !== undefined ? c.kiffs : (c.coins || 0) * 250);
-        gainsKiffementsOscart += (c.partArtisteOscart !== undefined ? c.partArtisteOscart : Math.round((c.coins || 0) * 0.60));
+        gainsKiffementsOscart += (c.partArtisteOscart !== undefined ? c.partArtisteOscart : Math.round((c.coins || 0) * 0.70));
       });
     } catch(e) { /* pas de cadeaux */ }
     setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues, artistName: artistName || email, notLinked: false, publicLinks: linksList, kifsRecus, gainsKiffementsOscart });
@@ -5830,27 +5872,13 @@ function ArtistPage() {
                   onClick={e => e.stopPropagation()}>
                   <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
                   <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
-                    {RECHARGES.map(r => (
-                      <button key={r.oscart} onClick={() => setRechargeModalArtiste(r)}
-                        style={{ padding:'12px 8px', borderRadius:10, border:`2px solid ${rechargeModalArtiste.oscart===r.oscart?'#ffd700':'rgba(255,215,0,0.2)'}`, background:rechargeModalArtiste.oscart===r.oscart?'rgba(255,215,0,0.15)':'rgba(255,215,0,0.05)', cursor:'pointer', textAlign:'center' }}>
-                        <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
-                        <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
-                      </button>
-                    ))}
+                  <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
+                    <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+                    <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
+                    <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
+                      La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
+                    </p>
                   </div>
-                  <button onClick={async () => {
-                    try {
-                      const res = await fetch('/api/create-checkout', {
-                        method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({ amount: rechargeModalArtiste.fcfa, oscart: rechargeModalArtiste.oscart, email: user?.email || '', userId: user?.uid || '' })
-                      });
-                      const data = await res.json();
-                      if (data.url) window.location.href = data.url;
-                    } catch(e) { alert('Erreur. Réessayez.'); }
-                  }} style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
-                    Payer {rechargeModalArtiste.fcfa.toLocaleString()} F par carte Visa
-                  </button>
                   <button onClick={() => setRechargeModalArtiste(null)}
                     style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                     Fermer
@@ -6079,6 +6107,23 @@ function ArtistPage() {
                       <p style={{ color:'#8098b8', fontSize:10 }}>{s.label}</p>
                     </div>
                   ))}
+                </div>
+                {/* CONFIDENTIALITÉ : Public ⇄ Privé (masque du fil Découvrir sans rien supprimer) */}
+                <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid #eef3fb', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+                  <div>
+                    <p style={{ fontSize:12, fontWeight:700, color: q.masque ? '#b07a00' : '#1a6bff', margin:'0 0 2px' }}>
+                      {q.masque ? '🔒 Privé (masqué du fil)' : '🌐 Public (visible dans Découvrir)'}
+                    </p>
+                    <p style={{ fontSize:10, color:'#8098b8', margin:0 }}>
+                      {q.masque ? 'Vos données sont conservées. Repassez en Public quand vous voulez.' : 'Passez en Privé pour masquer sans rien perdre.'}
+                    </p>
+                  </div>
+                  <button onClick={() => basculerPrive(q, !q.masque)} disabled={togglingPrive === q.id}
+                    style={{ padding:'8px 16px', borderRadius:99, border:'none', cursor:'pointer', fontWeight:800, fontSize:12,
+                      background: q.masque ? 'linear-gradient(135deg,#1a6bff,#0050d0)' : 'linear-gradient(135deg,#E0A82E,#f0c050)',
+                      color: q.masque ? '#fff' : '#1a2340', opacity: togglingPrive === q.id ? 0.6 : 1, whiteSpace:'nowrap' }}>
+                    {togglingPrive === q.id ? '...' : (q.masque ? '🌐 Rendre Public' : '🔒 Rendre Privé')}
+                  </button>
                 </div>
               </div>
             ))}
@@ -8028,6 +8073,7 @@ function CarteSortie({ s }: { s: any }) {
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
   };
+  void reserver; void reserving; // conservés pour réactivation après maintenance
 
   return (
     <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
@@ -8078,9 +8124,9 @@ function CarteSortie({ s }: { s: any }) {
             <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>Réservé — disponible le jour J</p>
           </div>
         ) : (
-          <button onClick={reserver} disabled={reserving}
+          <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
             style={{ width:'100%', padding:13, borderRadius:10, border:'none', background:'linear-gradient(135deg,#E0A82E,#f0c050)', color:'#1a2340', fontWeight:800, fontSize:14, cursor:'pointer' }}>
-            {reserving ? 'Réservation...' : `Réserver mon téléchargement (${s.prixOscart} Oscart)`}
+            Réservation (maintenance)
           </button>
         )}
       </div>
@@ -8103,8 +8149,10 @@ function DecouvrirPage() {
       snap => {
         const tous = snap.docs.map(d => ({id:d.id,...d.data()})) as any[];
         // Déduplication : une seule entrée par publicLinkId (et par titre+artiste en secours)
+        // + on masque les publications mises en "Privé" par l'artiste (masque === true)
         const vus = new Set<string>();
         const uniques = tous.filter((c:any) => {
+          if (c.masque === true) return false; // publication privée → masquée du fil
           const cle1 = c.publicLinkId || '';
           const cle2 = `${(c.label||'').toLowerCase().trim()}__${(c.artist||c.artistEmail||'').toLowerCase().trim()}`;
           if (cle1 && vus.has('id:'+cle1)) return false;
@@ -8629,27 +8677,13 @@ function ProfilPage() {
               onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
               <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
-                {RECHARGES.map(r => (
-                  <button key={r.oscart} onClick={() => setRechargeModalProfil(r)}
-                    style={{ padding:'12px 8px', borderRadius:10, border:`2px solid ${rechargeModalProfil.oscart===r.oscart?'#ffd700':'rgba(255,215,0,0.2)'}`, background:rechargeModalProfil.oscart===r.oscart?'rgba(255,215,0,0.15)':'rgba(255,215,0,0.05)', cursor:'pointer', textAlign:'center' }}>
-                    <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
-                    <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F</p>
-                  </button>
-                ))}
+              <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
+                <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+                <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
+                <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
+                  La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
+                </p>
               </div>
-              <button onClick={async () => {
-                try {
-                  const res = await fetch('/api/create-checkout', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({ amount: rechargeModalProfil.fcfa, oscart: rechargeModalProfil.oscart, email: user?.email||'', userId: user?.uid||'' })
-                  });
-                  const data = await res.json();
-                  if (data.url) window.location.href = data.url;
-                } catch(e) { alert('Erreur. Réessayez.'); }
-              }} style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
-                Payer par carte Visa
-              </button>
               <button onClick={() => setRechargeModalProfil(null)}
                 style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                 Fermer
@@ -11455,6 +11489,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     } catch(e) { console.error(e); }
     setPaying(false);
   };
+  void payer; void paying; // conservés pour réactivation après maintenance
 
   const downloadAll = () => {
     files.forEach((f:any, i:number) => {
@@ -11493,27 +11528,12 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
               Recharger {rechargeModal.oscart} Oscart
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
-            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:16, marginBottom:12 }}>
-              <p style={{ color:'#ffd700', fontSize:12, fontWeight:700, marginBottom:6 }}>Wave · Orange Money · MTN MoMo</p>
-              <p style={{ color:'#dde4f5', fontSize:13, margin:0 }}>
-                Envoyez <strong style={{ color:'#ffd700' }}>{rechargeModal.fcfa.toLocaleString()} F CFA</strong><br/>
-                <span style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Instructions communiquées par notre équipe</span>
+            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
+              <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+              <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
+              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
+                La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
               </p>
-            </div>
-            <div style={{ background:'rgba(30,111,255,0.08)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:14, padding:16, marginBottom:16 }}>
-              <p style={{ color:'#4da6ff', fontSize:12, fontWeight:700, marginBottom:8 }}>Visa · Mastercard</p>
-              <button onClick={async () => {
-                try {
-                  const res = await fetch('/api/create-checkout', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({ amount: rechargeModal.fcfa, oscart: rechargeModal.oscart, email: user?.email || '', userId: user?.uid || '' })
-                  });
-                  const data = await res.json();
-                  if (data.url) window.location.href = data.url;
-                } catch(e) { alert('Erreur paiement carte. Réessayez.'); }
-              }} style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
-                Payer {rechargeModal.fcfa.toLocaleString()} F CFA par carte
-              </button>
             </div>
             <button onClick={() => setRechargeModal(null)}
               style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
@@ -11524,17 +11544,10 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
       )}
 
       {/* Bouton paiement direct (utilisé dans le modal de AchatWidget) */}
-      {solde < prixOscart ? (
-        <button onClick={() => { const r = RECHARGES.filter(x => x.oscart >= prixOscart)[0] || RECHARGES[0]; setRechargeModal(r); }}
-          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-          Recharger pour télécharger
-        </button>
-      ) : (
-        <button onClick={payer} disabled={paying}
-          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-          {paying ? 'Traitement...' : 'Confirmer le téléchargement'}
-        </button>
-      )}
+      <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLe téléchargement payant est en cours de maintenance. Il sera bientôt disponible. Merci de votre patience.'); }}
+        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+        Téléchargement payant (maintenance)
+      </button>
     </div>
   );
 }
@@ -11714,13 +11727,29 @@ function PublicStreamPage() {
         track, duration: Math.round(duration), valid: true,
         source: 'publicLink', ts: new Date().toISOString(),
       });
+      // Incrémenter le compteur streams du QR code de l'artiste.
+      // On cherche le bon QR par plusieurs méthodes pour que ça compte TOUJOURS
+      // (lien public, QR public, Découvrir — même logique).
+      let qrDoc = null;
+      // par artistEmail + publicLinkId (cas le plus precis)
       if (data.artistEmail) {
-        const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('artistEmail', '==', data.artistEmail), where('publicLinkId', '==', publicLinkId)));
-        if (!qrSnap.empty) {
-          await updateDoc(doc(db, 'qrcodes', qrSnap.docs[0].id), {
-            streams: (qrSnap.docs[0].data().streams || 0) + 1,
-          });
-        }
+        const s1 = await getDocs(query(collection(db, 'qrcodes'), where('artistEmail', '==', data.artistEmail), where('publicLinkId', '==', publicLinkId)));
+        if (!s1.empty) qrDoc = s1.docs[0];
+      }
+      // sinon, par publicLinkId seul
+      if (!qrDoc) {
+        const s2 = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', publicLinkId)));
+        if (!s2.empty) qrDoc = s2.docs[0];
+      }
+      // sinon, si data porte un qrId direct
+      if (!qrDoc && data.qrId) {
+        const s3 = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', data.qrId)));
+        if (!s3.empty) qrDoc = s3.docs[0];
+      }
+      if (qrDoc) {
+        await updateDoc(doc(db, 'qrcodes', qrDoc.id), {
+          streams: (qrDoc.data().streams || 0) + 1,
+        });
       }
     } catch(e) { console.error('pubStream', e); }
     // Déclencher tuto cascade après premier play
@@ -11809,16 +11838,16 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — zoom qui danse avec la musique ── */}
-      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '16px 16px 0' }}>
-        <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2 }}>
+      {/* ── POCHETTE — zoom + flash lumineux qui dansent avec la musique ── */}
+      <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '20px 16px 0', display:'flex', justifyContent:'center' }}>
+        <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2, width:'90%' }}>
           {data.coverUrl ? (
             <img
               id="cover-reactive"
               src={data.coverUrl}
               alt={data.label}
-              style={{ width: '100%', maxHeight: '60vh', objectFit: 'cover', display: 'block', borderRadius: 8,
-                transition: 'transform .06s ease-out', willChange: 'transform' }}
+              style={{ width: '100%', maxHeight: '54vh', objectFit: 'cover', display: 'block', borderRadius: 8,
+                transition: 'transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out', willChange: 'transform, box-shadow, filter' }}
             />
           ) : (
             <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
@@ -11826,7 +11855,6 @@ function PublicStreamPage() {
             </div>
           )}
         </div>
-        {/* dégradé bas retiré */}
       </div>
 
       {/* ── TITRE + ARTISTE ── */}
