@@ -6771,6 +6771,29 @@ function ZikothequePage({ user }: { user: any }) {
 
   const currentFiles = currentAlbum?.files || [];
   const currentTrack = currentFiles[currentTrackIdx];
+  const streamCompte = useRef<string>(''); // évite de compter 2x la même piste en boucle
+
+  // Compter une écoute quand une piste démarre (incrémente streams du qrcode de l'album)
+  const recordStreamAlbum = async () => {
+    if (!currentAlbum) return;
+    const cle = `${currentAlbum.qrId || currentAlbum.id}_${currentTrackIdx}`;
+    if (streamCompte.current === cle) return; // déjà compté pour cette piste
+    streamCompte.current = cle;
+    try {
+      const qid = currentAlbum.qrId;
+      if (!qid) return;
+      // Retrouver le doc qrcode par qrId
+      const snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qid)));
+      if (!snap.empty) {
+        const ref0 = snap.docs[0];
+        await updateDoc(doc(db, 'qrcodes', ref0.id), { streams: (ref0.data().streams || 0) + 1 });
+      }
+      await addDoc(collection(db, 'streams'), {
+        qrId: qid, artist: currentAlbum.artist || '', label: currentAlbum.label || '',
+        track: currentTrack?.name || ('Piste ' + (currentTrackIdx + 1)), valid: true, ts: new Date().toISOString(),
+      });
+    } catch(e) { console.error('stream album', e); }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -6809,12 +6832,17 @@ function ZikothequePage({ user }: { user: any }) {
   }, [user]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.load();
-      // Le play() réel est déclenché par onCanPlay quand le nouveau fichier est prêt
-      // (évite la course entre le changement de src et play() → la lecture qui ne démarre pas)
+    // L'élément <audio> est recréé via key={url} à chaque piste.
+    // On force le play après le remontage (filet de sécurité si autoPlay/onLoadedData ratent sur mobile).
+    if (playing) {
+      const t = setTimeout(() => {
+        if (audioRef.current && audioRef.current.paused) {
+          audioRef.current.play().catch(() => {});
+        }
+      }, 120);
+      return () => clearTimeout(t);
     }
-  }, [currentTrackIdx, currentAlbum]);
+  }, [currentTrackIdx, currentAlbum, playing]);
 
   const [showPubZiko, setShowPubZiko] = useState(false);
   const [pendingNextZiko, setPendingNextZiko] = useState(false);
@@ -6866,11 +6894,13 @@ function ZikothequePage({ user }: { user: any }) {
 
       {/* AUDIO ENGINE */}
       {currentTrack && (
-        <audio ref={audioRef} src={currentTrack.url}
+        <audio ref={audioRef} key={currentTrack.url} src={currentTrack.url} autoPlay={playing}
           onTimeUpdate={() => { if (audioRef.current) { setCt(audioRef.current.currentTime); setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100 || 0); } }}
           onLoadedMetadata={() => { if (audioRef.current) setDur(audioRef.current.duration); }}
-          onCanPlay={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => setPlaying(false)); } }}
-          onEnded={onEnded} preload="metadata" />
+          onLoadedData={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => {}); } }}
+          onCanPlay={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => {}); } }}
+          onPlay={() => { recordStreamAlbum(); }}
+          onEnded={onEnded} preload="auto" />
       )}
 
       {/* HEADER */}
@@ -8276,9 +8306,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
   const user = auth.currentUser;
   const estVideo = /\.(mp4|mov|avi|mkv|webm|m4v)(\?|$)/i.test(s.teaserUrl || '');
 
-  // Compte à rebours en direct (se rafraîchit chaque minute)
+  // Compte à rebours en direct (se rafraîchit chaque seconde)
   useEffect(() => {
-    const t = setInterval(() => setMaintenant(Date.now()), 60000);
+    const t = setInterval(() => setMaintenant(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -8288,13 +8318,14 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       .then(snap => { if (!snap.empty) setReserve(true); }).catch(()=>{});
   }, [user, s.id]);
 
-  // Compte à rebours détaillé
+  // Compte à rebours détaillé (jusqu'à la seconde)
   const diffMs = new Date(s.dateSortie).getTime() - maintenant;
   const estSorti = diffMs <= 0;
-  const totalMin = Math.max(0, Math.floor(diffMs / 60000));
-  const cdJours = Math.floor(totalMin / (60*24));
-  const cdHeures = Math.floor((totalMin % (60*24)) / 60);
-  const cdMinutes = totalMin % 60;
+  const totalSec = Math.max(0, Math.floor(diffMs / 1000));
+  const cdJours = Math.floor(totalSec / (3600*24));
+  const cdHeures = Math.floor((totalSec % (3600*24)) / 3600);
+  const cdMinutes = Math.floor((totalSec % 3600) / 60);
+  const cdSecondes = totalSec % 60;
   const joursRestants = Math.ceil(diffMs / (1000*60*60*24));
   const progTelech = s.objTelech > 0 ? Math.min(100, Math.round((s.reservations || 0) / s.objTelech * 100)) : 0;
   const progCadeaux = s.objCadeaux > 0 ? Math.min(100, Math.round((s.cadeauxRecus || 0) / s.objCadeaux * 100)) : 0;
@@ -8368,7 +8399,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'rgba(10,132,255,0.15)' }}>
         <span style={{ color:C.blueLite, fontWeight:800, fontSize:10, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
         <span style={{ color:C.blueLite, fontSize:11, fontWeight:700 }}>
-          {estSorti ? 'Disponible' : `${cdJours}j ${cdHeures}h ${cdMinutes}min`}
+          {estSorti ? 'Disponible' : `${cdJours}j ${String(cdHeures).padStart(2,'0')}:${String(cdMinutes).padStart(2,'0')}:${String(cdSecondes).padStart(2,'0')}`}
         </span>
       </div>
 
@@ -8399,6 +8430,23 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       </div>
 
       <div style={{ padding:'10px 12px 12px' }}>
+        {/* COMPTE À REBOURS visuel (jours / heures / min / secondes) */}
+        {!estSorti && (
+          <div style={{ display:'flex', gap:6, marginBottom:11, justifyContent:'center' }}>
+            {[
+              { val: cdJours, lbl: cdJours > 1 ? 'JOURS' : 'JOUR' },
+              { val: cdHeures, lbl: 'H' },
+              { val: cdMinutes, lbl: 'MIN' },
+              { val: cdSecondes, lbl: 'SEC' },
+            ].map((b,i) => (
+              <div key={i} style={{ flex:1, maxWidth:64, background:'rgba(10,132,255,0.12)', border:`1px solid ${C.border}`, borderRadius:10, padding:'7px 2px', textAlign:'center' }}>
+                <p style={{ color:C.blueLite, fontWeight:800, fontSize:19, margin:0, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(b.val).padStart(2,'0')}</p>
+                <p style={{ color:C.textSoft, fontSize:8, margin:'3px 0 0', letterSpacing:0.5 }}>{b.lbl}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Objectifs compacts */}
         {s.objCadeaux > 0 && (
           <div style={{ marginBottom:7 }}>
@@ -12467,15 +12515,11 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  void progress; // la barre de progression est gérée par le splash HTML désormais
 
   useEffect(() => {
-    // Barre de progression animée pendant le chargement
-    const steps = [15, 35, 55, 75, 90];
-    let i = 0;
-    const t = setInterval(() => {
-      if (i < steps.length) { setProgress(steps[i]); i++; }
-      else clearInterval(t);
-    }, 300);
+    // (la barre animée est dans le splash HTML index.html)
+    const t = setInterval(() => { setProgress(p => (p < 90 ? p + 15 : p)); }, 300);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -12494,52 +12538,21 @@ export default function App() {
         } catch(e) { console.error('lien uid solde', e); }
       }
       setProgress(100);
-      setTimeout(() => {
-        setAuthLoading(false);
-        setTimeout(() => {
-          (window as any).__hideSplash?.();
-        }, 600);
-      }, 400);
+      setAuthLoading(false);
+      // Cacher le splash HTML dès que l'app est prête (transition directe, sans superposition)
+      (window as any).__hideSplash?.();
     });
     return () => { unsub(); clearInterval(t); };
   }, []);
 
-  if (authLoading) return (
-    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',sans-serif" }}>
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes progressGlow{0%,100%{box-shadow:0 0 8px rgba(30,111,255,0.6)}50%{box-shadow:0 0 20px rgba(30,111,255,0.9)}}
-      `}</style>
+  // Filet : si authLoading repasse false plus tard, on s'assure que le splash est caché
+  useEffect(() => {
+    if (!authLoading) (window as any).__hideSplash?.();
+  }, [authLoading]);
 
-      {/* Logo */}
-      <div style={{ animation:'fadeIn .5s ease', marginBottom:40 }}>
-        <Logo size="lg" />
-      </div>
-
-      {/* Barre de progression */}
-      <div style={{ width:220, animation:'fadeIn .5s ease .1s both' }}>
-        <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:99, height:4, overflow:'hidden', marginBottom:12 }}>
-          <div style={{
-            height:'100%',
-            width: `${progress}%`,
-            background:'linear-gradient(90deg,#1a6bff,#4da6ff)',
-            borderRadius:99,
-            transition:'width .3s ease',
-            animation:'progressGlow 1.5s ease infinite',
-          }} />
-        </div>
-        <p style={{ color:'rgba(255,255,255,0.35)', fontSize:12, textAlign:'center', letterSpacing:1 }}>
-          {progress < 50 ? 'Initialisation...' : progress < 90 ? 'Chargement de votre musique...' : 'Presque prêt...'}
-        </p>
-      </div>
-
-      {/* Tagline */}
-      <p style={{ color:'rgba(255,255,255,0.15)', fontSize:11, marginTop:40, letterSpacing:2, textTransform:'uppercase', animation:'fadeIn .5s ease .3s both' }}>
-        La Musique. Un Scan. Un Monde.
-      </p>
-    </div>
-  );
+  // Pendant le chargement initial, on n'affiche PAS de loader React :
+  // le splash HTML (index.html) reste seul visible → un seul écran de démarrage, pas de superposition.
+  if (authLoading) return null;
 
   return (
     <BrowserRouter>
