@@ -2742,10 +2742,12 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
         teaserUrl: s.fileUrl,           // l'extrait découpé (public avant le jour J)
         fichierComplet: s.fichierComplet || '',  // le fichier complet, gardé pour le jour J
         teaserDebut: s.teaserDebut || 0, teaserDuree: s.teaserDuree || 30,
+        pochetteUrl: s.pochetteUrl || '', description: s.description || '',
         fichierOfficiel: '',            // sera renseigné le jour J (depuis fichierComplet)
         dateSortie: s.dateSortie,
         objTelech: s.objTelech || 0,
         objCadeaux: s.objCadeaux || 0,
+        cadeauxRecus: 0,
         prixMusique: s.prixMusique,
         prixOscart: s.prixOscart,
         reservations: 0,
@@ -3036,10 +3038,12 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
         artistEmail: s.artistEmail, artistName: s.artistName,
         titre: s.titre, type: s.type, categorie: s.categorie,
         teaserUrl: s.fileUrl, pochetteUrl: s.pochetteUrl || '',
+        description: s.description || '',
         fichierComplet: s.fichierComplet || '',
         teaserDebut: s.teaserDebut || 0, teaserDuree: s.teaserDuree || 30,
         fichierOfficiel: '', dateSortie: s.dateSortie,
         objTelech: s.objTelech || 0, objCadeaux: s.objCadeaux || 0,
+        cadeauxRecus: 0,
         prixMusique: s.prixMusique, prixOscart: s.prixOscart,
         reservations: 0, statut: 'a_venir',
         createdAt: new Date().toISOString(),
@@ -7426,6 +7430,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   const [teaserDebut, setTeaserDebut] = useState(0);      // point de départ en secondes
   const [teaserDuree, setTeaserDuree] = useState(30);     // durée de l'extrait (15/30/45/60)
   const [dureeTotale, setDureeTotale] = useState(0);      // durée totale du fichier uploadé
+  const [descSortie, setDescSortie] = useState('');       // description du titre (sortie officielle)
 
   const prix = PRIX_PUBLICATION[type].oscart;
   const estVideo = type === 'video' || type === 'serie';
@@ -7553,10 +7558,13 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         fileUrl: teaserDecoupe,          // ce qui est public AVANT le jour J = l'extrait découpé
         fichierComplet: fileUrl,         // l'original complet, gardé pour le jour J (non exposé au public)
         teaserDebut, teaserDuree,        // paramètres de l'extrait
+        pochetteUrl: pochetteUrl || '',  // pochette affichée sur la carte sortie
+        description: descSortie.trim(),  // description du titre
         estSortie: true,
         dateSortie,
         objTelech: parseInt(objTelech) || 0,
         objCadeaux: parseInt(objCadeaux) || 0,
+        cadeauxRecus: 0,
         prixMusique: parseInt(prixMusique),
         prixOscart: Math.round(parseInt(prixMusique) / 10),
         statut: 'en_attente',
@@ -7569,7 +7577,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       });
       setMsg('✅ Sortie programmée soumise ! Elle sera validée puis publiée dans "Sortie officielle".');
       setTitre(''); setFile(null); setFileUrl(''); setDateSortie(''); setObjTelech(''); setObjCadeaux(''); setPrixMusique('');
-      setTeaserDebut(0); setTeaserDuree(30); setDureeTotale(0);
+      setTeaserDebut(0); setTeaserDuree(30); setDureeTotale(0); setDescSortie(''); setPochetteUrl('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
   };
 
@@ -7635,15 +7643,33 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
 
         <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
-        <input type="file" accept="image/*"
+        <input type="file" accept="image/*" id="inputPochetteContenu"
           onChange={e => e.target.files?.[0] && uploadPochette(e.target.files[0])}
-          style={{ ...S.inp, padding:8 }} />
-        {uploadingPoch && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload pochette...</p>}
-        {pochetteUrl && <img src={pochetteUrl} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginTop:6 }} />}
+          style={{ display:'none' }} />
+        <label htmlFor="inputPochetteContenu" style={{
+          display:'flex', alignItems:'center', gap:14,
+          border:`2px dashed ${pochetteUrl ? '#00a040' : '#1a6bff'}`, borderRadius:12, padding:'12px 14px',
+          background: pochetteUrl ? '#eafaf0' : '#f0f6ff', cursor:'pointer', marginBottom:6 }}>
+          {pochetteUrl ? (
+            <img src={pochetteUrl} alt="pochette" style={{ width:64, height:64, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
+          ) : (
+            <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:26 }}>🖼️</div>
+          )}
+          <div>
+            <p style={{ fontSize:13, fontWeight:700, color: pochetteUrl ? '#00a040' : '#1a6bff', margin:'0 0 2px' }}>
+              {uploadingPoch ? 'Upload de la pochette...' : pochetteUrl ? 'Pochette chargée — cliquez pour changer' : 'Cliquez pour ajouter une pochette'}
+            </p>
+            <p style={{ fontSize:11, color:'#8098b8', margin:0 }}>Image carrée recommandée (JPG, PNG)</p>
+          </div>
+        </label>
 
         {/* Coût */}
         {mode === 'sortie' ? (
           <div style={{ marginTop:14 }}>
+            <label style={S.lbl}>Description du titre (affichée sur la carte sortie)</label>
+            <textarea style={{ ...S.inp, minHeight:64, resize:'vertical' }} value={descSortie} onChange={e => setDescSortie(e.target.value)}
+              placeholder="Ex : Un titre puissant inspiré par la grâce et la fidélité..." />
+
             <label style={S.lbl}>Date de sortie officielle *</label>
             <input style={S.inp} type="date" value={dateSortie} onChange={e => setDateSortie(e.target.value)} />
 
@@ -8218,8 +8244,15 @@ function CarteSortie({ s }: { s: any }) {
   const [reserve, setReserve] = useState(false);
   const [reserving, setReserving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [maintenant, setMaintenant] = useState(Date.now());
   const user = auth.currentUser;
   const estVideo = /\.(mp4|mov|avi|mkv|webm|m4v)(\?|$)/i.test(s.teaserUrl || '');
+
+  // Compte à rebours en direct (se rafraîchit chaque minute)
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -8227,9 +8260,17 @@ function CarteSortie({ s }: { s: any }) {
       .then(snap => { if (!snap.empty) setReserve(true); }).catch(()=>{});
   }, [user, s.id]);
 
-  // Compte à rebours
-  const joursRestants = Math.ceil((new Date(s.dateSortie).getTime() - Date.now()) / (1000*60*60*24));
-  const progression = s.objTelech > 0 ? Math.min(100, Math.round((s.reservations || 0) / s.objTelech * 100)) : 0;
+  // Compte à rebours détaillé
+  const diffMs = new Date(s.dateSortie).getTime() - maintenant;
+  const estSorti = diffMs <= 0;
+  const totalMin = Math.max(0, Math.floor(diffMs / 60000));
+  const cdJours = Math.floor(totalMin / (60*24));
+  const cdHeures = Math.floor((totalMin % (60*24)) / 60);
+  const cdMinutes = totalMin % 60;
+  const joursRestants = Math.ceil(diffMs / (1000*60*60*24));
+  const progTelech = s.objTelech > 0 ? Math.min(100, Math.round((s.reservations || 0) / s.objTelech * 100)) : 0;
+  const progCadeaux = s.objCadeaux > 0 ? Math.min(100, Math.round((s.cadeauxRecus || 0) / s.objCadeaux * 100)) : 0;
+  void joursRestants;
 
   const reserver = async () => {
     if (!user) { window.location.href = '/ziko'; return; }
@@ -8263,6 +8304,20 @@ function CarteSortie({ s }: { s: any }) {
         text: `Réservation confirmée pour "${s.titre}" de ${s.artistName}. Disponible le ${s.dateSortie}.`,
         boutonStatut:'rouge', createdAt: new Date().toISOString(), lu:false,
       });
+      // Notif à l'ADMIN (suivi de toutes les réservations)
+      await addDoc(collection(db,'notifications'), {
+        to: 'bdonaldservices@gmail.com', type:'reservation_admin', sortieId: s.id,
+        text: `Nouvelle réservation : "${s.titre}" de ${s.artistName} — par ${user.displayName || user.email}. Total : ${(s.reservations || 0) + 1}.`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+      // Notif à l'ARTISTE (sa sortie a été réservée)
+      if (s.artistEmail) {
+        await addDoc(collection(db,'notifications'), {
+          to: s.artistEmail, type:'reservation_artiste', sortieId: s.id,
+          text: `🎉 Quelqu'un a réservé votre sortie "${s.titre}" ! Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`,
+          createdAt: new Date().toISOString(), lu:false,
+        });
+      }
       setReserve(true); setMsg('✅ Réservé ! Vous recevrez le contenu le jour de la sortie.');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
@@ -8271,42 +8326,76 @@ function CarteSortie({ s }: { s: any }) {
 
   return (
     <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
-      {/* Badge SORTIE OFFICIELLE + compte à rebours */}
+      {/* Badge SORTIE OFFICIELLE */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(224,168,46,0.12)' }}>
-        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
+        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>🎵 SORTIE OFFICIELLE</span>
         <span style={{ color:'#E0A82E', fontSize:12, fontWeight:700 }}>
-          {joursRestants > 0 ? `J-${joursRestants}` : 'Sortie imminente'}
+          {estSorti ? 'Disponible !' : `J-${cdJours}`}
         </span>
       </div>
 
-      {/* Teaser */}
+      {/* Pochette */}
+      {s.pochetteUrl && (
+        <img src={s.pochetteUrl} alt={s.titre} style={{ width:'100%', maxHeight:300, objectFit:'cover', display:'block' }} />
+      )}
+
+      {/* Teaser écoutable */}
       {estVideo ? (
         <video src={s.teaserUrl} controls playsInline style={{ width:'100%', maxHeight:260, background:'#000', display:'block' }} />
       ) : (
-        <div style={{ padding:'14px' }}>
+        <div style={{ padding:'12px 14px 0' }}>
           <audio src={s.teaserUrl} controls style={{ width:'100%' }} />
-          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>Extrait — version complète le jour de la sortie</p>
+          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>▶ Extrait — version complète le jour de la sortie</p>
         </div>
       )}
 
       <div style={{ padding:'14px' }}>
-        <p style={{ color:'#fff', fontWeight:800, fontSize:16, margin:'0 0 2px' }}>{s.titre}</p>
-        <p style={{ color:'#E0A82E', fontSize:13, margin:'0 0 10px' }}>{s.artistName}</p>
+        <p style={{ color:'#fff', fontWeight:800, fontSize:18, margin:'0 0 2px' }}>{s.titre}</p>
+        <p style={{ color:'#E0A82E', fontSize:13, fontWeight:600, margin:'0 0 8px' }}>{s.artistName}</p>
+        {s.description && <p style={{ color:'#cad4e8', fontSize:13, lineHeight:1.6, margin:'0 0 12px' }}>{s.description}</p>}
 
-        <div style={{ display:'flex', gap:14, marginBottom:10, fontSize:12, color:'#cad4e8' }}>
-          <span>Sortie : <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr')}</strong></span>
-          <span>Prix : <strong style={{ color:'#fff' }}>{s.prixMusique} F</strong></span>
-        </div>
+        <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 14px' }}>
+          📅 Sortie prévue le <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long', year:'numeric' })}</strong>
+        </p>
 
-        {/* Barre de progression */}
-        {s.objTelech > 0 && (
-          <div style={{ marginBottom:12 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#8098b8', marginBottom:4 }}>
-              <span>{(s.reservations || 0).toLocaleString()} réservations</span>
-              <span>Objectif : {s.objTelech.toLocaleString()}</span>
+        {/* COMPTE À REBOURS en direct */}
+        {!estSorti && (
+          <div style={{ display:'flex', gap:8, marginBottom:16, justifyContent:'center' }}>
+            {[
+              { val: cdJours, lbl: cdJours > 1 ? 'jours' : 'jour' },
+              { val: cdHeures, lbl: 'heures' },
+              { val: cdMinutes, lbl: 'min' },
+            ].map((b,i) => (
+              <div key={i} style={{ flex:1, maxWidth:90, background:'rgba(224,168,46,0.12)', border:'1px solid rgba(224,168,46,0.25)', borderRadius:12, padding:'10px 4px', textAlign:'center' }}>
+                <p style={{ color:'#E0A82E', fontWeight:800, fontSize:24, margin:0, lineHeight:1 }}>{b.val}</p>
+                <p style={{ color:'#8098b8', fontSize:10, margin:'4px 0 0', textTransform:'uppercase', letterSpacing:0.5 }}>{b.lbl}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* OBJECTIF cadeaux */}
+        {s.objCadeaux > 0 && (
+          <div style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
+              <span>🎁 Objectif cadeaux</span>
+              <span><strong style={{ color:'#fff' }}>{(s.cadeauxRecus || 0).toLocaleString()}</strong> / {s.objCadeaux.toLocaleString()}</span>
             </div>
             <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-              <div style={{ width:`${progression}%`, height:'100%', background:'linear-gradient(90deg,#E0A82E,#f0c050)', borderRadius:99 }} />
+              <div style={{ width:`${progCadeaux}%`, height:'100%', background:'linear-gradient(90deg,#ff6ba6,#ff9ec7)', borderRadius:99, transition:'width .4s' }} />
+            </div>
+          </div>
+        )}
+
+        {/* OBJECTIF pré-téléchargements */}
+        {s.objTelech > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
+              <span>⬇️ Objectif pré-téléchargements</span>
+              <span><strong style={{ color:'#fff' }}>{(s.reservations || 0).toLocaleString()}</strong> / {s.objTelech.toLocaleString()}</span>
+            </div>
+            <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+              <div style={{ width:`${progTelech}%`, height:'100%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99, transition:'width .4s' }} />
             </div>
           </div>
         )}
@@ -8315,13 +8404,18 @@ function CarteSortie({ s }: { s: any }) {
 
         {reserve ? (
           <div style={{ padding:12, borderRadius:10, background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.3)', textAlign:'center' }}>
-            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>Réservé — disponible le jour J</p>
+            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>✓ Réservé — vous serez notifié le jour J</p>
           </div>
         ) : (
-          <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
-            style={{ width:'100%', padding:13, borderRadius:10, border:'none', background:'linear-gradient(135deg,#E0A82E,#f0c050)', color:'#1a2340', fontWeight:800, fontSize:14, cursor:'pointer' }}>
-            Réservation (maintenance)
-          </button>
+          <>
+            <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>⬇️</span> PRÉ-TÉLÉCHARGER / RÉSERVER
+            </button>
+            <p style={{ color:'#8098b8', fontSize:11, lineHeight:1.5, margin:'8px 0 0', textAlign:'center' }}>
+              En pré-téléchargeant, vous recevrez une notification le jour de la sortie pour télécharger le titre.
+            </p>
+          </>
         )}
       </div>
     </div>
