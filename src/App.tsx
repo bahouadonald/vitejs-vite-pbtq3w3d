@@ -2739,8 +2739,10 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       await addDoc(collection(db,'sorties'), {
         artistEmail: s.artistEmail, artistName: s.artistName,
         titre: s.titre, type: s.type, categorie: s.categorie,
-        teaserUrl: s.fileUrl,           // l'extrait (audio/vidéo)
-        fichierOfficiel: '',            // sera uploadé le jour J
+        teaserUrl: s.fileUrl,           // l'extrait découpé (public avant le jour J)
+        fichierComplet: s.fichierComplet || '',  // le fichier complet, gardé pour le jour J
+        teaserDebut: s.teaserDebut || 0, teaserDuree: s.teaserDuree || 30,
+        fichierOfficiel: '',            // sera renseigné le jour J (depuis fichierComplet)
         dateSortie: s.dateSortie,
         objTelech: s.objTelech || 0,
         objCadeaux: s.objCadeaux || 0,
@@ -3034,6 +3036,8 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
         artistEmail: s.artistEmail, artistName: s.artistName,
         titre: s.titre, type: s.type, categorie: s.categorie,
         teaserUrl: s.fileUrl, pochetteUrl: s.pochetteUrl || '',
+        fichierComplet: s.fichierComplet || '',
+        teaserDebut: s.teaserDebut || 0, teaserDuree: s.teaserDuree || 30,
         fichierOfficiel: '', dateSortie: s.dateSortie,
         objTelech: s.objTelech || 0, objCadeaux: s.objCadeaux || 0,
         prixMusique: s.prixMusique, prixOscart: s.prixOscart,
@@ -3060,6 +3064,36 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
         createdAt: new Date().toISOString(), lu:false,
       });
     } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
+  // Lancer la sortie en débloquant DIRECTEMENT le fichier complet déjà stocké (pas de re-upload)
+  const lancerSortieAuto = async (sortie: any) => {
+    const urlComplete = sortie.fichierComplet;
+    if (!urlComplete) { alert('Aucun fichier complet stocké. Utilisez l\'upload manuel.'); return; }
+    if (!window.confirm(`Lancer la sortie de "${sortie.titre}" maintenant ? Le fichier complet sera débloqué pour ceux qui ont réservé.`)) return;
+    setUploadingSortie(sortie.id);
+    try {
+      await updateDoc(doc(db,'sorties',sortie.id), { fichierOfficiel: urlComplete, statut:'sortie', sortieLe: new Date().toISOString() });
+      const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
+      for (const r of resaSnap.docs) {
+        await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: urlComplete });
+        await addDoc(collection(db,'notifications'), {
+          to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
+          fichierUrl: urlComplete, titre: sortie.titre, artistName: sortie.artistName,
+          text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
+          boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
+        });
+      }
+      const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
+      await addDoc(collection(db,'decouvrir'), {
+        publicLinkId, artist: sortie.artistName, artistEmail: sortie.artistEmail,
+        label: sortie.titre, categorie: sortie.categorie, coverUrl: sortie.pochetteUrl || '',
+        files: [{ url: urlComplete, name: urlComplete }],
+        publishedAt: new Date().toISOString(),
+      });
+      alert(`Sortie lancée ! ${resaSnap.size} fan(s) notifié(s).`);
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+    setUploadingSortie(null);
   };
 
   const lancerSortie = async (sortie: any, f: File) => {
@@ -3160,11 +3194,21 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
               </span>
             </div>
             <div style={{ background:'#fff8e6', borderRadius:8, padding:'10px 12px', marginTop:8 }}>
-              <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Jour J : uploadez le fichier officiel pour débloquer les téléchargements réservés.</p>
-              <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
-                {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
-                <input type="file" accept="audio/*,video/*" style={{ display:'none' }} onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
-              </label>
+              <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Jour J : débloquez le fichier complet pour les téléchargements réservés.</p>
+              {s.fichierComplet ? (
+                <>
+                  <button onClick={() => lancerSortieAuto(s)} disabled={uploadingSortie===s.id}
+                    style={{ display:'block', width:'100%', padding:'10px 14px', borderRadius:8, background:'#00a040', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', border:'none', marginBottom:8 }}>
+                    {uploadingSortie===s.id ? 'Lancement...' : '🚀 Lancer maintenant (fichier déjà prêt)'}
+                  </button>
+                  <p style={{ color:'#5a7090', fontSize:10, margin:'0 0 8px' }}>Le fichier complet a été chargé par l'artiste : aucun nouvel upload nécessaire.</p>
+                </>
+              ) : (
+                <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                  {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
+                  <input type="file" accept="audio/*,video/*" style={{ display:'none' }} onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
+                </label>
+              )}
             </div>
             {canDelete && <button onClick={() => supprimerSortie(s)} style={{ ...S.btnRed, fontSize:11, padding:'4px 10px', marginTop:10 }}>Supprimer</button>}
           </div>
@@ -3209,6 +3253,36 @@ function ProductionTab() {
     );
     return () => { unsub(); unsubCmd(); unsubSorties(); };
   }, []);
+
+  // Lancer la sortie en débloquant DIRECTEMENT le fichier complet déjà stocké (pas de re-upload)
+  const lancerSortieAuto = async (sortie: any) => {
+    const urlComplete = sortie.fichierComplet;
+    if (!urlComplete) { alert('Aucun fichier complet stocké. Utilisez l\'upload manuel.'); return; }
+    if (!window.confirm(`Lancer la sortie de "${sortie.titre}" maintenant ? Le fichier complet sera débloqué pour ceux qui ont réservé.`)) return;
+    setUploadingSortie(sortie.id);
+    try {
+      await updateDoc(doc(db,'sorties',sortie.id), { fichierOfficiel: urlComplete, statut:'sortie', sortieLe: new Date().toISOString() });
+      const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
+      for (const r of resaSnap.docs) {
+        await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: urlComplete });
+        await addDoc(collection(db,'notifications'), {
+          to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
+          fichierUrl: urlComplete, titre: sortie.titre, artistName: sortie.artistName,
+          text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
+          boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
+        });
+      }
+      const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
+      await addDoc(collection(db,'decouvrir'), {
+        publicLinkId, artist: sortie.artistName, artistEmail: sortie.artistEmail,
+        label: sortie.titre, categorie: sortie.categorie, coverUrl: sortie.pochetteUrl || '',
+        files: [{ url: urlComplete, name: urlComplete }],
+        publishedAt: new Date().toISOString(),
+      });
+      alert(`Sortie lancée ! ${resaSnap.size} fan(s) notifié(s).`);
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+    setUploadingSortie(null);
+  };
 
   // LE JOUR J : uploader le fichier officiel → débloque les téléchargements réservés
   const lancerSortie = async (sortie: any, f: File) => {
@@ -3289,12 +3363,22 @@ function ProductionTab() {
               </div>
               <a href={s.teaserUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', fontSize:12, color:'#1a6bff', marginBottom:10 }}>▶ Écouter le teaser</a>
               <div style={{ background:'#fff8e6', borderRadius:8, padding:'10px 12px' }}>
-                <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Le jour J : uploadez le fichier officiel complet pour débloquer les téléchargements réservés.</p>
-                <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
-                  {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
-                  <input type="file" accept="audio/*,video/*" style={{ display:'none' }}
-                    onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
-                </label>
+                <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Le jour J : débloquez le fichier complet pour les téléchargements réservés.</p>
+                {s.fichierComplet ? (
+                  <>
+                    <button onClick={() => lancerSortieAuto(s)} disabled={uploadingSortie===s.id}
+                      style={{ display:'block', width:'100%', padding:'10px 14px', borderRadius:8, background:'#00a040', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', border:'none', marginBottom:8 }}>
+                      {uploadingSortie===s.id ? 'Lancement...' : '🚀 Lancer maintenant (fichier déjà prêt)'}
+                    </button>
+                    <p style={{ color:'#5a7090', fontSize:10, margin:0 }}>Le fichier complet a été chargé par l'artiste : aucun nouvel upload nécessaire.</p>
+                  </>
+                ) : (
+                  <label style={{ display:'inline-block', padding:'8px 14px', borderRadius:8, background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                    {uploadingSortie===s.id ? 'Upload en cours...' : 'Lancer la sortie (uploader le fichier officiel)'}
+                    <input type="file" accept="audio/*,video/*" style={{ display:'none' }}
+                      onChange={e => e.target.files?.[0] && lancerSortie(s, e.target.files[0])} />
+                  </label>
+                )}
               </div>
             </div>
             );
@@ -7338,6 +7422,10 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   const [objTelech, setObjTelech] = useState('');
   const [objCadeaux, setObjCadeaux] = useState('');
   const [prixMusique, setPrixMusique] = useState('');
+  // Outil de découpe du teaser (extrait pour la sortie officielle)
+  const [teaserDebut, setTeaserDebut] = useState(0);      // point de départ en secondes
+  const [teaserDuree, setTeaserDuree] = useState(30);     // durée de l'extrait (15/30/45/60)
+  const [dureeTotale, setDureeTotale] = useState(0);      // durée totale du fichier uploadé
 
   const prix = PRIX_PUBLICATION[type].oscart;
   const estVideo = type === 'video' || type === 'serie';
@@ -7368,10 +7456,31 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       formData.append('upload_preset', 'doniel_unsigned');
       const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: formData });
       const data = await res.json();
-      if (data.secure_url) { setFileUrl(data.secure_url); setFile(f); setMsg('Fichier prêt.'); }
+      if (data.secure_url) {
+        setFileUrl(data.secure_url); setFile(f); setMsg('Fichier prêt.');
+        // Récupérer la durée totale du fichier (pour borner le curseur de découpe)
+        if (data.duration) { setDureeTotale(Math.floor(data.duration)); }
+        else {
+          // secours : lire la durée côté navigateur
+          try {
+            const el = document.createElement(estVideo ? 'video' : 'audio');
+            el.preload = 'metadata';
+            el.onloadedmetadata = () => { if (el.duration && isFinite(el.duration)) setDureeTotale(Math.floor(el.duration)); };
+            el.src = data.secure_url;
+          } catch {}
+        }
+      }
       else setMsg('Erreur upload. Réessayez.');
     } catch { setMsg('Erreur upload. Réessayez.'); }
     setUploading(false);
+  };
+
+  // Construit l'URL Cloudinary DÉCOUPÉE (extrait) : Cloudinary coupe côté serveur,
+  // le fichier complet n'est JAMAIS exposé au navigateur → impossible à aspirer.
+  const construireTeaserUrl = (urlComplete: string, debut: number, duree: number): string => {
+    if (!urlComplete || !urlComplete.includes('/upload/')) return urlComplete;
+    const transfo = `so_${debut},du_${duree}`;
+    return urlComplete.replace('/upload/', `/upload/${transfo}/`);
   };
 
   const uploadPochette = async (f: File) => {
@@ -7429,13 +7538,18 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
 
   const soumettreSortie = async () => {
     if (!titre.trim()) { setMsg('Entrez le titre'); return; }
-    if (!fileUrl) { setMsg('Ajoutez votre teaser (extrait)'); return; }
+    if (!fileUrl) { setMsg('Ajoutez votre fichier complet'); return; }
     if (!dateSortie) { setMsg('Indiquez la date de sortie officielle'); return; }
     if (!prixMusique || parseInt(prixMusique) <= 0) { setMsg('Indiquez le prix du téléchargement (en FCFA)'); return; }
     try {
+      // L'URL teaser est l'extrait DÉCOUPÉ par Cloudinary (le fichier complet n'est jamais exposé avant le jour J)
+      const teaserDecoupe = construireTeaserUrl(fileUrl, teaserDebut, teaserDuree);
       await addDoc(collection(db,'soumissions'), {
         artistEmail: user.email, artistName, artistUid: user.uid,
-        titre: titre.trim(), type, categorie, fileUrl,
+        titre: titre.trim(), type, categorie,
+        fileUrl: teaserDecoupe,          // ce qui est public AVANT le jour J = l'extrait découpé
+        fichierComplet: fileUrl,         // l'original complet, gardé pour le jour J (non exposé au public)
+        teaserDebut, teaserDuree,        // paramètres de l'extrait
         estSortie: true,
         dateSortie,
         objTelech: parseInt(objTelech) || 0,
@@ -7448,10 +7562,11 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       await addDoc(collection(db,'notifications'), {
         to: 'bdonaldservices@gmail.com', type:'soumission',
         text: `SORTIE PROGRAMMÉE de ${artistName} : "${titre.trim()}" — sortie le ${dateSortie}. À valider.`,
-        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
+        lien: teaserDecoupe, createdAt: new Date().toISOString(), lu: false,
       });
       setMsg('✅ Sortie programmée soumise ! Elle sera validée puis publiée dans "Sortie officielle".');
       setTitre(''); setFile(null); setFileUrl(''); setDateSortie(''); setObjTelech(''); setObjCadeaux(''); setPrixMusique('');
+      setTeaserDebut(0); setTeaserDuree(30); setDureeTotale(0);
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
   };
 
@@ -7477,7 +7592,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       {mode === 'sortie' && (
         <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
           <p style={{ color:'#b07a00', fontSize:12, margin:0, lineHeight:1.6 }}>
-            Programmez la sortie officielle de votre œuvre. Vous mettez un teaser (extrait) que les fans découvrent en streaming. Ils réservent leur téléchargement en payant à l'avance. Le jour J, vous uploadez le fichier officiel : tous ceux qui ont réservé le reçoivent automatiquement.
+            Programmez la sortie officielle de votre œuvre. Vous chargez votre <strong>fichier complet</strong>, puis vous choisissez un <strong>extrait teaser</strong> (15s à 1 min) que les fans découvrent en streaming. Ils réservent leur téléchargement en payant à l'avance. Le jour J, le fichier complet est débloqué automatiquement pour tous ceux qui ont réservé — et il reste protégé jusque-là.
           </p>
         </div>
       )}
@@ -7498,12 +7613,12 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           {cats.filter((c:any) => c.id !== 'tous').map((c:any) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
 
-        <label style={S.lbl}>Fichier ({estVideo ? 'vidéo' : 'audio'}) *</label>
+        <label style={S.lbl}>{mode === 'sortie' ? `Fichier complet (${estVideo ? 'vidéo' : 'audio'}) *` : `Fichier (${estVideo ? 'vidéo' : 'audio'}) *`}</label>
         <input type="file" accept={estVideo ? 'video/*' : 'audio/*'}
           onChange={e => e.target.files?.[0] && uploadFichier(e.target.files[0])}
           style={{ ...S.inp, padding:8 }} />
         {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
-        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté</p>}
+        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
 
         <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
         <input type="file" accept="image/*"
@@ -7517,6 +7632,63 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           <div style={{ marginTop:14 }}>
             <label style={S.lbl}>Date de sortie officielle *</label>
             <input style={S.inp} type="date" value={dateSortie} onChange={e => setDateSortie(e.target.value)} />
+
+            {/* ───── OUTIL DE DÉCOUPE DU TEASER ───── */}
+            {fileUrl && (
+              <div style={{ background:'#f0f6ff', border:'1px solid #b8d4f5', borderRadius:14, padding:16, margin:'14px 0' }}>
+                <p style={{ color:'#1a6bff', fontSize:13, fontWeight:800, margin:'0 0 4px' }}>🎬 Créer l'extrait teaser</p>
+                <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.6, margin:'0 0 14px' }}>
+                  Choisissez le passage que le public écoutera <strong>avant la sortie</strong>. Le fichier complet reste protégé : il ne sera débloqué que le jour J pour ceux qui ont réservé.
+                </p>
+
+                {/* Durée de l'extrait */}
+                <label style={{ ...S.lbl, marginBottom:6 }}>Durée de l'extrait</label>
+                <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                  {[15,30,45,60].map(d => (
+                    <button key={d} type="button" onClick={() => setTeaserDuree(d)}
+                      style={{ flex:1, padding:'10px 4px', borderRadius:10, border:`2px solid ${teaserDuree===d?'#1a6bff':'#dce6f7'}`, background:teaserDuree===d?'#eaf1ff':'#fff', color:teaserDuree===d?'#1a6bff':'#5a7090', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+                      {d === 60 ? '1 min' : d + 's'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Point de départ */}
+                <label style={{ ...S.lbl, marginBottom:6 }}>
+                  Début de l'extrait : <span style={{ color:'#1a6bff', fontWeight:800 }}>{Math.floor(teaserDebut/60)}:{String(teaserDebut%60).padStart(2,'0')}</span>
+                </label>
+                {dureeTotale > 0 ? (
+                  <>
+                    <input type="range" min={0} max={Math.max(0, dureeTotale - teaserDuree)} value={teaserDebut}
+                      onChange={e => setTeaserDebut(parseInt(e.target.value))}
+                      style={{ width:'100%', accentColor:'#1a6bff', marginBottom:6 }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#8098b8', marginBottom:12 }}>
+                      <span>Début 0:00</span>
+                      <span>Fin {Math.floor(dureeTotale/60)}:{String(dureeTotale%60).padStart(2,'0')}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p style={{ color:'#8098b8', fontSize:11, marginBottom:12 }}>Lecture de la durée du fichier... (ou réglez le début manuellement ci-dessous)</p>
+                )}
+
+                {/* Réglage manuel du début (secours) */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                  <span style={{ fontSize:11, color:'#5a7090' }}>Début (secondes) :</span>
+                  <input type="number" min={0} value={teaserDebut} onChange={e => setTeaserDebut(Math.max(0, parseInt(e.target.value)||0))}
+                    style={{ ...S.inp, width:90, padding:'6px 10px', margin:0 }} />
+                </div>
+
+                {/* Aperçu de l'extrait */}
+                <label style={{ ...S.lbl, marginBottom:6 }}>Aperçu de l'extrait ({teaserDuree === 60 ? '1 min' : teaserDuree+'s'})</label>
+                {estVideo ? (
+                  <video key={`${teaserDebut}-${teaserDuree}`} src={construireTeaserUrl(fileUrl, teaserDebut, teaserDuree)} controls playsInline
+                    style={{ width:'100%', maxHeight:200, background:'#000', borderRadius:10 }} />
+                ) : (
+                  <audio key={`${teaserDebut}-${teaserDuree}`} src={construireTeaserUrl(fileUrl, teaserDebut, teaserDuree)} controls
+                    style={{ width:'100%' }} />
+                )}
+                <p style={{ color:'#00a040', fontSize:11, margin:'8px 0 0' }}>✓ C'est cet extrait que le public entendra avant la sortie.</p>
+              </div>
+            )}
 
             <div style={{ display:'flex', gap:10 }}>
               <div style={{ flex:1 }}>
