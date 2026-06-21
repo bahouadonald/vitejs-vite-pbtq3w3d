@@ -1475,12 +1475,29 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   useEffect(() => () => { if (stopTimer.current) clearTimeout(stopTimer.current); }, []);
 
   const prev = () => {
-    if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
+    if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>{}); }
   };
 
   const next = () => {
-    if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
+    if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>{}); }
   };
+
+  // Au changement de piste : recharger et relancer la lecture (même élément audio, fiable sur mobile)
+  useEffect(() => {
+    const a = ref.current;
+    if (!a || !cur) return;
+    a.load();
+    if (playing) {
+      const lancer = () => {
+        if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+        setupAnalyser();
+        a.play().then(() => { startLevelLoop(); }).catch(() => {});
+      };
+      lancer();
+      a.addEventListener('canplay', lancer, { once: true });
+      return () => a.removeEventListener('canplay', lancer);
+    }
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const afterPub = () => {};
   void afterPub;
@@ -1493,14 +1510,16 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
+        onCanPlay={() => { if (playing && ref.current && ref.current.paused) { ref.current.play().catch(()=>{}); } }}
+        onPlay={() => { setPlaying(true); }}
         onEnded={() => {
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) {
             setIdx(i => i + 1);
             setPlaying(true);
-          } else { setPlaying(false); }
+          } else { setPlaying(false); stopLevelLoop(); }
         }}
-        preload="metadata" />
+        preload="auto" />
 
       {/* LIGNE COMPACTE : play + titre + hamburger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
