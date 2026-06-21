@@ -86,6 +86,19 @@ const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM
 const CLOUDINARY_CLOUD = 'drjp8ht84';
 const CLOUDINARY_UPLOAD_PRESET = 'securedrop_unsigned';
 const BASE_URL = 'https://doniel.art';
+
+// Optimisation d'image Cloudinary : ajoute f_auto (format moderne) + q_auto (compression intelligente)
+// + largeur max optionnelle. Réduit fortement le poids des images → chargement bien plus rapide.
+// Ne touche pas aux URLs non-Cloudinary (blob, autres CDN) ni aux données stockées.
+function optimImg(url: string, largeur?: number): string {
+  if (!url || typeof url !== 'string') return url || '';
+  if (!url.includes('/upload/')) return url;
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+  if (url.includes('f_auto') || url.includes('q_auto')) return url;
+  const transfo = largeur ? `f_auto,q_auto,w_${largeur},c_limit` : 'f_auto,q_auto';
+  return url.replace('/upload/', `/upload/${transfo}/`);
+}
+
 // Journal des transactions (audit anti-triche) : trace chaque mouvement de solde
 async function logTx(uid: string, type: string, oscartDelta: number, kiffsDelta: number, raison: string) {
   try {
@@ -2150,7 +2163,7 @@ function FanPage() {
           <div style={{ position:'relative', width:'100%', background:C.bgDeep }}>
             {qrData.coverUrl ? (
               <img
-                src={qrData.coverUrl}
+                src={optimImg(qrData.coverUrl, 800)}
                 alt={qrData.label}
                 style={{ width:'100%', maxHeight:360, objectFit:'cover', display:'block' }}
               />
@@ -2464,8 +2477,8 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
     setMediaType(isVid ? 'video' : 'image');
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch(`https://api.cloudinary.com/v1_1/dlnpdjgpc/${isVid?'video':'image'}/upload`, { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${isVid?'video':'image'}/upload`, { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) { setMediaUrl(data.secure_url); setSigMsg('Contenu prêt.'); }
       else setSigMsg('Erreur upload.');
@@ -2961,7 +2974,7 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
         <div key={c.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${aUnFichier ? '#00a040' : '#f04a6a'}` }}>
           <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
             {c.coverUrl ? (
-              <img src={c.coverUrl} alt={c.label} style={{ width:54, height:54, objectFit:'cover', borderRadius:8, flexShrink:0 }} />
+              <img src={optimImg(c.coverUrl, 120)} alt={c.label} style={{ width:54, height:54, objectFit:'cover', borderRadius:8, flexShrink:0 }} />
             ) : (
               <div style={{ width:54, height:54, borderRadius:8, background:'#eaf1ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>🎵</div>
             )}
@@ -3091,8 +3104,8 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
     setUploadingSortie(sortie.id);
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) {
         await updateDoc(doc(db,'sorties',sortie.id), { fichierOfficiel: data.secure_url, statut:'sortie', sortieLe: new Date().toISOString() });
@@ -3187,7 +3200,7 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
               <a href={s.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>Écouter le teaser</a>
               {s.pochetteUrl && <a href={s.pochetteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>Voir la pochette</a>}
             </div>
-            {s.pochetteUrl && <img src={s.pochetteUrl} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginBottom:10 }} />}
+            {s.pochetteUrl && <img src={optimImg(s.pochetteUrl, 200)} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginBottom:10 }} />}
             {canValidate && (
               <div style={{ display:'flex', gap:8 }}>
                 <button onClick={() => validerSortie(s)} style={{ flex:2, padding:10, borderRadius:8, border:'none', background:'#E0A82E', color:'#1a2340', fontWeight:700, fontSize:13, cursor:'pointer' }}>Valider et publier</button>
@@ -3349,8 +3362,8 @@ function ProductionTab() {
     setUploadingSortie(sortie.id);
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) {
         // Marquer la sortie comme sortie (officielle) avec le fichier complet
@@ -3384,8 +3397,8 @@ function ProductionTab() {
     setUploadingCmd(cmdId);
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/image/upload', { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) {
         const cmd = commandes.find(c => c.id === cmdId);
@@ -4801,15 +4814,19 @@ function AdminPage() {
   // Upload d'une nouvelle image de pochette (change juste l'image, garde tout le reste)
   const uploadEditCover = async (file: File) => {
     if (!file) return;
+    // Aperçu local immédiat (ne dépend pas du réseau)
+    try { setEditCover(URL.createObjectURL(file)); } catch {}
     setEditCoverUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('upload_preset', 'doniel_unsigned');
+      fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
       const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
       const d = await r.json();
+      console.log('EDIT COVER QR réponse:', d);
       if (d.secure_url) setEditCover(d.secure_url);
-    } catch(e) { console.error('cover', e); alert('Erreur upload image. Réessayez.'); }
+      else alert('Erreur upload : ' + (d?.error?.message || JSON.stringify(d).slice(0,120)));
+    } catch(e:any) { console.error('cover', e); alert('Erreur réseau : ' + (e?.message||'')); }
     setEditCoverUploading(false);
   };
 
@@ -4825,6 +4842,8 @@ function AdminPage() {
 
   const saveEdit = async () => {
     if (!editModal) return;
+    if (editCoverUploading) { alert('Patientez, l\'image est en cours d\'envoi...'); return; }
+    if (editCover.startsWith('blob:')) { alert('L\'image n\'a pas fini de s\'envoyer. Réessayez dans un instant.'); return; }
     const newTotal = parseInt(editScans) || editModal.totalScans;
     const newPriceVal = parseInt(editPrice) || editModal.price;
     await updateDoc(doc(db, 'qrcodes', editModal.id), {
@@ -6317,7 +6336,7 @@ function ArtistPage() {
                 return (
                   <div key={q.id} style={{ ...S.card, marginBottom:16 }}>
                     <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:12 }}>
-                      {q.coverUrl && <img src={q.coverUrl} style={{ width:56, height:56, borderRadius:10, objectFit:'cover' }} alt="" />}
+                      {q.coverUrl && <img src={optimImg(q.coverUrl, 120)} style={{ width:56, height:56, borderRadius:10, objectFit:'cover' }} alt="" />}
                       <div style={{ flex:1 }}>
                         <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{q.label}</p>
                         <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>{q.artist}</p>
@@ -6962,7 +6981,7 @@ function ZikothequePage({ user }: { user: any }) {
             {currentAlbum && (
               <div style={{ background: 'linear-gradient(135deg, rgba(30,111,255,0.2), rgba(77,166,255,0.08))', border: '1px solid rgba(30,111,255,0.25)', borderRadius: 18, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
                 {currentAlbum.coverUrl ? (
-                  <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 50, height: 50, borderRadius: 10, objectFit: 'cover', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
+                  <img src={optimImg(currentAlbum.coverUrl, 120)} alt={currentAlbum.label} style={{ width: 50, height: 50, borderRadius: 10, objectFit: 'cover', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
                 ) : (
                   <div style={{ width: 50, height: 50, borderRadius: 10, background: 'linear-gradient(135deg,#1e3a6e,#0a1535)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -6993,7 +7012,7 @@ function ZikothequePage({ user }: { user: any }) {
                   style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 14, background: isActive ? 'rgba(30,111,255,0.18)' : 'rgba(255,255,255,0.06)', border: isActive ? '1px solid rgba(30,111,255,0.35)' : '1px solid rgba(255,255,255,0.08)', marginBottom: 10, cursor: 'pointer', transition: 'all .2s', position:'relative', boxShadow: isActive ? '0 4px 20px rgba(30,111,255,0.2)' : '0 2px 8px rgba(0,0,0,0.2)' }}
                   onClick={() => playAlbum(item)}>
                   {item.coverUrl ? (
-                    <img src={item.coverUrl} alt={item.label} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                    <img src={optimImg(item.coverUrl, 120)} alt={item.label} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
                     <div style={{ width: 56, height: 56, borderRadius: 10, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -7095,7 +7114,7 @@ function ZikothequePage({ user }: { user: any }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {/* Album cover */}
               {currentAlbum.coverUrl ? (
-                <img src={currentAlbum.coverUrl} alt={currentAlbum.label} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                <img src={optimImg(currentAlbum.coverUrl, 120)} alt={currentAlbum.label} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
               ) : (
                 <div style={{ width: 44, height: 44, borderRadius: 8, background: 'linear-gradient(135deg, #0a1535, #1e3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}></div>
               )}
@@ -7913,8 +7932,8 @@ function CommandePochettes({ user, artistName, contenusValides }: any) {
     setUploading(true); setMsg('');
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/image/upload', { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) { setPhotoUrl(data.secure_url); setMsg('Photo ajoutée.'); }
       else setMsg('Erreur upload.');
@@ -8079,8 +8098,8 @@ function MotArtisteTab({ user, artistName }: any) {
     try {
       const formData = new FormData();
       formData.append('file', f);
-      formData.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/video/upload', { method:'POST', body: formData });
+      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/video/upload', { method:'POST', body: formData });
       const data = await res.json();
       if (data.secure_url) { setVideoUrl(data.secure_url); setMsg('Vidéo prête.'); }
       else setMsg('Erreur upload.');
@@ -8424,7 +8443,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       {/* Haut : pochette + infos */}
       <div style={{ display:'flex', gap:12, padding:'12px 12px 0' }}>
         {s.pochetteUrl ? (
-          <img src={s.pochetteUrl} alt={s.titre} style={{ width:96, height:96, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
+          <img src={optimImg(s.pochetteUrl, 300)} alt={s.titre} style={{ width:96, height:96, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
         ) : (
           <div style={{ width:96, height:96, borderRadius:10, background:C.bgSecond, flexShrink:0 }} />
         )}
@@ -8710,7 +8729,7 @@ function DecouvrirPage() {
               {fileUrl ? (
                 <AutoPlayMedia fileUrl={fileUrl} isVideo={isVideo} coverUrl={c.coverUrl} label={c.label} publicLinkId={c.publicLinkId} />
               ) : c.coverUrl ? (
-                <img src={c.coverUrl} alt={c.label} style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'top', display:'block' }} />
+                <img src={optimImg(c.coverUrl, 800)} alt={c.label} style={{ width:'100%', height:220, objectFit:'cover', objectPosition:'top', display:'block' }} />
               ) : (
                 <div style={{ width:'100%', height:220, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -9628,8 +9647,8 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
     setUploadingFile(true); setMsg('');
     try {
       const fd = new FormData();
-      fd.append('file', f); fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) { setFileUrl(data.secure_url); setMsg('Contenu ajouté.'); }
       else setMsg('Erreur upload du contenu.');
@@ -12242,7 +12261,7 @@ function PublicStreamPage() {
           {data.coverUrl ? (
             <img
               id="cover-reactive"
-              src={data.coverUrl}
+              src={optimImg(data.coverUrl, 800)}
               alt={data.label}
               style={{ width: '100%', maxHeight: '54vh', objectFit: 'cover', display: 'block', borderRadius: 8,
                 transition: 'transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out', willChange: 'transform, box-shadow, filter' }}
