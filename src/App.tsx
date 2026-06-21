@@ -6842,9 +6842,9 @@ function ZikothequePage({ user }: { user: any }) {
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
       audioRef.current.load();
-      if (playing) audioRef.current.play().catch(() => setPlaying(false));
+      // Le play() réel est déclenché par onCanPlay quand le nouveau fichier est prêt
+      // (évite la course entre le changement de src et play() → la lecture qui ne démarre pas)
     }
   }, [currentTrackIdx, currentAlbum]);
 
@@ -6915,6 +6915,7 @@ function ZikothequePage({ user }: { user: any }) {
         <audio ref={audioRef} src={currentTrack.url}
           onTimeUpdate={() => { if (audioRef.current) { setCt(audioRef.current.currentTime); setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100 || 0); } }}
           onLoadedMetadata={() => { if (audioRef.current) setDur(audioRef.current.duration); }}
+          onCanPlay={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => setPlaying(false)); } }}
           onEnded={onEnded} preload="metadata" />
       )}
 
