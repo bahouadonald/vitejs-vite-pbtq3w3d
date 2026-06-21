@@ -8397,99 +8397,96 @@ function CarteSortie({ s }: { s: any }) {
   };
   void reserver; void reserving; // conservés pour réactivation après maintenance
 
+  // Partage de la sortie officielle
+  const partagerSortie = async () => {
+    const url = `${window.location.origin}/decouvrir`;
+    const texte = `Sortie officielle : "${s.titre}" de ${s.artistName} — disponible le ${new Date(s.dateSortie).toLocaleDateString('fr')}. Pré-télécharge dès maintenant sur Doniel Zik !`;
+    try {
+      if (navigator.share) { await navigator.share({ title: s.titre, text: texte, url }); }
+      else { await navigator.clipboard.writeText(`${texte} ${url}`); setMsg('✅ Lien copié ! Partagez-le.'); }
+    } catch {}
+  };
+
   return (
-    <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
-      {/* Badge SORTIE OFFICIELLE */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(224,168,46,0.12)' }}>
-        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
-        <span style={{ color:'#E0A82E', fontSize:12, fontWeight:700 }}>
-          {estSorti ? 'Disponible !' : `J-${cdJours}`}
+    <div style={{ marginBottom:14, background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+      {/* Bandeau : badge + compte à rebours compact */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'rgba(10,132,255,0.15)' }}>
+        <span style={{ color:C.blueLite, fontWeight:800, fontSize:10, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
+        <span style={{ color:C.blueLite, fontSize:11, fontWeight:700 }}>
+          {estSorti ? 'Disponible' : `${cdJours}j ${cdHeures}h ${cdMinutes}min`}
         </span>
       </div>
 
-      {/* Pochette */}
-      {s.pochetteUrl && (
-        <img src={s.pochetteUrl} alt={s.titre} style={{ width:'100%', maxHeight:300, objectFit:'cover', display:'block' }} />
-      )}
-
-      {/* Teaser écoutable */}
-      {estVideo ? (
-        <video src={s.teaserUrl} controls playsInline style={{ width:'100%', maxHeight:260, background:'#000', display:'block' }} />
-      ) : (
-        <div style={{ padding:'12px 14px 0' }}>
-          <audio src={s.teaserUrl} controls style={{ width:'100%' }} />
-          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>Extrait — version complète le jour de la sortie</p>
-        </div>
-      )}
-
-      <div style={{ padding:'14px' }}>
-        <p style={{ color:'#fff', fontWeight:800, fontSize:18, margin:'0 0 2px' }}>{s.titre}</p>
-        <p style={{ color:'#E0A82E', fontSize:13, fontWeight:600, margin:'0 0 8px' }}>{s.artistName}</p>
-        {s.description && <p style={{ color:'#cad4e8', fontSize:13, lineHeight:1.6, margin:'0 0 12px' }}>{s.description}</p>}
-
-        <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 14px' }}>
-          Sortie prévue le <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long', year:'numeric' })}</strong>
-        </p>
-
-        {/* COMPTE À REBOURS en direct */}
-        {!estSorti && (
-          <div style={{ display:'flex', gap:8, marginBottom:16, justifyContent:'center' }}>
-            {[
-              { val: cdJours, lbl: cdJours > 1 ? 'jours' : 'jour' },
-              { val: cdHeures, lbl: 'heures' },
-              { val: cdMinutes, lbl: 'min' },
-            ].map((b,i) => (
-              <div key={i} style={{ flex:1, maxWidth:90, background:'rgba(224,168,46,0.12)', border:'1px solid rgba(224,168,46,0.25)', borderRadius:12, padding:'10px 4px', textAlign:'center' }}>
-                <p style={{ color:'#E0A82E', fontWeight:800, fontSize:24, margin:0, lineHeight:1 }}>{b.val}</p>
-                <p style={{ color:'#8098b8', fontSize:10, margin:'4px 0 0', textTransform:'uppercase', letterSpacing:0.5 }}>{b.lbl}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* OBJECTIF cadeaux */}
-        {s.objCadeaux > 0 && (
-          <div style={{ marginBottom:10 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
-              <span>Objectif cadeaux</span>
-              <span><strong style={{ color:'#fff' }}>{(s.cadeauxRecus || 0).toLocaleString()}</strong> / {s.objCadeaux.toLocaleString()}</span>
-            </div>
-            <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-              <div style={{ width:`${progCadeaux}%`, height:'100%', background:'linear-gradient(90deg,#ff6ba6,#ff9ec7)', borderRadius:99, transition:'width .4s' }} />
-            </div>
-          </div>
-        )}
-
-        {/* OBJECTIF pré-téléchargements */}
-        {s.objTelech > 0 && (
-          <div style={{ marginBottom:14 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
-              <span>Objectif pré-téléchargements</span>
-              <span><strong style={{ color:'#fff' }}>{(s.reservations || 0).toLocaleString()}</strong> / {s.objTelech.toLocaleString()}</span>
-            </div>
-            <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-              <div style={{ width:`${progTelech}%`, height:'100%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99, transition:'width .4s' }} />
-            </div>
-          </div>
-        )}
-
-        {msg && <p style={{ color: msg.startsWith('✅') ? '#4dff9a':'#ff8095', fontSize:12, margin:'0 0 8px' }}>{msg}</p>}
-
-        {reserve ? (
-          <div style={{ padding:12, borderRadius:10, background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.3)', textAlign:'center' }}>
-            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>Réservé — vous serez notifié le jour J</p>
-          </div>
+      {/* Haut : pochette + infos */}
+      <div style={{ display:'flex', gap:12, padding:'12px 12px 0' }}>
+        {s.pochetteUrl ? (
+          <img src={s.pochetteUrl} alt={s.titre} style={{ width:96, height:96, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
         ) : (
-          <>
+          <div style={{ width:96, height:96, borderRadius:10, background:C.bgSecond, flexShrink:0 }} />
+        )}
+        <div style={{ flex:1, minWidth:0 }}>
+          <p style={{ color:C.text, fontWeight:800, fontSize:16, margin:'0 0 2px', lineHeight:1.2 }}>{s.titre}</p>
+          <p style={{ color:C.blueLite, fontSize:12, fontWeight:600, margin:'0 0 4px' }}>{s.artistName}</p>
+          <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>
+            Sortie le <strong style={{ color:C.text }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long' })}</strong>
+          </p>
+          {s.description && <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.4, margin:'4px 0 0', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{s.description}</p>}
+        </div>
+      </div>
+
+      {/* Teaser compact */}
+      <div style={{ padding:'10px 12px 0' }}>
+        {estVideo ? (
+          <video src={s.teaserUrl} controls playsInline style={{ width:'100%', maxHeight:150, background:'#000', display:'block', borderRadius:8 }} />
+        ) : (
+          <audio src={s.teaserUrl} controls style={{ width:'100%', height:34 }} />
+        )}
+      </div>
+
+      <div style={{ padding:'10px 12px 12px' }}>
+        {/* Objectifs compacts */}
+        {s.objCadeaux > 0 && (
+          <div style={{ marginBottom:7 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:C.textSoft, marginBottom:3 }}>
+              <span>Cadeaux</span>
+              <span><strong style={{ color:C.text }}>{(s.cadeauxRecus || 0).toLocaleString()}</strong> / {s.objCadeaux.toLocaleString()}</span>
+            </div>
+            <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+              <div style={{ width:`${progCadeaux}%`, height:'100%', background:C.blueLite, borderRadius:99, transition:'width .4s' }} />
+            </div>
+          </div>
+        )}
+        {s.objTelech > 0 && (
+          <div style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:C.textSoft, marginBottom:3 }}>
+              <span>Pré-téléchargements</span>
+              <span><strong style={{ color:C.text }}>{(s.reservations || 0).toLocaleString()}</strong> / {s.objTelech.toLocaleString()}</span>
+            </div>
+            <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+              <div style={{ width:`${progTelech}%`, height:'100%', background:C.blue, borderRadius:99, transition:'width .4s' }} />
+            </div>
+          </div>
+        )}
+
+        {msg && <p style={{ color: msg.startsWith('✅') ? C.success:C.alert, fontSize:11, margin:'0 0 6px' }}>{msg}</p>}
+
+        {/* Bouton réserver + partage côte à côte */}
+        <div style={{ display:'flex', gap:8 }}>
+          {reserve ? (
+            <div style={{ flex:1, padding:11, borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)', textAlign:'center' }}>
+              <p style={{ color:C.success, fontWeight:700, fontSize:12, margin:0 }}>Réservé</p>
+            </div>
+          ) : (
             <button onClick={() => { alert('Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
-              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              style={{ flex:1, padding:12, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
               PRÉ-TÉLÉCHARGER / RÉSERVER
             </button>
-            <p style={{ color:'#8098b8', fontSize:11, lineHeight:1.5, margin:'8px 0 0', textAlign:'center' }}>
-              En pré-téléchargeant, vous recevrez une notification le jour de la sortie pour télécharger le titre.
-            </p>
-          </>
-        )}
+          )}
+          <button onClick={partagerSortie} title="Partager"
+            style={{ flexShrink:0, width:46, padding:0, borderRadius:10, border:`1px solid ${C.border}`, background:C.bgSecond, color:C.blueLite, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   );
