@@ -3146,19 +3146,24 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
     setEditSortie(s); setEditDesc(s.description || ''); setEditPochette(s.pochetteUrl || ''); setEditPochUploading(false);
   };
   const uploadEditPochette = async (f: File) => {
+    // Aperçu local immédiat (ne dépend pas du réseau)
+    try { setEditPochette(URL.createObjectURL(f)); } catch {}
     setEditPochUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
       const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
       const d = await r.json();
+      console.log('EDIT POCHETTE réponse:', d);
       if (d.secure_url) setEditPochette(d.secure_url);
-      else alert('Erreur upload : ' + (d?.error?.message || 'réessayez'));
-    } catch { alert('Erreur upload pochette.'); }
+      else alert('Erreur upload : ' + (d?.error?.message || JSON.stringify(d).slice(0,120)));
+    } catch(e:any) { alert('Erreur réseau : ' + (e?.message||'')); console.error(e); }
     setEditPochUploading(false);
   };
   const enregistrerEditSortie = async () => {
     if (!editSortie) return;
+    if (editPochUploading) { alert('Patientez, la pochette est en cours d\'envoi...'); return; }
+    if (editPochette.startsWith('blob:')) { alert('L\'image n\'a pas fini de s\'envoyer. Réessayez dans un instant.'); return; }
     try {
       await updateDoc(doc(db,'sorties',editSortie.id), { description: editDesc.trim(), pochetteUrl: editPochette });
       setEditSortie(null);
@@ -7556,16 +7561,20 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   };
 
   const uploadPochette = async (f: File) => {
-    setUploadingPoch(true); setMsg('');
+    setUploadingPoch(true); setMsg('Upload pochette en cours...');
     try {
       const fd = new FormData();
       fd.append('file', f);
       fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
       const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
       const data = await res.json();
-      if (data.secure_url) { setPochetteUrl(data.secure_url); setMsg('Pochette prête.'); }
-      else { const raison = data?.error?.message || 'réponse inattendue'; setMsg('Erreur upload pochette : ' + raison); }
-    } catch { setMsg('Erreur upload pochette. Réessayez.'); }
+      console.log('POCHETTE Cloudinary réponse:', data);
+      if (data.secure_url) { setPochetteUrl(data.secure_url); setMsg('Pochette chargée.'); }
+      else {
+        const raison = data?.error?.message || JSON.stringify(data).slice(0,120);
+        setMsg('Erreur pochette : ' + raison);
+      }
+    } catch(e:any) { setMsg('Erreur réseau pochette : ' + (e?.message||'')); console.error(e); }
     setUploadingPoch(false);
   };
 
