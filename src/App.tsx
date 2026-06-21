@@ -7449,19 +7449,19 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
   }, [user?.email]);
 
   const uploadFichier = async (f: File) => {
-    setUploading(true); setMsg('');
+    setUploading(true); setMsg('Upload en cours...');
     try {
       const formData = new FormData();
       formData.append('file', f);
       formData.append('upload_preset', 'doniel_unsigned');
+      // 'auto' gère audio ET vidéo (les fichiers audio passent par la ressource 'video' chez Cloudinary)
       const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: formData });
       const data = await res.json();
       if (data.secure_url) {
-        setFileUrl(data.secure_url); setFile(f); setMsg('Fichier prêt.');
+        setFileUrl(data.secure_url); setFile(f); setMsg('✓ Fichier prêt.');
         // Récupérer la durée totale du fichier (pour borner le curseur de découpe)
         if (data.duration) { setDureeTotale(Math.floor(data.duration)); }
         else {
-          // secours : lire la durée côté navigateur
           try {
             const el = document.createElement(estVideo ? 'video' : 'audio');
             el.preload = 'metadata';
@@ -7470,8 +7470,13 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           } catch {}
         }
       }
-      else setMsg('Erreur upload. Réessayez.');
-    } catch { setMsg('Erreur upload. Réessayez.'); }
+      else {
+        // Afficher la vraie raison renvoyée par Cloudinary
+        const raison = data?.error?.message || 'réponse inattendue';
+        setMsg('Erreur upload : ' + raison);
+        console.error('Cloudinary upload error', data);
+      }
+    } catch(e:any) { setMsg('Erreur réseau : ' + (e?.message || 'connexion')); console.error(e); }
     setUploading(false);
   };
 
@@ -7614,10 +7619,21 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         </select>
 
         <label style={S.lbl}>{mode === 'sortie' ? `Fichier complet (${estVideo ? 'vidéo' : 'audio'}) *` : `Fichier (${estVideo ? 'vidéo' : 'audio'}) *`}</label>
-        <input type="file" accept={estVideo ? 'video/*' : 'audio/*'}
+        <input type="file" accept={estVideo ? 'video/*' : 'audio/*'} id="inputFichierContenu"
           onChange={e => e.target.files?.[0] && uploadFichier(e.target.files[0])}
-          style={{ ...S.inp, padding:8 }} />
-        {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
+          style={{ display:'none' }} />
+        <label htmlFor="inputFichierContenu" style={{
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6,
+          border:`2px dashed ${fileUrl ? '#00a040' : '#1a6bff'}`, borderRadius:12, padding:'22px 14px',
+          background: fileUrl ? '#eafaf0' : '#f0f6ff', cursor:'pointer', textAlign:'center', marginBottom:6 }}>
+          <span style={{ fontSize:30 }}>{uploading ? '⏳' : fileUrl ? '✓' : (estVideo ? '🎬' : '🎵')}</span>
+          <span style={{ fontSize:13, fontWeight:700, color: fileUrl ? '#00a040' : '#1a6bff' }}>
+            {uploading ? 'Upload en cours...' : fileUrl ? 'Fichier chargé — cliquez pour changer' : `Cliquez pour choisir votre ${estVideo ? 'vidéo' : 'audio'}`}
+          </span>
+          <span style={{ fontSize:11, color:'#8098b8' }}>
+            {file?.name ? file.name : (estVideo ? 'Formats vidéo acceptés' : 'Formats audio acceptés (MP3, WAV...)')}
+          </span>
+        </label>
         {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
 
         <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
