@@ -542,14 +542,16 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
       setShowRecharge(true);
       return;
     }
-    setSending(kiffement.id);
+    // SOLDE OPTIMISTE : on débite tout de suite à l'écran pour que les clics suivants soient instantanés
+    setSoldeCoins(s => s - kiffement.coins);
     try {
-      // Débiter les Oscart
+      // Débiter les Oscart (on lit la vraie valeur en base pour éviter tout double débit)
       const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       if (!snap.empty) {
         const curSolde = snap.docs[0].data();
+        const soldeReel = curSolde.solde || 0;
         await updateDoc(doc(db,'coins_solde',snap.docs[0].id), {
-          solde: soldeCoins - kiffement.coins,
+          solde: Math.max(0, soldeReel - kiffement.coins),
           kiffsDispo: (curSolde.kiffsDispo || 0) + kiffement.coins * 250,
         });
         logTx(user.uid, 'kiffement', -kiffement.coins, kiffement.coins * 250, `Kiffement ${kiffement.label}`);
@@ -695,9 +697,9 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
 
       {open && (
         <div onClick={() => { setOpen(false); onClose?.(); }} style={{ position:'fixed', inset:0, zIndex:9980, background:'rgba(0,0,0,0.4)' }}>
-        <div onClick={e => e.stopPropagation()} style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'14px 14px 16px', width:'92%', maxWidth:440, maxHeight:'56vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}>
+        <div onClick={e => e.stopPropagation()} style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:16, padding:'10px 12px 12px', width:'88%', maxWidth:380, maxHeight:'44vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}>
           <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}}`}</style>
-          <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'4px auto 12px' }} />
+          <div style={{ width:36, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'2px auto 10px' }} />
 
           {/* Solde Oscart */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
@@ -737,15 +739,15 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
             @keyframes kifFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
             .kif-card:active { transform:scale(0.92); }
           `}</style>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
           {KIFFEMENTS.map((k, ki) => {
             const canSend = soldeCoins >= k.coins;
             return (
               <button key={k.id} className="kif-card" onClick={() => handleClick(k)} disabled={sending === k.id}
-                style={{ padding:'12px 4px 10px', borderRadius:14, border:`1px solid ${canSend?'rgba(60,150,255,0.35)':'rgba(255,255,255,0.05)'}`, background: canSend?'linear-gradient(160deg,rgba(60,150,255,0.12),rgba(60,150,255,0.04))':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.45, transition:'transform .12s' }}>
-                <img src={k.image} alt={k.label} style={{ width:46, height:46, objectFit:'contain', margin:'0 auto 5px', display:'block', filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.4))', animation: canSend?`kifFloat 3s ease-in-out ${ki*0.2}s infinite`:'none' }} />
-                <p style={{ color: canSend?C.text:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{k.label}</p>
-                <p style={{ color:C.gold, fontSize:10, margin:0, display:'inline-flex', alignItems:'center', gap:2, justifyContent:'center' }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:11, height:11 }} />{k.coins}</p>
+                style={{ padding:'9px 4px 8px', borderRadius:12, border:`1px solid ${canSend?'rgba(60,150,255,0.35)':'rgba(255,255,255,0.05)'}`, background: canSend?'linear-gradient(160deg,rgba(60,150,255,0.12),rgba(60,150,255,0.04))':'rgba(255,255,255,0.02)', cursor: canSend?'pointer':'not-allowed', textAlign:'center', opacity: canSend?1:0.45, transition:'transform .12s' }}>
+                <img src={k.image} alt={k.label} style={{ width:38, height:38, objectFit:'contain', margin:'0 auto 4px', display:'block', filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.4))', animation: canSend?`kifFloat 3s ease-in-out ${ki*0.2}s infinite`:'none' }} />
+                <p style={{ color: canSend?C.text:C.textSoft, fontSize:10, fontWeight:700, margin:'0 0 2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{k.label}</p>
+                <p style={{ color:C.gold, fontSize:9, margin:0, display:'inline-flex', alignItems:'center', gap:2, justifyContent:'center' }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:10, height:10 }} />{k.coins}</p>
               </button>
             );
           })}
@@ -1159,6 +1161,8 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
   qrId: string, artistEmail?: string, buzz: number, tutoStep: number, onTutoNext: () => void
 }) {
   const [kiffs, setKiffs] = useState(0);
+  const kiffsBase = useRef(0); // dernier total connu de Firestore
+  const [kiffsLocaux, setKiffsLocaux] = useState(0); // +1 instantanés en attente de synchro
   const [justKiffed, setJustKiffed] = useState(false);
   const [flyHearts, setFlyHearts] = useState<{id:number,dx:number,size:number,dur:number,sway:number}[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -1172,7 +1176,10 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 
   useEffect(() => {
     const unsub1 = onSnapshot(doc(db,'kiffs_compteur', qrId), snap => {
-      setKiffs(snap.exists() ? (snap.data().total || 0) : 0);
+      const total = snap.exists() ? (snap.data().total || 0) : 0;
+      kiffsBase.current = total;
+      setKiffs(total);
+      setKiffsLocaux(0); // Firestore a rattrapé → on annule l'offset optimiste
     });
     const unsub2 = onSnapshot(query(collection(db,'commentaires'),where('qrId','==',qrId)), snap => setCommentCount(snap.size));
     const unsub3 = onSnapshot(query(collection(db,'cadeaux'),where('qrId','==',qrId)), snap => {
@@ -1197,6 +1204,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       sway: (Math.random() - 0.5) * 80,
     }];
     setFlyHearts(h => [...h, ...news]);
+    setKiffsLocaux(n => n + 1); // +1 INSTANTANÉ à l'écran, sans attendre Firestore
     setTimeout(() => setFlyHearts(h => h.filter(x => x.id !== id)), 1800);
     setJustKiffed(true); setTimeout(() => setJustKiffed(false), 250);
     if (tutoStep === 3) onTutoNext();
@@ -1246,7 +1254,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
           <svg width="20" height="20" viewBox="0 0 24 24" fill={justKiffed?'#ff3b6b':'none'} stroke={justKiffed?'#ff3b6b':'#8098b8'} strokeWidth="2" style={{ animation: justKiffed ? 'heartPop .3s ease' : 'none' }}>
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-          <span style={{ fontSize:10, fontWeight:700, display:'inline-block', animation: justKiffed ? 'countPop .3s ease' : 'none' }}>Kiff {kiffs > 0 ? kiffs : ''}</span>
+          <span style={{ fontSize:10, fontWeight:700, display:'inline-block', animation: justKiffed ? 'countPop .3s ease' : 'none' }}>Kiff {(kiffs + kiffsLocaux) > 0 ? (kiffs + kiffsLocaux) : ''}</span>
         </button>
 
         {/* COMMENTER */}
