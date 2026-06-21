@@ -680,7 +680,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
 
             {/* PAIEMENT EN MAINTENANCE */}
             <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-              <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+              
               <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
               <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
                 La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
@@ -3137,6 +3137,34 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
     try { await deleteDoc(doc(db,'sorties',sortie.id)); } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
+  // Modifier une sortie existante (pochette + description) sans tout refaire
+  const [editSortie, setEditSortie] = useState<any>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editPochette, setEditPochette] = useState('');
+  const [editPochUploading, setEditPochUploading] = useState(false);
+  const ouvrirEditSortie = (s: any) => {
+    setEditSortie(s); setEditDesc(s.description || ''); setEditPochette(s.pochetteUrl || ''); setEditPochUploading(false);
+  };
+  const uploadEditPochette = async (f: File) => {
+    setEditPochUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
+      const d = await r.json();
+      if (d.secure_url) setEditPochette(d.secure_url);
+      else alert('Erreur upload : ' + (d?.error?.message || 'réessayez'));
+    } catch { alert('Erreur upload pochette.'); }
+    setEditPochUploading(false);
+  };
+  const enregistrerEditSortie = async () => {
+    if (!editSortie) return;
+    try {
+      await updateDoc(doc(db,'sorties',editSortie.id), { description: editDesc.trim(), pochetteUrl: editPochette });
+      setEditSortie(null);
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
+
   const aVenir = sorties.filter(s => s.statut === 'a_venir');
   const lancees = sorties.filter(s => s.statut === 'sortie');
 
@@ -3164,8 +3192,8 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
               </div>
             </div>
             <div style={{ display:'flex', gap:10, marginBottom:10, flexWrap:'wrap' }}>
-              <a href={s.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>▶ Écouter le teaser</a>
-              {s.pochetteUrl && <a href={s.pochetteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>🖼 Voir la pochette</a>}
+              <a href={s.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>Écouter le teaser</a>
+              {s.pochetteUrl && <a href={s.pochetteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:'#1a6bff', fontWeight:700 }}>Voir la pochette</a>}
             </div>
             {s.pochetteUrl && <img src={s.pochetteUrl} alt="pochette" style={{ width:90, height:90, objectFit:'cover', borderRadius:10, marginBottom:10 }} />}
             {canValidate && (
@@ -3203,7 +3231,7 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
                 <>
                   <button onClick={() => lancerSortieAuto(s)} disabled={uploadingSortie===s.id}
                     style={{ display:'block', width:'100%', padding:'10px 14px', borderRadius:8, background:'#00a040', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', border:'none', marginBottom:8 }}>
-                    {uploadingSortie===s.id ? 'Lancement...' : '🚀 Lancer maintenant (fichier déjà prêt)'}
+                    {uploadingSortie===s.id ? 'Lancement...' : 'Lancer maintenant (fichier déjà prêt)'}
                   </button>
                   <p style={{ color:'#5a7090', fontSize:10, margin:'0 0 8px' }}>Le fichier complet a été chargé par l'artiste : aucun nouvel upload nécessaire.</p>
                 </>
@@ -3214,7 +3242,10 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
                 </label>
               )}
             </div>
-            {canDelete && <button onClick={() => supprimerSortie(s)} style={{ ...S.btnRed, fontSize:11, padding:'4px 10px', marginTop:10 }}>Supprimer</button>}
+            <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+              <button onClick={() => ouvrirEditSortie(s)} style={{ ...S.btn2, fontSize:11, padding:'4px 12px' }}>Modifier pochette / description</button>
+              {canDelete && <button onClick={() => supprimerSortie(s)} style={{ ...S.btnRed, fontSize:11, padding:'4px 10px' }}>Supprimer</button>}
+            </div>
           </div>
           );
         })}
@@ -3230,6 +3261,39 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
               <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{s.artistName} · {(s.reservations||0).toLocaleString()} téléchargement(s) réservé(s)</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* MODAL — modifier pochette / description d'une sortie */}
+      {editSortie && (
+        <div onClick={() => setEditSortie(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:16, padding:20, maxWidth:420, width:'100%', maxHeight:'85vh', overflowY:'auto' }}>
+            <h3 style={{ fontFamily:'serif', fontSize:19, margin:'0 0 4px' }}>Modifier la sortie</h3>
+            <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 16px' }}>{editSortie.titre} — {editSortie.artistName}</p>
+
+            <label style={S.lbl}>Pochette</label>
+            <input type="file" accept="image/*" id="editSortiePoch" style={{ display:'none' }}
+              onChange={e => e.target.files?.[0] && uploadEditPochette(e.target.files[0])} />
+            <label htmlFor="editSortiePoch" style={{ display:'flex', alignItems:'center', gap:14, border:`2px dashed ${editPochette?'#00a040':'#1a6bff'}`, borderRadius:12, padding:12, background: editPochette?'#eafaf0':'#f0f6ff', cursor:'pointer', marginBottom:14 }}>
+              {editPochette ? (
+                <img src={editPochette} alt="pochette" style={{ width:64, height:64, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
+              ) : (
+                <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:'#5a7090' }}>IMG</div>
+              )}
+              <span style={{ fontSize:13, fontWeight:700, color: editPochette?'#00a040':'#1a6bff' }}>
+                {editPochUploading ? 'Upload...' : editPochette ? 'Changer l\u2019image' : 'Ajouter une pochette'}
+              </span>
+            </label>
+
+            <label style={S.lbl}>Description</label>
+            <textarea style={{ ...S.inp, minHeight:70, resize:'vertical' }} value={editDesc} onChange={e => setEditDesc(e.target.value)}
+              placeholder="Description du titre..." />
+
+            <div style={{ display:'flex', gap:10, marginTop:16 }}>
+              <button onClick={enregistrerEditSortie} style={{ flex:2, padding:12, borderRadius:10, border:'none', background:'#00a040', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>Enregistrer</button>
+              <button onClick={() => setEditSortie(null)} style={{ flex:1, padding:12, borderRadius:10, border:'1px solid #ccc', background:'transparent', color:'#666', fontWeight:700, fontSize:14, cursor:'pointer' }}>Annuler</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -3365,14 +3429,14 @@ function ProductionTab() {
                   {joursRestants > 0 ? `J-${joursRestants}` : 'Jour J'}
                 </span>
               </div>
-              <a href={s.teaserUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', fontSize:12, color:'#1a6bff', marginBottom:10 }}>▶ Écouter le teaser</a>
+              <a href={s.teaserUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-block', fontSize:12, color:'#1a6bff', marginBottom:10 }}>Écouter le teaser</a>
               <div style={{ background:'#fff8e6', borderRadius:8, padding:'10px 12px' }}>
                 <p style={{ color:'#b07a00', fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Le jour J : débloquez le fichier complet pour les téléchargements réservés.</p>
                 {s.fichierComplet ? (
                   <>
                     <button onClick={() => lancerSortieAuto(s)} disabled={uploadingSortie===s.id}
                       style={{ display:'block', width:'100%', padding:'10px 14px', borderRadius:8, background:'#00a040', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', border:'none', marginBottom:8 }}>
-                      {uploadingSortie===s.id ? 'Lancement...' : '🚀 Lancer maintenant (fichier déjà prêt)'}
+                      {uploadingSortie===s.id ? 'Lancement...' : 'Lancer maintenant (fichier déjà prêt)'}
                     </button>
                     <p style={{ color:'#5a7090', fontSize:10, margin:0 }}>Le fichier complet a été chargé par l'artiste : aucun nouvel upload nécessaire.</p>
                   </>
@@ -4984,7 +5048,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               <div style={{ flex: 1 }}>
                 <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadEditCover(e.target.files[0])} style={{ display: 'none' }} id="editCoverInput" />
                 <label htmlFor="editCoverInput" style={{ ...S.btn2, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block' }}>
-                  {editCover ? '🖼️ Changer l\u2019image' : '🖼️ Ajouter une image'}
+                  {editCover ? 'Changer l\u2019image' : 'Ajouter une image'}
                 </label>
                 {editCoverUploading && <p style={{ color: '#1a6bff', fontSize: 12, marginTop: 6 }}>Envoi de l\u2019image...</p>}
               </div>
@@ -5197,7 +5261,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                   <button key={t} onClick={() => setNewType(t)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid ' + (newType === t ? '#1a6bff' : '#c8d8ef'), background: newType === t ? '#eaf1ff' : 'transparent', color: newType === t ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 12 }}>{l}</button>
                 ))}
               </div>
-              <label style={S.lbl}>🖼️ Image de pochette (obligatoire)</label>
+              <label style={S.lbl}>Image de pochette (obligatoire)</label>
               <div style={{ border: '2px dashed #b8cce8', borderRadius: 12, padding: 18, marginBottom: 14, textAlign: 'center', background: '#f5f8ff' }}>
                 <input type="file" accept="image/*" onChange={e => setCoverFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="coverInput" />
                 <label htmlFor="coverInput" style={{ ...S.btn2, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block', marginBottom: 10 }}>📷 Choisir l'image</label>
@@ -5969,7 +6033,7 @@ function ArtistPage() {
                   <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
                   <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
                   <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-                    <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+                    
                     <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
                     <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
                       La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
@@ -7463,7 +7527,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body: formData });
       const data = await res.json();
       if (data.secure_url) {
-        setFileUrl(data.secure_url); setFile(f); setMsg('✓ Fichier prêt.');
+        setFileUrl(data.secure_url); setFile(f); setMsg('Fichier prêt.');
         if (data.duration) { setDureeTotale(Math.floor(data.duration)); }
         else {
           try {
@@ -7632,7 +7696,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6,
           border:`2px dashed ${fileUrl ? '#00a040' : '#1a6bff'}`, borderRadius:12, padding:'22px 14px',
           background: fileUrl ? '#eafaf0' : '#f0f6ff', cursor:'pointer', textAlign:'center', marginBottom:6 }}>
-          <span style={{ fontSize:30 }}>{uploading ? '⏳' : fileUrl ? '✓' : (estVideo ? '🎬' : '🎵')}</span>
+          <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{uploading ? 'Envoi...' : fileUrl ? 'OK' : 'FICHIER'}</span>
           <span style={{ fontSize:13, fontWeight:700, color: fileUrl ? '#00a040' : '#1a6bff' }}>
             {uploading ? 'Upload en cours...' : fileUrl ? 'Fichier chargé — cliquez pour changer' : `Cliquez pour choisir votre ${estVideo ? 'vidéo' : 'audio'}`}
           </span>
@@ -7640,7 +7704,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
             {file?.name ? file.name : (estVideo ? 'Formats vidéo acceptés' : 'Formats audio acceptés (MP3, WAV...)')}
           </span>
         </label>
-        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
+        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
 
         <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
         <input type="file" accept="image/*" id="inputPochetteContenu"
@@ -7653,7 +7717,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
           {pochetteUrl ? (
             <img src={pochetteUrl} alt="pochette" style={{ width:64, height:64, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
           ) : (
-            <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:26 }}>🖼️</div>
+            <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:'#5a7090' }}>IMG</div>
           )}
           <div>
             <p style={{ fontSize:13, fontWeight:700, color: pochetteUrl ? '#00a040' : '#1a6bff', margin:'0 0 2px' }}>
@@ -7676,7 +7740,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
             {/* ───── OUTIL DE DÉCOUPE DU TEASER ───── */}
             {fileUrl && (
               <div style={{ background:'#f0f6ff', border:'1px solid #b8d4f5', borderRadius:14, padding:16, margin:'14px 0' }}>
-                <p style={{ color:'#1a6bff', fontSize:13, fontWeight:800, margin:'0 0 4px' }}>🎬 Créer l'extrait teaser</p>
+                <p style={{ color:'#1a6bff', fontSize:13, fontWeight:800, margin:'0 0 4px' }}>Créer l'extrait teaser</p>
                 <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.6, margin:'0 0 14px' }}>
                   Choisissez le passage que le public écoutera <strong>avant la sortie</strong>. Le fichier complet reste protégé : il ne sera débloqué que le jour J pour ceux qui ont réservé.
                 </p>
@@ -8314,7 +8378,7 @@ function CarteSortie({ s }: { s: any }) {
       if (s.artistEmail) {
         await addDoc(collection(db,'notifications'), {
           to: s.artistEmail, type:'reservation_artiste', sortieId: s.id,
-          text: `🎉 Quelqu'un a réservé votre sortie "${s.titre}" ! Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`,
+          text: `Quelqu'un a réservé votre sortie "${s.titre}" ! Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`,
           createdAt: new Date().toISOString(), lu:false,
         });
       }
@@ -8328,7 +8392,7 @@ function CarteSortie({ s }: { s: any }) {
     <div style={{ marginBottom:16, background:'rgba(224,168,46,0.06)', border:'1px solid rgba(224,168,46,0.3)', borderRadius:16, overflow:'hidden' }}>
       {/* Badge SORTIE OFFICIELLE */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(224,168,46,0.12)' }}>
-        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>🎵 SORTIE OFFICIELLE</span>
+        <span style={{ color:'#E0A82E', fontWeight:800, fontSize:11, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
         <span style={{ color:'#E0A82E', fontSize:12, fontWeight:700 }}>
           {estSorti ? 'Disponible !' : `J-${cdJours}`}
         </span>
@@ -8345,7 +8409,7 @@ function CarteSortie({ s }: { s: any }) {
       ) : (
         <div style={{ padding:'12px 14px 0' }}>
           <audio src={s.teaserUrl} controls style={{ width:'100%' }} />
-          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>▶ Extrait — version complète le jour de la sortie</p>
+          <p style={{ color:'#8098b8', fontSize:11, margin:'6px 0 0', textAlign:'center' }}>Extrait — version complète le jour de la sortie</p>
         </div>
       )}
 
@@ -8355,7 +8419,7 @@ function CarteSortie({ s }: { s: any }) {
         {s.description && <p style={{ color:'#cad4e8', fontSize:13, lineHeight:1.6, margin:'0 0 12px' }}>{s.description}</p>}
 
         <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 14px' }}>
-          📅 Sortie prévue le <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long', year:'numeric' })}</strong>
+          Sortie prévue le <strong style={{ color:'#fff' }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long', year:'numeric' })}</strong>
         </p>
 
         {/* COMPTE À REBOURS en direct */}
@@ -8378,7 +8442,7 @@ function CarteSortie({ s }: { s: any }) {
         {s.objCadeaux > 0 && (
           <div style={{ marginBottom:10 }}>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
-              <span>🎁 Objectif cadeaux</span>
+              <span>Objectif cadeaux</span>
               <span><strong style={{ color:'#fff' }}>{(s.cadeauxRecus || 0).toLocaleString()}</strong> / {s.objCadeaux.toLocaleString()}</span>
             </div>
             <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -8391,7 +8455,7 @@ function CarteSortie({ s }: { s: any }) {
         {s.objTelech > 0 && (
           <div style={{ marginBottom:14 }}>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#cad4e8', marginBottom:4 }}>
-              <span>⬇️ Objectif pré-téléchargements</span>
+              <span>Objectif pré-téléchargements</span>
               <span><strong style={{ color:'#fff' }}>{(s.reservations || 0).toLocaleString()}</strong> / {s.objTelech.toLocaleString()}</span>
             </div>
             <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -8404,13 +8468,13 @@ function CarteSortie({ s }: { s: any }) {
 
         {reserve ? (
           <div style={{ padding:12, borderRadius:10, background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.3)', textAlign:'center' }}>
-            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>✓ Réservé — vous serez notifié le jour J</p>
+            <p style={{ color:'#4dff9a', fontWeight:700, fontSize:13, margin:0 }}>Réservé — vous serez notifié le jour J</p>
           </div>
         ) : (
           <>
-            <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
+            <button onClick={() => { alert('Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
               style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              <span style={{ fontSize:18 }}>⬇️</span> PRÉ-TÉLÉCHARGER / RÉSERVER
+              PRÉ-TÉLÉCHARGER / RÉSERVER
             </button>
             <p style={{ color:'#8098b8', fontSize:11, lineHeight:1.5, margin:'8px 0 0', textAlign:'center' }}>
               En pré-téléchargeant, vous recevrez une notification le jour de la sortie pour télécharger le titre.
@@ -8966,7 +9030,7 @@ function ProfilPage() {
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
               <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
               <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-                <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+                
                 <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
                 <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
                   La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
@@ -11817,7 +11881,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
             <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-              <p style={{ fontSize:32, margin:'0 0 8px' }}>🔧</p>
+              
               <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
               <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
                 La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
@@ -11832,7 +11896,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
       )}
 
       {/* Bouton paiement direct (utilisé dans le modal de AchatWidget) */}
-      <button onClick={() => { alert('🔧 Paiement temporairement indisponible.\n\nLe téléchargement payant est en cours de maintenance. Il sera bientôt disponible. Merci de votre patience.'); }}
+      <button onClick={() => { alert('Paiement temporairement indisponible.\n\nLe téléchargement payant est en cours de maintenance. Il sera bientôt disponible. Merci de votre patience.'); }}
         style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
         Téléchargement payant (maintenance)
       </button>
