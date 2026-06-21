@@ -1447,6 +1447,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
   // Pub plein écran après arrêt/fin
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [pendingNext, setPendingNext] = useState(false);
+  void showPubAfter; void setShowPubAfter; void pendingNext; void setPendingNext;
   const [showPlaylist, setShowPlaylist] = useState(false);
 
   // Pub pendant lecture SUPPRIMÉE — la pub vient uniquement APRÈS la lecture complète
@@ -1459,11 +1460,6 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       ref.current.pause();
       setPlaying(false);
       stopLevelLoop();
-      // Timer 7s — si pas de reprise → pub plein écran
-      stopTimer.current = setTimeout(() => {
-        setPendingNext(false);
-        setShowPubAfter(true);
-      }, 7000);
     } else {
       if (stopTimer.current) clearTimeout(stopTimer.current);
       streamStart.current = Date.now() / 1000;
@@ -1486,23 +1482,13 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; }
   };
 
-  const afterPub = () => {
-    setShowPubAfter(false);
-    if (pendingNext && idx < files.length - 1) {
-      setIdx(i => i + 1);
-      setPlaying(true);
-      streamStart.current = Date.now() / 1000;
-    }
-    setPendingNext(false);
-  };
+  const afterPub = () => {};
+  void afterPub;
 
   if (!files || files.length === 0) return null;
 
   return (
     <div style={{ background: 'rgba(20,28,48,0.92)', borderRadius: 16, padding: '12px 14px', border: '1px solid '+C.border, boxShadow: '0 6px 24px rgba(0,0,0,0.4)' }}>
-
-      {/* PUB plein écran APRÈS arrêt/fin uniquement */}
-      {showPubAfter && <PubOverlay trigger="track" onDone={afterPub} />}
 
       <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
         onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
@@ -1510,9 +1496,8 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
         onEnded={() => {
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) {
-            setPlaying(false);
-            setPendingNext(true);
-            setShowPubAfter(true);
+            setIdx(i => i + 1);
+            setPlaying(true);
           } else { setPlaying(false); }
         }}
         preload="metadata" />
@@ -1690,9 +1675,11 @@ function TutoCascade({ onDone }: { onDone: () => void }) {
 function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
   const [idx, setIdx] = useState(0);
   const [showPubBefore, setShowPubBefore] = useState(false);
+  void setShowPubBefore;
   const [showPubAfter, setShowPubAfter] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [pendingIdx, setPendingIdx] = useState<number|null>(null);
+  void pendingIdx; void setPendingIdx;
   const ref = useRef<HTMLVideoElement>(null);
   const countRef = useRef<any>(null);
   if (!files || files.length === 0) return null;
@@ -1727,33 +1714,19 @@ function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
         </div>
       )}
 
-      {/* Pub avant lecture vidéo SUPPRIMÉE — pub seulement après */}
-
-      {/* Pub après fin vidéo */}
-      {showPubAfter && (
-        <PubOverlay trigger="track" onDone={() => {
-          setShowPubAfter(false);
-          if (pendingIdx !== null) {
-            setIdx(pendingIdx);
-            setPendingIdx(null);
-            // Pas de pub avant la vidéo suivante — seulement à la fin
-          }
-        }} />
-      )}
-
       {/* Lecteur vidéo */}
-      {!showPubBefore && !showPubAfter && (
+      {!showPubBefore && (
         <video
           ref={ref}
           key={cur?.url}
           src={cur?.url}
           controls
           controlsList="nodownload"
+          autoPlay
           style={{ width: '100%', maxHeight: 280, background: '#000', display: 'block' }}
           onEnded={() => {
             if (idx < files.length - 1) {
-              setPendingIdx(idx + 1);
-              setShowPubAfter(true);
+              setIdx(idx + 1);
             }
           }}
         />
@@ -1769,12 +1742,7 @@ function VideoPlayer({ files, onPlay }: { files: any[], onPlay?: () => void }) {
       {files.length > 1 && (
         <div style={{ padding: '8px 0', background:'rgba(0,0,0,0.6)' }}>
           {files.map((f, i) => (
-            <div key={i} onClick={() => {
-              if (i !== idx) {
-                setPendingIdx(i);
-                setShowPubAfter(true);
-              }
-            }}
+            <div key={i} onClick={() => { if (i !== idx) setIdx(i); }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer', background: i === idx ? 'rgba(30,111,255,0.2)' : 'transparent' }}>
               <span style={{ color: i === idx ? '#4da6ff' : 'rgba(255,255,255,0.4)', fontSize: 14 }}>{i === idx ? '▶' : '○'}</span>
               <span style={{ fontSize: 12, color: i === idx ? '#fff' : 'rgba(255,255,255,0.6)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -2086,7 +2054,7 @@ function FanPage() {
       }
       setDlProgress(100);
       setStep('done');
-      setShowPubAfterDL(true);
+      setShowPubAfterDL(false);
       if (zikoState === 'idle') setShowZikoTuto(true);
       return;
     }
@@ -2114,7 +2082,7 @@ function FanPage() {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       await markAsDownloaded();
       setDlStatus('Telechargement lance !');
-      setShowPubAfterDL(true); // pub après DL desktop
+      setShowPubAfterDL(false);
       setTimeout(() => setStep('done'), 1500);
     } catch (e: any) {
       setDlStatus('Erreur: ' + e.message);
@@ -2153,7 +2121,7 @@ function FanPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {showPubAfterDL && (
+      {false && showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
       )}
 
@@ -6850,6 +6818,7 @@ function ZikothequePage({ user }: { user: any }) {
 
   const [showPubZiko, setShowPubZiko] = useState(false);
   const [pendingNextZiko, setPendingNextZiko] = useState(false);
+  void showPubZiko; void setShowPubZiko; void pendingNextZiko; void setPendingNextZiko;
 
   const playAlbum = (item: any, trackIdx = 0) => {
     // Lecture directe sans pub avant
@@ -6867,23 +6836,20 @@ function ZikothequePage({ user }: { user: any }) {
     if (playing) {
       audioRef.current.pause();
       setPlaying(false);
-      // Pub après arrêt
-      setPendingNextZiko(false);
-      setShowPubZiko(true);
     } else {
-      // Lecture directe
       audioRef.current.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
   };
 
   const onEnded = () => {
+    // Enchaîner directement sur la piste suivante (sans pub)
     if (currentTrackIdx < currentFiles.length - 1) {
-      // Pub après fin de piste
+      setCurrentTrackIdx(i => i + 1);
+      setPlaying(true);
+    } else {
       setPlaying(false);
-      setPendingNextZiko(true);
-      setShowPubZiko(true);
-    } else { setPlaying(false); }
+    }
   };
 
   const logout = async () => { await signOut(auth); };
@@ -6897,18 +6863,6 @@ function ZikothequePage({ user }: { user: any }) {
         .track-row:hover { background: rgba(30,111,255,0.08) !important; }
         .album-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(30,111,255,0.15) !important; }
       `}</style>
-
-      {/* PUB après arrêt ou fin de piste */}
-      {showPubZiko && (
-        <PubOverlay trigger="track" onDone={() => {
-          setShowPubZiko(false);
-          if (pendingNextZiko && currentTrackIdx < currentFiles.length - 1) {
-            setCurrentTrackIdx(i => i + 1);
-            setPlaying(true);
-          }
-          setPendingNextZiko(false);
-        }} />
-      )}
 
       {/* AUDIO ENGINE */}
       {currentTrack && (
@@ -11951,7 +11905,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
     const unsub = onSnapshot(doc(db, 'ventes', venteId), (d) => {
       if (d.exists() && d.data()?.dlActive) {
         setDlActive(true);
-        setShowPubAfterPay(true); // pub après paiement confirmé
+        setShowPubAfterPay(false);
       }
     });
     return unsub;
@@ -12032,7 +11986,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
   if (dlActive) return (
     <div style={{ marginBottom:20 }}>
       {/* Pub après paiement confirmé */}
-      {showPubAfterPay && (
+      {false && showPubAfterPay && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterPay(false)} />
       )}
       <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
