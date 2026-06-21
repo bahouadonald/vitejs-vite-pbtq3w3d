@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Doniel Zik" />
-    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="theme-color" content="#0E2A52" />
     <meta name="description" content="Doniel Zik — l'écosystème des créateurs africains. Musique, cinéma, humour, publicité." />
     <link rel="manifest" href="/manifest.json" />
     <meta property="og:title" content="Doniel Zik" />
@@ -20,45 +20,57 @@
 
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { background: #FFFFFF !important; }
-      #root { background: #FFFFFF; min-height: 100vh; opacity: 1; }
+      html, body { background: #0E2A52 !important; }
+      #root { background: #0E2A52; min-height: 100vh; opacity: 1; }
 
       #splash {
         position: fixed; inset: 0;
-        background: #FFFFFF;
+        background:
+          radial-gradient(circle at 50% 38%, rgba(60,150,255,0.28), transparent 55%),
+          linear-gradient(165deg, #0A2148 0%, #0E2A52 50%, #143665 100%);
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         z-index: 99999; opacity: 1; transition: opacity 0.35s ease;
         font-family: -apple-system, 'DM Sans', sans-serif;
       }
       #splash.hiding { opacity: 0; pointer-events: none; }
 
-      #logo-wrap { position: relative; margin-bottom: 34px; display: flex; align-items: center; justify-content: center; }
+      #logo-wrap { position: relative; margin-bottom: 38px; display: flex; align-items: center; justify-content: center; }
+      #logo-glow {
+        position: absolute; width: 230px; height: 230px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(60,150,255,0.4), rgba(91,176,255,0.15) 45%, transparent 70%);
+        filter: blur(10px); animation: glowPulse 3.5s ease-in-out infinite;
+      }
+      /* Le logo a un fond blanc : "screen" rend ce blanc transparent sur le fond bleu foncé */
       #logo-img {
         position: relative; width: 120px; height: 120px; object-fit: contain;
-        animation: breathe 3s ease-in-out infinite;
+        animation: breathe 3.5s ease-in-out infinite;
+        filter: drop-shadow(0 8px 28px rgba(0,0,0,0.45));
+        mix-blend-mode: screen;
       }
       @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+      @keyframes glowPulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
 
-      #splash-title { text-align: center; margin-bottom: 28px; }
+      #splash-title { text-align: center; margin-bottom: 30px; }
       #splash-title .line {
-        font-size: 26px; font-weight: 800; color: #0E2A52;
+        font-size: 26px; font-weight: 800; color: #ffffff;
         letter-spacing: 0.5px; line-height: 1.25; opacity: 0;
-        animation: fadeUp 0.6s ease forwards;
+        animation: fadeUp 0.7s ease forwards;
       }
-      #splash-title .line:nth-child(1) { animation-delay: 0.15s; }
-      #splash-title .line:nth-child(2) { animation-delay: 0.30s; color: #0A84FF; }
-      #splash-title .line:nth-child(3) { animation-delay: 0.45s; color: #0A84FF; }
+      #splash-title .line:nth-child(1) { animation-delay: 0.2s; }
+      #splash-title .line:nth-child(2) { animation-delay: 0.45s; color: #5BB0FF; }
+      #splash-title .line:nth-child(3) { animation-delay: 0.7s; color: #F5C84C; }
       @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-      #splash-bar-wrap { width: 200px; background: rgba(14,42,82,0.1); border-radius: 99px; height: 4px; overflow: hidden; margin-bottom: 16px; }
+      #splash-bar-wrap { width: 200px; background: rgba(255,255,255,0.1); border-radius: 99px; height: 4px; overflow: hidden; margin-bottom: 16px; }
       #splash-bar-inner {
         width: 0%; height: 100%;
         background: linear-gradient(90deg, #0A84FF, #5BB0FF);
-        border-radius: 99px; animation: barFill 1.2s ease forwards;
+        border-radius: 99px; animation: barFill 1.4s ease forwards;
+        box-shadow: 0 0 12px rgba(91,176,255,0.7);
       }
       @keyframes barFill { to { width: 100%; } }
       #splash-tagline {
-        position: absolute; bottom: 42px; color: rgba(14,42,82,0.45);
+        position: absolute; bottom: 42px; color: rgba(170,190,220,0.6);
         font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 600;
       }
     </style>
@@ -67,6 +79,7 @@
   <body>
     <div id="splash">
       <div id="logo-wrap">
+        <div id="logo-glow"></div>
         <img id="logo-img" src="/icons/icon-512x512.png" alt="Doniel Zik"
           onerror="this.onerror=null; this.src='/icons/icon-192x192.png';" />
       </div>
@@ -82,8 +95,8 @@
     <div id="root"></div>
 
     <script>
-      // Le splash se cache dès que l'app React est prête (signal envoyé par main.tsx),
-      // avec un filet de sécurité à 1,5s maximum si le signal n'arrive pas.
+      // Le splash se cache dès que l'app React est prête (signal window.__hideSplash),
+      // avec un filet de sécurité à 1,6s maximum. Un seul écran de chargement, pas de doublon.
       (function () {
         var hidden = false;
         function hideSplash() {
@@ -95,10 +108,8 @@
             setTimeout(function () { if (s && s.parentNode) s.remove(); }, 400);
           }
         }
-        // Signal envoyé par l'app quand elle a fini de monter
         window.__hideSplash = hideSplash;
-        // Filet de sécurité : 1,5s maximum
-        setTimeout(hideSplash, 1500);
+        setTimeout(hideSplash, 1600);
       })();
     </script>
 
