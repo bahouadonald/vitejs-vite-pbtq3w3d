@@ -7453,13 +7453,12 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
     try {
       const formData = new FormData();
       formData.append('file', f);
-      formData.append('upload_preset', 'doniel_unsigned');
-      // 'auto' gère audio ET vidéo (les fichiers audio passent par la ressource 'video' chez Cloudinary)
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: formData });
+      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      // Compte Cloudinary principal (le même que l'admin, qui fonctionne)
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload', { method:'POST', body: formData });
       const data = await res.json();
       if (data.secure_url) {
         setFileUrl(data.secure_url); setFile(f); setMsg('✓ Fichier prêt.');
-        // Récupérer la durée totale du fichier (pour borner le curseur de découpe)
         if (data.duration) { setDureeTotale(Math.floor(data.duration)); }
         else {
           try {
@@ -7471,7 +7470,6 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         }
       }
       else {
-        // Afficher la vraie raison renvoyée par Cloudinary
         const raison = data?.error?.message || 'réponse inattendue';
         setMsg('Erreur upload : ' + raison);
         console.error('Cloudinary upload error', data);
@@ -7493,11 +7491,11 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
     try {
       const fd = new FormData();
       fd.append('file', f);
-      fd.append('upload_preset', 'doniel_unsigned');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dlnpdjgpc/auto/upload', { method:'POST', body: fd });
+      fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
       const data = await res.json();
       if (data.secure_url) { setPochetteUrl(data.secure_url); setMsg('Pochette prête.'); }
-      else setMsg('Erreur upload pochette. Réessayez.');
+      else { const raison = data?.error?.message || 'réponse inattendue'; setMsg('Erreur upload pochette : ' + raison); }
     } catch { setMsg('Erreur upload pochette. Réessayez.'); }
     setUploadingPoch(false);
   };
