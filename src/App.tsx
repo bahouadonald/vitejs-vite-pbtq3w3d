@@ -484,6 +484,25 @@ const OSCART_TO_FCFA = 10;
 const OSCART_TO_EUR = 0.015;
 const OSCART_TO_USD = 0.016;
 
+// ── DEVISES LOCALES (affichage indicatif à la recharge) ──
+// FCFA est la base : 1 Oscart = 10 FCFA. Les autres devises sont converties via le taux du jour.
+const DEVISE_PAR_PAYS: Record<string, string> = {
+  CI:'XOF', SN:'XOF', BF:'XOF', ML:'XOF', NE:'XOF', TG:'XOF', BJ:'XOF', GW:'XOF',
+  CM:'XAF', GA:'XAF', CG:'XAF', TD:'XAF', CF:'XAF', GQ:'XAF',
+  GH:'GHS', NG:'NGN', KE:'KES', ZA:'ZAR', MA:'MAD', DZ:'DZD', TN:'TND', EG:'EGP',
+  CD:'CDF', GN:'GNF', RW:'RWF', UG:'UGX', TZ:'TZS', ET:'ETB', AO:'AOA',
+  FR:'EUR', BE:'EUR', DE:'EUR', ES:'EUR', IT:'EUR', PT:'EUR',
+  US:'USD', CA:'CAD', GB:'GBP', CH:'CHF',
+};
+const INFO_DEVISE: Record<string, { sym: string, dec: number }> = {
+  XOF:{ sym:'F CFA', dec:0 }, XAF:{ sym:'FCFA', dec:0 }, GHS:{ sym:'GH\u20B5', dec:2 },
+  NGN:{ sym:'\u20A6', dec:0 }, KES:{ sym:'KSh', dec:0 }, ZAR:{ sym:'R', dec:2 },
+  MAD:{ sym:'DH', dec:2 }, DZD:{ sym:'DA', dec:0 }, TND:{ sym:'DT', dec:2 }, EGP:{ sym:'E\u00A3', dec:2 },
+  CDF:{ sym:'FC', dec:0 }, GNF:{ sym:'FG', dec:0 }, RWF:{ sym:'FRw', dec:0 }, UGX:{ sym:'USh', dec:0 },
+  TZS:{ sym:'TSh', dec:0 }, ETB:{ sym:'Br', dec:2 }, AOA:{ sym:'Kz', dec:0 },
+  EUR:{ sym:'\u20AC', dec:2 }, USD:{ sym:'$', dec:2 }, CAD:{ sym:'C$', dec:2 }, GBP:{ sym:'\u00A3', dec:2 }, CHF:{ sym:'CHF', dec:2 },
+};
+
 // ── CONCOURS KIFS — paliers de récompenses par défaut (configurables depuis l'admin) ──
 // type 'cash' = montant en FCFA · type 'objet' = récompense physique (voiture...)
 const PALIERS_CONCOURS_DEFAUT = [
@@ -499,6 +518,77 @@ const formatOscart = (oscart: number, devise: 'fcfa'|'eur'|'usd' = 'fcfa') => {
   if (devise === 'usd') return `${(oscart * OSCART_TO_USD).toFixed(2)} $`;
   return `${(oscart * OSCART_TO_FCFA).toLocaleString()} F CFA`;
 };
+
+// ── Détection de la devise locale (IP) + taux de change du jour ──
+// Mondial : on utilise la devise renvoyée directement par l'API selon le pays.
+function useDeviseLocale() {
+  const [codeDevise, setCodeDevise] = useState<string>(() => {
+    try { return localStorage.getItem('dz_devise') || ''; } catch { return ''; }
+  });
+  const [pays, setPays] = useState<string>(() => {
+    try { return localStorage.getItem('dz_pays') || ''; } catch { return ''; }
+  });
+  const [taux, setTaux] = useState<number>(1); // 1 XOF = `taux` unités de la devise locale
+
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      try {
+        let dev = codeDevise;
+        // 1. Détecter le pays ET sa devise par IP (mondial)
+        if (!dev) {
+          const r = await fetch('https://ipapi.co/json/');
+          const d = await r.json();
+          const cc = (d && d.country_code) ? d.country_code : 'CI';
+          // L'API renvoie directement la devise du pays ; secours via notre table puis XOF
+          dev = (d && d.currency) ? d.currency : (DEVISE_PAR_PAYS[cc] || 'XOF');
+          if (!annule) {
+            setCodeDevise(dev); setPays(cc);
+            try { localStorage.setItem('dz_devise', dev); localStorage.setItem('dz_pays', cc); } catch {}
+          }
+        }
+        // 2. Récupérer le taux XOF -> devise locale (sauf zone FCFA)
+        if (dev && dev !== 'XOF' && dev !== 'XAF') {
+          const rt = await fetch('https://open.er-api.com/v6/latest/XOF');
+          const dt = await rt.json();
+          if (dt && dt.rates && dt.rates[dev] && !annule) setTaux(dt.rates[dev]);
+        } else if (!annule) {
+          setTaux(1);
+        }
+      } catch { /* secours : on reste en FCFA */ }
+    })();
+    return () => { annule = true; };
+  }, [codeDevise]);
+
+  const changerPays = (cc: string) => {
+    const dev = DEVISE_PAR_PAYS[cc] || 'XOF';
+    setCodeDevise(dev); setPays(cc); setTaux(1);
+    try { localStorage.setItem('dz_devise', dev); localStorage.setItem('dz_pays', cc); } catch {}
+  };
+
+  // Formate un montant dans la devise locale. Utilise Intl (connaît toutes les devises du monde),
+  // avec secours sur notre table de symboles pour les devises africaines mal gérées par Intl.
+  const formaterDevise = (montant: number, code: string): string => {
+    const info = INFO_DEVISE[code];
+    try {
+      return new Intl.NumberFormat('fr', { style: 'currency', currency: code, maximumFractionDigits: info ? info.dec : 2 }).format(montant);
+    } catch {
+      const sym = info ? info.sym : code;
+      const dec = info ? info.dec : 2;
+      return `${montant.toLocaleString('fr', { minimumFractionDigits: dec, maximumFractionDigits: dec })} ${sym}`;
+    }
+  };
+
+  // Convertit un montant FCFA en libellé local indicatif (ex: "≈ 230 GHS")
+  const enLocal = (fcfa: number): string => {
+    if (!codeDevise || codeDevise === 'XOF' || codeDevise === 'XAF') return '';
+    const montant = fcfa * taux;
+    if (!montant || !isFinite(montant)) return '';
+    return `≈ ${formaterDevise(montant, codeDevise)}`;
+  };
+
+  return { codeDevise, pays, enLocal, changerPays };
+}
 
 const RECHARGES = [
   { fcfa:500,   oscart:35  },
@@ -527,6 +617,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const [soldeCoins, setSoldeCoins] = useState(0);
+  const { enLocal } = useDeviseLocale();
   const [sending, setSending] = useState<string|null>(null);
   const [msg, setMsg] = useState('');
   const [showLoginModal, setShowLoginModal] = useState('');
@@ -718,7 +809,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
             <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>Votre solde</p>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ color:'#ffd700', fontWeight:800, fontSize:14 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:14, height:14, verticalAlign:"-2px", marginRight:3 }} />{soldeCoins} Oscart = {(soldeCoins * 10).toLocaleString()} F CFA</span>
+              <span style={{ color:'#ffd700', fontWeight:800, fontSize:14 }}><img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:14, height:14, verticalAlign:"-2px", marginRight:3 }} />{soldeCoins.toLocaleString()} Oscart</span>
               <button onClick={() => setShowRecharge(!showRecharge)}
                 style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,215,0,0.4)', background:'rgba(255,215,0,0.1)', color:'#ffd700', fontSize:11, fontWeight:700, cursor:'pointer' }}>
                 Recharger
@@ -736,7 +827,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
                     style={{ padding:'10px 6px', borderRadius:10, border:'1px solid rgba(255,215,0,0.2)', background:'rgba(255,215,0,0.06)', cursor:'pointer', textAlign:'center' }}>
                     <p style={{ color:'#ffd700', fontWeight:800, fontSize:15, margin:'0 0 2px' }}>{r.oscart} Oscart</p>
                     <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{r.fcfa.toLocaleString()} F CFA</p>
-                    <p style={{ color:'rgba(255,255,255,0.2)', fontSize:10, margin:0 }}>{(r.oscart * 0.015).toFixed(2)} €</p>
+                    {enLocal(r.fcfa) && <p style={{ color:'#5BB0FF', fontSize:10, margin:'2px 0 0' }}>{enLocal(r.fcfa)}</p>}
                   </button>
                 ))}
               </div>
