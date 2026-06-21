@@ -8313,7 +8313,7 @@ function CompteRebours({ dateSortie }: { dateSortie?: string }) {
 // ─────────────────────────────────────────────
 // CARTE SORTIE — rubrique "Sortie officielle" avec réservation
 // ─────────────────────────────────────────────
-function CarteSortie({ s }: { s: any }) {
+function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
   const [reserve, setReserve] = useState(false);
   const [reserving, setReserving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -8399,7 +8399,7 @@ function CarteSortie({ s }: { s: any }) {
 
   // Partage de la sortie officielle
   const partagerSortie = async () => {
-    const url = `${window.location.origin}/decouvrir`;
+    const url = `${window.location.origin}/decouvrir?sortie=${s.id}`;
     const texte = `Sortie officielle : "${s.titre}" de ${s.artistName} — disponible le ${new Date(s.dateSortie).toLocaleDateString('fr')}. Pré-télécharge dès maintenant sur Doniel Zik !`;
     try {
       if (navigator.share) { await navigator.share({ title: s.titre, text: texte, url }); }
@@ -8408,7 +8408,7 @@ function CarteSortie({ s }: { s: any }) {
   };
 
   return (
-    <div style={{ marginBottom:14, background:C.card, border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
+    <div id={'sortie-' + s.id} style={{ marginBottom:14, background:C.card, border:`1px solid ${cible ? C.blue : C.border}`, boxShadow: cible ? `0 0 0 2px ${C.blue}` : 'none', borderRadius:14, overflow:'hidden' }}>
       {/* Bandeau : badge + compte à rebours compact */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'rgba(10,132,255,0.15)' }}>
         <span style={{ color:C.blueLite, fontWeight:800, fontSize:10, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
@@ -8499,7 +8499,26 @@ function DecouvrirPage() {
   const [typeFiltre, setTypeFiltre] = useState('tous');
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
+  const [sortieCiblee, setSortieCiblee] = useState('');
   const user = auth.currentUser;
+
+  // Lien partagé vers une sortie précise : ?sortie=ID → onglet Bientôt + mise en évidence
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('sortie');
+    if (sid) { setTypeFiltre('bientot'); setSortieCiblee(sid); }
+  }, []);
+
+  // Quand les sorties sont chargées et qu'une cible existe, scroller dessus
+  useEffect(() => {
+    if (sortieCiblee && sorties.length > 0) {
+      const t = setTimeout(() => {
+        const el = document.getElementById('sortie-' + sortieCiblee);
+        if (el) el.scrollIntoView({ behavior:'smooth', block:'center' });
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [sortieCiblee, sorties]);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -8633,7 +8652,7 @@ function DecouvrirPage() {
               <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Les prochaines sorties officielles apparaîtront ici</p>
             </div>
           ) : (
-            sorties.filter(s => s.statut === 'a_venir').map(s => <CarteSortie key={s.id} s={s} />)
+            sorties.filter(s => s.statut === 'a_venir').map(s => <CarteSortie key={s.id} s={s} cible={s.id === sortieCiblee} />)
           )
         )}
 
