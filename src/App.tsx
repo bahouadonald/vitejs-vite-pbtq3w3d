@@ -12558,26 +12558,27 @@ export default function App() {
     // (la barre animée est dans le splash HTML index.html)
     const t = setInterval(() => { setProgress(p => (p < 90 ? p + 15 : p)); }, 300);
 
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      // On affiche l'app IMMÉDIATEMENT dès que l'auth répond (pas d'attente réseau supplémentaire)
       setUser(u);
-      // Oscart de bienvenue SUPPRIMÉ — les nouveaux comptes démarrent à 0 Oscart
-      // Portefeuille unique : si un doc coins_solde existe avec cet email mais sans uid
-      // (créé par l'admin via crédit Oscart), on lie l'uid pour que l'utilisateur le retrouve.
-      if (u && u.email) {
-        try {
-          const byUid = await getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid)));
-          if (byUid.empty) {
-            const byEmail = await getDocs(query(collection(db,'coins_solde'), where('email','==',u.email.toLowerCase())));
-            if (!byEmail.empty) {
-              await updateDoc(doc(db,'coins_solde',byEmail.docs[0].id), { uid: u.uid });
-            }
-          }
-        } catch(e) { console.error('lien uid solde', e); }
-      }
       setProgress(100);
       setAuthLoading(false);
-      // Cacher le splash HTML dès que l'app est prête (transition directe, sans superposition)
       (window as any).__hideSplash?.();
+
+      // Liaison du portefeuille unique : faite EN ARRIÈRE-PLAN, sans bloquer l'affichage
+      if (u && u.email) {
+        (async () => {
+          try {
+            const byUid = await getDocs(query(collection(db,'coins_solde'), where('uid','==',u.uid)));
+            if (byUid.empty) {
+              const byEmail = await getDocs(query(collection(db,'coins_solde'), where('email','==',u.email!.toLowerCase())));
+              if (!byEmail.empty) {
+                await updateDoc(doc(db,'coins_solde',byEmail.docs[0].id), { uid: u.uid });
+              }
+            }
+          } catch(e) { console.error('lien uid solde', e); }
+        })();
+      }
     });
     return () => { unsub(); clearInterval(t); };
   }, []);
