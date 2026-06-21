@@ -6832,17 +6832,19 @@ function ZikothequePage({ user }: { user: any }) {
   }, [user]);
 
   useEffect(() => {
-    // L'élément <audio> est recréé via key={url} à chaque piste.
-    // On force le play après le remontage (filet de sécurité si autoPlay/onLoadedData ratent sur mobile).
+    // Au changement de piste : recharger la nouvelle source puis lancer la lecture.
+    // On garde le MÊME élément audio (pas de key) pour que play() reste autorisé sur mobile.
+    const a = audioRef.current;
+    if (!a || !currentTrack) return;
+    a.load();
     if (playing) {
-      const t = setTimeout(() => {
-        if (audioRef.current && audioRef.current.paused) {
-          audioRef.current.play().catch(() => {});
-        }
-      }, 120);
-      return () => clearTimeout(t);
+      const lancer = () => { a.play().catch(() => {}); };
+      // Tenter dès que possible + filet via l'événement canplay
+      lancer();
+      a.addEventListener('canplay', lancer, { once: true });
+      return () => a.removeEventListener('canplay', lancer);
     }
-  }, [currentTrackIdx, currentAlbum, playing]);
+  }, [currentTrackIdx, currentAlbum]);
 
   const [showPubZiko, setShowPubZiko] = useState(false);
   const [pendingNextZiko, setPendingNextZiko] = useState(false);
@@ -6861,12 +6863,10 @@ function ZikothequePage({ user }: { user: any }) {
 
   const togglePlay = () => {
     if (!audioRef.current) return;
-    if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
+    if (audioRef.current.paused) {
+      audioRef.current.play().catch(() => {});
     } else {
-      audioRef.current.play().catch(() => setPlaying(false));
-      setPlaying(true);
+      audioRef.current.pause();
     }
   };
 
@@ -6894,12 +6894,11 @@ function ZikothequePage({ user }: { user: any }) {
 
       {/* AUDIO ENGINE */}
       {currentTrack && (
-        <audio ref={audioRef} key={currentTrack.url} src={currentTrack.url} autoPlay={playing}
+        <audio ref={audioRef} src={currentTrack.url}
           onTimeUpdate={() => { if (audioRef.current) { setCt(audioRef.current.currentTime); setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100 || 0); } }}
           onLoadedMetadata={() => { if (audioRef.current) setDur(audioRef.current.duration); }}
-          onLoadedData={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => {}); } }}
-          onCanPlay={() => { if (playing && audioRef.current && audioRef.current.paused) { audioRef.current.play().catch(() => {}); } }}
-          onPlay={() => { recordStreamAlbum(); }}
+          onPlay={() => { setPlaying(true); recordStreamAlbum(); }}
+          onPause={() => { if (audioRef.current && !audioRef.current.ended) setPlaying(false); }}
           onEnded={onEnded} preload="auto" />
       )}
 
@@ -7049,7 +7048,7 @@ function ZikothequePage({ user }: { user: any }) {
               </div>
               {currentFiles.map((f: any, i: number) => (
                 <div key={i} className="track-row"
-                  onClick={() => { setCurrentTrackIdx(i); setPlaying(true); setShowPlaylist(false); }}
+                  onClick={() => { setCurrentTrackIdx(i); setPlaying(true); setShowPlaylist(false); if (audioRef.current) audioRef.current.play().catch(()=>{}); }}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', cursor: 'pointer', background: i === currentTrackIdx ? 'rgba(30,111,255,0.12)' : 'transparent', transition: 'background .15s' }}>
                   <span style={{ color: i === currentTrackIdx ? '#4da6ff' : '#4a5878', fontSize: 13, fontWeight: 700, minWidth: 20 }}>
                     {i === currentTrackIdx && playing ? '▶' : (i + 1)}
@@ -7091,13 +7090,13 @@ function ZikothequePage({ user }: { user: any }) {
               {/* Time */}
               <span style={{ color: '#4a5878', fontSize: 10, flexShrink: 0 }}>{formatTime(ct)} / {formatTime(dur)}</span>
               {/* Controls */}
-              <button onClick={() => { if (currentTrackIdx > 0) { setCurrentTrackIdx(i => i - 1); setPlaying(true); } }}
+              <button onClick={() => { if (currentTrackIdx > 0) { setCurrentTrackIdx(i => i - 1); setPlaying(true); if (audioRef.current) audioRef.current.play().catch(()=>{}); } }}
                 style={{ background: 'none', border: 'none', color: currentTrackIdx === 0 ? '#2a3a60' : '#8098b8', fontSize: 18, cursor: 'pointer', padding: 4 }}>⏮</button>
               <button onClick={togglePlay}
                 style={{ width: 42, height: 42, borderRadius: 99, border: 'none', background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 16px rgba(30,111,255,0.4)' }}>
                 {playing ? '⏸' : '▶'}
               </button>
-              <button onClick={() => { if (currentTrackIdx < currentFiles.length - 1) { setCurrentTrackIdx(i => i + 1); setPlaying(true); } }}
+              <button onClick={() => { if (currentTrackIdx < currentFiles.length - 1) { setCurrentTrackIdx(i => i + 1); setPlaying(true); if (audioRef.current) audioRef.current.play().catch(()=>{}); } }}
                 style={{ background: 'none', border: 'none', color: currentTrackIdx === currentFiles.length - 1 ? '#2a3a60' : '#8098b8', fontSize: 18, cursor: 'pointer', padding: 4 }}>⏭</button>
               {/* Playlist toggle */}
               <button onClick={() => setShowPlaylist(!showPlaylist)}
