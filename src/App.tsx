@@ -3093,7 +3093,7 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
       });
       alert(`Sortie lancée ! ${resaSnap.size} fan(s) notifié(s).`);
     } catch(e:any) { alert('Erreur : ' + e.message); }
-    setUploadingSortie(null);
+    setUploadingSortie('');
   };
 
   const lancerSortie = async (sortie: any, f: File) => {
@@ -3281,7 +3281,7 @@ function ProductionTab() {
       });
       alert(`Sortie lancée ! ${resaSnap.size} fan(s) notifié(s).`);
     } catch(e:any) { alert('Erreur : ' + e.message); }
-    setUploadingSortie(null);
+    setUploadingSortie('');
   };
 
   // LE JOUR J : uploader le fichier officiel → débloque les téléchargements réservés
