@@ -8431,6 +8431,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
   const [reserving, setReserving] = useState(false);
   const [msg, setMsg] = useState('');
   const [maintenant, setMaintenant] = useState(Date.now());
+  const [ouvert, setOuvert] = useState(!!cible); // plié par défaut ; ouvert si on arrive via lien partagé
   const user = auth.currentUser;
   const estVideo = /\.(mp4|mov|avi|mkv|webm|m4v)(\?|$)/i.test(s.teaserUrl || '');
 
@@ -8523,20 +8524,21 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
 
   return (
     <div id={'sortie-' + s.id} style={{ marginBottom:14, background:C.card, border:`1px solid ${cible ? C.blue : C.border}`, boxShadow: cible ? `0 0 0 2px ${C.blue}` : 'none', borderRadius:14, overflow:'hidden' }}>
-      {/* Bandeau : badge + compte à rebours compact */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'rgba(10,132,255,0.15)' }}>
+      {/* Bandeau : badge + compte à rebours compact (cliquable pour déplier) */}
+      <div onClick={() => setOuvert(o => !o)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 12px', background:'rgba(10,132,255,0.15)', cursor:'pointer' }}>
         <span style={{ color:C.blueLite, fontWeight:800, fontSize:10, letterSpacing:0.5 }}>SORTIE OFFICIELLE</span>
-        <span style={{ color:C.blueLite, fontSize:11, fontWeight:700 }}>
+        <span style={{ color:C.blueLite, fontSize:11, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
           {estSorti ? 'Disponible' : `${cdJours}j ${String(cdHeures).padStart(2,'0')}:${String(cdMinutes).padStart(2,'0')}:${String(cdSecondes).padStart(2,'0')}`}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ transform: ouvert ? 'rotate(180deg)' : 'none', transition:'transform .25s' }}><polyline points="6 9 12 15 18 9"/></svg>
         </span>
       </div>
 
-      {/* Haut : pochette + infos */}
-      <div style={{ display:'flex', gap:12, padding:'12px 12px 0' }}>
+      {/* Haut : pochette + infos (cliquable pour déplier) */}
+      <div onClick={() => setOuvert(o => !o)} style={{ display:'flex', gap:12, padding:'12px 12px', cursor:'pointer' }}>
         {s.pochetteUrl ? (
-          <img src={optimImg(s.pochetteUrl, 300)} alt={s.titre} style={{ width:96, height:96, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
+          <img src={optimImg(s.pochetteUrl, ouvert ? 600 : 200)} alt={s.titre} style={{ width: ouvert ? 130 : 72, height: ouvert ? 130 : 72, objectFit:'cover', borderRadius:10, flexShrink:0, transition:'width .25s, height .25s' }} />
         ) : (
-          <div style={{ width:96, height:96, borderRadius:10, background:C.bgSecond, flexShrink:0 }} />
+          <div style={{ width: ouvert ? 130 : 72, height: ouvert ? 130 : 72, borderRadius:10, background:C.bgSecond, flexShrink:0, transition:'width .25s, height .25s' }} />
         )}
         <div style={{ flex:1, minWidth:0 }}>
           <p style={{ color:C.text, fontWeight:800, fontSize:16, margin:'0 0 2px', lineHeight:1.2 }}>{s.titre}</p>
@@ -8544,10 +8546,13 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
           <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>
             Sortie le <strong style={{ color:C.text }}>{new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long' })}</strong>
           </p>
-          {s.description && <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.4, margin:'4px 0 0', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{s.description}</p>}
+          {!ouvert && <p style={{ color:C.blueLite, fontSize:10, margin:'6px 0 0', opacity:0.8 }}>Appuyez pour voir les détails</p>}
+          {ouvert && s.description && <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.4, margin:'4px 0 0' }}>{s.description}</p>}
         </div>
       </div>
 
+      {/* CONTENU DÉPLIÉ : visible seulement quand ouvert */}
+      {ouvert && (<>
       {/* Teaser compact */}
       <div style={{ padding:'10px 12px 0' }}>
         {estVideo ? (
@@ -8619,6 +8624,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
           </button>
         </div>
       </div>
+      </>)}
     </div>
   );
 }
@@ -11962,6 +11968,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
   const [solde, setSolde] = useState(0);
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
+  const [zipping, setZipping] = useState('');
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const user = auth.currentUser;
   const prixOscart = Math.ceil(prix / 10);
@@ -11999,21 +12006,47 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
   };
   void payer; void paying; // conservés pour réactivation après maintenance
 
-  const downloadAll = () => {
-    files.forEach((f:any, i:number) => {
-      setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
-        a.download = f.name; a.target = '_blank';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      }, i * 1200);
-    });
+  // Télécharge tout l'album en UN SEUL fichier ZIP (Chrome ne bloque pas un seul téléchargement)
+  const downloadAll = async () => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      const a = document.createElement('a');
+      a.href = files[0].url.replace('/upload/','/upload/fl_attachment/');
+      a.download = files[0].name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      return;
+    }
+    try {
+      setZipping('Préparation du ZIP...');
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const dossier = zip.folder(albumLabel || 'album') as any;
+      for (let i = 0; i < files.length; i++) {
+        setZipping(`Ajout ${i + 1}/${files.length}...`);
+        const f = files[i];
+        const resp = await fetch(f.url);
+        const blob = await resp.blob();
+        const nom = f.name && /\.[a-z0-9]+$/i.test(f.name) ? f.name : `${f.name || ('piste-' + (i + 1))}.mp3`;
+        dossier.file(nom, blob);
+      }
+      setZipping('Compression...');
+      const contenu = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(contenu);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${albumLabel || 'album'}.zip`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setZipping('');
+    } catch(e) {
+      console.error('zip', e);
+      setZipping('');
+      alert('Erreur lors de la création du ZIP. Téléchargez les pistes une par une ci-dessous.');
+    }
   };
 
   if (done) return (
-    <button onClick={downloadAll}
-      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-      Télécharger maintenant
+    <button onClick={downloadAll} disabled={!!zipping}
+      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: zipping ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipping ? '#cfe' : '#000', fontWeight:800, fontSize:15, cursor: zipping ? 'wait' : 'pointer' }}>
+      {zipping ? zipping : (files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant')}
     </button>
   );
 
@@ -12071,6 +12104,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
   const [errMsg, setErrMsg] = useState('');
   const [dlActive, setDlActive] = useState(false);
   const [venteId, setVenteId] = useState('');
+  const [zipDl, setZipDl] = useState('');
   const [showDetail, setShowDetail] = useState(false);
 
   const [showPubAfterPay, setShowPubAfterPay] = useState(false);
@@ -12147,15 +12181,40 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
     }
   };
 
-  const downloadAll = () => {
-    files.forEach((f:any, i:number) => {
-      setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
-        a.download = f.name; a.target = '_blank';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      }, i * 1200);
-    });
+  const downloadAll = async () => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      const a = document.createElement('a');
+      a.href = files[0].url.replace('/upload/','/upload/fl_attachment/');
+      a.download = files[0].name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      return;
+    }
+    try {
+      setZipDl('Préparation du ZIP...');
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const dossier = zip.folder(albumLabel || 'album') as any;
+      for (let i = 0; i < files.length; i++) {
+        setZipDl(`Ajout ${i + 1}/${files.length}...`);
+        const f = files[i];
+        const resp = await fetch(f.url);
+        const blob = await resp.blob();
+        const nom = f.name && /\.[a-z0-9]+$/i.test(f.name) ? f.name : `${f.name || ('piste-' + (i + 1))}.mp3`;
+        dossier.file(nom, blob);
+      }
+      setZipDl('Compression...');
+      const contenu = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(contenu);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${albumLabel || 'album'}.zip`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setZipDl('');
+    } catch(e) {
+      console.error('zip', e);
+      setZipDl('');
+      alert('Erreur lors de la création du ZIP. Téléchargez les pistes une par une ci-dessous.');
+    }
   };
 
   // Téléchargement activé (après confirmation Wave webhook)
@@ -12169,10 +12228,24 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
         <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>✅ Paiement confirmé !</p>
         <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Wave a confirmé votre paiement. Votre téléchargement est prêt.</p>
-        <button onClick={downloadAll}
-          style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-          <span style={{ fontSize:22 }}>⬇</span> Télécharger maintenant
+        <button onClick={downloadAll} disabled={!!zipDl}
+          style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background: zipDl ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipDl ? '#cfe' : '#000', fontWeight:800, fontSize:16, cursor: zipDl ? 'wait' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+          {zipDl ? zipDl : <><span style={{ fontSize:22 }}>⬇</span> {files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant'}</>}
         </button>
+
+        {/* Téléchargements individuels (piste par piste) */}
+        {files && files.length > 1 && (
+          <div style={{ marginTop:14, borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:12 }}>
+            <p style={{ color:'#6a88aa', fontSize:11, fontWeight:700, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:1 }}>Ou télécharger piste par piste</p>
+            {files.map((f:any, i:number) => (
+              <a key={i} href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', marginBottom:6, borderRadius:10, background:'rgba(255,255,255,0.04)', color:'#cfe', fontSize:13, textDecoration:'none' }}>
+                <span style={{ fontSize:14 }}>⬇</span>
+                <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(f.name || ('Piste ' + (i + 1))).replace(/\.[^/.]+$/, '')}</span>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
