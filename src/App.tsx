@@ -7922,7 +7922,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
                 <input style={S.inp} type="number" min="0" value={objTelech} onChange={e => setObjTelech(e.target.value)} placeholder="Ex: 100000" />
               </div>
               <div style={{ flex:1 }}>
-                <label style={S.lbl}>Objectif cadeaux</label>
+                <label style={S.lbl}>Objectif kiffements</label>
                 <input style={S.inp} type="number" min="0" value={objCadeaux} onChange={e => setObjCadeaux(e.target.value)} placeholder="Ex: 50000" />
               </div>
             </div>
@@ -8533,6 +8533,23 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         </span>
       </div>
 
+      {/* COMPTE À REBOURS visuel — TOUJOURS visible (plié ou déplié) */}
+      {!estSorti && (
+        <div style={{ display:'flex', gap:6, justifyContent:'center', padding:'12px 12px 4px' }}>
+          {[
+            { val: cdJours, lbl: cdJours > 1 ? 'JOURS' : 'JOUR' },
+            { val: cdHeures, lbl: 'H' },
+            { val: cdMinutes, lbl: 'MIN' },
+            { val: cdSecondes, lbl: 'SEC' },
+          ].map((b,i) => (
+            <div key={i} style={{ flex:1, maxWidth:64, background:'rgba(10,132,255,0.12)', border:`1px solid ${C.border}`, borderRadius:10, padding:'7px 2px', textAlign:'center' }}>
+              <p style={{ color:C.blueLite, fontWeight:800, fontSize:19, margin:0, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(b.val).padStart(2,'0')}</p>
+              <p style={{ color:C.textSoft, fontSize:8, margin:'3px 0 0', letterSpacing:0.5 }}>{b.lbl}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Haut : pochette + infos (cliquable pour déplier) */}
       <div onClick={() => setOuvert(o => !o)} style={{ display:'flex', gap:12, padding:'12px 12px', cursor:'pointer' }}>
         {s.pochetteUrl ? (
@@ -8563,28 +8580,11 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       </div>
 
       <div style={{ padding:'10px 12px 12px' }}>
-        {/* COMPTE À REBOURS visuel (jours / heures / min / secondes) */}
-        {!estSorti && (
-          <div style={{ display:'flex', gap:6, marginBottom:11, justifyContent:'center' }}>
-            {[
-              { val: cdJours, lbl: cdJours > 1 ? 'JOURS' : 'JOUR' },
-              { val: cdHeures, lbl: 'H' },
-              { val: cdMinutes, lbl: 'MIN' },
-              { val: cdSecondes, lbl: 'SEC' },
-            ].map((b,i) => (
-              <div key={i} style={{ flex:1, maxWidth:64, background:'rgba(10,132,255,0.12)', border:`1px solid ${C.border}`, borderRadius:10, padding:'7px 2px', textAlign:'center' }}>
-                <p style={{ color:C.blueLite, fontWeight:800, fontSize:19, margin:0, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{String(b.val).padStart(2,'0')}</p>
-                <p style={{ color:C.textSoft, fontSize:8, margin:'3px 0 0', letterSpacing:0.5 }}>{b.lbl}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Objectifs compacts */}
         {s.objCadeaux > 0 && (
           <div style={{ marginBottom:7 }}>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:C.textSoft, marginBottom:3 }}>
-              <span>Cadeaux</span>
+              <span>Kiffements</span>
               <span><strong style={{ color:C.text }}>{(s.cadeauxRecus || 0).toLocaleString()}</strong> / {s.objCadeaux.toLocaleString()}</span>
             </div>
             <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
@@ -8623,6 +8623,13 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
         </div>
+
+        {/* Bouton ENVOYER UN KIFFEMENT (soutenir l'artiste avant la sortie) */}
+        <button onClick={() => { alert('Envoyer un kiffement sera bientôt disponible.\n\nL\'envoi de kiffements est en cours de maintenance. Vous pourrez bientôt soutenir l\'artiste avant la sortie. Merci de votre patience.'); }}
+          style={{ width:'100%', marginTop:8, padding:12, borderRadius:10, border:`1px solid ${C.gold}`, background:'rgba(245,200,76,0.1)', color:C.gold, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+          ENVOYER UN KIFFEMENT
+        </button>
       </div>
       </>)}
     </div>
