@@ -81,6 +81,19 @@ async function demanderResetPassword(email: string): Promise<{ok: boolean, error
   }
 }
 
+// ── Email de notification (prévient même app fermée) via /api/notify (Resend) ──
+// Best-effort : si l'envoi échoue, on n'interrompt pas l'action en cours.
+async function envoyerEmailNotif(to: string, sujet: string, message: string): Promise<void> {
+  if (!to) return;
+  try {
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, sujet, message }),
+    });
+  } catch { /* échec silencieux : la notif Firestore reste la source principale */ }
+}
+
 const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
 
 const CLOUDINARY_CLOUD = 'drjp8ht84';
@@ -495,12 +508,12 @@ const DEVISE_PAR_PAYS: Record<string, string> = {
   US:'USD', CA:'CAD', GB:'GBP', CH:'CHF',
 };
 const INFO_DEVISE: Record<string, { sym: string, dec: number }> = {
-  XOF:{ sym:'F CFA', dec:0 }, XAF:{ sym:'FCFA', dec:0 }, GHS:{ sym:'GH\u20B5', dec:2 },
-  NGN:{ sym:'\u20A6', dec:0 }, KES:{ sym:'KSh', dec:0 }, ZAR:{ sym:'R', dec:2 },
-  MAD:{ sym:'DH', dec:2 }, DZD:{ sym:'DA', dec:0 }, TND:{ sym:'DT', dec:2 }, EGP:{ sym:'E\u00A3', dec:2 },
+  XOF:{ sym:'F CFA', dec:0 }, XAF:{ sym:'FCFA', dec:0 }, GHS:{ sym:'GH', dec:2 },
+  NGN:{ sym:'', dec:0 }, KES:{ sym:'KSh', dec:0 }, ZAR:{ sym:'R', dec:2 },
+  MAD:{ sym:'DH', dec:2 }, DZD:{ sym:'DA', dec:0 }, TND:{ sym:'DT', dec:2 }, EGP:{ sym:'E', dec:2 },
   CDF:{ sym:'FC', dec:0 }, GNF:{ sym:'FG', dec:0 }, RWF:{ sym:'FRw', dec:0 }, UGX:{ sym:'USh', dec:0 },
   TZS:{ sym:'TSh', dec:0 }, ETB:{ sym:'Br', dec:2 }, AOA:{ sym:'Kz', dec:0 },
-  EUR:{ sym:'\u20AC', dec:2 }, USD:{ sym:'$', dec:2 }, CAD:{ sym:'C$', dec:2 }, GBP:{ sym:'\u00A3', dec:2 }, CHF:{ sym:'CHF', dec:2 },
+  EUR:{ sym:'', dec:2 }, USD:{ sym:'$', dec:2 }, CAD:{ sym:'C$', dec:2 }, GBP:{ sym:'', dec:2 }, CHF:{ sym:'CHF', dec:2 },
 };
 
 // ── CONCOURS KIFS — paliers de récompenses par défaut (configurables depuis l'admin) ──
@@ -588,6 +601,56 @@ function useDeviseLocale() {
   };
 
   return { codeDevise, pays, enLocal, changerPays };
+}
+
+// ── Notifications système du navigateur (B) ──
+// Écoute les nouvelles notifications de l'utilisateur connecté et affiche une notification
+// système (même si l'app est en arrière-plan). Demande la permission au premier usage.
+function usePushNotifications(userEmail?: string) {
+  const dejaVus = useRef<Set<string>>(new Set());
+  const premierChargement = useRef(true);
+
+  useEffect(() => {
+    if (!userEmail || typeof Notification === 'undefined') return;
+
+    // Demander la permission une fois (sans bloquer)
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    const unsub = onSnapshot(
+      query(collection(db, 'notifications'), where('to', '==', userEmail), orderBy('createdAt', 'desc')),
+      snap => {
+        // Au tout premier chargement, on mémorise les notifs existantes SANS notifier
+        // (sinon on recevrait une notif pour chaque ancienne notification)
+        if (premierChargement.current) {
+          snap.docs.forEach(d => dejaVus.current.add(d.id));
+          premierChargement.current = false;
+          return;
+        }
+        // Pour chaque NOUVELLE notification non lue, afficher une notification système
+        snap.docChanges().forEach(ch => {
+          if (ch.type === 'added' && !dejaVus.current.has(ch.doc.id)) {
+            dejaVus.current.add(ch.doc.id);
+            const n = ch.doc.data();
+            if (n.lu) return;
+            if (Notification.permission === 'granted') {
+              try {
+                const notif = new Notification('Doniel Zik', {
+                  body: n.text || 'Vous avez une nouvelle notification',
+                  icon: '/icons/icon-192x192.png',
+                  badge: '/icons/icon-192x192.png',
+                  tag: ch.doc.id,
+                });
+                notif.onclick = () => { window.focus(); window.location.href = '/notifications'; notif.close(); };
+              } catch {}
+            }
+          }
+        });
+      }
+    );
+    return () => unsub();
+  }, [userEmail]);
 }
 
 const RECHARGES = [
@@ -876,6 +939,8 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
   const [msg, setMsg] = useState('');
   const [editCommentId, setEditCommentId] = useState<string|null>(null);
   const [editCommentText, setEditCommentText] = useState('');
+  const [replyTo, setReplyTo] = useState<string|null>(null); // id du commentaire auquel on répond
+  const [replyText, setReplyText] = useState('');
   const user = auth.currentUser;
 
   // Charger le compteur dès le montage
@@ -883,7 +948,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
     if (!qrId) return;
     const unsub = onSnapshot(
       query(collection(db, 'commentaires'), where('qrId','==',qrId)),
-      snap => setCount(snap.size)
+      snap => setCount(snap.docs.filter(d => !d.data().parentId).length)
     );
     return unsub;
   }, [qrId]);
@@ -937,6 +1002,26 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
     setLoading(false);
   };
 
+  // Envoyer une réponse à un commentaire (fil de discussion)
+  const submitReply = async (parentId: string) => {
+    if (!user) { setShowLoginModal('Connectez-vous pour répondre'); return; }
+    if (!replyText.trim()) return;
+    const textLower = replyText.toLowerCase();
+    const motInterdit = MOTS_INTERDITS.find(m => textLower.includes(m));
+    if (motInterdit) { setMsg('Votre réponse contient des termes non autorisés.'); return; }
+    try {
+      await addDoc(collection(db, 'commentaires'), {
+        qrId, text: replyText.trim(),
+        parentId, // marque cette entrée comme une réponse
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
+        userPhoto: user.photoURL || '',
+        createdAt: new Date().toISOString(),
+      });
+      setReplyText(''); setReplyTo(null);
+    } catch(e) { console.error(e); }
+  };
+
   return (
     <div style={{ marginBottom: compact ? 0 : 16, display: compact ? 'inline-block' : 'block' }}>
       {showLoginModal && <LoginModal message={showLoginModal} onClose={() => setShowLoginModal('')} />}
@@ -967,10 +1052,11 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
           </div>
           {msg && <p style={{ color:'#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
           {/* Liste commentaires */}
-          {comments.length === 0 ? (
+          {comments.filter(c => !c.parentId).length === 0 ? (
             <p style={{ color:'#4a5878', fontSize:12, textAlign:'center' }}>Soyez le premier à commenter</p>
-          ) : comments.map(c => (
-            <div key={c.id} style={{ display:'flex', gap:10, marginBottom:12 }}>
+          ) : comments.filter(c => !c.parentId).map(c => (
+            <div key={c.id} style={{ marginBottom:12 }}>
+            <div style={{ display:'flex', gap:10 }}>
               <div style={{ width:32, height:32, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
                 {c.userPhoto ? <img src={c.userPhoto} style={{ width:32, height:32, borderRadius:99 }} alt="" /> : c.userName?.[0]?.toUpperCase()}
               </div>
@@ -993,6 +1079,11 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
                 )}
                 <div style={{ display:'flex', gap:10, marginTop:4 }}>
                   <p style={{ fontSize:10, color:'#4a5878' }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
+                  {/* Tout le monde de connecté peut répondre */}
+                  <button onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); }}
+                    style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                    Répondre
+                  </button>
                   {user && c.userId === user.uid && (
                     <>
                       <button onClick={() => { setEditCommentId(c.id); setEditCommentText(c.text); }}
@@ -1005,14 +1096,58 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
                       </button>
                     </>
                   )}
-                  {user && user.email === artistEmail && (
-                    <button onClick={() => setText(`@${c.userName} `)}
-                      style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
-                      Répondre
+                  {/* L'admin peut supprimer n'importe quel commentaire */}
+                  {user && user.email === ADMIN_EMAIL && c.userId !== user.uid && (
+                    <button onClick={async () => { if (window.confirm('Supprimer ce commentaire (admin) ?')) await deleteDoc(doc(db,'commentaires',c.id)); }}
+                      style={{ fontSize:10, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                      Supprimer (admin)
                     </button>
                   )}
                 </div>
+
+                {/* Zone de réponse */}
+                {replyTo === c.id && (
+                  <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                    <input value={replyText} onChange={e => setReplyText(e.target.value)} autoFocus
+                      onKeyDown={e => e.key==='Enter' && submitReply(c.id)}
+                      placeholder={`Répondre à ${c.userName}...`}
+                      style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:99, padding:'6px 12px', color:'#fff', fontSize:12, outline:'none' }} />
+                    <button onClick={() => submitReply(c.id)} disabled={!replyText.trim()}
+                      style={{ padding:'6px 12px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                      Envoyer
+                    </button>
+                  </div>
+                )}
+
+                {/* Réponses à ce commentaire (fil) */}
+                {comments.filter(r => r.parentId === c.id).map(r => (
+                  <div key={r.id} style={{ display:'flex', gap:8, marginTop:8, marginLeft:4, paddingLeft:8, borderLeft:'2px solid rgba(90,176,255,0.2)' }}>
+                    <div style={{ width:24, height:24, borderRadius:99, background:'linear-gradient(135deg,#5BB0FF,#1a6bff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, flexShrink:0 }}>
+                      {r.userPhoto ? <img src={r.userPhoto} style={{ width:24, height:24, borderRadius:99 }} alt="" /> : r.userName?.[0]?.toUpperCase()}
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <p style={{ fontWeight:700, fontSize:11, color:'#5BB0FF', marginBottom:1 }}>{r.userName}</p>
+                      <p style={{ fontSize:12, color:'#dde4f5', lineHeight:1.4 }}>{r.text}</p>
+                      <div style={{ display:'flex', gap:8, marginTop:2 }}>
+                        <p style={{ fontSize:9, color:'#4a5878' }}>{new Date(r.createdAt).toLocaleDateString('fr')}</p>
+                        {user && r.userId === user.uid && (
+                          <button onClick={async () => { if (window.confirm('Supprimer cette réponse ?')) await deleteDoc(doc(db,'commentaires',r.id)); }}
+                            style={{ fontSize:9, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                            Supprimer
+                          </button>
+                        )}
+                        {user && user.email === ADMIN_EMAIL && r.userId !== user.uid && (
+                          <button onClick={async () => { if (window.confirm('Supprimer cette réponse (admin) ?')) await deleteDoc(doc(db,'commentaires',r.id)); }}
+                            style={{ fontSize:9, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                            Supprimer (admin)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+            </div>
             </div>
           ))}
         </div>
@@ -3377,7 +3512,7 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
                 <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:'#5a7090' }}>IMG</div>
               )}
               <span style={{ fontSize:13, fontWeight:700, color: editPochette?'#00a040':'#1a6bff' }}>
-                {editPochUploading ? 'Upload...' : editPochette ? 'Changer l\u2019image' : 'Ajouter une pochette'}
+                {editPochUploading ? 'Upload...' : editPochette ? 'Changer limage' : 'Ajouter une pochette'}
               </span>
             </label>
 
@@ -4370,7 +4505,7 @@ function PubOscartTab({ user }: { user: any }) {
       const note = (trouveVia === 'nouveau-email-seul')
         ? ' (l artiste verra ses Oscart des sa prochaine connexion)'
         : '';
-      setMsg(`\u2705 ${m.toLocaleString()} Oscart ajoutes au compte ${cible}.${note}`);
+      setMsg(`${m.toLocaleString()} Oscart ajoutes au compte ${cible}.${note}`);
       setMontant('');
       chargerSolde();
     } catch(e: any) {
@@ -4383,7 +4518,7 @@ function PubOscartTab({ user }: { user: any }) {
 
   return (
     <div style={S.card}>
-      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83D\uDCB0 Oscart pour la publicite</h3>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Oscart pour la publicite</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
         Creditez n importe quel compte (melomane ou artiste) en Oscart. Mettez l email du
         tableau de bord de l artiste pour qu il puisse publier ses contenus. Par defaut votre
@@ -4411,7 +4546,7 @@ function PubOscartTab({ user }: { user: any }) {
       <button onClick={crediter} disabled={loading} style={{ ...S.btn, width:'100%', padding:13, opacity: loading ? 0.6 : 1 }}>
         {loading ? 'Credit en cours...' : 'Crediter ce compte'}
       </button>
-      {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
+      {msg && <p style={{ color: msg.startsWith('') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
     </div>
   );
 }
@@ -4442,7 +4577,7 @@ function ConcoursConfigTab() {
     setPaliers(prev => prev.map((p, idx) => idx === i ? { ...p, [champ]: valeur } : p));
   };
   const ajouterPalier = () => {
-    setPaliers(prev => [...prev, { kifs: 0, type: 'cash', valeur: 0, label: '', icone: '\uD83C\uDF81' }]);
+    setPaliers(prev => [...prev, { kifs: 0, type: 'cash', valeur: 0, label: '', icone: '' }]);
   };
   const supprimerPalier = (i: number) => {
     setPaliers(prev => prev.filter((_, idx) => idx !== i));
@@ -4459,7 +4594,7 @@ function ConcoursConfigTab() {
         setDocId(ref.id);
       }
       setPaliers(tries);
-      setMsg('\u2705 Paliers enregistres. Ils sont maintenant visibles par les artistes.');
+      setMsg('Paliers enregistres. Ils sont maintenant visibles par les artistes.');
       setTimeout(() => setMsg(''), 4000);
     } catch(e) { console.error(e); setMsg('Erreur lors de l enregistrement.'); }
     setLoading(false);
@@ -4469,7 +4604,7 @@ function ConcoursConfigTab() {
 
   return (
     <div style={S.card}>
-      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83C\uDFC6 Paliers du Concours Kiffs</h3>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Paliers du Concours Kiffs</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
         Modifiez librement les paliers de kiffs et les prix associes. Les artistes voient ces recompenses
         dans leur tableau de bord. Type "cash" = montant en FCFA, Type "objet" = recompense physique.
@@ -4515,7 +4650,7 @@ function ConcoursConfigTab() {
         </button>
         <button onClick={reset} style={{ ...S.btn2, padding:13 }}>Reinitialiser</button>
       </div>
-      {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
+      {msg && <p style={{ color: msg.startsWith('') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center' }}>{msg}</p>}
     </div>
   );
 }
@@ -4550,7 +4685,7 @@ function InscriptionsTab() {
   return (
     <div>
       <div style={{ ...S.card, marginBottom:12 }}>
-        <h3 style={{ margin:'0 0 4px', color:'#1a2340', fontSize:18 }}>\uD83D\uDCDD Inscriptions artistes</h3>
+        <h3 style={{ margin:'0 0 4px', color:'#1a2340', fontSize:18 }}>Inscriptions artistes</h3>
         <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>{items.length} demande(s) recue(s) via la page /rejoindre</p>
       </div>
 
@@ -4561,7 +4696,7 @@ function InscriptionsTab() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
             <div>
               <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:'0 0 2px' }}>{it.nom}</p>
-              <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>{it.typeContenu}{it.ville ? ' \u00b7 ' + it.ville : ''}</p>
+              <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>{it.typeContenu}{it.ville ? ' ' + it.ville : ''}</p>
             </div>
             <span style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:99,
               background: it.statut === 'traite' ? '#eaf7ee' : '#fff4e0',
@@ -4571,15 +4706,15 @@ function InscriptionsTab() {
           </div>
 
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
-            <a href={`tel:+${(it.tel||'').replace(/[^0-9]/g,'')}`} style={{ ...S.btn2, textDecoration:'none', fontSize:13 }}>\uD83D\uDCDE {it.tel}</a>
+            <a href={`tel:+${(it.tel||'').replace(/[^0-9]/g,'')}`} style={{ ...S.btn2, textDecoration:'none', fontSize:13 }}>{it.tel}</a>
             <a href={`https://wa.me/${(it.tel||'').replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer" style={{ background:'#25D366', color:'#fff', padding:'8px 14px', borderRadius:10, textDecoration:'none', fontSize:13, fontWeight:700 }}>WhatsApp</a>
           </div>
 
-          {it.message && <p style={{ color:'#5a7090', fontSize:13, fontStyle:'italic', margin:'0 0 10px', padding:'8px 12px', background:'#f7f9fc', borderRadius:8 }}>\u00ab {it.message} \u00bb</p>}
+          {it.message && <p style={{ color:'#5a7090', fontSize:13, fontStyle:'italic', margin:'0 0 10px', padding:'8px 12px', background:'#f7f9fc', borderRadius:8 }}>{it.message} </p>}
 
           <p style={{ color:'#8098b8', fontSize:11, margin:'0 0 10px' }}>
             Engagements coches : {Array.isArray(it.engagements) ? it.engagements.filter((e:boolean)=>e).length : 0}/5
-            {it.createdAt ? ' \u00b7 ' + new Date(it.createdAt).toLocaleDateString('fr-FR') : ''}
+            {it.createdAt ? ' ' + new Date(it.createdAt).toLocaleDateString('fr-FR') : ''}
           </p>
 
           <div style={{ display:'flex', gap:8 }}>
@@ -4626,7 +4761,7 @@ function MotsDePasseTab({ user }: { user: any }) {
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok) {
-        setMsg(`\u2705 Mot de passe redefini pour ${cible}. Communiquez-lui : ${nouveauMdp}`);
+        setMsg(`Mot de passe redefini pour ${cible}. Communiquez-lui : ${nouveauMdp}`);
         setEmailCible('');
       } else {
         setMsg(`Erreur (${resp.status}) : ` + (data.error || 'action impossible'));
@@ -4639,7 +4774,7 @@ function MotsDePasseTab({ user }: { user: any }) {
 
   return (
     <div style={S.card}>
-      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>\uD83D\uDD11 Redefinir un mot de passe</h3>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Redefinir un mot de passe</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
         Definissez directement un nouveau mot de passe pour le compte d un utilisateur,
         puis communiquez-le lui. Reserve au super administrateur.
@@ -4655,7 +4790,7 @@ function MotsDePasseTab({ user }: { user: any }) {
       <button onClick={definir} disabled={loading} style={{ ...S.btn, width:'100%', padding:13, opacity: loading ? 0.6 : 1 }}>
         {loading ? 'En cours...' : 'Redefinir le mot de passe'}
       </button>
-      {msg && <p style={{ color: msg.startsWith('\u2705') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center', wordBreak:'break-word' }}>{msg}</p>}
+      {msg && <p style={{ color: msg.startsWith('') ? '#1a6bff' : '#e04060', fontSize:13, marginTop:12, textAlign:'center', wordBreak:'break-word' }}>{msg}</p>}
     </div>
   );
 }
@@ -5150,9 +5285,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               <div style={{ flex: 1 }}>
                 <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadEditCover(e.target.files[0])} style={{ display: 'none' }} id="editCoverInput" />
                 <label htmlFor="editCoverInput" style={{ ...S.btn2, fontSize: 12, padding: '8px 14px', cursor: 'pointer', display: 'inline-block' }}>
-                  {editCover ? 'Changer l\u2019image' : 'Ajouter une image'}
+                  {editCover ? 'Changer limage' : 'Ajouter une image'}
                 </label>
-                {editCoverUploading && <p style={{ color: '#1a6bff', fontSize: 12, marginTop: 6 }}>Envoi de l\u2019image...</p>}
+                {editCoverUploading && <p style={{ color: '#1a6bff', fontSize: 12, marginTop: 6 }}>Envoi de limage...</p>}
               </div>
             </div>
 
@@ -8498,6 +8633,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         text: `Nouvelle réservation : "${s.titre}" de ${s.artistName} — par ${user.displayName || user.email}. Total : ${(s.reservations || 0) + 1}.`,
         createdAt: new Date().toISOString(), lu:false,
       });
+      // Email à l'admin (reçu même app fermée)
+      envoyerEmailNotif('bdonaldservices@gmail.com', 'Nouvelle réservation Doniel Zik',
+        `Nouvelle réservation pour "${s.titre}" de ${s.artistName}, faite par ${user.displayName || user.email}. Total : ${(s.reservations || 0) + 1} réservation(s).`);
       // Notif à l'ARTISTE (sa sortie a été réservée)
       if (s.artistEmail) {
         await addDoc(collection(db,'notifications'), {
@@ -8505,6 +8643,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
           text: `Quelqu'un a réservé votre sortie "${s.titre}" ! Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`,
           createdAt: new Date().toISOString(), lu:false,
         });
+        // Email à l'artiste
+        envoyerEmailNotif(s.artistEmail, 'Votre sortie a été réservée !',
+          `Bonne nouvelle ! Quelqu'un vient de réserver votre sortie "${s.titre}". Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`);
       }
       setReserve(true); setMsg('✅ Réservé ! Vous recevrez le contenu le jour de la sortie.');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
@@ -10483,8 +10624,8 @@ function RejoindrePage() {
   const QUESTIONS = [
     'Je suis prêt(e) à distribuer mes pochettes reçues.',
     'Je suis prêt(e) à partager mes liens pour faire écouter et télécharger au maximum de mélomanes.',
-    'Je suis prêt(e) à inciter ma communauté à m\u2019envoyer un maximum de cadeaux.',
-    'Je vais challenger pour atteindre les millions de Kiffs et obtenir des récompenses (cash, voiture\u2026).',
+    'Je suis prêt(e) à inciter ma communauté à menvoyer un maximum de cadeaux.',
+    'Je vais challenger pour atteindre les millions de Kiffs et obtenir des récompenses (cash, voiture).',
     'Je suis prêt(e) à programmer des sorties officielles et inciter ma communauté à télécharger au maximum.',
   ];
 
@@ -10496,7 +10637,7 @@ function RejoindrePage() {
 
   const enregistrer = async () => {
     setErr('');
-    if (!nom.trim()) { setErr('Indiquez votre nom d\u2019artiste.'); return; }
+    if (!nom.trim()) { setErr('Indiquez votre nom dartiste.'); return; }
     if (!tel.trim()) { setErr('Indiquez votre numéro de téléphone.'); return; }
     if (!typeContenu) { setErr('Choisissez votre type de contenu.'); return; }
     if (!tousEngages) { setErr('Merci de cocher tous les engagements pour continuer.'); return; }
@@ -10515,12 +10656,12 @@ function RejoindrePage() {
       setDone(true);
     } catch(e:any) {
       console.error(e);
-      setErr('Erreur lors de l\u2019enregistrement. Réessayez ou contactez-nous directement.');
+      setErr('Erreur lors de lenregistrement. Réessayez ou contactez-nous directement.');
     }
     setLoading(false);
   };
 
-  const waLink = `https://wa.me/${CONTACT_TEL}?text=${encodeURIComponent('Bonjour, je viens de m\u2019inscrire sur Doniel Zik (' + (nom || 'artiste') + '). Je souhaite prendre rendez-vous.')}`;
+  const waLink = `https://wa.me/${CONTACT_TEL}?text=${encodeURIComponent('Bonjour, je viens de minscrire sur Doniel Zik (' + (nom || 'artiste') + '). Je souhaite prendre rendez-vous.')}`;
 
   // ── ÉCRAN DE CONFIRMATION ──
   if (done) {
@@ -10667,7 +10808,7 @@ function RejoindrePage() {
             style={{ width:'100%', padding:'16px', borderRadius:14, border:'none', cursor:'pointer',
               background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:16,
               opacity: loading ? 0.6 : 1 }}>
-            {loading ? 'Enregistrement...' : 'M\u2019inscrire maintenant'}
+            {loading ? 'Enregistrement...' : 'Minscrire maintenant'}
           </button>
         </div>
 
@@ -12724,6 +12865,9 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   void progress; // la barre de progression est gérée par le splash HTML désormais
+
+  // Notifications système : prévient l'utilisateur connecté dès qu'une notif arrive (même app en arrière-plan)
+  usePushNotifications(user?.email);
 
   useEffect(() => {
     // (la barre animée est dans le splash HTML index.html)
