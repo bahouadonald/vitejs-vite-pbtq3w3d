@@ -9230,6 +9230,8 @@ function ProfilPage() {
     });
     setProjetSent(true);
   };
+  // "Projet créatif" en attente (Pour bientôt) — variables conservées pour réactivation
+  void showProjet; void setShowProjet; void projetSent; void projetForm; void setProjetForm; void envoyerProjet;
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -9366,40 +9368,15 @@ function ProfilPage() {
           </div>
         </div>
 
-        {/* PROJET CRÉATIF */}
+        {/* PROJET CRÉATIF — en attente (Pour bientôt) */}
         <div style={{ background:'rgba(30,111,255,0.06)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:16, padding:'18px 20px', marginBottom:16 }}>
           <p style={{ fontWeight:800, fontSize:15, color:'#4da6ff', marginBottom:6 }}>Vous avez un projet créatif ?</p>
           <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>
             Vous êtes artiste, humoriste, réalisateur ou scénariste mais vous n'avez pas les moyens de produire ? Doniel Zik peut vous aider à produire et promouvoir votre contenu.
           </p>
-          {!showProjet ? (
-            <button onClick={() => setShowProjet(true)}
-              style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
-              Soumettre mon projet
-            </button>
-          ) : projetSent ? (
-            <p style={{ color:'#00c853', fontWeight:700, textAlign:'center' }}>Demande envoyée ! Nous vous contacterons bientôt.</p>
-          ) : (
-            <div>
-              <input style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any }}
-                placeholder="Votre nom" value={projetForm.nom} onChange={e => setProjetForm(f => ({...f, nom:e.target.value}))} />
-              <select style={{ width:'100%', background:'#1e2540', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any }}
-                value={projetForm.type} onChange={e => setProjetForm(f => ({...f, type:e.target.value}))}>
-                <option value="musique">Musique</option>
-                <option value="video">Vidéo / Film</option>
-                <option value="humour">Humour</option>
-                <option value="autre">Autre</option>
-              </select>
-              <textarea style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:8, boxSizing:'border-box' as any, minHeight:80, resize:'none' as any }}
-                placeholder="Décrivez votre projet..." value={projetForm.description} onChange={e => setProjetForm(f => ({...f, description:e.target.value}))} />
-              <input style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, padding:'10px 14px', color:'#dde4f5', fontSize:13, marginBottom:12, boxSizing:'border-box' as any }}
-                placeholder="Votre WhatsApp (+225...)" value={projetForm.whatsapp} onChange={e => setProjetForm(f => ({...f, whatsapp:e.target.value}))} />
-              <button onClick={envoyerProjet}
-                style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
-                Envoyer ma demande
-              </button>
-            </div>
-          )}
+          <div style={{ width:'100%', padding:12, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'#8098b8', fontWeight:700, fontSize:14, textAlign:'center' }}>
+            Pour bientôt
+          </div>
         </div>
 
         {/* INFORMATIONS */}
