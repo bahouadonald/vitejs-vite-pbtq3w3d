@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import { db, auth } from './firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
-  onSnapshot, query, orderBy, where, getDocs
+  onSnapshot, query, orderBy, where, getDocs, limit
 } from 'firebase/firestore';
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -121,6 +121,28 @@ async function logTx(uid: string, type: string, oscartDelta: number, kiffsDelta:
     });
   } catch (e) { /* silencieux */ }
 }
+// Notifie les autres mélomanes qui ont déjà interagi (commenté/kiffé...) avec un même qrId,
+// pour ramener les actifs ("X a fait l'action, toi aussi"). Best-effort, ne bloque jamais.
+async function notifierActiviteCommunaute(qrId: string, exclureUid: string, message: string): Promise<void> {
+  if (!qrId) return;
+  try {
+    // On cible les mélomanes qui ont laissé un commentaire sur ce contenu (preuve d'intérêt)
+    const snap = await getDocs(query(collection(db, 'commentaires'), where('qrId','==',qrId)));
+    const dejaNotifies = new Set<string>();
+    for (const d of snap.docs) {
+      const c = d.data();
+      const emailCible = c.userEmail;
+      if (emailCible && c.userId !== exclureUid && !dejaNotifies.has(emailCible)) {
+        dejaNotifies.add(emailCible);
+        await addDoc(collection(db, 'notifications'), {
+          to: emailCible, type: 'activite',
+          text: message, qrId, createdAt: new Date().toISOString(), lu: false,
+        });
+      }
+    }
+  } catch(e) { console.error('notif activite communaute', e); }
+}
+
 // Donner UN kiff (Option A) : dépense le stock du donneur, compte les offerts, crédite l'artiste
 async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Promise<'ok'|'vide'|'erreur'> {
   try {
@@ -438,6 +460,7 @@ const SIGNATURES = [
   { id:"vip", label:"Accès VIP", desc:"Accès coulisses et rencontre privée avec l'artiste", color:"#ffd700", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3z"/></svg>) },
   { id:"clip", label:"Dans son clip", desc:"Votre visage apparaît dans le prochain clip", color:"#00c853", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00c853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>) },
   { id:"mention", label:"Mention spéciale", desc:"Dédicace vidéo personnalisée rien que pour vous", color:"#f04a6a", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f04a6a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/><path d="M12 14c1.6-1.3 3-2.2 3-3.6a1.4 1.4 0 0 0-2.7-.5l-.3.4-.3-.4A1.4 1.4 0 0 0 9 10.4c0 1.4 1.4 2.3 3 3.6z"/></svg>) },
+  { id:"spot", label:"Signature Spot", desc:"Votre nom cité et chanté dans une prochaine musique de l'artiste", color:"#F5C84C", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F5C84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>) },
   { id:"challenge", label:"Challenge clip", desc:"Votre challenge sera intégré dans un clip", color:"#fb923c", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>) },
   { id:"tournage", label:"Tournage avec vous", desc:"Participez à un tournage avec l'artiste", color:"#1a6bff", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>) },
 ];
@@ -981,6 +1004,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
       await addDoc(collection(db, 'commentaires'), {
         qrId, text: text.trim(),
         userId: user.uid,
+        userEmail: user.email || '',
         userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
         userPhoto: user.photoURL || '',
         createdAt: new Date().toISOString(),
@@ -997,6 +1021,9 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
           lu: false,
         });
       }
+      // Notif activité (message 6) : prévenir les autres mélomanes actifs sur ce contenu
+      await notifierActiviteCommunaute(qrId, user.uid,
+        `${user.displayName || 'Quelqu\'un'} vient de commenter ce contenu. Rejoins la discussion !`);
       setText(''); setMsg('');
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -1014,10 +1041,14 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
         qrId, text: replyText.trim(),
         parentId, // marque cette entrée comme une réponse
         userId: user.uid,
+        userEmail: user.email || '',
         userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
         userPhoto: user.photoURL || '',
         createdAt: new Date().toISOString(),
       });
+      // Notif activité (message 7) : une réponse a été postée
+      await notifierActiviteCommunaute(qrId, user.uid,
+        `${user.displayName || 'Quelqu\'un'} a répondu à un commentaire sur ce contenu. Va voir la discussion !`);
       setReplyText(''); setReplyTo(null);
     } catch(e) { console.error(e); }
   };
@@ -1451,6 +1482,19 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     try {
       const r = await donnerKiff(user.uid, qrId, artistEmail);
       if (r === 'vide') { setShowKiffements(true); }
+      else if (r === 'ok') {
+        // Notif activité (message 4) : quelqu'un a kiffé ce contenu
+        notifierActiviteCommunaute(qrId, user.uid,
+          `${user.displayName || 'Quelqu\'un'} a kiffé ce contenu. Toi aussi, montre ton soutien : kiffe-le !`);
+        // Notif à l'ARTISTE (B1), modérée car le kiff arrive souvent
+        if (artistEmail && Math.random() < 0.25) {
+          await addDoc(collection(db, 'notifications'), {
+            to: artistEmail, role:'artiste', type:'kiff',
+            text: `${user.displayName || 'Un fan'} a kiffé votre contenu ! Continuez comme ça.`,
+            createdAt: new Date().toISOString(), lu:false,
+          });
+        }
+      }
     } catch(e) { console.error(e); }
   };
 
@@ -2244,6 +2288,19 @@ function FanPage() {
       ));
       if (existing.empty) {
         await addDoc(collection(db, 'zikotheque'), { uid, ...zikoData });
+        const uZiko = auth.currentUser;
+        if (uZiko && qrData.qrId) {
+          notifierActiviteCommunaute(qrData.qrId, uZiko.uid,
+            `${uZiko.displayName || 'Quelqu\'un'} a ajouté "${qrData.label || 'ce contenu'}" à sa Zikothèque. Ajoute-le à la tienne aussi !`);
+        }
+        // Notif à l'ARTISTE (B1) : son contenu a été ajouté à une Zikothèque
+        if (qrData.artistEmail) {
+          await addDoc(collection(db, 'notifications'), {
+            to: qrData.artistEmail, role:'artiste', type:'zikotheque',
+            text: `${uZiko?.displayName || 'Un fan'} a ajouté votre contenu "${qrData.label || ''}" à sa Zikothèque.`,
+            createdAt: new Date().toISOString(), lu:false,
+          });
+        }
       }
       setZikoState('done');
     } catch(e) { console.error('ziko', e); setZikoState('idle'); }
@@ -2270,6 +2327,12 @@ function FanPage() {
       });
       await updateDoc(doc(db, 'qrcodes', qrDocId.current), { streams: (qrData.streams || 0) + 1 });
       setQrData((prev: any) => ({ ...prev, streams: (prev.streams || 0) + 1 }));
+      // Notif activité (message 8) : écouter arrive souvent → on ne notifie qu'occasionnellement (anti-spam)
+      const uEcoute = auth.currentUser;
+      if (uEcoute && qrData.qrId && Math.random() < 0.2) {
+        notifierActiviteCommunaute(qrData.qrId, uEcoute.uid,
+          `${uEcoute.displayName || 'Quelqu\'un'} écoute "${qrData.label || 'ce contenu'}". Écoute-le toi aussi !`);
+      }
       // Déclencher tuto cascade après la première écoute
       if (!localStorage.getItem('dz_tuto_seen_v4')) {
         setTimeout(() => setShowTutoCascade(true), 500);
@@ -2288,6 +2351,20 @@ function FanPage() {
         // On ne bloque plus jamais — le DL devient payant quand épuisé
         status: 'active',
       });
+      // Notif activité (message 9) : quelqu'un a téléchargé ce contenu
+      const u = auth.currentUser;
+      if (u && qrData.qrId) {
+        notifierActiviteCommunaute(qrData.qrId, u.uid,
+          `${u.displayName || 'Quelqu\'un'} a téléchargé "${qrData.label || 'ce contenu'}". Télécharge-le toi aussi !`);
+      }
+      // Notif à l'ARTISTE (B1) : son contenu a été téléchargé
+      if (qrData.artistEmail) {
+        await addDoc(collection(db, 'notifications'), {
+          to: qrData.artistEmail, role:'artiste', type:'telechargement',
+          text: `${u?.displayName || 'Un fan'} a téléchargé votre contenu "${qrData.label || ''}".`,
+          createdAt: new Date().toISOString(), lu:false,
+        });
+      }
     } catch(e) { console.error('markDL', e); }
   };
 
@@ -2954,6 +3031,12 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
         text: `Félicitations ! Votre contenu "${s.titre}" est validé et publié. Votre lien et votre QR public sont disponibles. Partagez-les à vos fans !`,
         createdAt: new Date().toISOString(), lu: false,
       });
+      // Notif GÉNÉRALE : nouvelle publication, visible par tous les mélomanes
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'generale',
+        text: `Nouveau sur Doniel Zik : "${s.titre}" de ${s.artistName} est disponible ! Allez l'écouter et soutenez l'artiste.`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
       setScansModal(null); setNbScans('1');
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
@@ -2984,6 +3067,12 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       await addDoc(collection(db,'notifications'), {
         to: s.artistEmail, type:'validation',
         text: `Votre sortie "${s.titre}" est validée et publiée dans "Sortie officielle" ! Les fans peuvent réserver dès maintenant. Le jour J, uploadez votre fichier officiel.`,
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      // Notif GÉNÉRALE : nouvelle sortie officielle à venir, visible par tous les mélomanes
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'generale',
+        text: `Sortie officielle à venir : "${s.titre}" de ${s.artistName}, le ${new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long' })}. Réservez et envoyez des kiffements pour soutenir l'artiste !`,
         createdAt: new Date().toISOString(), lu: false,
       });
     } catch(e:any) { alert('Erreur : ' + e.message); }
@@ -4656,6 +4745,72 @@ function ConcoursConfigTab() {
 }
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// NOTIFICATIONS ÉDUCATIVES — l'admin envoie un message général à tous les mélomanes
+// ─────────────────────────────────────────────
+function NotifsEducativesTab() {
+  const [message, setMessage] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // Messages éducatifs prêts à l'emploi (1 clic)
+  const MODELES = [
+    "Le savais-tu ? Un kiffement, c'est un cadeau que tu offres à ton artiste pour le soutenir. Plus tu en envoies, plus tu l'aides à réussir !",
+    "Pour soutenir tes artistes, recharge tes Oscart ! Va dans ta Zikothèque, choisis ta recharge et obtiens tes Oscart en quelques secondes.",
+    "Recharge tes Oscart et télécharge la musique de tes artistes préférés pour l'écouter partout, même hors connexion !",
+    "Recharge tes Oscart puis offre des kiffements à ton artiste : c'est le meilleur moyen de le soutenir et de le faire grandir.",
+    "Offre des kiffements à ton artiste : à chaque cadeau, tu gagnes aussi des kiffs et tu augmentes tes chances de récompenses exclusives !",
+    "Ne rate aucune sortie ! Réserve ou pré-télécharge la prochaine musique de ton artiste avant tout le monde.",
+    "Cherche ton artiste préféré ! Tape son nom dans la barre de recherche et retrouve toute sa musique sur Doniel Zik.",
+    "Doniel Zik, ce n'est pas que la musique ! Découvre l'humour, les clips et les vidéos de tes créateurs préférés.",
+    "Tu as un talent artistique ? Publie ton contenu sur Doniel Zik et obtiens le maximum de visibilité et de revenus. Qu'attends-tu ?",
+  ];
+
+  const envoyer = async (texte: string) => {
+    if (!texte.trim()) { setMsg('Écrivez un message.'); return; }
+    setEnvoi(true); setMsg('');
+    try {
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'educative',
+        text: texte.trim(),
+        createdAt: new Date().toISOString(), lu: false,
+      });
+      setMsg('Notification envoyée à tous les mélomanes.');
+      setMessage('');
+    } catch(e:any) { setMsg('Erreur : ' + (e?.message || '')); }
+    setEnvoi(false);
+  };
+
+  return (
+    <div>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Notifications à tous</h3>
+      <p style={{ color:'#5a7090', fontSize:13, marginBottom:16 }}>
+        Envoyez un message à tous les mélomanes (encouragement à envoyer des kiffements, annonces...). Il apparaît dans l'onglet "Général" de leurs notifications.
+      </p>
+
+      <textarea value={message} onChange={e => setMessage(e.target.value)}
+        placeholder="Écrivez votre message..."
+        style={{ width:'100%', minHeight:90, background:'#fff', border:'1px solid #d0d8e8', borderRadius:10, padding:'12px 14px', color:'#1a2340', fontSize:14, boxSizing:'border-box' as any, resize:'none' as any, marginBottom:10 }} />
+      <button onClick={() => envoyer(message)} disabled={envoi}
+        style={{ width:'100%', padding:13, borderRadius:10, border:'none', background: envoi ? '#9bb' : '#1a6bff', color:'#fff', fontWeight:800, fontSize:14, cursor: envoi ? 'wait' : 'pointer', marginBottom:8 }}>
+        {envoi ? 'Envoi...' : 'Envoyer à tous'}
+      </button>
+      {msg && <p style={{ color: msg.startsWith('Erreur') ? '#d04a6a' : '#00a050', fontSize:13, textAlign:'center', marginBottom:14 }}>{msg}</p>}
+
+      <p style={{ color:'#5a7090', fontSize:12, fontWeight:700, margin:'18px 0 8px' }}>Messages prêts (1 clic) :</p>
+      {MODELES.map((m, i) => (
+        <div key={i} style={{ background:'#f4f7fc', border:'1px solid #e0e8f4', borderRadius:10, padding:'10px 12px', marginBottom:8 }}>
+          <p style={{ color:'#3a4560', fontSize:13, lineHeight:1.5, margin:'0 0 8px' }}>{m}</p>
+          <button onClick={() => envoyer(m)} disabled={envoi}
+            style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+            Envoyer celui-ci
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // INSCRIPTIONS ARTISTES — liste des demandes via /rejoindre
 // ─────────────────────────────────────────────
 function InscriptionsTab() {
@@ -5392,6 +5547,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'puboscart'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('puboscart')}>💰 Pub Oscart</button>
         <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Concours</button>
         <button style={{...tabStyle(tab === 'inscriptions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('inscriptions')}>📝 Inscriptions</button>
+        <button style={{...tabStyle(tab === 'notifsedu'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('notifsedu')}>Notifs à tous</button>
         {estSuperAdmin(user?.email) && <button style={{...tabStyle(tab === 'motsdepasse'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('motsdepasse')}>🔑 Mots de passe</button>}
         <button style={{...tabStyle(tab === 'artistes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('artistes')}>Artistes</button>
         <button style={{...tabStyle(tab === 'soumissions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('soumissions')}>Soumissions</button>
@@ -5592,6 +5748,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         {tab === 'puboscart' && <PubOscartTab user={user} />}
         {tab === 'concours' && <ConcoursConfigTab />}
         {tab === 'inscriptions' && <InscriptionsTab />}
+        {tab === 'notifsedu' && <NotifsEducativesTab />}
         {tab === 'motsdepasse' && estSuperAdmin(user?.email) && <MotsDePasseTab user={user} />}
 
         {tab === 'soumissions' && <SoumissionsTab canValidate={estAdmin(user?.email)} canDelete={estSuperAdmin(user?.email)} />}
@@ -8647,6 +8804,12 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         envoyerEmailNotif(s.artistEmail, 'Votre sortie a été réservée !',
           `Bonne nouvelle ! Quelqu'un vient de réserver votre sortie "${s.titre}". Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`);
       }
+      // Notif GÉNÉRALE (message 11) : une réservation pousse les autres à réserver aussi
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'generale',
+        text: `${user.displayName || 'Quelqu\'un'} a réservé "${s.titre}" de ${s.artistName}. Réserve-la toi aussi avant la sortie !`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
       setReserve(true); setMsg('✅ Réservé ! Vous recevrez le contenu le jour de la sortie.');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
@@ -8660,6 +8823,13 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
     try {
       if (navigator.share) { await navigator.share({ title: s.titre, text: texte, url }); }
       else { await navigator.clipboard.writeText(`${texte} ${url}`); setMsg('✅ Lien copié ! Partagez-le.'); }
+      // Notif générale (message 12) : un partage pousse les autres à partager aussi
+      const u = auth.currentUser;
+      await addDoc(collection(db,'notifications'), {
+        to: 'all', type:'generale',
+        text: `${u?.displayName || 'Quelqu\'un'} a partagé "${s.titre}" de ${s.artistName}. Partage-le toi aussi pour soutenir l'artiste !`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
     } catch {}
   };
 
@@ -9086,10 +9256,10 @@ function NotificationsPage() {
 
   const getIcon = (type: string) => {
     if (type === 'kiff') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#f04a6a" stroke="#f04a6a" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
-    if (type === 'commentaire') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+    if (type === 'commentaire' || type === 'activite') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
     if (type === 'kiffement') return <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffd700" stroke="#ffd700" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
     if (type === 'signature') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>;
-    if (type === 'generale' || type === 'mot_valide' || type === 'mot_artiste') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
+    if (type === 'generale' || type === 'mot_valide' || type === 'mot_artiste' || type === 'educative') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
     return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8098b8" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>;
   };
 
@@ -9160,6 +9330,13 @@ function NotificationsPage() {
                   } catch {}
                 }} style={{ marginTop:8, padding:'10px 16px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00a040,#4dff9a)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
                   ⬇ Télécharger maintenant
+                </button>
+              )}
+              {n.type === 'educative' && (
+                <button onClick={(e) => { e.stopPropagation(); window.location.href = '/decouvrir'; }}
+                  style={{ marginTop:8, padding:'10px 16px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#F5C84C,#e0a82e)', color:'#1a2340', fontWeight:800, fontSize:13, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+                  Envoyer un kiffement
                 </button>
               )}
             </div>
@@ -12845,6 +13022,87 @@ export default function App() {
 
   // Notifications système : prévient l'utilisateur connecté dès qu'une notif arrive (même app en arrière-plan)
   usePushNotifications(user?.email);
+
+  // Notifications éducatives AUTO (façon A) : à l'ouverture, si la dernière éducative
+  // date de plus de 3 jours, on en envoie une nouvelle (pioche dans une liste). Sans serveur.
+  useEffect(() => {
+    if (!user) return;
+    const MESSAGES_EDU = [
+      // 1. C'est quoi un kiffement
+      "Le savais-tu ? Un kiffement, c'est un cadeau que tu offres à ton artiste pour le soutenir. Plus tu en envoies, plus tu l'aides à réussir !",
+      // 2. Se recharger en Oscart
+      "Pour soutenir tes artistes, recharge tes Oscart ! Va dans ta Zikothèque, choisis ta recharge et obtiens tes Oscart en quelques secondes.",
+      // 3. Se recharger et télécharger
+      "Recharge tes Oscart et télécharge la musique de tes artistes préférés pour l'écouter partout, même hors connexion !",
+      // 4. Se recharger et offrir des kiffements
+      "Recharge tes Oscart puis offre des kiffements à ton artiste : c'est le meilleur moyen de le soutenir et de le faire grandir.",
+      // 5. Offrir des kiffements pour obtenir des kiffs
+      "Offre des kiffements à ton artiste : à chaque cadeau, tu gagnes aussi des kiffs et tu augmentes tes chances de récompenses exclusives !",
+      // 6. Réserver / pré-télécharger
+      "Ne rate aucune sortie ! Réserve ou pré-télécharge la prochaine musique de ton artiste avant tout le monde.",
+      // 7. Scroller, rechercher
+      "Cherche ton artiste préféré ! Tape son nom dans la barre de recherche et retrouve toute sa musique sur Doniel Zik.",
+      // 8. Découvrir humour, clips, vidéos
+      "Doniel Zik, ce n'est pas que la musique ! Découvre l'humour, les clips et les vidéos de tes créateurs préférés.",
+      // 9. Mélomane avec talent -> devenir artiste
+      "Tu as un talent artistique ? Publie ton contenu sur Doniel Zik et obtiens le maximum de visibilité et de revenus. Qu'attends-tu ?",
+    ];
+    (async () => {
+      try {
+        const q = query(collection(db,'notifications'), where('to','==','all'), where('type','==','educative'), orderBy('createdAt','desc'), limit(1));
+        const snap = await getDocs(q);
+        const maintenant = Date.now();
+        let envoyer = snap.empty;
+        if (!snap.empty) {
+          const derniere = new Date(snap.docs[0].data().createdAt).getTime();
+          if (maintenant - derniere > 3 * 24 * 3600 * 1000) envoyer = true; // > 3 jours
+        }
+        if (envoyer) {
+          const texte = MESSAGES_EDU[Math.floor(Math.random() * MESSAGES_EDU.length)];
+          await addDoc(collection(db,'notifications'), {
+            to: 'all', type:'educative', text: texte,
+            createdAt: new Date().toISOString(), lu: false,
+          });
+        }
+      } catch(e) { console.error('edu auto', e); }
+    })();
+  }, [user]);
+
+  // Notifications TUTO pour l'ARTISTE (B2) : si l'utilisateur est un artiste, on lui envoie
+  // de temps en temps (1 tous les 3 jours) un conseil pour faire grandir sa communauté.
+  useEffect(() => {
+    if (!user || !user.email) return;
+    const MESSAGES_TUTO_ARTISTE = [
+      "Conseil : publiez régulièrement votre contenu sur Doniel Zik pour gagner en visibilité et toucher plus de fans !",
+      "Astuce : programmez une sortie officielle et invitez votre communauté à la réserver à l'avance. L'attente crée l'engouement !",
+      "Incitez votre communauté à télécharger votre musique : plus de téléchargements, plus de revenus pour vous.",
+      "Demandez à vos fans de vous envoyer un maximum de kiffs : c'est le carburant de votre réussite sur Doniel Zik !",
+      "Vos fans peuvent vous offrir des kiffements. Encouragez-les : chaque kiffement vous rapproche de vos objectifs.",
+      "N'oubliez pas : vous pouvez offrir des signatures (dédicaces) à vos fans les plus fidèles pour les récompenser et les fidéliser !",
+    ];
+    (async () => {
+      try {
+        // Vérifier que l'utilisateur est bien un artiste
+        const artSnap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
+        if (artSnap.empty) return;
+        // Dernière notif tuto envoyée à cet artiste
+        const q = query(collection(db,'notifications'), where('to','==',user.email), where('type','==','tuto_artiste'), orderBy('createdAt','desc'), limit(1));
+        const snap = await getDocs(q);
+        let envoyer = snap.empty;
+        if (!snap.empty) {
+          const derniere = new Date(snap.docs[0].data().createdAt).getTime();
+          if (Date.now() - derniere > 3 * 24 * 3600 * 1000) envoyer = true;
+        }
+        if (envoyer) {
+          const texte = MESSAGES_TUTO_ARTISTE[Math.floor(Math.random() * MESSAGES_TUTO_ARTISTE.length)];
+          await addDoc(collection(db,'notifications'), {
+            to: user.email, role:'artiste', type:'tuto_artiste', text: texte,
+            createdAt: new Date().toISOString(), lu: false,
+          });
+        }
+      } catch(e) { console.error('tuto artiste', e); }
+    })();
+  }, [user]);
 
   useEffect(() => {
     // (la barre animée est dans le splash HTML index.html)
