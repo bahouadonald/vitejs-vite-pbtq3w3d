@@ -94,6 +94,20 @@ async function envoyerEmailNotif(to: string, sujet: string, message: string): Pr
   } catch { /* échec silencieux : la notif Firestore reste la source principale */ }
 }
 
+// Notifie l'admin (notif in-app + email) à chaque nouvel enregistrement (artiste/commercial/mélomane...)
+async function notifierAdminEnregistrement(quoi: string, details: string): Promise<void> {
+  const ADMIN = 'bdonaldservices@gmail.com';
+  try {
+    await addDoc(collection(db, 'notifications'), {
+      to: ADMIN, type: 'enregistrement_admin',
+      text: `Nouvel enregistrement — ${quoi} : ${details}`,
+      createdAt: new Date().toISOString(), lu: false,
+    });
+  } catch(e) { console.error('notif admin enreg', e); }
+  // Email à l'admin (reçu même app fermée)
+  envoyerEmailNotif(ADMIN, `Nouvel enregistrement : ${quoi}`, `Un nouvel enregistrement vient d'avoir lieu sur Doniel Zik.\n\nType : ${quoi}\n${details}`);
+}
+
 const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
 
 const CLOUDINARY_CLOUD = 'drjp8ht84';
@@ -2141,6 +2155,7 @@ function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string) => vo
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
+      notifierAdminEnregistrement('Nouveau mélomane', `${displayName || ''} (${email})`);
       onSuccess(result.user.uid);
     } catch (e: any) { setMsg('Erreur: ' + e.message); setLoading(false); }
   };
@@ -4102,6 +4117,7 @@ function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[], canD
         email: email.trim().toLowerCase(),
         createdAt: new Date().toISOString(),
       });
+      notifierAdminEnregistrement('Nouvel artiste', `${nom.trim()} (${email.trim().toLowerCase()})`);
       setMsg('✅ Artiste enregistré ! Il peut maintenant créer son compte sur /artiste');
       setNom(''); setEmail('');
     } catch(e:any) { setMsg('Erreur: ' + e.message); }
@@ -5176,6 +5192,7 @@ function AdminPage() {
             commercialEmail: newCommercialEmail || '',
             createdAt: new Date().toISOString(),
           });
+          notifierAdminEnregistrement('Nouvel artiste', `${newArtist} (${newArtistEmail})`);
         }
       }
       setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
@@ -10458,6 +10475,7 @@ function CommercialPage() {
                           methode: inscMethode, cible: inscCible, objectif: inscObjectif,
                           status: 'en_attente', createdAt: new Date().toISOString(),
                         });
+                        notifierAdminEnregistrement('Nouveau commercial', `${inscNom} (${inscEmail.trim().toLowerCase()}) — ${inscCommune || ''}`);
                         setMsg('✅ Inscription envoyée ! Votre compte sera validé par votre responsable.');
                         await signOut(auth);
                         setTimeout(() => { setMode('login'); setInscStep(1); setInscNom(''); setInscEmail(''); setInscTel(''); setInscPass(''); setMsg(''); }, 2500);
@@ -10807,6 +10825,7 @@ function RejoindrePage() {
         statut: 'nouveau',
         createdAt: new Date().toISOString(),
       });
+      notifierAdminEnregistrement('Demande artiste (/rejoindre)', `${nom.trim()} — ${tel.trim()} — ${ville.trim()}`);
       setDone(true);
     } catch(e:any) {
       console.error(e);
