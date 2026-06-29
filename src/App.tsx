@@ -8891,7 +8891,6 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
   };
-  void reserver; void reserving; // conservés pour réactivation après maintenance
 
   // Partage de la sortie officielle
   const partagerSortie = async () => {
@@ -9001,9 +9000,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
               <p style={{ color:C.success, fontWeight:700, fontSize:12, margin:0 }}>Réservé</p>
             </div>
           ) : (
-            <button onClick={() => { alert('Paiement temporairement indisponible.\n\nLa réservation payante est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.'); }}
-              style={{ flex:1, padding:12, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
-              PRÉ-TÉLÉCHARGER / RÉSERVER
+            <button onClick={reserver} disabled={reserving}
+              style={{ flex:1, padding:12, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:13, cursor: reserving?'wait':'pointer' }}>
+              {reserving ? 'Réservation...' : `PRÉ-TÉLÉCHARGER / RÉSERVER${s.prixOscart ? ` (${s.prixOscart} Oscart)` : ''}`}
             </button>
           )}
           <button onClick={partagerSortie} title="Partager"
@@ -9013,7 +9012,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         </div>
 
         {/* Bouton ENVOYER UN KIFFEMENT (soutenir l'artiste avant la sortie) */}
-        <button onClick={() => { alert('Envoyer un kiffement sera bientôt disponible.\n\nL\'envoi de kiffements est en cours de maintenance. Vous pourrez bientôt soutenir l\'artiste avant la sortie. Merci de votre patience.'); }}
+        <button onClick={() => { window.location.href = `/decouvrir?sortie=${s.id}`; }}
           style={{ width:'100%', marginTop:8, padding:12, borderRadius:10, border:`1px solid ${C.gold}`, background:'rgba(245,200,76,0.1)', color:C.gold, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           ENVOYER UN KIFFEMENT
@@ -12388,7 +12387,6 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     } catch(e) { console.error(e); }
     setPaying(false);
   };
-  void payer; void paying; // conservés pour réactivation après maintenance
 
   // Télécharge tout l'album en UN SEUL fichier ZIP (Chrome ne bloque pas un seul téléchargement)
   const downloadAll = async () => {
@@ -12472,9 +12470,9 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
       )}
 
       {/* Bouton paiement direct (utilisé dans le modal de AchatWidget) */}
-      <button onClick={() => { alert('Paiement temporairement indisponible.\n\nLe téléchargement payant est en cours de maintenance. Il sera bientôt disponible. Merci de votre patience.'); }}
-        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-        Téléchargement payant (maintenance)
+      <button onClick={payer} disabled={paying || (user && solde < prixOscart)}
+        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: (user && solde < prixOscart) ? 'rgba(255,215,0,0.3)' : 'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor: paying?'wait':'pointer' }}>
+        {paying ? 'Traitement...' : (user && solde < prixOscart) ? `Solde insuffisant (${prixOscart} Oscart requis)` : `Télécharger pour ${prixOscart} Oscart`}
       </button>
     </div>
   );
