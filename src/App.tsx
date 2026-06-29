@@ -135,6 +135,24 @@ async function logTx(uid: string, type: string, oscartDelta: number, kiffsDelta:
     });
   } catch (e) { /* silencieux */ }
 }
+
+// Lance un paiement GeniusPay (recharge Oscart) : appelle le serveur et redirige vers le checkout.
+// Renvoie un message d'erreur si échec, sinon redirige la page.
+async function lancerPaiementGeniusPay(oscart: number, fcfa: number): Promise<string> {
+  try {
+    const u = auth.currentUser;
+    if (!u) return 'Connectez-vous pour recharger.';
+    const resp = await fetch('/api/creer-paiement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oscart, fcfa, uid: u.uid, email: u.email, nom: u.displayName }),
+    });
+    const data = await resp.json();
+    if (data.ok && data.url) { window.location.href = data.url; return ''; }
+    return data.error || 'Erreur, réessayez.';
+  } catch { return 'Erreur de connexion, réessayez.'; }
+}
+
 // Notifie les autres mélomanes qui ont déjà interagi (commenté/kiffé...) avec un même qrId,
 // pour ramener les actifs ("X a fait l'action, toi aussi"). Best-effort, ne bloque jamais.
 async function notifierActiviteCommunaute(qrId: string, exclureUid: string, message: string): Promise<void> {
@@ -469,37 +487,38 @@ function RechargeDeviseSelector({ fcfa }: { fcfa: number }) {
 // SIGNATURES ARTISTE — ce que l'artiste peut offrir
 // ─────────────────────────────────────────────
 const SIGNATURES = [
-  { id:"selfie", label:"Selfie dédié", desc:"Une photo dédicacée spécialement pour vous", color:"#1a6bff", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>) },
-  { id:"invitation", label:"Invitation événement", desc:"Entrée gratuite à un concert ou une prestation", color:"#7c3aed", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M13 5v14"/></svg>) },
-  { id:"vip", label:"Accès VIP", desc:"Accès coulisses et rencontre privée avec l'artiste", color:"#ffd700", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3z"/></svg>) },
-  { id:"clip", label:"Dans son clip", desc:"Votre visage apparaît dans le prochain clip", color:"#00c853", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00c853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>) },
-  { id:"mention", label:"Mention spéciale", desc:"Dédicace vidéo personnalisée rien que pour vous", color:"#f04a6a", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f04a6a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/><path d="M12 14c1.6-1.3 3-2.2 3-3.6a1.4 1.4 0 0 0-2.7-.5l-.3.4-.3-.4A1.4 1.4 0 0 0 9 10.4c0 1.4 1.4 2.3 3 3.6z"/></svg>) },
-  { id:"spot", label:"Signature Spot", desc:"Votre nom cité et chanté dans une prochaine musique de l'artiste", color:"#F5C84C", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F5C84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>) },
-  { id:"challenge", label:"Challenge clip", desc:"Votre challenge sera intégré dans un clip", color:"#fb923c", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>) },
-  { id:"tournage", label:"Tournage avec vous", desc:"Participez à un tournage avec l'artiste", color:"#1a6bff", icon:(<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6bff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"middle" }}><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>) },
+  { id:"selfie", label:"Selfie dédié", desc:"Une photo dédicacée spécialement pour vous", color:"#1a6bff", image:"/signatures/selfie.png", detail:"L'artiste prend une vraie photo de lui, rien que pour vous, avec une dédicace personnalisée à votre nom. Un souvenir unique et personnel pour immortaliser votre soutien." },
+  { id:"invitation", label:"Invitation événement", desc:"Entrée gratuite à un concert ou une prestation", color:"#7c3aed", image:"/signatures/invitation.png", detail:"Recevez une invitation personnelle pour assister gratuitement à un concert, un showcase ou une prestation de votre artiste. Vivez la musique en direct, aux premières loges." },
+  { id:"vip", label:"Accès VIP", desc:"Accès coulisses et rencontre privée avec l'artiste", color:"#ffd700", image:"/signatures/vip.png", detail:"Le privilège ultime : accédez aux coulisses et rencontrez votre artiste en personne. Un moment privé et exclusif réservé à ses plus grands soutiens." },
+  { id:"clip", label:"Dans son clip", desc:"Votre visage apparaît dans le prochain clip", color:"#00c853", image:"/signatures/clip.png", detail:"Votre visage apparaît dans le prochain clip vidéo de l'artiste ! Devenez une partie de son œuvre et montrez à tous que vous avez participé à sa création." },
+  { id:"mention", label:"Mention spéciale", desc:"Dédicace vidéo personnalisée rien que pour vous", color:"#f04a6a", image:"/signatures/mention.png", detail:"L'artiste enregistre une vidéo de dédicace personnalisée, rien que pour vous, où il cite votre nom et vous remercie pour votre soutien. Un message vidéo unique à garder." },
+  { id:"spot", label:"Signature Spot", desc:"Votre nom cité et chanté dans une prochaine musique de l'artiste", color:"#F5C84C", image:"/signatures/spot.png", detail:"La consécration : votre nom est cité et chanté (\"spotté\") dans une prochaine musique de l'artiste ! Entrez à jamais dans son œuvre. Réservée aux soutiens les plus généreux." },
+  { id:"challenge", label:"Challenge clip", desc:"Votre challenge sera intégré dans un clip", color:"#fb923c", image:"/signatures/challenge.png", detail:"Proposez un challenge (danse, geste, mot...) et l'artiste l'intègre dans l'un de ses clips. Votre idée devient virale grâce à votre artiste." },
+  { id:"tournage", label:"Tournage avec vous", desc:"Participez à un tournage avec l'artiste", color:"#1a6bff", image:"/signatures/tournage.png", detail:"Participez en personne au tournage d'un clip ou d'une vidéo de l'artiste. Vivez l'envers du décor et partagez un moment de création inoubliable à ses côtés." },
 ];
 
 function SignatureShowcase({ onClose }: { onClose: () => void }) {
+  const [selSig, setSelSig] = useState<typeof SIGNATURES[0] | null>(null);
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:9995 }}
       onClick={onClose}>
       <div style={{ position:'fixed', left:'50%', bottom:90, transform:'translateX(-50%)', background:C.bgSecond, border:'1px solid '+C.border, borderRadius:18, padding:'16px 16px 18px', width:'92%', maxWidth:440, maxHeight:'62vh', overflowY:'auto', boxShadow:'0 12px 48px rgba(0,0,0,0.6)', animation:'bandUp .25s ease-out' }}
         onClick={e => e.stopPropagation()}>
-        <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}} @keyframes sigFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
+        <style>{`@keyframes bandUp{0%{opacity:0;transform:translate(-50%,20px)}100%{opacity:1;transform:translate(-50%,0)}} @keyframes sigFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}} @keyframes sigPageIn{0%{opacity:0;transform:scale(0.95)}100%{opacity:1;transform:scale(1)}}`}</style>
         <p style={{ fontWeight:900, fontSize:16, color:C.text, textAlign:'center', marginBottom:4 }}>
           Envoyez des kiffements
         </p>
         <p style={{ color:C.textSoft, fontSize:12, textAlign:'center', marginBottom:16 }}>
-          Votre artiste peut vous offrir une signature en retour
+          Votre artiste peut vous offrir une signature en retour — appuyez pour découvrir
         </p>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
           {SIGNATURES.map((s, si) => (
-            <div key={s.id} style={{
+            <div key={s.id} onClick={() => setSelSig(s)} style={{
               background:`linear-gradient(135deg,${s.color}22,${s.color}11)`,
               border:`1px solid ${s.color}44`,
-              borderRadius:14, padding:'12px 6px', textAlign:'center',
+              borderRadius:14, padding:'12px 6px', textAlign:'center', cursor:'pointer',
             }}>
-              <div style={{ fontSize:24, marginBottom:6, animation:`sigFloat 3s ease-in-out ${si*0.2}s infinite` }}>{s.icon}</div>
+              <div style={{ marginBottom:6, animation:`sigFloat 3s ease-in-out ${si*0.2}s infinite` }}><img src={s.image} alt={s.label} style={{ width:44, height:44, objectFit:'contain' }} /></div>
               <p style={{ fontWeight:800, fontSize:11, color:C.text, margin:'0 0 2px' }}>{s.label}</p>
               <p style={{ color:C.textSoft, fontSize:9, lineHeight:1.4, margin:0 }}>{s.desc}</p>
             </div>
@@ -515,6 +534,41 @@ function SignatureShowcase({ onClose }: { onClose: () => void }) {
           Envoyer un kiffement maintenant
         </button>
       </div>
+
+      {/* GRANDE PAGE 9:16 — détail d'une signature au clic */}
+      {selSig && (
+        <div onClick={() => setSelSig(null)}
+          style={{ position:'fixed', inset:0, background:'rgba(5,12,28,0.92)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ position:'relative', width:'100%', maxWidth:380, aspectRatio:'9/16', maxHeight:'90vh', borderRadius:24, overflow:'hidden', background:`linear-gradient(165deg, ${selSig.color}33 0%, ${C.bgDeep} 55%, ${C.bgDeep} 100%)`, border:`1px solid ${selSig.color}55`, boxShadow:`0 20px 60px rgba(0,0,0,0.7), 0 0 80px ${selSig.color}22`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'32px 24px', animation:'sigPageIn .3s ease-out' }}>
+            {/* Bouton fermer */}
+            <button onClick={() => setSelSig(null)}
+              style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:99, border:'none', background:'rgba(255,255,255,0.12)', color:'#fff', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+
+            {/* Glow + illustration */}
+            <div style={{ position:'relative', marginBottom:28 }}>
+              <div style={{ position:'absolute', inset:'-30%', background:`radial-gradient(circle, ${selSig.color}55, transparent 70%)`, filter:'blur(20px)' }} />
+              <img src={selSig.image} alt={selSig.label} style={{ position:'relative', width:170, height:170, objectFit:'contain', filter:`drop-shadow(0 10px 30px ${selSig.color}88)` }} />
+            </div>
+
+            {/* Titre */}
+            <p style={{ color:'#fff', fontWeight:900, fontSize:26, textAlign:'center', margin:'0 0 6px', letterSpacing:0.5 }}>{selSig.label}</p>
+            <div style={{ width:50, height:3, borderRadius:99, background:selSig.color, marginBottom:18 }} />
+
+            {/* Texte explicatif */}
+            <p style={{ color:C.text, fontSize:15, lineHeight:1.6, textAlign:'center', margin:0, opacity:0.95 }}>{selSig.detail}</p>
+
+            {/* Bas : comment l'obtenir */}
+            <div style={{ marginTop:'auto', paddingTop:24, width:'100%' }}>
+              <div style={{ background:'rgba(245,200,76,0.12)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:12, padding:'12px 16px', textAlign:'center' }}>
+                <p style={{ color:C.gold, fontSize:13, fontWeight:700, margin:0 }}>
+                  Envoyez un maximum de kiffements à votre artiste pour avoir la chance de recevoir cette signature !
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -882,18 +936,21 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
 
-            {/* PAIEMENT EN MAINTENANCE */}
-            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-              
-              <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
-              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
-                La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
-              </p>
-            </div>
-
+            {/* PAIEMENT GENIUSPAY */}
+            <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+              Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+            </p>
+            <button onClick={async () => {
+              setMsg('Redirection vers le paiement...');
+              const err = await lancerPaiementGeniusPay(rechargeModal.oscart, rechargeModal.fcfa);
+              if (err) setMsg(err);
+            }}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+              Payer {rechargeModal.fcfa.toLocaleString()} F CFA
+            </button>
             <button onClick={() => setRechargeModal(null)}
-              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-              Fermer
+              style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'#8098b8', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+              Annuler
             </button>
           </div>
         </div>
@@ -2910,7 +2967,7 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
                   {SIGNATURES.map(s => (
                     <button key={s.id} onClick={() => { setTypeChoisi(s); setSigMsg(''); }}
                       style={{ padding:'14px 10px', borderRadius:14, border:`1px solid ${s.color}44`, background:`${s.color}11`, cursor:'pointer', textAlign:'center' }}>
-                      <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
+                      <div style={{ marginBottom:6 }}><img src={s.image} alt={s.label} style={{ width:40, height:40, objectFit:'contain' }} /></div>
                       <p style={{ fontWeight:800, fontSize:12, color:'#1a2340', margin:'0 0 2px' }}>{s.label}</p>
                       <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.4, margin:0 }}>{s.desc}</p>
                     </button>
@@ -2923,7 +2980,7 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
               </>
             ) : (
               <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>{typeChoisi.icon} {typeChoisi.label}</p>
+                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4, display:'flex', alignItems:'center', gap:8 }}><img src={typeChoisi.image} alt="" style={{ width:24, height:24, objectFit:'contain' }} /> {typeChoisi.label}</p>
                 <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>
                   Pour <strong>{offreModal.userName}</strong>. Ajoutez une photo ou une vidéo où vous annoncez ce que vous offrez (mentionnez {offreModal.userName}).
                 </p>
@@ -6442,17 +6499,20 @@ function ArtistPage() {
                 <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
                   onClick={e => e.stopPropagation()}>
                   <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
-                  <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
-                  <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-                    
-                    <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
-                    <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
-                      La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
-                    </p>
-                  </div>
+                  <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>Recharger {rechargeModalArtiste.oscart} Oscart</p>
+                  <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+                    Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+                  </p>
+                  <button onClick={async () => {
+                    const err = await lancerPaiementGeniusPay(rechargeModalArtiste.oscart, rechargeModalArtiste.fcfa);
+                    if (err) alert(err);
+                  }}
+                    style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                    Payer {rechargeModalArtiste.fcfa.toLocaleString()} F CFA
+                  </button>
                   <button onClick={() => setRechargeModalArtiste(null)}
                     style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
-                    Fermer
+                    Annuler
                   </button>
                 </div>
               </div>
@@ -9534,17 +9594,20 @@ function ProfilPage() {
             <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
               onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
-              <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>Recharger mes Oscart</p>
-              <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-                
-                <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
-                <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
-                  La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
-                </p>
-              </div>
+              <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>Recharger {rechargeModalProfil.oscart} Oscart</p>
+              <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+                Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+              </p>
+              <button onClick={async () => {
+                const err = await lancerPaiementGeniusPay(rechargeModalProfil.oscart, rechargeModalProfil.fcfa);
+                if (err) alert(err);
+              }}
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                Payer {rechargeModalProfil.fcfa.toLocaleString()} F CFA
+              </button>
               <button onClick={() => setRechargeModalProfil(null)}
                 style={{ width:'100%', padding:10, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
-                Fermer
+                Annuler
               </button>
             </div>
           </div>
@@ -12390,16 +12453,19 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
               Recharger {rechargeModal.oscart} Oscart
             </p>
             <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
-            <div style={{ background:'rgba(255,215,0,0.08)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:14, padding:'24px 18px', marginBottom:16, textAlign:'center' }}>
-              
-              <p style={{ color:'#ffd700', fontSize:15, fontWeight:800, margin:'0 0 8px' }}>Paiement temporairement indisponible</p>
-              <p style={{ color:'#dde4f5', fontSize:13, lineHeight:1.6, margin:0 }}>
-                La recharge d'Oscart est en cours de maintenance. Elle sera bientôt disponible. Merci de votre patience.
-              </p>
-            </div>
+            <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+              Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+            </p>
+            <button onClick={async () => {
+              const err = await lancerPaiementGeniusPay(rechargeModal.oscart, rechargeModal.fcfa);
+              if (err) alert(err);
+            }}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+              Payer {rechargeModal.fcfa.toLocaleString()} F CFA
+            </button>
             <button onClick={() => setRechargeModal(null)}
               style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
-              Fermer
+              Annuler
             </button>
           </div>
         </div>
@@ -13047,42 +13113,49 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const MESSAGES_EDU = [
-      // 1. C'est quoi un kiffement
-      "Le savais-tu ? Un kiffement, c'est un cadeau que tu offres à ton artiste pour le soutenir. Plus tu en envoies, plus tu l'aides à réussir !",
-      // 2. Se recharger en Oscart
-      "Pour soutenir tes artistes, recharge tes Oscart ! Va dans ta Zikothèque, choisis ta recharge et obtiens tes Oscart en quelques secondes.",
-      // 3. Se recharger et télécharger
-      "Recharge tes Oscart et télécharge la musique de tes artistes préférés pour l'écouter partout, même hors connexion !",
-      // 4. Se recharger et offrir des kiffements
-      "Recharge tes Oscart puis offre des kiffements à ton artiste : c'est le meilleur moyen de le soutenir et de le faire grandir.",
-      // 5. Offrir des kiffements pour obtenir des kiffs
-      "Offre des kiffements à ton artiste : à chaque cadeau, tu gagnes aussi des kiffs et tu augmentes tes chances de récompenses exclusives !",
-      // 6. Réserver / pré-télécharger
-      "Ne rate aucune sortie ! Réserve ou pré-télécharge la prochaine musique de ton artiste avant tout le monde.",
-      // 7. Scroller, rechercher
+      // 1. Rechercher son artiste
       "Cherche ton artiste préféré ! Tape son nom dans la barre de recherche et retrouve toute sa musique sur Doniel Zik.",
-      // 8. Découvrir humour, clips, vidéos
+      // 2. Découvrir tout le contenu
       "Doniel Zik, ce n'est pas que la musique ! Découvre l'humour, les clips et les vidéos de tes créateurs préférés.",
-      // 9. Mélomane avec talent -> devenir artiste
-      "Tu as un talent artistique ? Publie ton contenu sur Doniel Zik et obtiens le maximum de visibilité et de revenus. Qu'attends-tu ?",
+      // 3. C'est quoi un kiffement
+      "Un kiffement, c'est un cadeau que tu offres à ton artiste pour le soutenir. Plus tu en envoies, plus tu l'aides à réussir !",
+      // 4. Recharger ses Oscart
+      "Pour soutenir tes artistes, recharge tes Oscart ! Va dans ta Zikothèque, choisis ta recharge et obtiens-les en quelques secondes.",
+      // 5. Recharger et télécharger
+      "Recharge tes Oscart et télécharge la musique de tes artistes préférés pour l'écouter partout, même hors connexion !",
+      // 6. Recharger et offrir des kiffements
+      "Recharge tes Oscart puis offre des kiffements à ton artiste : c'est le meilleur moyen de le soutenir et de le faire grandir.",
+      // 7. Gagner des kiffs
+      "Offre des kiffements à ton artiste : à chaque cadeau, tu gagnes aussi des kiffs et augmentes tes chances de récompenses exclusives !",
+      // 8. Les signatures
+      "Envoie un maximum de kiffements et reçois une signature exclusive : dédicace vidéo, ou ton nom chanté dans sa prochaine musique (Signature Spot) !",
+      // 9. Réserver / pré-télécharger
+      "Ne rate aucune sortie ! Réserve ou pré-télécharge la prochaine musique de ton artiste avant tout le monde.",
+      // 10. Devenir artiste
+      "Tu as un talent ? Publie ton contenu sur Doniel Zik et obtiens le maximum de visibilité et de revenus. Qu'attends-tu ?",
     ];
     (async () => {
       try {
-        const q = query(collection(db,'notifications'), where('to','==','all'), where('type','==','educative'), orderBy('createdAt','desc'), limit(1));
+        // Combien de messages éducatifs sont déjà partis aujourd'hui, et quand le dernier ?
+        const debutJour = new Date(); debutJour.setHours(0,0,0,0);
+        const q = query(collection(db,'notifications'), where('to','==','all'), where('type','==','educative'), orderBy('createdAt','desc'), limit(15));
         const snap = await getDocs(q);
-        const maintenant = Date.now();
-        let envoyer = snap.empty;
+        const aujourdhui = snap.docs.filter(d => new Date(d.data().createdAt).getTime() >= debutJour.getTime());
+        const dejaEnvoyesAuj = aujourdhui.length;
+        // Si les 10 du jour sont déjà partis, on ne fait rien
+        if (dejaEnvoyesAuj >= MESSAGES_EDU.length) return;
+        // Espacer : au moins ~2h entre deux messages éducatifs
         if (!snap.empty) {
-          const derniere = new Date(snap.docs[0].data().createdAt).getTime();
-          if (maintenant - derniere > 3 * 24 * 3600 * 1000) envoyer = true; // > 3 jours
+          const dernier = new Date(snap.docs[0].data().createdAt).getTime();
+          if (Date.now() - dernier < 2 * 3600 * 1000) return; // pas encore l'heure du suivant
         }
-        if (envoyer) {
-          const texte = MESSAGES_EDU[Math.floor(Math.random() * MESSAGES_EDU.length)];
-          await addDoc(collection(db,'notifications'), {
-            to: 'all', type:'educative', text: texte,
-            createdAt: new Date().toISOString(), lu: false,
-          });
-        }
+        // Envoyer le message suivant dans l'ordre (index = nombre déjà envoyés aujourd'hui)
+        const idx = dejaEnvoyesAuj % MESSAGES_EDU.length;
+        await addDoc(collection(db,'notifications'), {
+          to: 'all', type:'educative', text: MESSAGES_EDU[idx],
+          ordre: idx + 1,
+          createdAt: new Date().toISOString(), lu: false,
+        });
       } catch(e) { console.error('edu auto', e); }
     })();
   }, [user]);
@@ -13110,7 +13183,7 @@ export default function App() {
         let envoyer = snap.empty;
         if (!snap.empty) {
           const derniere = new Date(snap.docs[0].data().createdAt).getTime();
-          if (Date.now() - derniere > 3 * 24 * 3600 * 1000) envoyer = true;
+          if (Date.now() - derniere > 24 * 3600 * 1000) envoyer = true; // > 1 jour
         }
         if (envoyer) {
           const texte = MESSAGES_TUTO_ARTISTE[Math.floor(Math.random() * MESSAGES_TUTO_ARTISTE.length)];
