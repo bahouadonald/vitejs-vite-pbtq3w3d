@@ -8095,7 +8095,7 @@ const TYPES_CONTENU = [
   { id:'tous', label:'Actu & Mood', titre:'Actu & Mood Artistique', icon:'M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h12v4H3v-4z' },
   { id:'audio', label:'Musique', titre:'Musique', icon:'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z' },
   { id:'video', label:'Vidéo', titre:'Vidéo', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
-  { id:'challenge', label:'Challenge', titre:'Challenges', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
+  { id:'challenge', label:'Challenge', titre:'Challenges', icon:'M13 2L3 14h7l-1 8 10-12h-7l1-8z' },
   { id:'bientot', label:'Sorties', titre:'Sorties officielles', icon:'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z' },
 ];
 
@@ -9451,26 +9451,31 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
   const [dureeMusique, setDureeMusique] = useState(0);      // durée totale de la chanson
   const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
+  const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
+  const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const videoRef = useRef<HTMLVideoElement|null>(null);
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const mediaRecorderRef = useRef<MediaRecorder|null>(null);
   const streamRef = useRef<MediaStream|null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const audioCtxRef = useRef<any>(null);
+  const musiqueElRef = useRef<HTMLAudioElement|null>(null);
 
   const DUREE_MAX = 75; // 1 min 15 s maximum
 
-  // Filtres CSS simples applicables à la vidéo
+  // Filtres CSS applicables à la vidéo (style beauté/ambiance moderne)
   const FILTRES: {id:string, nom:string, css:string}[] = [
-    { id:'aucun',   nom:'Aucun',    css:'none' },
-    { id:'nb',      nom:'N&B',      css:'grayscale(1)' },
-    { id:'sepia',   nom:'Sépia',    css:'sepia(0.8)' },
-    { id:'vif',     nom:'Vif',      css:'saturate(1.8) contrast(1.1)' },
-    { id:'chaud',   nom:'Chaud',    css:'sepia(0.3) saturate(1.4) hue-rotate(-10deg)' },
-    { id:'froid',   nom:'Froid',    css:'saturate(1.2) hue-rotate(20deg) brightness(1.05)' },
-    { id:'vintage', nom:'Vintage',  css:'sepia(0.4) contrast(1.2) brightness(0.95) saturate(1.3)' },
-    { id:'clair',   nom:'Clair',    css:'brightness(1.2) contrast(0.95)' },
-    { id:'sombre',  nom:'Dramatique', css:'contrast(1.4) brightness(0.85) saturate(1.2)' },
+    { id:'aucun',   nom:'Original',  css:'none' },
+    { id:'beaute',  nom:'Beauté',    css:'brightness(1.12) saturate(1.15) contrast(0.96) blur(0.3px)' },
+    { id:'eclat',   nom:'Éclat',     css:'brightness(1.15) saturate(1.3) contrast(1.05)' },
+    { id:'doux',    nom:'Doux',      css:'brightness(1.08) saturate(0.9) contrast(0.92) blur(0.4px)' },
+    { id:'vif',     nom:'Vif',       css:'saturate(1.7) contrast(1.15)' },
+    { id:'chaud',   nom:'Chaud',     css:'sepia(0.25) saturate(1.4) hue-rotate(-8deg) brightness(1.05)' },
+    { id:'froid',   nom:'Froid',     css:'saturate(1.2) hue-rotate(18deg) brightness(1.05)' },
+    { id:'nb',      nom:'N&B',       css:'grayscale(1) contrast(1.1)' },
+    { id:'vintage', nom:'Vintage',   css:'sepia(0.45) contrast(1.15) brightness(0.98) saturate(1.3)' },
+    { id:'cine',    nom:'Ciné',      css:'contrast(1.3) brightness(0.92) saturate(1.25) hue-rotate(-5deg)' },
   ];
   const filtreCss = FILTRES.find(f => f.id === filtre)?.css || 'none';
 
@@ -9498,28 +9503,57 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     }
   }, [etape, urlChanson]);
 
-  // Démarrer la caméra + jouer la musique (à partir du point choisi) + minuteur + arrêt auto à 75s
+  // Démarrer la caméra + MIXER la musique dans l'enregistrement + minuteur + arrêt auto à 75s
   const demarrerFilm = async () => {
     setMsg('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'user' }, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFace }, audio: true });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-      // Lancer la musique à partir du point choisi
-      if (urlChanson && audioRef.current) {
-        audioRef.current.src = urlChanson;
-        audioRef.current.currentTime = musiqueDebut;
-        audioRef.current.play().catch(()=>{});
+
+      // ── MIXAGE AUDIO : mélanger le micro + la musique dans une seule piste enregistrée ──
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+      const dest = ctx.createMediaStreamDestination();
+
+      // 1) Le micro (son ambiant de la personne)
+      try {
+        const micSource = ctx.createMediaStreamSource(stream);
+        micSource.connect(dest);
+      } catch {}
+
+      // 2) La musique de l'artiste (si le son n'est pas coupé)
+      if (urlChanson && !sonCoupe) {
+        const musEl = new Audio(urlChanson);
+        musEl.crossOrigin = 'anonymous';
+        musEl.currentTime = musiqueDebut;
+        musiqueElRef.current = musEl;
+        try {
+          const musSource = ctx.createMediaElementSource(musEl);
+          musSource.connect(dest);       // vers l'enregistrement
+          musSource.connect(ctx.destination); // vers les haut-parleurs (pour entendre)
+          await musEl.play().catch(()=>{});
+        } catch {
+          // Si le mixage échoue (CORS), au moins jouer le son en direct
+          musEl.play().catch(()=>{});
+        }
       }
+
+      // Flux final = vidéo (caméra) + audio mixé (micro + musique)
+      const videoTrack = stream.getVideoTracks()[0];
+      const mixedStream = new MediaStream([videoTrack, ...dest.stream.getAudioTracks()]);
+
       chunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+      const mr = new MediaRecorder(mixedStream);
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type:'video/webm' });
         setVideoBlob(blob);
         setVideoUrl(URL.createObjectURL(blob));
         streamRef.current?.getTracks().forEach(t => t.stop());
-        if (audioRef.current) audioRef.current.pause();
+        if (musiqueElRef.current) musiqueElRef.current.pause();
+        if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch {} }
         if (timerRef.current) clearInterval(timerRef.current);
         setEtape(4);
       };
@@ -9527,7 +9561,6 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       mr.start();
       setRecording(true);
       setTempsEcoule(0);
-      // Minuteur : compte les secondes, arrêt auto à DUREE_MAX
       timerRef.current = setInterval(() => {
         setTempsEcoule(t => {
           const nv = t + 1;
@@ -9707,6 +9740,20 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
               )}
             </div>
             <audio ref={audioRef} />
+
+            {/* Options : caméra avant/arrière + couper le son */}
+            {!recording && (
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                <button onClick={() => setCameraFace(cameraFace === 'user' ? 'environment' : 'user')}
+                  style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                  {cameraFace === 'user' ? 'Caméra avant' : 'Caméra arrière'} ⟳
+                </button>
+                <button onClick={() => setSonCoupe(!sonCoupe)}
+                  style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${sonCoupe?'#f04a6a':'rgba(255,255,255,0.12)'}`, background: sonCoupe?'rgba(240,74,106,0.12)':'rgba(255,255,255,0.05)', color: sonCoupe?'#f04a6a':C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                  {sonCoupe ? 'Musique coupée' : 'Couper la musique'}
+                </button>
+              </div>
+            )}
 
             {/* Filtres (sélection avant/pendant le film) */}
             <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:14 }}>
