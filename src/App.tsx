@@ -9493,6 +9493,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
+  const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
   const videoRef = useRef<HTMLVideoElement|null>(null);
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const mediaRecorderRef = useRef<MediaRecorder|null>(null);
@@ -9561,7 +9562,10 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const demarrerFilm = async () => {
     setMsg('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFace }, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: cameraFace },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
 
@@ -9582,6 +9586,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         const musEl = new Audio();
         musEl.crossOrigin = 'anonymous';
         musEl.preload = 'auto';
+        musEl.volume = 1;
+        (musEl as any).playsInline = true;
         musEl.src = urlChanson;
         musiqueElRef.current = musEl;
         try {
@@ -9589,17 +9595,23 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           await new Promise<void>((resolve) => {
             let fini = false;
             const ok = () => { if (!fini) { fini = true; resolve(); } };
+            musEl.oncanplaythrough = ok;
             musEl.oncanplay = ok;
             musEl.onloadeddata = ok;
             musEl.onerror = ok;
-            setTimeout(ok, 2500); // sécurité : on n'attend jamais plus de 2,5s
+            setTimeout(ok, 3000); // sécurité : on n'attend jamais plus de 3s
           });
           try { musEl.currentTime = musiqueDebut; } catch {}
+          // Mixage Web Audio (pour enregistrer la musique dans la vidéo)
           const musSource = ctx.createMediaElementSource(musEl);
-          musSource.connect(dest);            // vers l'enregistrement
-          musSource.connect(ctx.destination); // vers les haut-parleurs (pour entendre)
+          const gain = ctx.createGain();
+          gain.gain.value = 1;
+          musSource.connect(gain);
+          gain.connect(dest);            // vers l'enregistrement
+          gain.connect(ctx.destination); // vers les haut-parleurs (pour entendre)
+          await ctx.resume().catch(()=>{});
           await musEl.play().catch(()=>{});
-        } catch {
+        } catch (err) {
           // Si le mixage Web Audio échoue (CORS), au moins jouer le son en direct
           try { musEl.currentTime = musiqueDebut; } catch {}
           musEl.play().catch(()=>{});
@@ -9788,13 +9800,22 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                     <button onClick={() => {
                         if (!audioRef.current) return;
                         const a = audioRef.current;
+                        if (!a.paused) { a.pause(); setApercuJoue(false); return; }
                         a.src = urlChanson;
-                        const lancer = () => { try { a.currentTime = musiqueDebut; } catch {} a.play().catch(()=>{}); setTimeout(()=>a.pause(), 5000); };
+                        a.volume = 1;
+                        a.load();
+                        const lancer = () => {
+                          try { a.currentTime = musiqueDebut; } catch {}
+                          a.play().then(() => {
+                            setApercuJoue(true);
+                            setTimeout(() => { try { a.pause(); } catch {}; setApercuJoue(false); }, 5000);
+                          }).catch(() => { setMsg('Impossible de lire la musique (vérifiez votre connexion).'); });
+                        };
                         if (a.readyState >= 2) lancer();
-                        else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; a.load(); }
+                        else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
                       }}
-                      style={{ marginTop:8, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background:'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                      ▶ Écouter ce passage (5s)
+                      style={{ marginTop:8, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                      {apercuJoue ? '⏸ Lecture en cours...' : '▶ Écouter ce passage (5s)'}
                     </button>
                   </>
                 ) : (
