@@ -2551,10 +2551,10 @@ function FanPage() {
       {step === 'ready' && qrData && (
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
           {/* Bouton Découvrir flottant (toujours accessible) */}
-          <a href="/decouvrir" style={{ position:'fixed', top:14, right:14, zIndex:60, display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', fontSize:13, fontWeight:700, boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
+          <Link to="/decouvrir" style={{ position:'fixed', top:14, right:14, zIndex:60, display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', fontSize:13, fontWeight:700, boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Découvrir
-          </a>
+          </Link>
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO CASCADE — bulles après Play ── */}
