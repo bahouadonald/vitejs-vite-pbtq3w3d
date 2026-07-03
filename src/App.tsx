@@ -263,6 +263,20 @@ const CONTRAT_COMMERCIAL = [
   { t: "Article 9 — Droit applicable", c: "Le présent contrat est régi par le droit en vigueur en Côte d'Ivoire." },
 ];
 
+// Contrat de production musicale (single) — 10 articles
+const CONTRAT_PRODUCTION = [
+  { t: "Article 1 — Objet", c: "Le présent contrat définit les conditions dans lesquelles la Société Doniel Zik (BDE SARL) réalise la production d'un single musical au profit de l'Artiste, comprenant l'enregistrement studio, la création de pochettes, la publication et la promotion." },
+  { t: "Article 2 — Contenu de la prestation", c: "La production comprend : l'enregistrement d'un single en studio, la fourniture de 100 pochettes physiques avec QR code, la publication du titre sur la plateforme Doniel Zik, la réalisation d'un clip et une action de promotion télévisée." },
+  { t: "Article 3 — Engagement de l'Artiste", c: "L'Artiste s'engage à être présent aux séances d'enregistrement et de tournage convenues, à fournir les éléments nécessaires (paroles, mélodies, éléments visuels) et à collaborer de bonne foi à la bonne réalisation de la production." },
+  { t: "Article 4 — Modalités financières", c: "Le montant et les modalités de paiement de la production sont convenus séparément entre l'Artiste et la Société, en dehors de la plateforme. La présente inscription en ligne vaut engagement et sert au suivi du dossier ; elle ne constitue pas un paiement." },
+  { t: "Article 5 — Droits sur l'œuvre", c: "L'Artiste conserve la propriété de son œuvre. Il autorise la Société à publier, diffuser et promouvoir le single produit sur la plateforme Doniel Zik et ses canaux de promotion, dans le cadre de la présente production." },
+  { t: "Article 6 — Activités de valorisation", c: "L'Artiste est informé que la plateforme propose des activités de valorisation de sa musique, notamment les challenges réalisés par les mélomanes et le partage sur les réseaux sociaux, qui contribuent à la diffusion et à la rémunération de son œuvre." },
+  { t: "Article 7 — Rémunération de l'Artiste", c: "L'Artiste perçoit une rémunération lorsque sa musique est utilisée sur la plateforme, y compris lorsqu'un mélomane réalise un challenge sur son titre et que ce challenge reçoit des cadeaux (kiffements), selon les conditions de répartition en vigueur." },
+  { t: "Article 8 — Délais", c: "Les délais de réalisation de chaque étape (enregistrement, pochettes, clip, publication, promotion) sont communiqués à l'Artiste et peuvent varier selon les disponibilités techniques et la collaboration de l'Artiste." },
+  { t: "Article 9 — Obligations de la Société", c: "La Société s'engage à réaliser la production avec sérieux et professionnalisme, à tenir l'Artiste informé de l'avancement, et à respecter l'intégrité artistique de l'œuvre." },
+  { t: "Article 10 — Durée et droit applicable", c: "Le présent contrat prend effet à sa signature et court jusqu'à la livraison complète de la production. Il est régi par le droit en vigueur en Côte d'Ivoire. Tout litige sera réglé à l'amiable en priorité." },
+];
+
 const CONDITIONS_ARTISTE = [
   { t: "1. Votre contenu vous appartient", c: "Vous déclarez être l'auteur ou le détenteur des droits du contenu enregistré. Vous devez figurer dans ce contenu (featuring accepté). Tout contenu plagié ou ne vous appartenant pas est interdit et sera retiré." },
   { t: "2. Autorisation de diffusion", c: "Vous autorisez Doniel Zik à héberger, diffuser, faire écouter, télécharger et promouvoir votre contenu sur la plateforme et via les liens et QR codes publics générés." },
@@ -2380,12 +2394,11 @@ function FanPage() {
       qrDocId.current = docId;
       const data = { id: docId, ...snap.docs[0].data() } as any;
       setQrData(data);
-      try {
-        await addDoc(collection(db, 'visits'), { qrId, artist: data.artist || '', label: data.label || '', ts: new Date().toISOString() });
-        await updateDoc(doc(db, 'qrcodes', docId), { visits: (data.visits || 0) + 1 });
-      } catch (e) { console.error('visit', e); }
-      // Plus de mode locked — toujours ready, le DL épuisé est géré dans le JSX
+      // Afficher la page TOUT DE SUITE (ne pas attendre l'écriture des stats)
       setStep('ready');
+      // Enregistrer la visite EN ARRIÈRE-PLAN (ne bloque plus l'affichage)
+      addDoc(collection(db, 'visits'), { qrId, artist: data.artist || '', label: data.label || '', ts: new Date().toISOString() }).catch(()=>{});
+      updateDoc(doc(db, 'qrcodes', docId), { visits: (data.visits || 0) + 1 }).catch(()=>{});
     };
     load();
   }, [qrId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -7243,7 +7256,7 @@ function LandingPage() {
         {[
           { titre:'Pour les Artistes', desc:'Monétisez votre musique, humour ou cinéma via QR code, liens publics et kiffements. Soyez payé à chaque écoute et téléchargement.', lien:'/artiste', btn:'Espace Artiste' },
           { titre:'Pour les Annonceurs', desc:'Diffusez votre publicité auprès de milliers de mélomanes ivoiriens actifs. À partir de 1 000 FCFA.', lien:'/annonceurs', btn:'Espace Annonceur' },
-          { titre:'Devenir Commercial', desc:'Rejoignez notre réseau terrain. Recrutez des artistes et annonceurs. Gagnez des commissions sur chaque inscription.', lien:'/commercial', btn:'Espace Commercial' },
+          { titre:'Production musicale', desc:'Faites produire votre single par Doniel Zik : studio, pochettes QR, clip et promotion télé. Enregistrez-vous et signez votre contrat en ligne.', lien:'/production', btn:'Produire ma musique' },
         ].map((s,i) => (
           <div key={i} className="dz-service-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12, animationDelay:`${i * 0.12}s` }}>
             <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', marginBottom:6 }}>{s.titre}</p>
@@ -8837,17 +8850,23 @@ function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any)
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          // La vidéo joue seulement si elle est bien visible (au moins 60% à l'écran)
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            // Couper toutes les autres vidéos/audios de la page avant de jouer celle-ci
+            document.querySelectorAll('video, audio').forEach((m: any) => {
+              if (m !== media && !m.paused) { try { m.pause(); } catch {} }
+            });
             media.muted = muted;
             const p = media.play();
             if (p && p.then) p.then(() => setPlaying(true)).catch(() => setPlaying(false));
           } else {
-            media.pause();
+            // Dès qu'elle sort de la zone centrale, elle se coupe
+            try { media.pause(); } catch {}
             setPlaying(false);
           }
         });
       },
-      { threshold: [0, 0.5, 1] }
+      { threshold: [0, 0.6, 1], rootMargin: '-10% 0px -10% 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -9469,7 +9488,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [msg, setMsg] = useState('');
   const [tempsEcoule, setTempsEcoule] = useState(0);        // secondes filmées
   const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
-  const [dureeMusique, setDureeMusique] = useState(0);      // durée totale de la chanson
+  const [dureeMusique, setDureeMusique] = useState(180);   // durée (180 par défaut, jamais bloquant)
   const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
   const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
@@ -12652,6 +12671,295 @@ function AnnonceurDashboard({ annonceur, user }: { annonceur: any, user: any }) 
   );
 }
 
+// ─────────────────────────────────────────────
+// PAGE PRODUCTION MUSICALE — /production
+// Comment ça marche + offre + inscription + contrat signé
+// ─────────────────────────────────────────────
+function ProductionPage() {
+  const [user, setUser] = useState<any>(null);
+  const [etape, setEtape] = useState<'presentation'|'formulaire'|'contrat'|'fait'>('presentation');
+  // Formulaire
+  const [nom, setNom] = useState('');
+  const [tel, setTel] = useState('');
+  const [emailArt, setEmailArt] = useState('');
+  const [projet, setProjet] = useState('');
+  const [msg, setMsg] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  // Contrat
+  const [lu, setLu] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement|null>(null);
+  const [aSigne, setASigne] = useState(false);
+  const dessine = useRef(false);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      if (u) { setUser(u); setEmailArt(u.email || ''); setNom(u.displayName || ''); }
+    });
+  }, []);
+
+  // ── Signature dessinée (canvas) ──
+  const posCanvas = (e: any) => {
+    const c = canvasRef.current; if (!c) return { x:0, y:0 };
+    const r = c.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - r.left) * (c.width / r.width), y: (clientY - r.top) * (c.height / r.height) };
+  };
+  const debutTrait = (e: any) => {
+    e.preventDefault(); dessine.current = true;
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
+    const { x, y } = posCanvas(e);
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+  const traitEnCours = (e: any) => {
+    if (!dessine.current) return;
+    e.preventDefault();
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
+    const { x, y } = posCanvas(e);
+    ctx.lineTo(x, y); ctx.strokeStyle = '#0D1526'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
+    setASigne(true);
+  };
+  const finTrait = () => { dessine.current = false; };
+  const effacerSignature = () => {
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+    setASigne(false);
+  };
+
+  // ── Envoyer l'inscription (étape formulaire) ──
+  const validerFormulaire = () => {
+    if (!nom.trim()) { setMsg('Indiquez votre nom d\'artiste'); return; }
+    if (!tel.trim()) { setMsg('Indiquez votre numéro de téléphone'); return; }
+    if (!emailArt.trim()) { setMsg('Indiquez votre email'); return; }
+    setMsg('');
+    setEtape('contrat');
+  };
+
+  // ── Signer et enregistrer le dossier ──
+  const signerEtEnvoyer = async () => {
+    if (!lu) { setMsg('Veuillez cocher « J\'ai lu et j\'accepte »'); return; }
+    if (!aSigne) { setMsg('Veuillez dessiner votre signature'); return; }
+    setEnvoi(true); setMsg('');
+    try {
+      const signatureImg = canvasRef.current?.toDataURL('image/png') || '';
+      const now = new Date();
+      await addDoc(collection(db, 'demandes_production'), {
+        nom: nom.trim(),
+        tel: tel.trim(),
+        email: emailArt.trim(),
+        projet: projet.trim(),
+        uid: user?.uid || '',
+        // Preuve de signature
+        signatureImg,
+        contratAccepte: true,
+        contratVersion: 'production-v1',
+        dateSignature: now.toISOString(),
+        heureSignature: now.toLocaleTimeString('fr-FR'),
+        statut: 'nouveau',
+        createdAt: now.toISOString(),
+      });
+      // Notifier l'admin
+      await addDoc(collection(db, 'notifications'), {
+        to: 'bdonaldservices@gmail.com', type: 'production',
+        text: `Nouvelle demande de production musicale : ${nom.trim()} (${tel.trim()}). Contrat signé en ligne.`,
+        createdAt: now.toISOString(), lu: false,
+      });
+      envoyerEmailNotif('bdonaldservices@gmail.com', 'Nouvelle demande de production Doniel Zik',
+        `${nom.trim()} vient de s'inscrire pour une production musicale et a signé le contrat en ligne. Téléphone : ${tel.trim()}, Email : ${emailArt.trim()}.`);
+      setEtape('fait');
+    } catch (e: any) {
+      setMsg('Erreur lors de l\'enregistrement. Réessayez.');
+      console.error(e);
+    }
+    setEnvoi(false);
+  };
+
+  const ETAPES_OFFRE = [
+    { icone: '🎙️', titre: 'Single studio', desc: 'Votre titre enregistré et mixé en studio professionnel.' },
+    { icone: '💿', titre: '100 pochettes QR', desc: '100 pochettes physiques avec QR code pour partager votre musique partout.' },
+    { icone: '📲', titre: 'Publication', desc: 'Votre single publié sur la plateforme Doniel Zik.' },
+    { icone: '🎬', titre: 'Clip vidéo', desc: 'Un clip pour donner vie à votre chanson.' },
+    { icone: '📺', titre: 'Promotion télé', desc: 'Une action de promotion à la télévision.' },
+  ];
+
+  return (
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:60 }}>
+      {/* En-tête */}
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+        <Lien href="/" style={{ color:C.text, fontSize:20, textDecoration:'none' }}>←</Lien>
+        <p style={{ fontWeight:800, fontSize:15, color:C.gold, margin:0 }}>Production musicale</p>
+        <span style={{ width:20 }} />
+      </div>
+
+      <div style={{ maxWidth:520, margin:'0 auto', padding:'20px 16px' }}>
+
+        {/* ── ÉTAPE PRÉSENTATION : Comment ça marche + offre ── */}
+        {etape === 'presentation' && (
+          <>
+            <h1 style={{ fontSize:24, fontWeight:900, margin:'0 0 8px', color:C.text }}>Faites produire votre musique</h1>
+            <p style={{ color:C.textSoft, fontSize:14, lineHeight:1.6, margin:'0 0 24px' }}>
+              Doniel Zik produit votre single de A à Z et le fait vivre sur la plateforme. Enregistrez-vous, signez votre contrat en ligne, et notre équipe vous recontacte.
+            </p>
+
+            {/* Ce que comprend l'offre */}
+            <p style={{ color:C.gold, fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', margin:'0 0 12px' }}>Ce que comprend la production</p>
+            <div style={{ marginBottom:26 }}>
+              {ETAPES_OFFRE.map((o, i) => (
+                <div key={i} style={{ display:'flex', gap:12, alignItems:'flex-start', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'13px 15px', marginBottom:9 }}>
+                  <span style={{ fontSize:22 }}>{o.icone}</span>
+                  <div>
+                    <p style={{ color:C.text, fontSize:14, fontWeight:700, margin:'0 0 2px' }}>{o.titre}</p>
+                    <p style={{ color:C.textSoft, fontSize:12, lineHeight:1.5, margin:0 }}>{o.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Comment ça marche */}
+            <p style={{ color:C.gold, fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', margin:'0 0 12px' }}>Comment ça marche</p>
+            <div style={{ marginBottom:26 }}>
+              {[
+                { n:'1', t:'Vous vous enregistrez', d:'Remplissez le formulaire avec vos informations et votre projet.' },
+                { n:'2', t:'Vous signez le contrat en ligne', d:'Lisez et signez votre contrat de production directement sur votre téléphone.' },
+                { n:'3', t:'Notre équipe vous recontacte', d:'Nous convenons ensemble des détails et du règlement, en dehors de la plateforme.' },
+                { n:'4', t:'On produit votre single', d:'Studio, pochettes, clip, publication et promotion télé.' },
+                { n:'5', t:'Votre musique prend vie', d:'Les mélomanes écoutent, réalisent des challenges sur votre titre et le partagent sur les réseaux sociaux.' },
+              ].map((s, i) => (
+                <div key={i} style={{ display:'flex', gap:12, marginBottom:14 }}>
+                  <div style={{ flexShrink:0, width:30, height:30, borderRadius:99, background:'rgba(30,111,255,0.2)', border:'1px solid rgba(90,176,255,0.4)', display:'flex', alignItems:'center', justifyContent:'center', color:'#5BB0FF', fontWeight:800, fontSize:14 }}>{s.n}</div>
+                  <div style={{ flex:1 }}>
+                    <p style={{ color:C.text, fontSize:14, fontWeight:700, margin:'0 0 2px' }}>{s.t}</p>
+                    <p style={{ color:C.textSoft, fontSize:12, lineHeight:1.5, margin:0 }}>{s.d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Encart rémunération (nouveauté challenges) */}
+            <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.25)', borderRadius:14, padding:'16px 18px', marginBottom:26 }}>
+              <p style={{ color:C.gold, fontSize:14, fontWeight:800, margin:'0 0 8px' }}>Votre musique vous rapporte</p>
+              <p style={{ color:C.textSoft, fontSize:13, lineHeight:1.6, margin:0 }}>
+                Sur Doniel Zik, votre single ne dort jamais. Les mélomanes réalisent des <b style={{ color:C.text }}>challenges</b> sur votre musique et la partagent sur TikTok, Facebook et WhatsApp. À chaque fois que votre titre est utilisé et qu'un challenge reçoit des cadeaux, <b style={{ color:C.text }}>vous êtes rémunéré</b>. Plus votre musique circule, plus vous gagnez.
+              </p>
+            </div>
+
+            <button onClick={() => setEtape('formulaire')}
+              style={{ width:'100%', padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:16, cursor:'pointer' }}>
+              Je m'inscris
+            </button>
+          </>
+        )}
+
+        {/* ── ÉTAPE FORMULAIRE ── */}
+        {etape === 'formulaire' && (
+          <>
+            <h2 style={{ fontSize:20, fontWeight:800, margin:'0 0 6px' }}>Vos informations</h2>
+            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 20px' }}>Renseignez vos coordonnées pour que notre équipe vous recontacte.</p>
+
+            <label style={{ color:C.textSoft, fontSize:12, fontWeight:700, display:'block', marginBottom:6 }}>Nom d'artiste *</label>
+            <input value={nom} onChange={e => setNom(e.target.value)} placeholder="Votre nom d'artiste"
+              style={{ width:'100%', padding:13, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:14, marginBottom:14, boxSizing:'border-box' }} />
+
+            <label style={{ color:C.textSoft, fontSize:12, fontWeight:700, display:'block', marginBottom:6 }}>Téléphone (WhatsApp) *</label>
+            <input value={tel} onChange={e => setTel(e.target.value)} placeholder="Ex : 07 00 00 00 00" type="tel"
+              style={{ width:'100%', padding:13, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:14, marginBottom:14, boxSizing:'border-box' }} />
+
+            <label style={{ color:C.textSoft, fontSize:12, fontWeight:700, display:'block', marginBottom:6 }}>Email *</label>
+            <input value={emailArt} onChange={e => setEmailArt(e.target.value)} placeholder="votre@email.com" type="email"
+              style={{ width:'100%', padding:13, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:14, marginBottom:14, boxSizing:'border-box' }} />
+
+            <label style={{ color:C.textSoft, fontSize:12, fontWeight:700, display:'block', marginBottom:6 }}>Votre projet (facultatif)</label>
+            <textarea value={projet} onChange={e => setProjet(e.target.value)} placeholder="Parlez-nous de votre single, votre style, vos idées..." rows={3}
+              style={{ width:'100%', padding:13, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:14, marginBottom:18, boxSizing:'border-box', resize:'vertical' }} />
+
+            {msg && <p style={{ color:'#f04a6a', fontSize:13, margin:'0 0 12px' }}>{msg}</p>}
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setEtape('presentation')}
+                style={{ flex:1, padding:14, borderRadius:12, border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:C.textSoft, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Retour
+              </button>
+              <button onClick={validerFormulaire}
+                style={{ flex:2, padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+                Continuer vers le contrat
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── ÉTAPE CONTRAT ── */}
+        {etape === 'contrat' && (
+          <>
+            <h2 style={{ fontSize:20, fontWeight:800, margin:'0 0 6px' }}>Contrat de production</h2>
+            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 18px' }}>Lisez attentivement, cochez votre accord et signez ci-dessous.</p>
+
+            {/* Articles du contrat */}
+            <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:18, maxHeight:320, overflowY:'auto' }}>
+              {CONTRAT_PRODUCTION.map((a, i) => (
+                <div key={i} style={{ marginBottom:14 }}>
+                  <p style={{ color:C.gold, fontSize:13, fontWeight:800, margin:'0 0 4px' }}>{a.t}</p>
+                  <p style={{ color:C.textSoft, fontSize:12.5, lineHeight:1.6, margin:0 }}>{a.c}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Case J'ai lu et j'accepte */}
+            <label style={{ display:'flex', gap:10, alignItems:'flex-start', cursor:'pointer', marginBottom:18 }}>
+              <input type="checkbox" checked={lu} onChange={e => setLu(e.target.checked)} style={{ marginTop:3, width:18, height:18, accentColor:'#1a6bff', flexShrink:0 }} />
+              <span style={{ color:C.text, fontSize:13, lineHeight:1.5 }}>J'ai lu et j'accepte les conditions du contrat de production musicale de Doniel Zik.</span>
+            </label>
+
+            {/* Signature dessinée */}
+            <p style={{ color:C.textSoft, fontSize:12, fontWeight:700, margin:'0 0 8px' }}>Votre signature (dessinez avec le doigt)</p>
+            <div style={{ position:'relative', marginBottom:8 }}>
+              <canvas ref={canvasRef} width={480} height={160}
+                onMouseDown={debutTrait} onMouseMove={traitEnCours} onMouseUp={finTrait} onMouseLeave={finTrait}
+                onTouchStart={debutTrait} onTouchMove={traitEnCours} onTouchEnd={finTrait}
+                style={{ width:'100%', height:160, background:'#fff', borderRadius:12, border:'1px solid rgba(255,255,255,0.15)', touchAction:'none', display:'block' }} />
+              {!aSigne && <span style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', color:'#c0c8d8', fontSize:13, pointerEvents:'none' }}>Signez ici</span>}
+            </div>
+            <button onClick={effacerSignature}
+              style={{ background:'none', border:'none', color:C.textSoft, fontSize:12, cursor:'pointer', marginBottom:18, textDecoration:'underline' }}>
+              Effacer la signature
+            </button>
+
+            {msg && <p style={{ color:'#f04a6a', fontSize:13, margin:'0 0 12px' }}>{msg}</p>}
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setEtape('formulaire')}
+                style={{ flex:1, padding:14, borderRadius:12, border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:C.textSoft, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Retour
+              </button>
+              <button onClick={signerEtEnvoyer} disabled={envoi}
+                style={{ flex:2, padding:14, borderRadius:12, border:'none', background: envoi ? 'rgba(30,111,255,0.5)' : 'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor: envoi ? 'default' : 'pointer' }}>
+                {envoi ? 'Enregistrement...' : 'Signer et envoyer'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── ÉTAPE FAIT ── */}
+        {etape === 'fait' && (
+          <div style={{ textAlign:'center', padding:'40px 10px' }}>
+            <div style={{ width:70, height:70, borderRadius:99, background:'rgba(0,200,83,0.15)', border:'1px solid rgba(0,200,83,0.4)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontSize:34 }}>✓</div>
+            <h2 style={{ fontSize:22, fontWeight:800, margin:'0 0 10px' }}>Demande enregistrée !</h2>
+            <p style={{ color:C.textSoft, fontSize:14, lineHeight:1.6, margin:'0 0 24px' }}>
+              Votre contrat est signé et votre demande de production est bien enregistrée. Notre équipe vous recontacte très vite au {tel} pour la suite.
+            </p>
+            <Lien href="/decouvrir" style={{ display:'inline-block', padding:'14px 28px', borderRadius:99, background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, textDecoration:'none' }}>
+              Découvrir la plateforme
+            </Lien>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 function DzStudioPage() {
   const [view, setView] = useState<'login'|'register'|'dashboard'>('login');
   const [user, setUser] = useState<any>(null);
@@ -13905,15 +14213,15 @@ function PublicStreamPage() {
       if (!snap.empty) {
         const d = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
         setData(d);
-        // Compter le Buzz — incrémenter visits
-        try {
-          await updateDoc(doc(db, 'publicLinks', snap.docs[0].id), { visits: (d.visits || 0) + 1 });
-          // Aussi dans decouvrir si publié
-          const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',publicLinkId)));
-          if (!dSnap.empty) await updateDoc(doc(db,'decouvrir',dSnap.docs[0].id),{ buzz:(dSnap.docs[0].data().buzz||0)+1 });
-        } catch(e) { console.error('buzz',e); }
+        setLoading(false); // Afficher TOUT DE SUITE (ne pas attendre les compteurs)
+        // Compter le Buzz EN ARRIÈRE-PLAN (ne bloque plus l'affichage)
+        updateDoc(doc(db, 'publicLinks', snap.docs[0].id), { visits: (d.visits || 0) + 1 }).catch(()=>{});
+        getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',publicLinkId)))
+          .then(dSnap => { if (!dSnap.empty) updateDoc(doc(db,'decouvrir',dSnap.docs[0].id),{ buzz:(dSnap.docs[0].data().buzz||0)+1 }).catch(()=>{}); })
+          .catch(()=>{});
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [publicLinkId]);
@@ -14434,6 +14742,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/profil" element={<ProfilPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
+        <Route path="/production" element={<ProductionPage />} />
         <Route path="/commercial" element={<CommercialPage />} />
         <Route path="/responsable" element={<ResponsablePage />} />
         <Route path="/conditions" element={<ConditionsPage />} />
