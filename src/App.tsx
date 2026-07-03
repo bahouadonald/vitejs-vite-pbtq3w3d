@@ -9254,7 +9254,7 @@ function MesChallengesPage() {
       // Notifier le créateur du challenge
       await addDoc(collection(db,'notifications'), {
         to: ch.userEmail || ch.userId, type:'activite',
-        text: `${user.displayName || 'Quelqu\\'un'} vous a envoyé un kiffement sur votre challenge !`,
+        text: `${user.displayName || 'Une personne'} vous a envoye un kiffement sur votre challenge !`,
         createdAt: new Date().toISOString(), lu:false,
       });
     } catch(e) { console.error(e); alert('Erreur lors de l\'envoi.'); }
