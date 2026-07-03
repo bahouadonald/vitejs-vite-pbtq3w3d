@@ -9181,9 +9181,13 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
 function MesChallengesPage() {
   const [user, setUser] = useState<any>(null);
   const [mesChallenges, setMesChallenges] = useState<any[]>([]);
+  const [tousChallenges, setTousChallenges] = useState<any[]>([]);
   const [contenus, setContenus] = useState<any[]>([]);
   const [creer, setCreer] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [ongletCh, setOngletCh] = useState<'tous'|'mes'>('tous');
+  const [monSolde, setMonSolde] = useState(0);
+  const [partageCh, setPartageCh] = useState<any>(null); // challenge à partager
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -9195,14 +9199,83 @@ function MesChallengesPage() {
         snap => { setMesChallenges(snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a:any,b:any)=>(b.createdAt||'').localeCompare(a.createdAt||''))); setLoading(false); },
         () => setLoading(false)
       );
+      // Mon solde Oscart (pour envoyer des kiffements)
+      onSnapshot(query(collection(db,'coins_solde'), where('uid','==',u.uid)),
+        s => { if (!s.empty) setMonSolde(s.docs[0].data().solde || 0); });
     });
+    // Tous les challenges (fil Découvrir)
+    const unsubTous = onSnapshot(
+      query(collection(db,'challenges'), orderBy('createdAt','desc')),
+      snap => { setTousChallenges(snap.docs.map(d => ({ id:d.id, ...d.data() }))); setLoading(false); },
+      () => setLoading(false)
+    );
     // Contenus (pour choisir la chanson dans la création)
     const unsub = onSnapshot(
       query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
       snap => setContenus(snap.docs.map(d => ({id:d.id,...d.data()})).filter((c:any)=>c.masque!==true))
     );
-    return () => unsub();
+    return () => { unsub(); unsubTous(); };
   }, []);
+
+  // Kiffer un challenge (like simple, +1)
+  const kifferChallenge = async (ch: any) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db,'challenges', ch.id), { kiffements: (ch.kiffements || 0) + 1 });
+    } catch(e) { console.error(e); }
+  };
+
+  // Envoyer un kiffement (cadeau) : répartition Mélomane 40% / Artiste 30% / Structure 30%
+  const kiffementChallenge = async (ch: any, coins: number) => {
+    if (!user) return;
+    if (monSolde < coins) { alert('Solde Oscart insuffisant. Rechargez dans votre profil.'); return; }
+    try {
+      const montant = coins * 100; // valeur FCFA du kiffement
+      // Débiter le donateur
+      const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
+      if (!soldeSnap.empty) {
+        await updateDoc(doc(db,'coins_solde', soldeSnap.docs[0].id), { solde: increment(-coins) });
+      }
+      // Enregistrer le kiffement du challenge avec la répartition (calcul interne)
+      await addDoc(collection(db,'challenge_kiffements'), {
+        challengeId: ch.id,
+        donateurId: user.uid, donateurName: user.displayName || 'Mélomane',
+        beneficiaireMelomane: ch.userId, melomaneNom: ch.userName,
+        artisteEmail: ch.artisteEmail, artisteNom: ch.artisteNom,
+        coins, montant,
+        partMelomane: Math.round(montant * 0.40),
+        partArtiste: Math.round(montant * 0.30),
+        partStructure: Math.round(montant * 0.30),
+        createdAt: new Date().toISOString(),
+      });
+      // Incrémenter le compteur affiché
+      await updateDoc(doc(db,'challenges', ch.id), { kiffements: (ch.kiffements || 0) + coins });
+      // Notifier le créateur du challenge
+      await addDoc(collection(db,'notifications'), {
+        to: ch.userEmail || ch.userId, type:'activite',
+        text: `${user.displayName || 'Quelqu\\'un'} vous a envoyé un kiffement sur votre challenge !`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+    } catch(e) { console.error(e); alert('Erreur lors de l\'envoi.'); }
+  };
+
+  // Partage
+  const partagerChallenge = (ch: any, reseau: string) => {
+    const url = window.location.origin + '/challenge';
+    const texte = `Regarde ce challenge sur Doniel Zik : ${ch.chansonTitre} par ${ch.artisteNom} !`;
+    if (reseau === 'natif' && navigator.share) {
+      navigator.share({ title:'Challenge Doniel Zik', text: texte, url }).catch(()=>{});
+      return;
+    }
+    let lien = '';
+    if (reseau === 'whatsapp') lien = `https://wa.me/?text=${encodeURIComponent(texte + ' ' + url)}`;
+    if (reseau === 'facebook') lien = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    if (reseau === 'tiktok') lien = 'https://www.tiktok.com/upload';
+    if (reseau === 'youtube') lien = 'https://www.youtube.com/upload';
+    if (lien) window.open(lien, '_blank');
+    // Compter le partage
+    updateDoc(doc(db,'challenges', ch.id), { partages: (ch.partages || 0) + 1 }).catch(()=>{});
+  };
 
   const telecharger = (url: string, nom: string) => {
     const a = document.createElement('a');
@@ -9228,35 +9301,113 @@ function MesChallengesPage() {
           <span style={{ fontSize:18 }}>🎬</span> Créer un challenge
         </button>
 
-        <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:12 }}>Mes challenges</p>
+        {/* Onglets internes : Tous les challenges / Mes challenges */}
+        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+          <button onClick={() => setOngletCh('tous')}
+            style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${ongletCh==='tous'?'#4da6ff':'rgba(255,255,255,0.1)'}`, background: ongletCh==='tous'?'rgba(77,166,255,0.12)':'transparent', color: ongletCh==='tous'?'#4da6ff':C.textSoft, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+            Tous les challenges
+          </button>
+          <button onClick={() => setOngletCh('mes')}
+            style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${ongletCh==='mes'?'#4da6ff':'rgba(255,255,255,0.1)'}`, background: ongletCh==='mes'?'rgba(77,166,255,0.12)':'transparent', color: ongletCh==='mes'?'#4da6ff':C.textSoft, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+            Mes challenges
+          </button>
+        </div>
 
-        {loading ? (
-          <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:30 }}>Chargement...</p>
-        ) : mesChallenges.length === 0 ? (
-          <div style={{ textAlign:'center', padding:40 }}>
-            <p style={{ fontSize:36, marginBottom:10 }}>🎬</p>
-            <p style={{ color:C.textSoft, fontSize:14 }}>Vous n'avez pas encore de challenge</p>
-            <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Créez votre premier challenge sur la musique de votre artiste !</p>
-          </div>
-        ) : (
-          mesChallenges.map(ch => (
-            <div key={ch.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, overflow:'hidden', marginBottom:16 }}>
-              <video src={ch.videoUrl} controls playsInline style={{ width:'100%', maxHeight:400, background:'#000' }} />
-              <div style={{ padding:'12px 14px' }}>
-                <p style={{ color:'#eaf2ff', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>🎵 {ch.chansonTitre} · {ch.artisteNom}</p>
-                <div style={{ display:'flex', gap:14, margin:'8px 0' }}>
-                  <span style={{ color:'#f04a6a', fontSize:12, fontWeight:700 }}>♥ {ch.kiffements || 0} kiffements</span>
-                  <span style={{ color:C.textSoft, fontSize:12 }}>↗ {ch.partages || 0} partages</span>
-                </div>
-                <button onClick={() => telecharger(ch.videoUrl, `challenge-${ch.chansonTitre||'video'}.mp4`)}
-                  style={{ width:'100%', padding:11, borderRadius:10, border:'1px solid rgba(90,176,255,0.4)', background:'rgba(90,176,255,0.1)', color:'#5BB0FF', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  Télécharger ma vidéo
-                </button>
-              </div>
+        {/* ONGLET TOUS — fil des challenges avec interactions */}
+        {ongletCh === 'tous' && (
+          loading ? (
+            <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:30 }}>Chargement...</p>
+          ) : tousChallenges.length === 0 ? (
+            <div style={{ textAlign:'center', padding:40 }}>
+              <p style={{ fontSize:36, marginBottom:10 }}>🎬</p>
+              <p style={{ color:C.textSoft, fontSize:14 }}>Aucun challenge pour l'instant</p>
+              <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Soyez le premier à créer votre challenge !</p>
             </div>
-          ))
+          ) : (
+            tousChallenges.map(ch => (
+              <div key={ch.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, overflow:'hidden', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px' }}>
+                  {ch.userPhoto ? <img src={ch.userPhoto} style={{ width:32, height:32, borderRadius:99, objectFit:'cover' }} alt="" /> : <div style={{ width:32, height:32, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, color:'#fff', fontWeight:700 }}>{ch.userName?.[0]?.toUpperCase()}</div>}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ color:'#eaf2ff', fontSize:13, fontWeight:700, margin:0 }}>{ch.userName}</p>
+                    <p style={{ color:C.textSoft, fontSize:11, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🎵 {ch.chansonTitre} · {ch.artisteNom}</p>
+                  </div>
+                </div>
+                <video src={ch.videoUrl} controls playsInline style={{ width:'100%', maxHeight:420, background:'#000' }} />
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px' }}>
+                  <button onClick={() => kifferChallenge(ch)}
+                    style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'none', color:'#f04a6a', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                    ♥ {ch.kiffements || 0}
+                  </button>
+                  <button onClick={() => { if (window.confirm('Envoyer un kiffement (10 Oscart) sur ce challenge ?')) kiffementChallenge(ch, 10); }}
+                    style={{ display:'flex', alignItems:'center', gap:5, background:'rgba(245,200,76,0.12)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:99, padding:'5px 12px', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                    🎁 Kiffement
+                  </button>
+                  <button onClick={() => setPartageCh(ch)}
+                    style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5, background:'none', border:'none', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
+                    ↗ {ch.partages || 0}
+                  </button>
+                </div>
+              </div>
+            ))
+          )
+        )}
+
+        {/* ONGLET MES CHALLENGES — téléchargeables pour soi */}
+        {ongletCh === 'mes' && (
+          loading ? (
+            <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:30 }}>Chargement...</p>
+          ) : mesChallenges.length === 0 ? (
+            <div style={{ textAlign:'center', padding:40 }}>
+              <p style={{ fontSize:36, marginBottom:10 }}>🎬</p>
+              <p style={{ color:C.textSoft, fontSize:14 }}>Vous n'avez pas encore de challenge</p>
+              <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Créez votre premier challenge sur la musique de votre artiste !</p>
+            </div>
+          ) : (
+            mesChallenges.map(ch => (
+              <div key={ch.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, overflow:'hidden', marginBottom:16 }}>
+                <video src={ch.videoUrl} controls playsInline style={{ width:'100%', maxHeight:400, background:'#000' }} />
+                <div style={{ padding:'12px 14px' }}>
+                  <p style={{ color:'#eaf2ff', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>🎵 {ch.chansonTitre} · {ch.artisteNom}</p>
+                  <div style={{ display:'flex', gap:14, margin:'8px 0' }}>
+                    <span style={{ color:'#f04a6a', fontSize:12, fontWeight:700 }}>♥ {ch.kiffements || 0} kiffements</span>
+                    <span style={{ color:C.textSoft, fontSize:12 }}>↗ {ch.partages || 0} partages</span>
+                  </div>
+                  <button onClick={() => telecharger(ch.videoUrl, `challenge-${ch.chansonTitre||'video'}.mp4`)}
+                    style={{ width:'100%', padding:11, borderRadius:10, border:'1px solid rgba(90,176,255,0.4)', background:'rgba(90,176,255,0.1)', color:'#5BB0FF', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    Télécharger ma vidéo
+                  </button>
+                </div>
+              </div>
+            ))
+          )
         )}
       </div>
+
+      {/* MODAL PARTAGE */}
+      {partageCh && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:10001, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setPartageCh(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'22px 20px 34px', width:'100%', maxWidth:480 }}>
+            <p style={{ color:'#fff', fontWeight:800, fontSize:16, margin:'0 0 16px' }}>Partager ce challenge</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <button onClick={() => { partagerChallenge(partageCh,'whatsapp'); setPartageCh(null); }}
+                style={{ padding:14, borderRadius:12, border:'1px solid rgba(37,211,102,0.4)', background:'rgba(37,211,102,0.12)', color:'#25D366', fontWeight:700, fontSize:14, cursor:'pointer' }}>WhatsApp</button>
+              <button onClick={() => { partagerChallenge(partageCh,'facebook'); setPartageCh(null); }}
+                style={{ padding:14, borderRadius:12, border:'1px solid rgba(66,103,178,0.4)', background:'rgba(66,103,178,0.12)', color:'#6a9eff', fontWeight:700, fontSize:14, cursor:'pointer' }}>Facebook</button>
+              <button onClick={() => { partagerChallenge(partageCh,'tiktok'); setPartageCh(null); }}
+                style={{ padding:14, borderRadius:12, border:'1px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>TikTok</button>
+              <button onClick={() => { partagerChallenge(partageCh,'youtube'); setPartageCh(null); }}
+                style={{ padding:14, borderRadius:12, border:'1px solid rgba(255,0,0,0.35)', background:'rgba(255,0,0,0.1)', color:'#ff6b6b', fontWeight:700, fontSize:14, cursor:'pointer' }}>YouTube Shorts</button>
+            </div>
+            <button onClick={() => { partagerChallenge(partageCh,'natif'); setPartageCh(null); }}
+              style={{ width:'100%', marginTop:10, padding:13, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>Autre / Copier le lien</button>
+            <button onClick={() => setPartageCh(null)}
+              style={{ width:'100%', marginTop:8, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>Annuler</button>
+          </div>
+        </div>
+      )}
 
       {/* NAV BAS */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
