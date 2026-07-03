@@ -8095,6 +8095,7 @@ const TYPES_CONTENU = [
   { id:'tous', label:'Actu & Mood', titre:'Actu & Mood Artistique', icon:'M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h12v4H3v-4z' },
   { id:'audio', label:'Musique', titre:'Musique', icon:'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z' },
   { id:'video', label:'Vidéo', titre:'Vidéo', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
+  { id:'challenge', label:'Challenge', titre:'Challenges', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
   { id:'bientot', label:'Sorties', titre:'Sorties officielles', icon:'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z' },
 ];
 
@@ -8433,7 +8434,7 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
                   <audio key={`${teaserDebut}-${teaserDuree}`} src={construireTeaserUrl(fileUrl, teaserDebut, teaserDuree)} controls
                     style={{ width:'100%' }} />
                 )}
-                <p style={{ color:'#00a040', fontSize:11, margin:'8px 0 0' }}>✓ C'est cet extrait que le public entendra avant la sortie.</p>
+                <p style={{ color:'#00a040', fontSize:11, margin:'8px 0 0' }}>✓ C'est cet extrait que le public {estVideo ? 'verra' : 'entendra'} avant la sortie.</p>
               </div>
             )}
 
@@ -9877,7 +9878,7 @@ function DecouvrirPage() {
         {/* RUBRIQUE CHALLENGE — vidéos de challenges + bouton Créer */}
         {typeFiltre === 'challenge' && (
           <div>
-            <button onClick={() => { setChallengeArtiste(''); setChallengeSig(''); setChallengeMode(true); }}
+            <button onClick={() => { window.location.href = '/challenge'; }}
               style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:16, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               <span style={{ fontSize:18 }}>🎬</span> Créer mon challenge
             </button>
