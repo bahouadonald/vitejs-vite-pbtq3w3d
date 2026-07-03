@@ -10041,7 +10041,7 @@ function DecouvrirPage() {
         const pool = candidats.length > 0 ? candidats : contenusFiltres.slice(0, 6);
         const hero = pool[Math.floor(Math.random() * pool.length)];
         return (
-          <a href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210 }}>
+          <Lien href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210 }}>
             {hero.coverUrl ? (
               <img src={hero.coverUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
             ) : (
@@ -10056,7 +10056,7 @@ function DecouvrirPage() {
                 <span style={{ color:'#0D1526', fontSize:13, fontWeight:800 }}>Écouter</span>
               </div>
             </div>
-          </a>
+          </Lien>
         );
       })()}
 
@@ -10152,7 +10152,7 @@ function DecouvrirPage() {
           return (
           <div key={c.id} style={{ marginBottom:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, overflow:'hidden' }}>
             {/* Média avec lecture automatique */}
-            <a href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
+            <Lien href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
               {fileUrl ? (
                 <AutoPlayMedia fileUrl={fileUrl} isVideo={isVideo} coverUrl={c.coverUrl} label={c.label} publicLinkId={c.publicLinkId} />
               ) : c.coverUrl ? (
@@ -10162,7 +10162,7 @@ function DecouvrirPage() {
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 </div>
               )}
-            </a>
+            </Lien>
             <div style={{ padding:'12px 14px' }}>
               <p style={{ fontWeight:700, fontSize:15, marginBottom:2 }}>{c.label}</p>
               <p style={{ color:'#4da6ff', fontSize:13, marginBottom:8 }}>{c.artist}</p>
@@ -10193,10 +10193,10 @@ function DecouvrirPage() {
                 }} title="Partager" style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 </button>
-                <a href={`/ecoute/${c.publicLinkId}`} title="Lire"
+                <Lien href={`/ecoute/${c.publicLinkId}`}
                   style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(30,111,255,0.2)', flexShrink:0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="#4da6ff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-                </a>
+                </Lien>
               </div>
             </div>
           </div>
