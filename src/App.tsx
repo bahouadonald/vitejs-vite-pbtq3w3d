@@ -9451,6 +9451,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
   const [dureeMusique, setDureeMusique] = useState(0);      // durée totale de la chanson
   const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
+  const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const videoRef = useRef<HTMLVideoElement|null>(null);
@@ -9478,6 +9479,17 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     { id:'cine',    nom:'Ciné',      css:'contrast(1.3) brightness(0.92) saturate(1.25) hue-rotate(-5deg)' },
   ];
   const filtreCss = FILTRES.find(f => f.id === filtre)?.css || 'none';
+
+  // Effets de MOUVEMENT (zoom animé) — s'ajoutent aux filtres de couleur
+  const EFFETS: {id:string, nom:string, anim:string}[] = [
+    { id:'aucun',    nom:'Fixe',       anim:'none' },
+    { id:'zoomlent', nom:'Zoom lent',  anim:'chZoomLent 8s ease-in-out infinite' },
+    { id:'pulse',    nom:'Pulse',      anim:'chPulse 0.8s ease-in-out infinite' },
+    { id:'balance',  nom:'Balancement', anim:'chBalance 5s ease-in-out infinite' },
+    { id:'zoomin',   nom:'Zoom avant', anim:'chZoomIn 6s ease-out forwards' },
+    { id:'vibe',     nom:'Vibe',       anim:'chVibe 1.6s ease-in-out infinite' },
+  ];
+  const effetAnim = EFFETS.find(e => e.id === effet)?.anim || 'none';
 
   // Liste des artistes distincts (à partir des contenus officiels)
   const artistes = Array.from(new Set(contenus.map((c:any) => c.artistEmail || c.artist).filter(Boolean)))
@@ -9604,6 +9616,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         chansonId: chanson?.id || '',
         musiqueDebut,
         filtre,
+        effet,
         videoUrl: data.secure_url,
         sigId: sigId || '',
         kiffements: 0, partages: 0,
@@ -9645,6 +9658,13 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
 
   return (
     <div style={{ position:'fixed', inset:0, background:C.bgDeep, zIndex:10000, overflowY:'auto', fontFamily:"'DM Sans',sans-serif", color:C.text }}>
+      <style>{`
+        @keyframes chZoomLent { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
+        @keyframes chPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
+        @keyframes chBalance { 0%,100% { transform:scale(1.1) translateX(-4%); } 50% { transform:scale(1.1) translateX(4%); } }
+        @keyframes chZoomIn { 0% { transform:scale(1); } 100% { transform:scale(1.35); } }
+        @keyframes chVibe { 0%,100% { transform:scale(1.05); } 25% { transform:scale(1.05) translate(-2%,1%); } 75% { transform:scale(1.05) translate(2%,-1%); } }
+      `}</style>
       {/* En-tête */}
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:5 }}>
         <button onClick={onClose} style={{ background:'none', border:'none', color:C.text, fontSize:22, cursor:'pointer' }}>×</button>
@@ -9723,7 +9743,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             )}
 
             <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'55vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover', filter: filtreCss }} />
+              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover', filter: filtreCss, animation: effetAnim, transformOrigin:'center center' }} />
               {recording && (
                 <>
                   <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
@@ -9756,11 +9776,23 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             )}
 
             {/* Filtres (sélection avant/pendant le film) */}
-            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:14 }}>
+            <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 6px' }}>Filtres (couleur / lumière)</p>
+            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:12 }}>
               {FILTRES.map(f => (
                 <button key={f.id} onClick={() => setFiltre(f.id)}
                   style={{ flexShrink:0, padding:'7px 14px', borderRadius:99, border:`1px solid ${filtre===f.id?'#4da6ff':'rgba(255,255,255,0.12)'}`, background: filtre===f.id?'rgba(77,166,255,0.15)':'rgba(255,255,255,0.04)', color: filtre===f.id?'#4da6ff':C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
                   {f.nom}
+                </button>
+              ))}
+            </div>
+
+            {/* Effets de mouvement (zoom animé) */}
+            <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 6px' }}>Effets de mouvement (zoom)</p>
+            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:14 }}>
+              {EFFETS.map(e => (
+                <button key={e.id} onClick={() => setEffet(e.id)}
+                  style={{ flexShrink:0, padding:'7px 14px', borderRadius:99, border:`1px solid ${effet===e.id?'#f5c84c':'rgba(255,255,255,0.12)'}`, background: effet===e.id?'rgba(245,200,76,0.15)':'rgba(255,255,255,0.04)', color: effet===e.id?'#f5c84c':C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  {e.nom}
                 </button>
               ))}
             </div>
