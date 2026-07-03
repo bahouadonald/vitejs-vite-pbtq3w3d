@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
@@ -7763,14 +7763,14 @@ function ZikothequePage({ user }: { user: any }) {
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
-          <a key={item.path} href={item.path}
+          <Link key={item.path} to={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               {item.svg}
               {item.path === '/notifications' && <BadgeNotif />}
             </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -9419,14 +9419,14 @@ function MesChallengesPage() {
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
-          <a key={item.path} href={item.path}
+          <Link key={item.path} to={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               {item.svg}
               {item.path === '/notifications' && <BadgeNotif />}
             </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -10170,14 +10170,14 @@ function DecouvrirPage() {
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
-          <a key={item.path} href={item.path}
+          <Link key={item.path} to={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               {item.svg}
               {item.path === '/notifications' && <BadgeNotif />}
             </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -10344,14 +10344,14 @@ function NotificationsPage() {
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
-          <a key={item.path} href={item.path}
+          <Link key={item.path} to={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               {item.svg}
               {item.path === '/notifications' && <BadgeNotif />}
             </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -10795,14 +10795,14 @@ function ProfilPage() {
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
-          <a key={item.path} href={item.path}
+          <Link key={item.path} to={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               {item.svg}
               {item.path === '/notifications' && <BadgeNotif />}
             </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
