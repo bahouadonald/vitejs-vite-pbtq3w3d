@@ -9447,11 +9447,32 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [recording, setRecording] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [msg, setMsg] = useState('');
+  const [tempsEcoule, setTempsEcoule] = useState(0);        // secondes filmées
+  const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
+  const [dureeMusique, setDureeMusique] = useState(0);      // durée totale de la chanson
+  const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
   const videoRef = useRef<HTMLVideoElement|null>(null);
   const audioRef = useRef<HTMLAudioElement|null>(null);
   const mediaRecorderRef = useRef<MediaRecorder|null>(null);
   const streamRef = useRef<MediaStream|null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<any>(null);
+
+  const DUREE_MAX = 75; // 1 min 15 s maximum
+
+  // Filtres CSS simples applicables à la vidéo
+  const FILTRES: {id:string, nom:string, css:string}[] = [
+    { id:'aucun',   nom:'Aucun',    css:'none' },
+    { id:'nb',      nom:'N&B',      css:'grayscale(1)' },
+    { id:'sepia',   nom:'Sépia',    css:'sepia(0.8)' },
+    { id:'vif',     nom:'Vif',      css:'saturate(1.8) contrast(1.1)' },
+    { id:'chaud',   nom:'Chaud',    css:'sepia(0.3) saturate(1.4) hue-rotate(-10deg)' },
+    { id:'froid',   nom:'Froid',    css:'saturate(1.2) hue-rotate(20deg) brightness(1.05)' },
+    { id:'vintage', nom:'Vintage',  css:'sepia(0.4) contrast(1.2) brightness(0.95) saturate(1.3)' },
+    { id:'clair',   nom:'Clair',    css:'brightness(1.2) contrast(0.95)' },
+    { id:'sombre',  nom:'Dramatique', css:'contrast(1.4) brightness(0.85) saturate(1.2)' },
+  ];
+  const filtreCss = FILTRES.find(f => f.id === filtre)?.css || 'none';
 
   // Liste des artistes distincts (à partir des contenus officiels)
   const artistes = Array.from(new Set(contenus.map((c:any) => c.artistEmail || c.artist).filter(Boolean)))
@@ -9464,19 +9485,32 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   // Chansons de l'artiste sélectionné (contenus audio/clip officiels)
   const chansonsArtiste = contenus.filter((c:any) => (c.artistEmail || c.artist) === artiste);
 
-  // Démarrer la caméra + jouer la musique par-dessus
+  // URL audio de la chanson choisie
+  const urlChanson = chanson?.fichierUrl || chanson?.url || chanson?.audioUrl || chanson?.fileUrl || (chanson?.files?.[0]?.url) || '';
+
+  // Quand on arrive à l'étape "régler la musique", charger la durée
+  useEffect(() => {
+    if (etape === 3 && urlChanson) {
+      const a = document.createElement('audio');
+      a.preload = 'metadata';
+      a.onloadedmetadata = () => { if (a.duration && isFinite(a.duration)) setDureeMusique(Math.floor(a.duration)); };
+      a.src = urlChanson;
+    }
+  }, [etape, urlChanson]);
+
+  // Démarrer la caméra + jouer la musique (à partir du point choisi) + minuteur + arrêt auto à 75s
   const demarrerFilm = async () => {
     setMsg('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'user' }, audio: true });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-      // Lancer la musique de la chanson pendant le film
-      if (chanson?.fichierUrl || chanson?.url || chanson?.audioUrl) {
-        const src = chanson.fichierUrl || chanson.url || chanson.audioUrl;
-        if (audioRef.current) { audioRef.current.src = src; audioRef.current.currentTime = 0; audioRef.current.play().catch(()=>{}); }
+      // Lancer la musique à partir du point choisi
+      if (urlChanson && audioRef.current) {
+        audioRef.current.src = urlChanson;
+        audioRef.current.currentTime = musiqueDebut;
+        audioRef.current.play().catch(()=>{});
       }
-      // Enregistrer
       chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -9484,24 +9518,34 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         const blob = new Blob(chunksRef.current, { type:'video/webm' });
         setVideoBlob(blob);
         setVideoUrl(URL.createObjectURL(blob));
-        // Arrêter caméra + musique
         streamRef.current?.getTracks().forEach(t => t.stop());
         if (audioRef.current) audioRef.current.pause();
+        if (timerRef.current) clearInterval(timerRef.current);
         setEtape(4);
       };
       mediaRecorderRef.current = mr;
       mr.start();
       setRecording(true);
+      setTempsEcoule(0);
+      // Minuteur : compte les secondes, arrêt auto à DUREE_MAX
+      timerRef.current = setInterval(() => {
+        setTempsEcoule(t => {
+          const nv = t + 1;
+          if (nv >= DUREE_MAX) { arreterFilm(); }
+          return nv;
+        });
+      }, 1000);
     } catch (e:any) {
       setMsg('Impossible d\'accéder à la caméra. Autorisez l\'accès dans votre navigateur.');
     }
   };
 
   const arreterFilm = () => {
-    if (mediaRecorderRef.current && recording) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setRecording(false);
     }
+    setRecording(false);
   };
 
   // Publier le challenge
@@ -9525,6 +9569,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         artisteEmail: artiste, artisteNom,
         chansonTitre: chanson?.label || chanson?.titre || '',
         chansonId: chanson?.id || '',
+        musiqueDebut,
+        filtre,
         videoUrl: data.secure_url,
         sigId: sigId || '',
         kiffements: 0, partages: 0,
@@ -9619,16 +9665,59 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         {etape === 3 && (
           <>
             <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Filmez votre challenge</p>
-            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 14px' }}>Sur "{chanson?.label || chanson?.titre}". La musique joue pendant le film.</p>
-            <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'60vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+
+            {/* Musique sélectionnée + choix de la partie (avant de filmer) */}
+            {!recording && (
+              <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.25)', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
+                <p style={{ color:C.gold, fontSize:13, fontWeight:800, margin:'0 0 8px' }}>🎵 {chanson?.label || chanson?.titre || 'Chanson'}</p>
+                {dureeMusique > 0 ? (
+                  <>
+                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 6px' }}>
+                      La musique démarrera à <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span>
+                    </p>
+                    <input type="range" min={0} max={Math.max(0, dureeMusique - 5)} value={musiqueDebut}
+                      onChange={e => setMusiqueDebut(parseInt(e.target.value))}
+                      style={{ width:'100%', accentColor:C.gold }} />
+                    <button onClick={() => { if (audioRef.current) { audioRef.current.src = urlChanson; audioRef.current.currentTime = musiqueDebut; audioRef.current.play().catch(()=>{}); setTimeout(()=>audioRef.current?.pause(), 5000); } }}
+                      style={{ marginTop:8, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background:'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                      ▶ Écouter ce passage (5s)
+                    </button>
+                  </>
+                ) : (
+                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Chargement de la musique...</p>
+                )}
+              </div>
+            )}
+
+            <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'55vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
+              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover', filter: filtreCss }} />
               {recording && (
-                <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ width:8, height:8, borderRadius:99, background:'#fff', animation:'pulse 1s infinite' }} /> REC
-                </div>
+                <>
+                  <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ width:8, height:8, borderRadius:99, background:'#fff', animation:'pulse 1s infinite' }} /> REC
+                  </div>
+                  {/* Minuteur + barre de progression vers 1min15 */}
+                  <div style={{ position:'absolute', top:12, right:12, background:'rgba(0,0,0,0.6)', borderRadius:99, padding:'4px 12px', fontSize:13, fontWeight:800, color:'#fff' }}>
+                    {Math.floor(tempsEcoule/60)}:{String(tempsEcoule%60).padStart(2,'0')} / 1:15
+                  </div>
+                  <div style={{ position:'absolute', bottom:0, left:0, right:0, height:4, background:'rgba(255,255,255,0.2)' }}>
+                    <div style={{ height:'100%', width:`${(tempsEcoule/DUREE_MAX)*100}%`, background:'#f04a6a', transition:'width 1s linear' }} />
+                  </div>
+                </>
               )}
             </div>
             <audio ref={audioRef} />
+
+            {/* Filtres (sélection avant/pendant le film) */}
+            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:14 }}>
+              {FILTRES.map(f => (
+                <button key={f.id} onClick={() => setFiltre(f.id)}
+                  style={{ flexShrink:0, padding:'7px 14px', borderRadius:99, border:`1px solid ${filtre===f.id?'#4da6ff':'rgba(255,255,255,0.12)'}`, background: filtre===f.id?'rgba(77,166,255,0.15)':'rgba(255,255,255,0.04)', color: filtre===f.id?'#4da6ff':C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  {f.nom}
+                </button>
+              ))}
+            </div>
+
             {!recording ? (
               <button onClick={demarrerFilm}
                 style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
@@ -9640,6 +9729,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                 Arrêter et voir
               </button>
             )}
+            <p style={{ color:C.textSoft, fontSize:11, textAlign:'center', marginTop:8 }}>Durée maximum : 1 min 15 s (arrêt automatique).</p>
             {msg && <p style={{ color:'#f04a6a', fontSize:12, textAlign:'center', marginTop:10 }}>{msg}</p>}
           </>
         )}
