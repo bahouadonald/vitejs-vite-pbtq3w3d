@@ -2855,6 +2855,10 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
   const [mediaType, setMediaType] = useState<'image'|'video'>('image');
   const [uploadingSig, setUploadingSig] = useState(false);
   const [sigMsg, setSigMsg] = useState('');
+  // Champs spécifiques selon le type de signature
+  const [sigDate, setSigDate] = useState('');        // Accès VIP / Dans son clip présentiel
+  const [sigDetails, setSigDetails] = useState('');  // Infos (lieu, précisions...)
+  const [clipMode, setClipMode] = useState<'presentiel'|'challenge'>('presentiel'); // Dans son clip
 
   useEffect(() => {
     // Récupérer tous les kiffements reçus, groupés par donateur
@@ -2895,7 +2899,13 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 
   const offrirSignature = async () => {
     if (!offreModal || !typeChoisi) return;
-    if (!mediaUrl) { setSigMsg('Ajoutez votre photo ou vidéo'); return; }
+    const t = typeChoisi.id;
+    // Validation selon le type
+    if (t === 'dedicace' && !mediaUrl) { setSigMsg('Enregistrez ou ajoutez votre vidéo'); return; }
+    if (t === 'vip' && (!sigDate || !sigDetails.trim())) { setSigMsg('Indiquez la date et les infos de l\'événement'); return; }
+    if (t === 'clip' && clipMode === 'presentiel' && !sigDate) { setSigMsg('Indiquez la date du tournage'); return; }
+    if (t === 'clip' && clipMode === 'challenge' && !sigDetails.trim()) { setSigMsg('Décrivez le challenge à réaliser'); return; }
+
     // Récupérer le nom de l'artiste
     let artistName = artistEmail.split('@')[0];
     try {
@@ -2903,37 +2913,58 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
       if (!aSnap.empty) artistName = aSnap.docs[0].data().name || artistName;
     } catch {}
 
-    // 1. Notification PERSONNELLE au fan ciblé
+    // Sous-type pour "Dans son clip"
+    const sousType = t === 'clip' ? clipMode : '';
+
+    // 1. Notification PERSONNELLE au fan (mène à Profil → Mes signatures)
     await addDoc(collection(db,'notifications'), {
       to: offreModal.userEmail || offreModal.userId,
       type: 'signature',
-      text: `${artistName} a signé pour vous : ${typeChoisi.label} ! Regardez dans Actu & Mood.`,
+      text: `${artistName} vous a offert une signature : ${typeChoisi.label} ! Retrouvez-la dans votre profil.`,
       createdAt: new Date().toISOString(), lu: false,
     });
-    // 2. Notification GÉNÉRALE (visible par tous)
+    // 2. Notification GÉNÉRALE
     await addDoc(collection(db,'notifications'), {
       to: 'all', type: 'generale',
       text: `${artistName} offre "${typeChoisi.label}" à ${offreModal.userName}.`,
       createdAt: new Date().toISOString(), lu: false,
     });
-    // 3. Publier dans le Mood avec le contenu réel (photo/vidéo)
-    await addDoc(collection(db,'mots_artiste'), {
-      artistEmail, artistName,
-      texte: `offre "${typeChoisi.label}" à ${offreModal.userName}.`,
-      videoUrl: mediaType === 'video' ? mediaUrl : '',
-      imageUrl: mediaType === 'image' ? mediaUrl : '',
-      estSignature: true, typeSignature: typeChoisi.id,
-      statut: 'valide',
-      createdAt: new Date().toISOString(),
-    });
-    // 4. Enregistrer la signature
+    // 3. Publier dans le Mood UNIQUEMENT pour la dédicace vidéo (contenu visible)
+    if (t === 'dedicace') {
+      await addDoc(collection(db,'mots_artiste'), {
+        artistEmail, artistName,
+        texte: `offre une dédicace vidéo à ${offreModal.userName}.`,
+        videoUrl: mediaType === 'video' ? mediaUrl : '',
+        imageUrl: mediaType === 'image' ? mediaUrl : '',
+        estSignature: true, typeSignature: t,
+        statut: 'valide',
+        createdAt: new Date().toISOString(),
+      });
+    }
+    // 4. Enregistrer la signature (avec les infos spécifiques + statut pour le formulaire Spot)
     await addDoc(collection(db,'signatures'), {
-      artistEmail, donateurId: offreModal.userId, donateurName: offreModal.userName,
-      type: typeChoisi.id, label: typeChoisi.label, mediaUrl, mediaType,
+      artistEmail, artistName,
+      donateurId: offreModal.userId,
+      donateurName: offreModal.userName,
+      donateurEmail: offreModal.userEmail || '',
+      type: t, label: typeChoisi.label,
+      mediaUrl: t === 'dedicace' ? mediaUrl : '',
+      mediaType: t === 'dedicace' ? mediaType : '',
+      date: sigDate || '',
+      details: sigDetails || '',
+      sousType,
+      // Signature Spot : en attente que le fan remplisse nom + slogan
+      statutSpot: t === 'spot' ? 'en_attente_fan' : '',
+      spotNom: '', spotSlogan: '',
+      // Challenge : en attente que le fan réalise sa vidéo
+      statutChallenge: (t === 'clip' && clipMode === 'challenge') ? 'a_faire' : '',
       createdAt: new Date().toISOString(),
     });
     setSent(true);
-    setTimeout(() => { setSent(false); setOffreModal(null); setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); }, 2000);
+    setTimeout(() => {
+      setSent(false); setOffreModal(null); setTypeChoisi(null);
+      setMediaUrl(''); setSigMsg(''); setSigDate(''); setSigDetails(''); setClipMode('presentiel');
+    }, 2000);
   };
 
   return (
@@ -3013,29 +3044,86 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
             ) : (
               <>
                 <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4, display:'flex', alignItems:'center', gap:8 }}><img src={typeChoisi.image} alt="" style={{ width:24, height:24, objectFit:'contain' }} /> {typeChoisi.label}</p>
-                <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>
-                  Pour <strong>{offreModal.userName}</strong>. Ajoutez une photo ou une vidéo où vous annoncez ce que vous offrez (mentionnez {offreModal.userName}).
-                </p>
+                <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>Pour <strong>{offreModal.userName}</strong>.</p>
 
-                <label style={{ display:'block', padding:'20px', borderRadius:14, border:'2px dashed #c8d8ef', background:'#f5f8ff', textAlign:'center', cursor:'pointer', marginBottom:14 }}>
-                  {mediaUrl ? (
-                    mediaType === 'video'
-                      ? <video src={mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, maxHeight:200 }} />
-                      : <img src={mediaUrl} style={{ width:'100%', borderRadius:10, maxHeight:200, objectFit:'cover' }} alt="" />
-                  ) : (
-                    <span style={{ color:'#1a6bff', fontSize:13, fontWeight:600 }}>{uploadingSig ? 'Upload en cours...' : 'Toucher pour ajouter une photo ou vidéo'}</span>
-                  )}
-                  <input type="file" accept="image/*,video/*" style={{ display:'none' }}
-                    onChange={e => e.target.files?.[0] && uploadSignature(e.target.files[0])} />
-                </label>
+                {/* DÉDICACE VIDÉO → upload d'une vidéo */}
+                {typeChoisi.id === 'dedicace' && (
+                  <>
+                    <p style={{ color:'#5a7090', fontSize:12, marginBottom:10 }}>Enregistrez ou ajoutez une vidéo où vous citez {offreModal.userName}.</p>
+                    <label style={{ display:'block', padding:'20px', borderRadius:14, border:'2px dashed #c8d8ef', background:'#f5f8ff', textAlign:'center', cursor:'pointer', marginBottom:14 }}>
+                      {mediaUrl ? (
+                        <video src={mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, maxHeight:200 }} />
+                      ) : (
+                        <span style={{ color:'#1a6bff', fontSize:13, fontWeight:600 }}>{uploadingSig ? 'Upload en cours...' : 'Toucher pour ajouter votre vidéo'}</span>
+                      )}
+                      <input type="file" accept="video/*" style={{ display:'none' }}
+                        onChange={e => e.target.files?.[0] && uploadSignature(e.target.files[0])} />
+                    </label>
+                  </>
+                )}
+
+                {/* SIGNATURE SPOT → l'artiste confirme, le fan remplira nom+slogan */}
+                {typeChoisi.id === 'spot' && (
+                  <div style={{ background:'#fffbf0', border:'1px solid #f0e0b0', borderRadius:12, padding:'14px 16px', marginBottom:14 }}>
+                    <p style={{ color:'#8a6d00', fontSize:13, lineHeight:1.6, margin:0 }}>
+                      Vous vous engagez à citer et chanter {offreModal.userName} dans une prochaine musique. Après validation, {offreModal.userName} recevra un formulaire pour vous indiquer le nom et le slogan à chanter.
+                    </p>
+                  </div>
+                )}
+
+                {/* ACCÈS VIP → date + infos événement */}
+                {typeChoisi.id === 'vip' && (
+                  <>
+                    <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Date de l'événement</label>
+                    <input type="date" value={sigDate} onChange={e => setSigDate(e.target.value)}
+                      style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:12, boxSizing:'border-box' as any }} />
+                    <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Infos (lieu, comment accéder...)</label>
+                    <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                      placeholder="Ex : Concert au Palais de la Culture, présentez-vous à l'entrée VIP avec ce message."
+                      style={{ width:'100%', minHeight:70, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                  </>
+                )}
+
+                {/* DANS SON CLIP → présentiel (date) OU challenge (description) */}
+                {typeChoisi.id === 'clip' && (
+                  <>
+                    <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                      <button onClick={() => setClipMode('presentiel')}
+                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='presentiel'?'#1a6bff':'#d0d8e8'}`, background: clipMode==='presentiel'?'#eaf1ff':'#fff', color: clipMode==='presentiel'?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                        Tournage en présentiel
+                      </button>
+                      <button onClick={() => setClipMode('challenge')}
+                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='challenge'?'#1a6bff':'#d0d8e8'}`, background: clipMode==='challenge'?'#eaf1ff':'#fff', color: clipMode==='challenge'?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                        Challenge à réaliser
+                      </button>
+                    </div>
+                    {clipMode === 'presentiel' ? (
+                      <>
+                        <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Date du tournage</label>
+                        <input type="date" value={sigDate} onChange={e => setSigDate(e.target.value)}
+                          style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:12, boxSizing:'border-box' as any }} />
+                        <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                          placeholder="Lieu et précisions du tournage (optionnel)."
+                          style={{ width:'100%', minHeight:60, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                      </>
+                    ) : (
+                      <>
+                        <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Décrivez le challenge à réaliser</label>
+                        <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                          placeholder="Ex : Fais une vidéo sur ma chanson en reprenant ce pas de danse. Les meilleures seront dans mon clip !"
+                          style={{ width:'100%', minHeight:80, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                      </>
+                    )}
+                  </>
+                )}
 
                 {sigMsg && <p style={{ color: sigMsg.includes('prêt') ? '#00a040':'#f04a6a', fontSize:12, margin:'0 0 12px' }}>{sigMsg}</p>}
 
-                <button onClick={offrirSignature} disabled={uploadingSig || !mediaUrl}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: mediaUrl ? 'linear-gradient(135deg,#1a6bff,#4da6ff)' : '#c8d8ef', color:'#fff', fontWeight:800, fontSize:15, cursor: mediaUrl?'pointer':'default' }}>
-                  Offrir et publier dans le Mood
+                <button onClick={offrirSignature} disabled={uploadingSig}
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#4da6ff)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                  {uploadingSig ? 'Envoi...' : 'Offrir cette signature'}
                 </button>
-                <button onClick={() => { setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); }}
+                <button onClick={() => { setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); setSigDate(''); setSigDetails(''); setClipMode('presentiel'); }}
                   style={{ width:'100%', marginTop:10, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
                   Retour
                 </button>
@@ -4886,6 +4974,24 @@ function NotifsEducativesTab() {
     setEnvoi(false);
   };
 
+  const [effacement, setEffacement] = useState(false);
+  const effacerToutesNotifs = async () => {
+    if (!window.confirm('Effacer TOUTES les notifications de TOUS les comptes ? Cette action est définitive et ne peut pas être annulée.')) return;
+    setEffacement(true); setMsg('');
+    try {
+      let total = 0;
+      // On efface par lots jusqu'à ce qu'il ne reste plus rien
+      while (true) {
+        const snap = await getDocs(query(collection(db,'notifications'), limit(300)));
+        if (snap.empty) break;
+        for (const d of snap.docs) { await deleteDoc(doc(db,'notifications', d.id)); total++; }
+        if (snap.size < 300) break;
+      }
+      setMsg(`${total} notification(s) effacée(s). Tout est propre.`);
+    } catch(e:any) { setMsg('Erreur : ' + (e?.message || '')); }
+    setEffacement(false);
+  };
+
   return (
     <div>
       <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Notifications à tous</h3>
@@ -4912,11 +5018,21 @@ function NotifsEducativesTab() {
           </button>
         </div>
       ))}
+
+      {/* Zone dangereuse : remise à zéro de toutes les notifications */}
+      <div style={{ marginTop:24, paddingTop:18, borderTop:'1px solid #e0e8f4' }}>
+        <p style={{ color:'#d04a6a', fontSize:12, fontWeight:800, margin:'0 0 6px' }}>Zone sensible</p>
+        <p style={{ color:'#5a7090', fontSize:12, lineHeight:1.5, margin:'0 0 10px' }}>
+          Efface TOUTES les notifications de tous les comptes (repart propre). Action définitive.
+        </p>
+        <button onClick={effacerToutesNotifs} disabled={effacement}
+          style={{ width:'100%', padding:12, borderRadius:10, border:'1px solid #d04a6a', background: effacement ? '#f5d0d8' : '#fff0f3', color:'#d04a6a', fontWeight:800, fontSize:13, cursor: effacement ? 'wait' : 'pointer' }}>
+          {effacement ? 'Effacement en cours...' : 'Effacer toutes les notifications'}
+        </button>
+      </div>
     </div>
   );
 }
-
-// INSCRIPTIONS ARTISTES — liste des demandes via /rejoindre
 // ─────────────────────────────────────────────
 function InscriptionsTab() {
   const [items, setItems] = useState<any[]>([]);
@@ -9066,6 +9182,7 @@ function DecouvrirPage() {
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
   const [sortieCiblee, setSortieCiblee] = useState('');
+  const [banniereKiff, setBanniereKiff] = useState(false);
   const user = auth.currentUser;
 
   // Lien partagé vers une sortie précise : ?sortie=ID → onglet Bientôt + mise en évidence
@@ -9073,6 +9190,8 @@ function DecouvrirPage() {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('sortie');
     if (sid) { setTypeFiltre('bientot'); setSortieCiblee(sid); }
+    // Venu d'une notif éducative "envoyez des kiffements" → afficher une bannière d'invitation
+    if (params.get('action') === 'kiffement') { setBanniereKiff(true); }
   }, []);
 
   // Quand les sorties sont chargées et qu'une cible existe, scroller dessus
@@ -9143,6 +9262,18 @@ function DecouvrirPage() {
         <Logo size="sm" />
         <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
       </div>
+
+      {/* Bannière : invitation à envoyer des kiffements (venu d'une notif éducative) */}
+      {banniereKiff && (
+        <div style={{ margin:'12px 16px 0', padding:'14px 16px', borderRadius:14, background:'linear-gradient(135deg, rgba(245,200,76,0.18), rgba(245,200,76,0.08))', border:'1px solid rgba(245,200,76,0.4)', display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ flex:1 }}>
+            <p style={{ color:C.gold, fontWeight:800, fontSize:14, margin:'0 0 4px' }}>Envoyez des kiffements à votre artiste</p>
+            <p style={{ color:C.textSoft, fontSize:12, margin:0, lineHeight:1.5 }}>Choisissez un artiste ci-dessous et ouvrez son contenu pour lui offrir des kiffements.</p>
+          </div>
+          <button onClick={() => setBanniereKiff(false)}
+            style={{ flexShrink:0, width:28, height:28, borderRadius:99, border:'none', background:'rgba(255,255,255,0.1)', color:C.text, fontSize:16, cursor:'pointer' }}>×</button>
+        </div>
+      )}
 
       {/* FILTRES TYPE — barre d'icônes style Facebook */}
       <div style={{ display:'flex', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 8px' }}>
@@ -9407,7 +9538,24 @@ function NotificationsPage() {
             <p style={{ color:'#2a3a60', fontSize:14 }}>Aucune notification pour l'instant</p>
           </div>
         ) : notifs.map(n => (
-          <div key={n.id} onClick={() => { markRead(n.id); if (n.type === 'reservation') setExpanded(x => ({ ...x, [n.id]: !x[n.id] })); }}
+          <div key={n.id} onClick={() => {
+              markRead(n.id);
+              if (n.type === 'reservation') { setExpanded(x => ({ ...x, [n.id]: !x[n.id] })); return; }
+              // Signature reçue → profil (section Mes signatures)
+              if (n.type === 'signature') { window.location.href = '/profil'; return; }
+              // Rediriger vers l'endroit concerné selon le type de notification
+              if (n.qrId) { window.location.href = `/fan?id=${n.qrId}`; return; }
+              if (n.type === 'educative' || n.type === 'generale' || n.type === 'activite') {
+                // Si la notif parle de kiffements → bannière d'invitation ; sinon Découvrir
+                if (n.text && n.text.toLowerCase().includes('kiffement')) {
+                  window.location.href = '/decouvrir?action=kiffement'; return;
+                }
+                window.location.href = '/decouvrir'; return;
+              }
+              if (n.type === 'tuto_artiste' || n.type === 'kiff' || n.type === 'zikotheque' || n.type === 'telechargement') {
+                window.location.href = '/decouvrir'; return;
+              }
+            }}
             style={{ display:'flex', gap:14, padding:'14px 16px', borderRadius:14, marginBottom:8, background: n.lu ? 'rgba(255,255,255,0.02)' : 'rgba(30,111,255,0.08)', border:`1px solid ${n.lu ? 'rgba(255,255,255,0.04)' : 'rgba(30,111,255,0.2)'}`, cursor:'pointer' }}>
             <div style={{ flexShrink:0, width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center' }}>
               {getIcon(n.type)}
@@ -9496,6 +9644,10 @@ function ProfilPage() {
   const [projetForm, setProjetForm] = useState({ nom:'', type:'musique', description:'', whatsapp:'' });
   const [projetSent, setProjetSent] = useState(false);
   const [rechargeModalProfil, setRechargeModalProfil] = useState<{fcfa:number,oscart:number}|null>(null);
+  const [mesSignatures, setMesSignatures] = useState<any[]>([]);
+  const [spotModal, setSpotModal] = useState<any>(null); // signature Spot à remplir (nom+slogan)
+  const [spotNom, setSpotNom] = useState('');
+  const [spotSlogan, setSpotSlogan] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -9513,8 +9665,30 @@ function ProfilPage() {
       setKiffsDispo(sd.kiffsDispo || 0);
       setKiffsOfferts(sd.kiffsOfferts || 0);
       setLoading(false);
+      // Écouter mes signatures reçues (temps réel)
+      onSnapshot(
+        query(collection(db,'signatures'), where('donateurId','==',u.uid)),
+        snap => setMesSignatures(snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a:any,b:any) => (b.createdAt||'').localeCompare(a.createdAt||'')))
+      );
     });
   }, []);
+
+  // Le fan remplit le formulaire Spot (nom + slogan)
+  const envoyerSpot = async () => {
+    if (!spotModal || !spotNom.trim()) return;
+    try {
+      await updateDoc(doc(db,'signatures', spotModal.id), {
+        spotNom: spotNom.trim(), spotSlogan: spotSlogan.trim(), statutSpot: 'rempli',
+      });
+      // Notifier l'artiste que le fan a rempli son nom + slogan
+      await addDoc(collection(db,'notifications'), {
+        to: spotModal.artistEmail, role:'artiste', type:'spot_rempli',
+        text: `${spotModal.donateurName} a renseigné son nom (${spotNom.trim()}) à citer dans votre musique.`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+      setSpotModal(null); setSpotNom(''); setSpotSlogan('');
+    } catch(e) { console.error(e); }
+  };
 
   const envoyerProjet = async () => {
     if (!projetForm.nom || !projetForm.whatsapp) return;
@@ -9573,7 +9747,72 @@ function ProfilPage() {
           </div>
         </div>
 
-        {/* VOS BADGES */}
+        {/* MES SIGNATURES */}
+        {mesSignatures.length > 0 && (
+          <div style={{ marginBottom:16 }}>
+            <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Mes signatures</p>
+            {mesSignatures.map(sig => {
+              const meta = SIGNATURES.find(x => x.id === sig.type);
+              const couleur = meta?.color || C.gold;
+              return (
+                <div key={sig.id} style={{ background:C.card, border:`1px solid ${couleur}44`, borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                    {meta?.image && <img src={meta.image} alt="" style={{ width:32, height:32, objectFit:'contain' }} />}
+                    <div style={{ flex:1 }}>
+                      <p style={{ color:'#fff', fontWeight:800, fontSize:14, margin:0 }}>{sig.label}</p>
+                      <p style={{ color:C.textSoft, fontSize:11, margin:'2px 0 0' }}>Offerte par {sig.artistName || 'un artiste'}</p>
+                    </div>
+                  </div>
+
+                  {/* Dédicace vidéo → lecture */}
+                  {sig.type === 'dedicace' && sig.mediaUrl && (
+                    <video src={sig.mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, maxHeight:280 }} />
+                  )}
+
+                  {/* Accès VIP → date + infos */}
+                  {sig.type === 'vip' && (
+                    <div style={{ background:'rgba(245,200,76,0.08)', borderRadius:10, padding:'10px 12px' }}>
+                      {sig.date && <p style={{ color:C.gold, fontSize:13, fontWeight:700, margin:'0 0 4px' }}>Date : {new Date(sig.date).toLocaleDateString('fr', { day:'2-digit', month:'long', year:'numeric' })}</p>}
+                      {sig.details && <p style={{ color:C.text, fontSize:12, lineHeight:1.5, margin:0 }}>{sig.details}</p>}
+                    </div>
+                  )}
+
+                  {/* Dans son clip → présentiel (date) ou challenge (bouton) */}
+                  {sig.type === 'clip' && sig.sousType === 'presentiel' && (
+                    <div style={{ background:'rgba(0,200,83,0.08)', borderRadius:10, padding:'10px 12px' }}>
+                      {sig.date && <p style={{ color:'#00c853', fontSize:13, fontWeight:700, margin:'0 0 4px' }}>Tournage le {new Date(sig.date).toLocaleDateString('fr', { day:'2-digit', month:'long', year:'numeric' })}</p>}
+                      {sig.details && <p style={{ color:C.text, fontSize:12, lineHeight:1.5, margin:0 }}>{sig.details}</p>}
+                    </div>
+                  )}
+                  {sig.type === 'clip' && sig.sousType === 'challenge' && (
+                    <div>
+                      {sig.details && <p style={{ color:C.text, fontSize:12, lineHeight:1.5, margin:'0 0 10px', background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px 10px' }}>{sig.details}</p>}
+                      <button onClick={() => { window.location.href = `/decouvrir?action=challenge&artiste=${encodeURIComponent(sig.artistEmail)}&sig=${sig.id}`; }}
+                        style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#fb923c,#f0730c)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+                        {sig.statutChallenge === 'realise' ? 'Challenge réalisé ✓' : 'Faire mon challenge'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Signature Spot → formulaire nom+slogan à remplir */}
+                  {sig.type === 'spot' && (
+                    sig.statutSpot === 'rempli' ? (
+                      <div style={{ background:'rgba(245,200,76,0.08)', borderRadius:10, padding:'10px 12px' }}>
+                        <p style={{ color:C.gold, fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Nom à chanter : {sig.spotNom}</p>
+                        {sig.spotSlogan && <p style={{ color:C.text, fontSize:12, margin:0 }}>Slogan : {sig.spotSlogan}</p>}
+                      </div>
+                    ) : (
+                      <button onClick={() => { setSpotModal(sig); setSpotNom(''); setSpotSlogan(''); }}
+                        style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#F5C84C,#e0a800)', color:'#1a2340', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+                        Indiquer mon nom à chanter
+                      </button>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div style={{ marginBottom:16 }}>
           <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Vos badges</p>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -9628,6 +9867,36 @@ function ProfilPage() {
         </div>
 
         {/* Modal recharge profil */}
+        {/* MODAL — formulaire Signature Spot (nom + slogan) */}
+        {spotModal && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+            onClick={() => setSpotModal(null)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
+              <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', margin:'0 0 4px' }}>Votre nom dans la musique</p>
+              <p style={{ color:'#8098b8', fontSize:13, margin:'0 0 16px', lineHeight:1.5 }}>
+                {spotModal.artistName} va citer votre nom dans une prochaine musique. Indiquez le nom et le slogan à chanter.
+              </p>
+              <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Nom à chanter *</label>
+              <input value={spotNom} onChange={e => setSpotNom(e.target.value)}
+                placeholder="Ex : Guy le Boss"
+                style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:12, boxSizing:'border-box' as any }} />
+              <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Slogan (optionnel)</label>
+              <input value={spotSlogan} onChange={e => setSpotSlogan(e.target.value)}
+                placeholder="Ex : Le patron du game"
+                style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:16, boxSizing:'border-box' as any }} />
+              <button onClick={envoyerSpot} disabled={!spotNom.trim()}
+                style={{ width:'100%', padding:13, borderRadius:10, border:'none', background: spotNom.trim() ? 'linear-gradient(135deg,#F5C84C,#e0a800)' : '#e0e0e0', color:'#1a2340', fontWeight:800, fontSize:14, cursor: spotNom.trim()?'pointer':'default' }}>
+                Envoyer à l'artiste
+              </button>
+              <button onClick={() => setSpotModal(null)}
+                style={{ width:'100%', marginTop:8, padding:11, borderRadius:10, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
         {rechargeModalProfil && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
             onClick={() => setRechargeModalProfil(null)}>
