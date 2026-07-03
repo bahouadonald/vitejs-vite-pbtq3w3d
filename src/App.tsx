@@ -603,14 +603,14 @@ const INFO_DEVISE: Record<string, { sym: string, dec: number }> = {
   EUR:{ sym:'', dec:2 }, USD:{ sym:'$', dec:2 }, CAD:{ sym:'C$', dec:2 }, GBP:{ sym:'', dec:2 }, CHF:{ sym:'CHF', dec:2 },
 };
 
-// ── CONCOURS KIFS — paliers de récompenses par défaut (configurables depuis l'admin) ──
-// type 'cash' = montant en FCFA · type 'objet' = récompense physique (voiture...)
+// ── RÉMUNÉRATION KIFS — paliers de récompenses par défaut (configurables depuis l'admin) ──
+// Règle : 100 kifs = 1 FCFA. Cette rémunération s'ajoute aux autres revenus de l'artiste.
 const PALIERS_CONCOURS_DEFAUT = [
-  { kifs: 10000000,   type: 'cash',  valeur: 100000,  label: '100 000 F CFA', icone: '🥉' },
-  { kifs: 50000000,   type: 'cash',  valeur: 500000,  label: '500 000 F CFA', icone: '🥈' },
-  { kifs: 100000000,  type: 'cash',  valeur: 1000000, label: '1 000 000 F CFA', icone: '🥇' },
-  { kifs: 500000000,  type: 'objet', valeur: 0,       label: 'Voiture berline', icone: '🚗' },
-  { kifs: 1000000000, type: 'objet', valeur: 0,       label: 'Voiture 4×4', icone: '🚙' },
+  { kifs: 10000000,   type: 'cash', valeur: 100000,   label: '100 000 F CFA',   icone: '🥉' },
+  { kifs: 50000000,   type: 'cash', valeur: 500000,   label: '500 000 F CFA',   icone: '🥈' },
+  { kifs: 100000000,  type: 'cash', valeur: 1000000,  label: '1 000 000 F CFA', icone: '🥇' },
+  { kifs: 500000000,  type: 'cash', valeur: 5000000,  label: '5 000 000 F CFA', icone: '🏆' },
+  { kifs: 1000000000, type: 'cash', valeur: 10000000, label: '10 000 000 F CFA', icone: '👑' },
 ];
 
 const formatOscart = (oscart: number, devise: 'fcfa'|'eur'|'usd' = 'fcfa') => {
@@ -1194,10 +1194,9 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
               <div style={{ width:32, height:32, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
                 {c.userPhoto ? <img src={c.userPhoto} style={{ width:32, height:32, borderRadius:99 }} alt="" /> : c.userName?.[0]?.toUpperCase()}
               </div>
-              <div style={{ flex:1 }}>
-                <p style={{ fontWeight:700, fontSize:12, color:'#4da6ff', marginBottom:2 }}>{c.userName}</p>
+              <div style={{ flex:1, minWidth:0 }}>
                 {editCommentId === c.id ? (
-                  <div style={{ display:'flex', gap:6, marginTop:4 }}>
+                  <div style={{ display:'flex', gap:6 }}>
                     <input value={editCommentText} onChange={e => setEditCommentText(e.target.value)}
                       style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:8, padding:'6px 10px', color:'#fff', fontSize:13, outline:'none' }} />
                     <button onClick={async () => {
@@ -1209,32 +1208,33 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
                       style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:12, cursor:'pointer' }}>Annuler</button>
                   </div>
                 ) : (
-                  <p style={{ fontSize:13, color:'#dde4f5', lineHeight:1.5 }}>{c.text}</p>
+                  <div style={{ display:'inline-block', background:'rgba(255,255,255,0.06)', borderRadius:16, padding:'8px 12px', maxWidth:'100%' }}>
+                    <span style={{ fontWeight:700, fontSize:12.5, color:'#eaf2ff', display:'block', marginBottom:1 }}>{c.userName}</span>
+                    <span style={{ fontSize:13, color:'#dde4f5', lineHeight:1.4, wordBreak:'break-word' }}>{c.text}</span>
+                  </div>
                 )}
-                <div style={{ display:'flex', gap:10, marginTop:4 }}>
-                  <p style={{ fontSize:10, color:'#4a5878' }}>{new Date(c.createdAt).toLocaleDateString('fr')}</p>
-                  {/* Tout le monde de connecté peut répondre */}
+                <div style={{ display:'flex', gap:14, marginTop:3, paddingLeft:12, alignItems:'center' }}>
+                  <span style={{ fontSize:10, color:'#4a5878' }}>{new Date(c.createdAt).toLocaleDateString('fr')}</span>
                   <button onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); }}
-                    style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                    style={{ fontSize:11, color:'#8098b8', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0 }}>
                     Répondre
                   </button>
                   {user && c.userId === user.uid && (
                     <>
                       <button onClick={() => { setEditCommentId(c.id); setEditCommentText(c.text); }}
-                        style={{ fontSize:10, color:'#4da6ff', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                        style={{ fontSize:11, color:'#8098b8', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0 }}>
                         Modifier
                       </button>
                       <button onClick={async () => { if (window.confirm('Supprimer ce commentaire ?')) await deleteDoc(doc(db,'commentaires',c.id)); }}
-                        style={{ fontSize:10, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                        style={{ fontSize:11, color:'#f04a6a', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0 }}>
                         Supprimer
                       </button>
                     </>
                   )}
-                  {/* L'admin peut supprimer n'importe quel commentaire */}
                   {user && user.email === ADMIN_EMAIL && c.userId !== user.uid && (
                     <button onClick={async () => { if (window.confirm('Supprimer ce commentaire (admin) ?')) await deleteDoc(doc(db,'commentaires',c.id)); }}
-                      style={{ fontSize:10, color:'#f04a6a', background:'none', border:'none', cursor:'pointer', padding:0 }}>
-                      Supprimer (admin)
+                      style={{ fontSize:11, color:'#f04a6a', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                      Supprimer
                     </button>
                   )}
                 </div>
@@ -4886,7 +4886,7 @@ function ConcoursConfigTab() {
 
   return (
     <div style={S.card}>
-      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Paliers du Concours Kiffs</h3>
+      <h3 style={{ margin:'0 0 6px', color:'#1a2340', fontSize:18 }}>Paliers de la Rémunération Kiffs</h3>
       <p style={{ color:'#5a7090', fontSize:13, margin:'0 0 18px', lineHeight:1.5 }}>
         Modifiez librement les paliers de kiffs et les prix associes. Les artistes voient ces recompenses
         dans leur tableau de bord. Type "cash" = montant en FCFA, Type "objet" = recompense physique.
@@ -4920,7 +4920,7 @@ function ConcoursConfigTab() {
             </div>
           </div>
           <label style={S.lbl}>Libelle affiche</label>
-          <input style={S.inp} value={p.label} onChange={e => majPalier(i, 'label', e.target.value)} placeholder="Ex : 100 000 F CFA ou Voiture berline" />
+          <input style={S.inp} value={p.label} onChange={e => majPalier(i, 'label', e.target.value)} placeholder="Ex : 100 000 F CFA" />
         </div>
       ))}
 
@@ -5767,7 +5767,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
       <div style={{ borderBottom: '1px solid #dce6f7', padding: '0 12px', display: 'flex', background: '#ffffff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         <button style={{...tabStyle(tab === 'qrcodes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('qrcodes')}>QR Codes ({qrcodes.length})</button>
         <button style={{...tabStyle(tab === 'puboscart'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('puboscart')}>💰 Pub Oscart</button>
-        <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Concours</button>
+        <button style={{...tabStyle(tab === 'concours'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('concours')}>🏆 Rémunération</button>
         <button style={{...tabStyle(tab === 'inscriptions'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('inscriptions')}>📝 Inscriptions</button>
         <button style={{...tabStyle(tab === 'notifsedu'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('notifsedu')}>Notifs à tous</button>
         {estSuperAdmin(user?.email) && <button style={{...tabStyle(tab === 'motsdepasse'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('motsdepasse')}>🔑 Mots de passe</button>}
@@ -7848,7 +7848,7 @@ function ConcoursKifsArtiste({ kifsRecus, gainsKiffementsOscart, gainsTelecharge
       {/* CONCOURS KIFS — paliers de prix */}
       <div style={{ ...S.card, padding:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-          <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:0 }}>🏆 Concours Kiffs</p>
+          <p style={{ color:'#1a2340', fontSize:16, fontWeight:800, margin:0 }}>🏆 Rémunération Kiffs</p>
           <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{kifsRecus.toLocaleString()} kiffs</span>
         </div>
         <p style={{ color:'#5a7090', fontSize:12, margin:'0 0 16px' }}>
