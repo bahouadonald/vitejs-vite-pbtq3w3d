@@ -6583,7 +6583,7 @@ function ArtistPage() {
   const logout = async () => { await signOut(auth); };
 
   if (view === 'dashboard' && user) return (
-    <div style={{ ...S.bg, minHeight: '100vh', overflowX:'hidden', width:'100%', maxWidth:'100vw' }}>
+    <div style={{ minHeight: '100vh', overflowX:'hidden', width:'100%', maxWidth:'100vw', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         .vente-row:hover{background:#eaf1ff!important}
@@ -6592,7 +6592,7 @@ function ArtistPage() {
       `}</style>
 
       {/* HEADER */}
-      <div style={{ background:'#ffffff', borderBottom:'1px solid #dce6f7', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50, gap:8 }}>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50, gap:8 }}>
         <Logo size="sm" />
         <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flexShrink:1 }}>
           {unreadVentes > 0 && (
@@ -6600,13 +6600,13 @@ function ArtistPage() {
               {unreadVentes} new
             </span>
           )}
-          <span style={{ color:'#5a7090', fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{stats.artistName || user.email}</span>
+          <span style={{ color:'#a9bedc', fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{stats.artistName || user.email}</span>
           <button style={{...S.btn2, flexShrink:0}} onClick={async () => await signOut(auth)}>Déconnexion</button>
         </div>
       </div>
 
       {/* TABS */}
-      <div style={{ borderBottom:'1px solid #dce6f7', padding:'0 12px', display:'flex', background:'#ffffff', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+      <div style={{ borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 12px', display:'flex', background:'rgba(22,27,39,0.6)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         <button style={{...tabStyle(dashTab==='stats'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('stats')}>Stats</button>
         <button style={{...tabStyle(dashTab==='publier'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('publier')}>Enregistrer</button>
         <button style={{...tabStyle(dashTab==='mot'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('mot')}>Mon Mood</button>
@@ -9648,6 +9648,12 @@ function ProfilPage() {
   const [spotModal, setSpotModal] = useState<any>(null); // signature Spot à remplir (nom+slogan)
   const [spotNom, setSpotNom] = useState('');
   const [spotSlogan, setSpotSlogan] = useState('');
+  // Édition du profil (photo + pseudo)
+  const [editProfil, setEditProfil] = useState(false);
+  const [pseudoEdit, setPseudoEdit] = useState('');
+  const [photoEdit, setPhotoEdit] = useState('');
+  const [uploadPhoto, setUploadPhoto] = useState(false);
+  const [savingProfil, setSavingProfil] = useState(false);
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -9690,6 +9696,40 @@ function ProfilPage() {
     } catch(e) { console.error(e); }
   };
 
+  // Ouvrir l'édition du profil (pré-remplir avec les valeurs actuelles)
+  const ouvrirEditProfil = () => {
+    setPseudoEdit(user?.displayName || '');
+    setPhotoEdit(user?.photoURL || '');
+    setEditProfil(true);
+  };
+  // Upload de la photo de profil sur Cloudinary
+  const uploadPhotoProfil = async (f: File) => {
+    setUploadPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', f); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method:'POST', body: fd });
+      const data = await res.json();
+      if (data.secure_url) setPhotoEdit(data.secure_url);
+    } catch(e) { console.error(e); }
+    setUploadPhoto(false);
+  };
+  // Enregistrer le profil (pseudo + photo)
+  const sauvegarderProfil = async () => {
+    if (!user) return;
+    setSavingProfil(true);
+    try {
+      await updateProfile(user, {
+        displayName: pseudoEdit.trim() || user.displayName || '',
+        photoURL: photoEdit || user.photoURL || '',
+      });
+      // Rafraîchir l'affichage local
+      setUser({ ...user, displayName: pseudoEdit.trim(), photoURL: photoEdit });
+      setEditProfil(false);
+    } catch(e) { console.error(e); }
+    setSavingProfil(false);
+  };
+
   const envoyerProjet = async () => {
     if (!projetForm.nom || !projetForm.whatsapp) return;
     await addDoc(collection(db,'demandes_production'), {
@@ -9727,7 +9767,11 @@ function ProfilPage() {
           <div style={{ display:'inline-block', padding:'4px 14px', borderRadius:99, background:'rgba(245,200,76,0.12)', border:'1px solid rgba(245,200,76,0.3)', marginBottom:6 }}>
             <span style={{ color:C.gold, fontSize:12, fontWeight:700 }}>Niveau {Math.max(1, Math.floor((likes + kiffements) / 10) + 1)}</span>
           </div>
-          <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>Membre depuis 2026</p>
+          <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 10px' }}>Membre depuis 2026</p>
+          <button onClick={ouvrirEditProfil}
+            style={{ padding:'7px 18px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            Modifier mon profil
+          </button>
         </div>
 
         {/* VOTRE IMPACT */}
@@ -9867,6 +9911,48 @@ function ProfilPage() {
         </div>
 
         {/* Modal recharge profil */}
+        {/* MODAL — édition du profil (photo + pseudo) */}
+        {editProfil && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+            onClick={() => setEditProfil(false)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
+              <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', margin:'0 0 16px' }}>Modifier mon profil</p>
+
+              {/* Photo */}
+              <div style={{ textAlign:'center', marginBottom:16 }}>
+                <label style={{ cursor:'pointer', display:'inline-block' }}>
+                  {photoEdit ? (
+                    <img src={photoEdit} alt="" style={{ width:90, height:90, borderRadius:99, objectFit:'cover', border:'3px solid #1a6bff' }} />
+                  ) : (
+                    <div style={{ width:90, height:90, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, fontWeight:800, color:'#fff', margin:'0 auto' }}>
+                      {pseudoEdit?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" style={{ display:'none' }}
+                    onChange={e => e.target.files?.[0] && uploadPhotoProfil(e.target.files[0])} />
+                </label>
+                <p style={{ color:'#1a6bff', fontSize:12, fontWeight:600, marginTop:8 }}>{uploadPhoto ? 'Upload...' : 'Toucher pour changer la photo'}</p>
+              </div>
+
+              {/* Pseudo */}
+              <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Pseudonyme</label>
+              <input value={pseudoEdit} onChange={e => setPseudoEdit(e.target.value)}
+                placeholder="Votre nom d'affichage"
+                style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:16, boxSizing:'border-box' as any }} />
+
+              <button onClick={sauvegarderProfil} disabled={savingProfil || uploadPhoto}
+                style={{ width:'100%', padding:13, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#4da6ff)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+                {savingProfil ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+              <button onClick={() => setEditProfil(false)}
+                style={{ width:'100%', marginTop:8, padding:11, borderRadius:10, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* MODAL — formulaire Signature Spot (nom + slogan) */}
         {spotModal && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
