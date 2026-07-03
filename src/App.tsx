@@ -7759,6 +7759,7 @@ function ZikothequePage({ user }: { user: any }) {
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
@@ -7956,12 +7957,12 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:"#1a2340" }}>Notifications</h2>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:C.text }}>Notifications</h2>
 
       {/* KIFFEMENTS REÇUS — groupés par mélomane */}
       {fans.length > 0 && (
         <div style={{ marginBottom:20 }}>
-          <p style={{ color:"#5a7090", fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
           {fans.map((f, i) => (
             <div key={i} style={{ ...S.card, marginBottom:10, cursor:'pointer' }}
               onClick={() => setOpenFan(openFan === f.nom ? null : f.nom)}>
@@ -7992,7 +7993,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
       {/* AUTRES NOTIFS (commentaires, mots validés...) */}
       {notifs.length > 0 && (
         <div>
-          <p style={{ color:"#5a7090", fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
+          <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
           {notifs.map(n => (
             <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
               <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
@@ -8012,7 +8013,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
       {rien && (
         <div style={{ textAlign:'center', padding:40 }}>
           <p style={{ fontSize:36, marginBottom:10 }}>🔔</p>
-          <p style={{ color:"#5a7090", fontSize:14 }}>Aucune notification pour l'instant</p>
+          <p style={{ color:C.textSoft, fontSize:14 }}>Aucune notification pour l'instant</p>
         </div>
       )}
     </div>
@@ -9174,15 +9175,364 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
   );
 }
 
+// ─────────────────────────────────────────────
+// PAGE MES CHALLENGES — /challenge (onglet du bas)
+// ─────────────────────────────────────────────
+function MesChallengesPage() {
+  const [user, setUser] = useState<any>(null);
+  const [mesChallenges, setMesChallenges] = useState<any[]>([]);
+  const [contenus, setContenus] = useState<any[]>([]);
+  const [creer, setCreer] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      if (!u) { window.location.href = '/ziko'; return; }
+      setUser(u);
+      // Mes challenges (temps réel)
+      onSnapshot(
+        query(collection(db,'challenges'), where('userId','==',u.uid)),
+        snap => { setMesChallenges(snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a:any,b:any)=>(b.createdAt||'').localeCompare(a.createdAt||''))); setLoading(false); },
+        () => setLoading(false)
+      );
+    });
+    // Contenus (pour choisir la chanson dans la création)
+    const unsub = onSnapshot(
+      query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
+      snap => setContenus(snap.docs.map(d => ({id:d.id,...d.data()})).filter((c:any)=>c.masque!==true))
+    );
+    return () => unsub();
+  }, []);
+
+  const telecharger = (url: string, nom: string) => {
+    const a = document.createElement('a');
+    a.href = url; a.download = nom || 'mon-challenge.mp4'; a.target = '_blank';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:90 }}>
+      {creer && (
+        <ChallengePage artisteEmail="" sigId="" contenus={contenus} onClose={() => setCreer(false)} />
+      )}
+
+      {/* HEADER */}
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
+        <Logo size="sm" />
+        <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Challenge</p>
+      </div>
+
+      <div style={{ maxWidth:500, margin:'0 auto', padding:'20px 16px' }}>
+        <button onClick={() => setCreer(true)}
+          style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:20, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span style={{ fontSize:18 }}>🎬</span> Créer un challenge
+        </button>
+
+        <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:12 }}>Mes challenges</p>
+
+        {loading ? (
+          <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:30 }}>Chargement...</p>
+        ) : mesChallenges.length === 0 ? (
+          <div style={{ textAlign:'center', padding:40 }}>
+            <p style={{ fontSize:36, marginBottom:10 }}>🎬</p>
+            <p style={{ color:C.textSoft, fontSize:14 }}>Vous n'avez pas encore de challenge</p>
+            <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Créez votre premier challenge sur la musique de votre artiste !</p>
+          </div>
+        ) : (
+          mesChallenges.map(ch => (
+            <div key={ch.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, overflow:'hidden', marginBottom:16 }}>
+              <video src={ch.videoUrl} controls playsInline style={{ width:'100%', maxHeight:400, background:'#000' }} />
+              <div style={{ padding:'12px 14px' }}>
+                <p style={{ color:'#eaf2ff', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>🎵 {ch.chansonTitre} · {ch.artisteNom}</p>
+                <div style={{ display:'flex', gap:14, margin:'8px 0' }}>
+                  <span style={{ color:'#f04a6a', fontSize:12, fontWeight:700 }}>♥ {ch.kiffements || 0} kiffements</span>
+                  <span style={{ color:C.textSoft, fontSize:12 }}>↗ {ch.partages || 0} partages</span>
+                </div>
+                <button onClick={() => telecharger(ch.videoUrl, `challenge-${ch.chansonTitre||'video'}.mp4`)}
+                  style={{ width:'100%', padding:11, borderRadius:10, border:'1px solid rgba(90,176,255,0.4)', background:'rgba(90,176,255,0.1)', color:'#5BB0FF', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  Télécharger ma vidéo
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* NAV BAS */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+        {[
+          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
+          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
+          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+        ].map((item) => (
+          <a key={item.path} href={item.path}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              {item.svg}
+              {item.path === '/notifications' && <BadgeNotif />}
+            </span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE CHALLENGE — façon TikTok (filmer sur la musique de l'artiste)
+// ─────────────────────────────────────────────
+function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmail: string, sigId: string, contenus: any[], onClose: () => void }) {
+  // Étapes : 1=choix artiste, 2=choix chanson, 3=filmer, 4=publier
+  const [etape, setEtape] = useState(artisteEmail ? 2 : 1);
+  const [artiste, setArtiste] = useState(artisteEmail);
+  const [recherche, setRecherche] = useState('');
+  const [chanson, setChanson] = useState<any>(null);
+  const [videoBlob, setVideoBlob] = useState<Blob|null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [recording, setRecording] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [msg, setMsg] = useState('');
+  const videoRef = useRef<HTMLVideoElement|null>(null);
+  const audioRef = useRef<HTMLAudioElement|null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder|null>(null);
+  const streamRef = useRef<MediaStream|null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  // Liste des artistes distincts (à partir des contenus officiels)
+  const artistes = Array.from(new Set(contenus.map((c:any) => c.artistEmail || c.artist).filter(Boolean)))
+    .map((email:any) => {
+      const c = contenus.find((x:any) => (x.artistEmail || x.artist) === email);
+      return { email, nom: c?.artist || c?.artistName || String(email).split('@')[0] };
+    })
+    .filter(a => !recherche || a.nom.toLowerCase().includes(recherche.toLowerCase()));
+
+  // Chansons de l'artiste sélectionné (contenus audio/clip officiels)
+  const chansonsArtiste = contenus.filter((c:any) => (c.artistEmail || c.artist) === artiste);
+
+  // Démarrer la caméra + jouer la musique par-dessus
+  const demarrerFilm = async () => {
+    setMsg('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'user' }, audio: true });
+      streamRef.current = stream;
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+      // Lancer la musique de la chanson pendant le film
+      if (chanson?.fichierUrl || chanson?.url || chanson?.audioUrl) {
+        const src = chanson.fichierUrl || chanson.url || chanson.audioUrl;
+        if (audioRef.current) { audioRef.current.src = src; audioRef.current.currentTime = 0; audioRef.current.play().catch(()=>{}); }
+      }
+      // Enregistrer
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type:'video/webm' });
+        setVideoBlob(blob);
+        setVideoUrl(URL.createObjectURL(blob));
+        // Arrêter caméra + musique
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        if (audioRef.current) audioRef.current.pause();
+        setEtape(4);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch (e:any) {
+      setMsg('Impossible d\'accéder à la caméra. Autorisez l\'accès dans votre navigateur.');
+    }
+  };
+
+  const arreterFilm = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  };
+
+  // Publier le challenge
+  const publier = async () => {
+    if (!videoBlob) return;
+    setPublishing(true); setMsg('');
+    try {
+      const user = auth.currentUser;
+      // Upload vidéo sur Cloudinary
+      const fd = new FormData();
+      fd.append('file', videoBlob); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`, { method:'POST', body: fd });
+      const data = await res.json();
+      if (!data.secure_url) { setMsg('Erreur upload vidéo.'); setPublishing(false); return; }
+
+      const artisteNom = artistes.find(a => a.email === artiste)?.nom || String(artiste).split('@')[0];
+      // Enregistrer le challenge (tag automatique de l'artiste)
+      await addDoc(collection(db,'challenges'), {
+        userId: user?.uid, userName: user?.displayName || 'Mélomane', userEmail: user?.email || '',
+        userPhoto: user?.photoURL || '',
+        artisteEmail: artiste, artisteNom,
+        chansonTitre: chanson?.label || chanson?.titre || '',
+        chansonId: chanson?.id || '',
+        videoUrl: data.secure_url,
+        sigId: sigId || '',
+        kiffements: 0, partages: 0,
+        createdAt: new Date().toISOString(),
+      });
+      // Si le challenge vient d'une signature → marquer réalisé + notifier l'artiste
+      if (sigId) {
+        try {
+          await updateDoc(doc(db,'signatures', sigId), { statutChallenge: 'realise' });
+        } catch {}
+      }
+      // Notifier l'artiste (tag auto)
+      await addDoc(collection(db,'notifications'), {
+        to: artiste, role:'artiste', type:'challenge_realise',
+        text: `${user?.displayName || 'Un mélomane'} a réalisé un challenge sur votre chanson "${chanson?.label || chanson?.titre || ''}" !`,
+        createdAt: new Date().toISOString(), lu:false,
+      });
+      setMsg('Challenge publié ! Votre artiste a été notifié.');
+      setTimeout(() => onClose(), 1800);
+    } catch (e:any) {
+      setMsg('Erreur : ' + (e?.message || ''));
+    }
+    setPublishing(false);
+  };
+
+  // Partage externe
+  const partager = async (reseau: string) => {
+    const url = window.location.origin + '/decouvrir';
+    const texte = `Regarde mon challenge sur Doniel Zik !`;
+    if (navigator.share) {
+      try { await navigator.share({ title:'Mon challenge', text: texte, url }); return; } catch {}
+    }
+    let lien = '';
+    if (reseau === 'facebook') lien = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    if (reseau === 'youtube') lien = 'https://www.youtube.com/upload';
+    if (reseau === 'tiktok') lien = 'https://www.tiktok.com/upload';
+    if (lien) window.open(lien, '_blank');
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:C.bgDeep, zIndex:10000, overflowY:'auto', fontFamily:"'DM Sans',sans-serif", color:C.text }}>
+      {/* En-tête */}
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', height:56, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:5 }}>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:C.text, fontSize:22, cursor:'pointer' }}>×</button>
+        <p style={{ fontWeight:800, fontSize:15, color:C.gold, margin:0 }}>Faire mon challenge</p>
+        <span style={{ width:22 }} />
+      </div>
+
+      <div style={{ maxWidth:500, margin:'0 auto', padding:'20px 16px' }}>
+        {/* ÉTAPE 1 — Choisir l'artiste */}
+        {etape === 1 && (
+          <>
+            <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Sélectionnez votre artiste</p>
+            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 16px' }}>Cherchez ou choisissez l'artiste dont vous voulez utiliser une chanson.</p>
+            <input value={recherche} onChange={e => setRecherche(e.target.value)}
+              placeholder="Rechercher un artiste..."
+              style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:14, marginBottom:14, boxSizing:'border-box' as any }} />
+            {artistes.length === 0 ? (
+              <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:20 }}>Aucun artiste trouvé.</p>
+            ) : artistes.map((a:any) => (
+              <button key={a.email} onClick={() => { setArtiste(a.email); setEtape(2); }}
+                style={{ width:'100%', textAlign:'left', padding:'14px 16px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:C.text, fontSize:15, fontWeight:700, cursor:'pointer', marginBottom:8 }}>
+                {a.nom}
+              </button>
+            ))}
+          </>
+        )}
+
+        {/* ÉTAPE 2 — Choisir la chanson */}
+        {etape === 2 && (
+          <>
+            <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Choisissez la chanson</p>
+            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 16px' }}>La musique jouera pendant que vous filmez votre vidéo.</p>
+            {chansonsArtiste.length === 0 ? (
+              <p style={{ color:C.textSoft, fontSize:13, textAlign:'center', padding:20 }}>Cet artiste n'a pas encore de chanson disponible.</p>
+            ) : chansonsArtiste.map((c:any) => (
+              <button key={c.id} onClick={() => { setChanson(c); setEtape(3); }}
+                style={{ width:'100%', textAlign:'left', padding:'14px 16px', borderRadius:12, border:`1px solid ${chanson?.id===c.id?C.gold:'rgba(255,255,255,0.08)'}`, background:'rgba(255,255,255,0.04)', color:C.text, fontSize:15, fontWeight:700, cursor:'pointer', marginBottom:8, display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:20 }}>🎵</span> {c.label || c.titre || 'Chanson'}
+              </button>
+            ))}
+            {!artisteEmail && (
+              <button onClick={() => setEtape(1)}
+                style={{ width:'100%', marginTop:8, padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
+                Changer d'artiste
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ÉTAPE 3 — Filmer */}
+        {etape === 3 && (
+          <>
+            <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Filmez votre challenge</p>
+            <p style={{ color:C.textSoft, fontSize:13, margin:'0 0 14px' }}>Sur "{chanson?.label || chanson?.titre}". La musique joue pendant le film.</p>
+            <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'60vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
+              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              {recording && (
+                <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:8, height:8, borderRadius:99, background:'#fff', animation:'pulse 1s infinite' }} /> REC
+                </div>
+              )}
+            </div>
+            <audio ref={audioRef} />
+            {!recording ? (
+              <button onClick={demarrerFilm}
+                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                Commencer à filmer
+              </button>
+            ) : (
+              <button onClick={arreterFilm}
+                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'#fff', color:'#f04a6a', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                Arrêter et voir
+              </button>
+            )}
+            {msg && <p style={{ color:'#f04a6a', fontSize:12, textAlign:'center', marginTop:10 }}>{msg}</p>}
+          </>
+        )}
+
+        {/* ÉTAPE 4 — Aperçu + Publier */}
+        {etape === 4 && (
+          <>
+            <p style={{ fontWeight:800, fontSize:17, margin:'0 0 14px' }}>Votre challenge</p>
+            {videoUrl && (
+              <video src={videoUrl} controls playsInline style={{ width:'100%', borderRadius:16, maxHeight:'55vh', marginBottom:14, background:'#000' }} />
+            )}
+            <button onClick={publier} disabled={publishing}
+              style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#1a6bff,#4da6ff)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+              {publishing ? 'Publication...' : 'Publier mon challenge'}
+            </button>
+            <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+              <button onClick={() => partager('tiktok')} style={{ flex:1, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>TikTok</button>
+              <button onClick={() => partager('facebook')} style={{ flex:1, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>Facebook</button>
+              <button onClick={() => partager('youtube')} style={{ flex:1, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>Shorts</button>
+            </div>
+            <button onClick={() => { setVideoBlob(null); setVideoUrl(''); setEtape(3); }}
+              style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
+              Refaire la vidéo
+            </button>
+            {msg && <p style={{ color: msg.includes('publié') ? '#00c853' : '#f04a6a', fontSize:13, textAlign:'center', marginTop:10 }}>{msg}</p>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DecouvrirPage() {
   const [contenus, setContenus] = useState<any[]>([]);
   const [motsArtistes, setMotsArtistes] = useState<any[]>([]);
   const [sorties, setSorties] = useState<any[]>([]);
+  const [challenges, setChallenges] = useState<any[]>([]);
   const [typeFiltre, setTypeFiltre] = useState('tous');
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [loading, setLoading] = useState(true);
   const [sortieCiblee, setSortieCiblee] = useState('');
   const [banniereKiff, setBanniereKiff] = useState(false);
+  const [challengeMode, setChallengeMode] = useState(false);
+  const [challengeArtiste, setChallengeArtiste] = useState('');
+  const [challengeSig, setChallengeSig] = useState('');
   const user = auth.currentUser;
 
   // Lien partagé vers une sortie précise : ?sortie=ID → onglet Bientôt + mise en évidence
@@ -9192,6 +9542,12 @@ function DecouvrirPage() {
     if (sid) { setTypeFiltre('bientot'); setSortieCiblee(sid); }
     // Venu d'une notif éducative "envoyez des kiffements" → afficher une bannière d'invitation
     if (params.get('action') === 'kiffement') { setBanniereKiff(true); }
+    // Venu d'une signature "Faire mon challenge" ou du bouton Challenge → page Challenge
+    if (params.get('action') === 'challenge') {
+      setChallengeMode(true);
+      setChallengeArtiste(params.get('artiste') || '');
+      setChallengeSig(params.get('sig') || '');
+    }
   }, []);
 
   // Quand les sorties sont chargées et qu'une cible existe, scroller dessus
@@ -9235,7 +9591,12 @@ function DecouvrirPage() {
       query(collection(db, 'sorties'), orderBy('createdAt','desc')),
       snap => setSorties(snap.docs.map(d => ({id:d.id,...d.data()})))
     );
-    return () => { unsub(); unsubMots(); unsubSorties(); };
+    const unsubChallenges = onSnapshot(
+      query(collection(db, 'challenges'), orderBy('createdAt','desc')),
+      snap => setChallenges(snap.docs.map(d => ({id:d.id,...d.data()}))),
+      () => {}
+    );
+    return () => { unsub(); unsubMots(); unsubSorties(); unsubChallenges(); };
   }, []);
 
   // Réinitialiser catégorie quand on change de type
@@ -9255,6 +9616,15 @@ function DecouvrirPage() {
   });
 
   return (
+    <>
+    {challengeMode && (
+      <ChallengePage
+        artisteEmail={challengeArtiste}
+        sigId={challengeSig}
+        contenus={contenus}
+        onClose={() => { setChallengeMode(false); window.history.replaceState({}, '', '/decouvrir'); }}
+      />
+    )}
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
 
       {/* HEADER */}
@@ -9353,6 +9723,42 @@ function DecouvrirPage() {
           )
         )}
 
+        {/* RUBRIQUE CHALLENGE — vidéos de challenges + bouton Créer */}
+        {typeFiltre === 'challenge' && (
+          <div>
+            <button onClick={() => { setChallengeArtiste(''); setChallengeSig(''); setChallengeMode(true); }}
+              style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:16, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>🎬</span> Créer mon challenge
+            </button>
+            {challenges.length === 0 ? (
+              <div style={{ textAlign:'center', padding:40 }}>
+                <p style={{ fontSize:36, marginBottom:10 }}>🎬</p>
+                <p style={{ color:'#4a5878', fontSize:14 }}>Aucun challenge pour l'instant</p>
+                <p style={{ color:'#4a5878', fontSize:12, marginTop:4 }}>Soyez le premier à créer votre challenge !</p>
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {challenges.map(ch => (
+                  <div key={ch.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, overflow:'hidden' }}>
+                    <video src={ch.videoUrl} controls playsInline style={{ width:'100%', aspectRatio:'9/16', objectFit:'cover', background:'#000' }} />
+                    <div style={{ padding:'8px 10px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                        {ch.userPhoto ? <img src={ch.userPhoto} style={{ width:20, height:20, borderRadius:99, objectFit:'cover' }} alt="" /> : <div style={{ width:20, height:20, borderRadius:99, background:'linear-gradient(135deg,#1a6bff,#4f46e5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:700 }}>{ch.userName?.[0]?.toUpperCase()}</div>}
+                        <span style={{ color:'#eaf2ff', fontSize:11, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ch.userName}</span>
+                      </div>
+                      <p style={{ color:'#8098b8', fontSize:10, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🎵 {ch.chansonTitre} · {ch.artisteNom}</p>
+                      <div style={{ display:'flex', gap:10, marginTop:6 }}>
+                        <span style={{ color:'#f04a6a', fontSize:11, fontWeight:700 }}>♥ {ch.kiffements || 0}</span>
+                        <span style={{ color:'#8098b8', fontSize:11 }}>↗ {ch.partages || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* MOODS — affichés dans le fil uniquement sur l'onglet Actu & Mood */}
         {typeFiltre !== 'bientot' && !loading && typeFiltre === 'tous' && motsArtistes.map(m => (
           <div key={'mood-'+m.id} style={{ marginBottom:16, background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.22)', borderRadius:16, overflow:'hidden', padding:'14px 16px' }}>
@@ -9366,7 +9772,7 @@ function DecouvrirPage() {
           </div>
         ))}
 
-        {typeFiltre === 'bientot' ? null : loading ? (
+        {(typeFiltre === 'bientot' || typeFiltre === 'challenge') ? null : loading ? (
           <div style={{ textAlign:'center', padding:40, color:'#4a5878' }}>Chargement...</div>
         ) : contenusFiltres.length === 0 && !(typeFiltre === 'tous' && motsArtistes.length > 0) ? (
           <div style={{ textAlign:'center', padding:40 }}>
@@ -9439,6 +9845,7 @@ function DecouvrirPage() {
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
@@ -9453,6 +9860,7 @@ function DecouvrirPage() {
         ))}
       </div>
     </div>
+    </>
   );
 }
 
@@ -9611,6 +10019,7 @@ function NotificationsPage() {
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
@@ -10061,6 +10470,7 @@ function ProfilPage() {
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
           { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
           { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
         ].map((item) => (
@@ -13654,6 +14064,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/decouvrir" element={<DecouvrirPage />} />
+        <Route path="/challenge" element={<MesChallengesPage />} />
         <Route path="/profil" element={<ProfilPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/studio" element={<DzStudioPage />} />
