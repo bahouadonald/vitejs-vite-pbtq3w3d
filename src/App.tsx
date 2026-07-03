@@ -487,14 +487,10 @@ function RechargeDeviseSelector({ fcfa }: { fcfa: number }) {
 // SIGNATURES ARTISTE — ce que l'artiste peut offrir
 // ─────────────────────────────────────────────
 const SIGNATURES = [
-  { id:"selfie", label:"Selfie dédié", desc:"Une photo dédicacée spécialement pour vous", color:"#1a6bff", image:"/signatures/selfie.png", detail:"L'artiste prend une vraie photo de lui, rien que pour vous, avec une dédicace personnalisée à votre nom. Un souvenir unique et personnel pour immortaliser votre soutien." },
-  { id:"invitation", label:"Invitation événement", desc:"Entrée gratuite à un concert ou une prestation", color:"#7c3aed", image:"/signatures/invitation.png", detail:"Recevez une invitation personnelle pour assister gratuitement à un concert, un showcase ou une prestation de votre artiste. Vivez la musique en direct, aux premières loges." },
-  { id:"vip", label:"Accès VIP", desc:"Accès coulisses et rencontre privée avec l'artiste", color:"#ffd700", image:"/signatures/vip.png", detail:"Le privilège ultime : accédez aux coulisses et rencontrez votre artiste en personne. Un moment privé et exclusif réservé à ses plus grands soutiens." },
-  { id:"clip", label:"Dans son clip", desc:"Votre visage apparaît dans le prochain clip", color:"#00c853", image:"/signatures/clip.png", detail:"Votre visage apparaît dans le prochain clip vidéo de l'artiste ! Devenez une partie de son œuvre et montrez à tous que vous avez participé à sa création." },
-  { id:"mention", label:"Mention spéciale", desc:"Dédicace vidéo personnalisée rien que pour vous", color:"#f04a6a", image:"/signatures/mention.png", detail:"L'artiste enregistre une vidéo de dédicace personnalisée, rien que pour vous, où il cite votre nom et vous remercie pour votre soutien. Un message vidéo unique à garder." },
-  { id:"spot", label:"Signature Spot", desc:"Votre nom cité et chanté dans une prochaine musique de l'artiste", color:"#F5C84C", image:"/signatures/spot.png", detail:"La consécration : votre nom est cité et chanté (\"spotté\") dans une prochaine musique de l'artiste ! Entrez à jamais dans son œuvre. Réservée aux soutiens les plus généreux." },
-  { id:"challenge", label:"Challenge clip", desc:"Votre challenge sera intégré dans un clip", color:"#fb923c", image:"/signatures/challenge.png", detail:"Proposez un challenge (danse, geste, mot...) et l'artiste l'intègre dans l'un de ses clips. Votre idée devient virale grâce à votre artiste." },
-  { id:"tournage", label:"Tournage avec vous", desc:"Participez à un tournage avec l'artiste", color:"#1a6bff", image:"/signatures/tournage.png", detail:"Participez en personne au tournage d'un clip ou d'une vidéo de l'artiste. Vivez l'envers du décor et partagez un moment de création inoubliable à ses côtés." },
+  { id:"dedicace", label:"Dédicace vidéo", desc:"Une vidéo personnalisée rien que pour vous", color:"#f04a6a", image:"/signatures/dedicace.png", detail:"L'artiste enregistre une vidéo personnalisée où il cite votre nom, vous remercie pour votre soutien et vous adresse un message rien que pour vous." },
+  { id:"vip", label:"Accès VIP", desc:"Entrée gratuite, coulisses et rencontre avec l'artiste", color:"#ffd700", image:"/signatures/vip.png", detail:"Vous bénéficiez d'une entrée gratuite à un concert ou une prestation de l'artiste, avec un accès aux coulisses et une rencontre en personne avec lui." },
+  { id:"clip", label:"Dans son clip", desc:"Vous intégrez le clip de l'artiste", color:"#00c853", image:"/signatures/clip.png", detail:"Vous intégrez le clip de l'artiste : votre présence, votre danse ou votre challenge sont intégrés dans son prochain clip ou vidéo." },
+  { id:"spot", label:"Signature Spot", desc:"Votre nom chanté dans une prochaine musique", color:"#F5C84C", image:"/signatures/spot.png", detail:"Votre nom est cité et chanté dans une prochaine musique de l'artiste. Vous entrez dans son œuvre, réservée à ceux qui offrent le plus de kiffements." },
 ];
 
 function SignatureShowcase({ onClose }: { onClose: () => void }) {
@@ -697,6 +693,42 @@ function useDeviseLocale() {
 // ── Notifications système du navigateur (B) ──
 // Écoute les nouvelles notifications de l'utilisateur connecté et affiche une notification
 // système (même si l'app est en arrière-plan). Demande la permission au premier usage.
+// Compte les notifications non lues du mélomane (perso + générales) pour le badge de la barre.
+function useNotifsNonLues(userEmail?: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!userEmail) { setCount(0); return; }
+    let perso = 0, gen = 0;
+    const maj = () => setCount(perso + gen);
+    const unsubP = onSnapshot(
+      query(collection(db,'notifications'), where('to','==',userEmail)),
+      snap => { perso = snap.docs.filter(d => d.data().role !== 'artiste' && d.data().lu !== true).length; maj(); }
+    );
+    const unsubG = onSnapshot(
+      query(collection(db,'notifications'), where('to','==','all')),
+      snap => { gen = snap.docs.filter(d => d.data().lu !== true).length; maj(); }
+    );
+    return () => { unsubP(); unsubG(); };
+  }, [userEmail]);
+  return count;
+}
+
+// Petit badge rouge avec le nombre de notifications non lues (pour la barre de navigation).
+function BadgeNotif() {
+  const [email, setEmail] = useState<string | undefined>(auth.currentUser?.email || undefined);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, u => setEmail(u?.email || undefined));
+    return () => unsub();
+  }, []);
+  const n = useNotifsNonLues(email);
+  if (!n) return null;
+  return (
+    <span style={{ position:'absolute', top:-4, right:-8, minWidth:16, height:16, padding:'0 4px', borderRadius:99, background:'#f04a6a', color:'#fff', fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, boxSizing:'border-box' }}>
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
 function usePushNotifications(userEmail?: string) {
   const dejaVus = useRef<Set<string>>(new Set());
   const premierChargement = useRef(true);
@@ -7616,7 +7648,10 @@ function ZikothequePage({ user }: { user: any }) {
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            {item.svg}
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              {item.svg}
+              {item.path === '/notifications' && <BadgeNotif />}
+            </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -9278,7 +9313,10 @@ function DecouvrirPage() {
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            {item.svg}
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              {item.svg}
+              {item.path === '/notifications' && <BadgeNotif />}
+            </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -9430,7 +9468,10 @@ function NotificationsPage() {
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            {item.svg}
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              {item.svg}
+              {item.path === '/notifications' && <BadgeNotif />}
+            </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -9670,7 +9711,10 @@ function ProfilPage() {
         ].map((item) => (
           <a key={item.path} href={item.path}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            {item.svg}
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              {item.svg}
+              {item.path === '/notifications' && <BadgeNotif />}
+            </span>
             <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
           </a>
         ))}
@@ -12250,17 +12294,17 @@ function PWAInstallBanner() {
             <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6 }}>Installer Doniel Zik</p>
             <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez votre méthode d'installation :</p>
 
-            {/* Android — APK direct */}
+            {/* Android — installation PWA (plus d'APK direct) */}
             {isAndroid && (
               <div style={{ background:'#f0f9ff', borderRadius:12, padding:'14px 16px', marginBottom:12, border:'2px solid #1a6bff' }}>
-                <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:8 }}>Android — Application native</p>
+                <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:8 }}>Android — Installer l'application</p>
                 <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:12 }}>
-                  Téléchargez l'application Android directement — pas besoin du Play Store.
+                  Installez Doniel Zik directement sur votre écran d'accueil, comme une vraie application.
                 </p>
-                <a href="/doniel-zik.apk" download="Doniel-Zik.apk"
-                  style={{ display:'block', width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none', boxSizing:'border-box' as any }}>
-                  Télécharger l'APK Android (1,5 MB)
-                </a>
+                <button onClick={() => { if ((window as any).installPWA) { (window as any).installPWA(); } else { alert('Ouvrez le menu de votre navigateur (⋮) puis appuyez sur "Installer l\'application" ou "Ajouter à l\'écran d\'accueil".'); } }}
+                  style={{ display:'block', width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', textAlign:'center' }}>
+                  Installer l'application
+                </button>
               </div>
             )}
 
@@ -12315,7 +12359,7 @@ function PWAInstallBanner() {
         <div style={{ flex:1 }}>
           <p style={{ fontWeight:800, fontSize:14, color:'#1a2340', marginBottom:2 }}>Installer Doniel Zik</p>
           <p style={{ color:'#8098b8', fontSize:12 }}>
-            {isAndroid ? 'App Android native · Hors-ligne' : 'Accès rapide · Fonctionne hors-ligne'}
+            {isAndroid ? 'Accès rapide · Fonctionne hors-ligne' : 'Accès rapide · Fonctionne hors-ligne'}
           </p>
         </div>
         <div style={{ display:'flex', gap:8, flexShrink:0 }}>
@@ -12324,10 +12368,10 @@ function PWAInstallBanner() {
             Plus tard
           </button>
           {isAndroid ? (
-            <a href="/doniel-zik.apk" download="Doniel-Zik.apk"
-              style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite', textDecoration:'none', display:'flex', alignItems:'center' }}>
-              Télécharger
-            </a>
+            <button id="pwa-install-btn" onClick={handleInstall}
+              style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite' }}>
+              Installer
+            </button>
           ) : (
             <button id="pwa-install-btn" onClick={handleInstall}
               style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#1a6bff', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', animation:'pulse2 2s ease infinite' }}>
