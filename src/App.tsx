@@ -8949,6 +8949,7 @@ function CompteRebours({ dateSortie }: { dateSortie?: string }) {
 // CARTE SORTIE — rubrique "Sortie officielle" avec réservation
 // ─────────────────────────────────────────────
 function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
+  const navigate = useNavigate();
   const [reserve, setReserve] = useState(false);
   const [reserving, setReserving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -9165,7 +9166,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         </div>
 
         {/* Bouton ENVOYER UN KIFFEMENT (soutenir l'artiste avant la sortie) */}
-        <button onClick={() => { window.location.href = `/decouvrir?sortie=${s.id}`; }}
+        <button onClick={() => { navigate(`/decouvrir?sortie=${s.id}`); }}
           style={{ width:'100%', marginTop:8, padding:12, borderRadius:10, border:`1px solid ${C.gold}`, background:'rgba(245,200,76,0.1)', color:C.gold, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           ENVOYER UN KIFFEMENT
@@ -9842,6 +9843,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
 }
 
 function DecouvrirPage() {
+  const navigate = useNavigate();
   const [contenus, setContenus] = useState<any[]>([]);
   const [motsArtistes, setMotsArtistes] = useState<any[]>([]);
   const [sorties, setSorties] = useState<any[]>([]);
@@ -10047,7 +10049,7 @@ function DecouvrirPage() {
         {/* RUBRIQUE CHALLENGE — vidéos de challenges + bouton Créer */}
         {typeFiltre === 'challenge' && (
           <div>
-            <button onClick={() => { window.location.href = '/challenge'; }}
+            <button onClick={() => { navigate('/challenge'); }}
               style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:16, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               <span style={{ fontSize:18 }}>🎬</span> Créer mon challenge
             </button>
@@ -10192,6 +10194,7 @@ function DecouvrirPage() {
 // PAGE NOTIFICATIONS MÉLOMANE
 // ─────────────────────────────────────────────
 function NotificationsPage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [notifsPerso, setNotifsPerso] = useState<any[]>([]);
   const [notifsGen, setNotifsGen] = useState<any[]>([]);
@@ -10271,18 +10274,18 @@ function NotificationsPage() {
               markRead(n.id);
               if (n.type === 'reservation') { setExpanded(x => ({ ...x, [n.id]: !x[n.id] })); return; }
               // Signature reçue → profil (section Mes signatures)
-              if (n.type === 'signature') { window.location.href = '/profil'; return; }
+              if (n.type === 'signature') { navigate('/profil'); return; }
               // Rediriger vers l'endroit concerné selon le type de notification
-              if (n.qrId) { window.location.href = `/fan?id=${n.qrId}`; return; }
+              if (n.qrId) { navigate(`/fan?id=${n.qrId}`); return; }
               if (n.type === 'educative' || n.type === 'generale' || n.type === 'activite') {
                 // Si la notif parle de kiffements → bannière d'invitation ; sinon Découvrir
                 if (n.text && n.text.toLowerCase().includes('kiffement')) {
-                  window.location.href = '/decouvrir?action=kiffement'; return;
+                  navigate('/decouvrir?action=kiffement'); return;
                 }
-                window.location.href = '/decouvrir'; return;
+                navigate('/decouvrir'); return;
               }
               if (n.type === 'tuto_artiste' || n.type === 'kiff' || n.type === 'zikotheque' || n.type === 'telechargement') {
-                window.location.href = '/decouvrir'; return;
+                navigate('/decouvrir'); return;
               }
             }}
             style={{ display:'flex', gap:14, padding:'14px 16px', borderRadius:14, marginBottom:8, background: n.lu ? 'rgba(255,255,255,0.02)' : 'rgba(30,111,255,0.08)', border:`1px solid ${n.lu ? 'rgba(255,255,255,0.04)' : 'rgba(30,111,255,0.2)'}`, cursor:'pointer' }}>
@@ -10324,7 +10327,7 @@ function NotificationsPage() {
                 </button>
               )}
               {n.type === 'educative' && (
-                <button onClick={(e) => { e.stopPropagation(); window.location.href = '/decouvrir'; }}
+                <button onClick={(e) => { e.stopPropagation(); navigate('/decouvrir'); }}
                   style={{ marginTop:8, padding:'10px 16px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#F5C84C,#e0a82e)', color:'#1a2340', fontWeight:800, fontSize:13, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8 }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
                   Envoyer un kiffement
@@ -10363,6 +10366,7 @@ function NotificationsPage() {
 // PROFIL PAGE
 // ─────────────────────────────────────────────
 function ProfilPage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [likes, setLikes] = useState(0);
   const [kiffements, setKiffements] = useState(0);
@@ -10561,7 +10565,7 @@ function ProfilPage() {
                   {sig.type === 'clip' && sig.sousType === 'challenge' && (
                     <div>
                       {sig.details && <p style={{ color:C.text, fontSize:12, lineHeight:1.5, margin:'0 0 10px', background:'rgba(255,255,255,0.03)', borderRadius:8, padding:'8px 10px' }}>{sig.details}</p>}
-                      <button onClick={() => { window.location.href = `/decouvrir?action=challenge&artiste=${encodeURIComponent(sig.artistEmail)}&sig=${sig.id}`; }}
+                      <button onClick={() => { navigate(`/decouvrir?action=challenge&artiste=${encodeURIComponent(sig.artistEmail)}&sig=${sig.id}`); }}
                         style={{ width:'100%', padding:12, borderRadius:10, border:'none', background:'linear-gradient(135deg,#fb923c,#f0730c)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
                         {sig.statutChallenge === 'realise' ? 'Challenge réalisé ✓' : 'Faire mon challenge'}
                       </button>
