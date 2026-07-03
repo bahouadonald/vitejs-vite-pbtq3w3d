@@ -713,6 +713,25 @@ function useNotifsNonLues(userEmail?: string): number {
   return count;
 }
 
+// Lien interne à navigation instantanée (sans rechargement de page).
+// S'utilise comme une balise <a> : <Lien href="/decouvrir">...</Lien>
+function Lien({ href, children, style, className, onClick }: { href: string, children?: any, style?: any, className?: string, onClick?: (e:any)=>void }) {
+  const navigate = useNavigate();
+  return (
+    <a href={href} className={className} style={style}
+      onClick={(e) => {
+        if (onClick) onClick(e);
+        // Navigation instantanée pour les liens internes (pas de nouvel onglet / touche spéciale)
+        if (!e.defaultPrevented && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+          e.preventDefault();
+          navigate(href);
+        }
+      }}>
+      {children}
+    </a>
+  );
+}
+
 // Petit badge rouge avec le nombre de notifications non lues (pour la barre de navigation).
 function BadgeNotif() {
   const [email, setEmail] = useState<string | undefined>(auth.currentUser?.email || undefined);
@@ -2770,7 +2789,7 @@ function FanPage() {
             )}
 
             {/* ── DÉCOUVRIR D'AUTRES ARTISTES — garder le visiteur sur la plateforme ── */}
-            <a href="/decouvrir" style={{ textDecoration:'none', display:'block', marginBottom:20 }}>
+            <Lien href="/decouvrir" style={{ textDecoration:'none', display:'block', marginBottom:20 }}>
               <div style={{ padding:'16px 20px', borderRadius:14, background:'linear-gradient(135deg,#1e6fff,#4da6ff)', display:'flex', alignItems:'center', gap:14, boxShadow:'0 4px 20px rgba(30,111,255,0.35)' }}>
                 <span style={{ fontSize:24, background:'rgba(255,255,255,0.18)', borderRadius:10, padding:'6px 9px' }}>🎵</span>
                 <div style={{ flex:1 }}>
@@ -2779,7 +2798,7 @@ function FanPage() {
                 </div>
                 <span style={{ fontSize:20, color:'#fff' }}>→</span>
               </div>
-            </a>
+            </Lien>
 
             {/* FOOTER */}
             <div style={{ textAlign:'center' }}>
@@ -7213,9 +7232,9 @@ function LandingPage() {
         <a href="/ziko" className="dz-hero-btn" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
           Accéder à ma Zikothèque
         </a>
-        <a href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:15, borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
+        <Lien href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:15, borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
           Découvrir des contenus
-        </a>
+        </Lien>
       </div>
 
       {/* SERVICES */}
@@ -7238,7 +7257,7 @@ function LandingPage() {
 
       {/* FOOTER */}
       <div style={{ textAlign:'center', padding:'20px 0 40px' }}>
-        <a href="/admin" style={{ color:'rgba(255,255,255,0.08)', fontSize:10, textDecoration:'none' }}>·</a>
+        <Lien href="/admin" style={{ color:'rgba(255,255,255,0.08)', fontSize:10, textDecoration:'none' }}>·</Lien>
       </div>
     </div>
   );
@@ -7323,10 +7342,10 @@ function UserAuthPage() {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(240,244,251,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #dce6f7', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 50 }}>
         <Logo size="sm" />
         <div style={{ display: 'flex', gap: 6 }}>
-          <a href="/artiste" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</a>
-          <a href="/annonceurs" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</a>
-          <a href="/commercial" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>👔 Commercial</a>
-          <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'transparent', fontSize: 6, fontWeight: 600, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
+          <Lien href="/artiste" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>🎤 Artiste</Lien>
+          <Lien href="/annonceurs" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📢 Annonceurs</Lien>
+          <Lien href="/commercial" style={{ background: '#eaf1ff', border: '1px solid #c8d8ef', borderRadius: 8, padding: '5px 10px', color: '#1a6bff', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>👔 Commercial</Lien>
+          <Lien href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'transparent', fontSize: 6, fontWeight: 600, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</Lien>
         </div>
       </div>
       <div style={{ width: '100%', maxWidth: 380, padding: '52px 16px 0' }}>
@@ -7558,9 +7577,9 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <a href="/decouvrir" style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 20, padding: '6px 12px', color: '#4da6ff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Découvrir</a>
+          <Lien href="/decouvrir" style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 20, padding: '6px 12px', color: '#4da6ff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Découvrir</Lien>
           {user.email === ADMIN_EMAIL && (
-            <a href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</a>
+            <Lien href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</Lien>
           )}
           <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', cursor: 'pointer', fontSize: 11 }}>Déco</button>
         </div>
@@ -7579,9 +7598,9 @@ function ZikothequePage({ user }: { user: any }) {
             <p style={{ color: '#4a5878', fontSize: 14, lineHeight: 1.8, marginBottom: 28 }}>
               Scannez une pochette musicale ou recevez un lien<br />pour ajouter vos premiers albums.
             </p>
-            <a href="/" style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 12, background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+            <Lien href="/" style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 12, background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
               Découvrir de la musique
-            </a>
+            </Lien>
           </div>
         ) : (
           <div style={{ animation: 'fadeUp .4s ease' }}>
@@ -12053,7 +12072,7 @@ function RejoindrePage() {
               Ou appelle le <a href={`tel:+${CONTACT_TEL}`} style={{ color:C.blueLite, fontWeight:700, textDecoration:'none' }}>+{CONTACT_TEL}</a>
             </p>
           </div>
-          <a href="/decouvrir" style={{ color:C.textSoft, fontSize:13, textDecoration:'none' }}>← Découvrir la plateforme</a>
+          <Lien href="/decouvrir" style={{ color:C.textSoft, fontSize:13, textDecoration:'none' }}>← Découvrir la plateforme</Lien>
         </div>
       </div>
     );
@@ -12222,7 +12241,7 @@ function AProposPage() {
     <div style={{ ...S.bg, minHeight:'100vh' }}>
       <div style={{ background:'#fff', borderBottom:'1px solid #dce6f7', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
         <Logo size="sm" />
-        <a href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', fontWeight:700 }}>← Accueil</a>
+        <Lien href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', fontWeight:700 }}>← Accueil</Lien>
       </div>
       <div style={{ maxWidth:720, margin:'0 auto', padding:'32px 20px 60px' }}>
         <h1 style={{ fontFamily:'serif', fontSize:30, fontWeight:800, marginBottom:8, color:'#1a6bff' }}>À propos de Doniel Zik</h1>
@@ -12238,11 +12257,11 @@ function AProposPage() {
           <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.6, marginBottom:16 }}>
             Que vous soyez artiste, mélomane ou annonceur, Doniel Zik vous ouvre les portes d'un nouvel écosystème créatif. Faites vivre votre talent, soutenez vos artistes préférés, ou faites connaître votre activité auprès d'une communauté active et engagée.
           </p>
-          <a href="/decouvrir" style={{ display:'inline-block', padding:'12px 24px', borderRadius:99, background:'#1a6bff', color:'#fff', textDecoration:'none', fontWeight:700, fontSize:14 }}>Découvrir la plateforme</a>
+          <Lien href="/decouvrir" style={{ display:'inline-block', padding:'12px 24px', borderRadius:99, background:'#1a6bff', color:'#fff', textDecoration:'none', fontWeight:700, fontSize:14 }}>Découvrir la plateforme</Lien>
         </div>
         <div style={{ marginTop:30, textAlign:'center', display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap' }}>
-          <a href="/conditions" style={{ color:'#8098b8', fontSize:13 }}>Conditions d'utilisation</a>
-          <a href="/privacy" style={{ color:'#8098b8', fontSize:13 }}>Confidentialité</a>
+          <Lien href="/conditions" style={{ color:'#8098b8', fontSize:13 }}>Conditions d'utilisation</Lien>
+          <Lien href="/privacy" style={{ color:'#8098b8', fontSize:13 }}>Confidentialité</Lien>
         </div>
         <p style={{ color:'#b0c4d8', fontSize:12, textAlign:'center', marginTop:24 }}>
           Doniel Zik — Édité par BDE SARL · Abidjan, Côte d'Ivoire · doniel.art
@@ -12257,7 +12276,7 @@ function ConditionsPage() {
     <div style={{ ...S.bg, minHeight: '100vh' }}>
       <div style={{ background: '#ffffff', borderBottom: '1px solid #dce6f7', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <Logo size="sm" />
-        <a href="/artiste" style={{ color: '#1a6bff', fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>← Retour</a>
+        <Lien href="/artiste" style={{ color: '#1a6bff', fontSize: 13, textDecoration: 'none', fontWeight: 700 }}>← Retour</Lien>
       </div>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
         <h1 style={{ fontFamily: 'serif', fontSize: 26, fontWeight: 800, marginBottom: 8, color: '#1a6bff' }}>
@@ -12805,7 +12824,7 @@ function DzStudioPage() {
           </button>
         </div>
         <p style={{ textAlign:'center', marginTop:16 }}>
-          <a href="/annonceurs" style={{ color:'#4a5878', fontSize:12, textDecoration:'none' }}>← Soumettre une nouvelle campagne</a>
+          <Lien href="/annonceurs" style={{ color:'#4a5878', fontSize:12, textDecoration:'none' }}>← Soumettre une nouvelle campagne</Lien>
         </p>
       </div>
     </div>
@@ -12882,9 +12901,9 @@ function DzStudioPage() {
               <div style={{ textAlign:'center', padding:'40px 20px', background:'rgba(255,255,255,0.03)', borderRadius:14, border:'1px solid rgba(255,255,255,0.06)' }}>
                 <p style={{ fontSize:36, marginBottom:10 }}>📢</p>
                 <p style={{ color:'#4a5878', fontSize:13, marginBottom:14 }}>Aucune campagne pour l'instant</p>
-                <a href="/annonceurs" style={{ display:'inline-block', padding:'12px 24px', borderRadius:12, background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:14, textDecoration:'none' }}>
+                <Lien href="/annonceurs" style={{ display:'inline-block', padding:'12px 24px', borderRadius:12, background:'linear-gradient(135deg,#ffd700,#ff9500)', color:'#000', fontWeight:800, fontSize:14, textDecoration:'none' }}>
                   Créer ma première campagne →
-                </a>
+                </Lien>
               </div>
             ) : campagnes.map(c => (
               <div key={c.id} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${c.status==='active'?'rgba(77,255,154,0.3)':c.status==='rejected'?'rgba(240,74,106,0.3)':'rgba(255,200,0,0.25)'}`, borderRadius:16, padding:16, marginBottom:14 }}>
@@ -12962,9 +12981,9 @@ function DzStudioPage() {
               </div>
             ))}
 
-            <a href="/annonceurs" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'14px', borderRadius:14, border:'1px solid rgba(255,200,0,0.25)', background:'rgba(255,200,0,0.06)', color:'#ffd700', textDecoration:'none', fontWeight:700, fontSize:14, boxSizing:'border-box' }}>
+            <Lien href="/annonceurs" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'14px', borderRadius:14, border:'1px solid rgba(255,200,0,0.25)', background:'rgba(255,200,0,0.06)', color:'#ffd700', textDecoration:'none', fontWeight:700, fontSize:14, boxSizing:'border-box' }}>
               ➕ Créer une nouvelle campagne
-            </a>
+            </Lien>
           </div>
         )}
 
@@ -13196,7 +13215,7 @@ function HomePage() {
           {[['Artistes','/artiste'],['Annonceurs','/annonceurs'],['Zikothèque','/ziko']].map(([l,h]) => (
             <a key={h} href={h} className="nav-link" style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, transition: 'all .2s' }}>{l}</a>
           ))}
-          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 99, boxShadow: '0 4px 20px #1a6bff44', transition: 'all .2s' }}>Démarrer →</a>
+          <Lien href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700, padding: '9px 20px', borderRadius: 99, boxShadow: '0 4px 20px #1a6bff44', transition: 'all .2s' }}>Démarrer →</Lien>
         </div>
       </nav>
 
@@ -13235,12 +13254,12 @@ function HomePage() {
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', animation: 'fadeUp .6s ease .4s both', padding: '0 16px' }}>
-          <a href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, fontWeight: 700, boxShadow: '0 6px 30px #1a6bff55', transition: 'all .25s', display: 'inline-block' }}>
+          <Lien href="/artiste" className="btn-glow" style={{ background: 'linear-gradient(135deg, #1a6bff, #0050d0)', color: '#fff', textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, fontWeight: 700, boxShadow: '0 6px 30px #1a6bff55', transition: 'all .25s', display: 'inline-block' }}>
             🎤 Je suis artiste
-          </a>
-          <a href="/annonceurs" style={{ textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', color: '#fff', background: 'rgba(255,255,255,0.05)', display: 'inline-block', fontWeight: 600, transition: 'all .25s', backdropFilter: 'blur(10px)' }}>
+          </Lien>
+          <Lien href="/annonceurs" style={{ textDecoration: 'none', padding: '16px 28px', fontSize: 16, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', color: '#fff', background: 'rgba(255,255,255,0.05)', display: 'inline-block', fontWeight: 600, transition: 'all .25s', backdropFilter: 'blur(10px)' }}>
             📢 Je veux annoncer
-          </a>
+          </Lien>
         </div>
       </section>
 
@@ -13321,9 +13340,9 @@ function HomePage() {
         </p>
         <p style={{ color: '#b0c4d8', fontSize: 11 }}>
           © 2025 ·{' '}
-          <a href="/conditions" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>CGU</a> ·{' '}
-          <a href="/annonceurs" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>Annonceurs</a> ·{' '}
-          <a href="/admin" style={{ color: 'transparent', textDecoration: 'none', fontSize: 4, opacity: 0.05 }}>·</a>
+          <Lien href="/conditions" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>CGU</Lien> ·{' '}
+          <Lien href="/annonceurs" style={{ color: 'rgba(255,255,255,0.25)', textDecoration: 'underline' }}>Annonceurs</Lien> ·{' '}
+          <Lien href="/admin" style={{ color: 'transparent', textDecoration: 'none', fontSize: 4, opacity: 0.05 }}>·</Lien>
         </p>
       </footer>
     </div>
@@ -14089,9 +14108,9 @@ function PublicStreamPage() {
           <img src={LOGO_B64} alt="DZ" style={{ width: 36, opacity: 0.35, display: 'block', margin: '0 auto 6px' }} />
           <p style={{ color: 'rgba(100,140,200,0.2)', fontSize: 9, letterSpacing: 2, marginBottom: 14 }}>LA MUSIQUE. UN SCAN. UN MONDE.</p>
           <div style={{ display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap', marginBottom:10 }}>
-            <a href="/apropos" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>À propos</a>
-            <a href="/conditions" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Conditions d'utilisation</a>
-            <a href="/privacy" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Confidentialité</a>
+            <Lien href="/apropos" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>À propos</Lien>
+            <Lien href="/conditions" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Conditions d'utilisation</Lien>
+            <Lien href="/privacy" style={{ color:'#8098b8', fontSize:12, textDecoration:'none' }}>Confidentialité</Lien>
           </div>
           <p style={{ color:'rgba(100,140,200,0.3)', fontSize:11 }}>© 2026 Doniel Zik — BDE SARL · Abidjan, Côte d'Ivoire</p>
         </div>
@@ -14206,7 +14225,7 @@ function PrivacyPage() {
   return (
     <div style={{ minHeight:'100vh', background:'#f5f8ff', fontFamily:"'DM Sans',sans-serif", padding:'40px 20px' }}>
       <div style={{ maxWidth:640, margin:'0 auto' }}>
-        <a href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', display:'block', marginBottom:24 }}>← Retour</a>
+        <Lien href="/" style={{ color:'#1a6bff', fontSize:13, textDecoration:'none', display:'block', marginBottom:24 }}>← Retour</Lien>
         <h1 style={{ fontFamily:'serif', fontSize:26, fontWeight:900, color:'#1a2340', marginBottom:8 }}>Politique de confidentialité</h1>
         <p style={{ color:'#8098b8', fontSize:12, marginBottom:32 }}>Dernière mise à jour : juin 2026 · BDE SARL · doniel.art</p>
 
