@@ -9525,12 +9525,15 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   // URL audio de la chanson choisie
   const urlChanson = chanson?.fichierUrl || chanson?.url || chanson?.audioUrl || chanson?.fileUrl || (chanson?.files?.[0]?.url) || '';
 
-  // Quand on arrive à l'étape "régler la musique", charger la durée
+  // Quand on arrive à l'étape "régler la musique", charger la durée (sans bloquer)
   useEffect(() => {
     if (etape === 3 && urlChanson) {
+      // Valeur par défaut immédiate pour afficher le curseur tout de suite (pas d'attente)
+      setDureeMusique(prev => prev > 0 ? prev : 180);
       const a = document.createElement('audio');
       a.preload = 'metadata';
-      a.onloadedmetadata = () => { if (a.duration && isFinite(a.duration)) setDureeMusique(Math.floor(a.duration)); };
+      a.onloadedmetadata = () => { if (a.duration && isFinite(a.duration) && a.duration > 0) setDureeMusique(Math.floor(a.duration)); };
+      a.onerror = () => {}; // en cas d'échec, on garde la valeur par défaut
       a.src = urlChanson;
     }
   }, [etape, urlChanson]);
@@ -9557,17 +9560,29 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
 
       // 2) La musique de l'artiste (si le son n'est pas coupé)
       if (urlChanson && !sonCoupe) {
-        const musEl = new Audio(urlChanson);
+        const musEl = new Audio();
         musEl.crossOrigin = 'anonymous';
-        musEl.currentTime = musiqueDebut;
+        musEl.preload = 'auto';
+        musEl.src = urlChanson;
         musiqueElRef.current = musEl;
         try {
+          // Attendre que l'audio soit prêt à jouer (évite le son muet)
+          await new Promise<void>((resolve) => {
+            let fini = false;
+            const ok = () => { if (!fini) { fini = true; resolve(); } };
+            musEl.oncanplay = ok;
+            musEl.onloadeddata = ok;
+            musEl.onerror = ok;
+            setTimeout(ok, 2500); // sécurité : on n'attend jamais plus de 2,5s
+          });
+          try { musEl.currentTime = musiqueDebut; } catch {}
           const musSource = ctx.createMediaElementSource(musEl);
-          musSource.connect(dest);       // vers l'enregistrement
+          musSource.connect(dest);            // vers l'enregistrement
           musSource.connect(ctx.destination); // vers les haut-parleurs (pour entendre)
           await musEl.play().catch(()=>{});
         } catch {
-          // Si le mixage échoue (CORS), au moins jouer le son en direct
+          // Si le mixage Web Audio échoue (CORS), au moins jouer le son en direct
+          try { musEl.currentTime = musiqueDebut; } catch {}
           musEl.play().catch(()=>{});
         }
       }
@@ -9751,7 +9766,14 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                     <input type="range" min={0} max={Math.max(0, dureeMusique - 5)} value={musiqueDebut}
                       onChange={e => setMusiqueDebut(parseInt(e.target.value))}
                       style={{ width:'100%', accentColor:C.gold }} />
-                    <button onClick={() => { if (audioRef.current) { audioRef.current.src = urlChanson; audioRef.current.currentTime = musiqueDebut; audioRef.current.play().catch(()=>{}); setTimeout(()=>audioRef.current?.pause(), 5000); } }}
+                    <button onClick={() => {
+                        if (!audioRef.current) return;
+                        const a = audioRef.current;
+                        a.src = urlChanson;
+                        const lancer = () => { try { a.currentTime = musiqueDebut; } catch {} a.play().catch(()=>{}); setTimeout(()=>a.pause(), 5000); };
+                        if (a.readyState >= 2) lancer();
+                        else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; a.load(); }
+                      }}
                       style={{ marginTop:8, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background:'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
                       ▶ Écouter ce passage (5s)
                     </button>
