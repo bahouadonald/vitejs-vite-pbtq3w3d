@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { db, auth } from './firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
@@ -729,7 +729,7 @@ function useNotifsNonLues(userEmail?: string): number {
 
 // Lien interne à navigation instantanée (sans rechargement de page).
 // S'utilise comme une balise <a> : <Lien href="/decouvrir">...</Lien>
-function Lien({ href, children, style, className, onClick }: { href: string, children?: any, style?: any, className?: string, onClick?: (e:any)=>void }) {
+function Lien({ href, children, style, className, onClick, state }: { href: string, children?: any, style?: any, className?: string, onClick?: (e:any)=>void, state?: any }) {
   const navigate = useNavigate();
   return (
     <a href={href} className={className} style={style}
@@ -738,7 +738,7 @@ function Lien({ href, children, style, className, onClick }: { href: string, chi
         // Navigation instantanée pour les liens internes (pas de nouvel onglet / touche spéciale)
         if (!e.defaultPrevented && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
           e.preventDefault();
-          navigate(href);
+          navigate(href, state ? { state } : undefined);
         }
       }}>
       {children}
@@ -9488,6 +9488,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [msg, setMsg] = useState('');
   const [tempsEcoule, setTempsEcoule] = useState(0);        // secondes filmées
   const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
+  const [musiqueFin, setMusiqueFin] = useState(60);         // fin de l'extrait musique (secondes)
   const [dureeMusique, setDureeMusique] = useState(180);   // durée (180 par défaut, jamais bloquant)
   const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
   const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
@@ -9558,14 +9559,42 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     }
   }, [etape, urlChanson]);
 
+  // Allumer la caméra en APERÇU dès qu'on arrive à l'étape filmer (on se voit avant de filmer)
+  useEffect(() => {
+    if (etape !== 3) return;
+    let stream: MediaStream | null = null;
+    let annule = false;
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: cameraFace },
+          audio: false, // pas de micro en aperçu (évite le mode appel avant de filmer)
+        });
+        if (annule) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(()=>{}); }
+      } catch {}
+    })();
+    return () => {
+      annule = true;
+      // Ne pas couper si on est en train d'enregistrer
+      if (!recording && stream) stream.getTracks().forEach(t => t.stop());
+    };
+  }, [etape, cameraFace]); // se relance si on change de caméra
+
   // Démarrer la caméra + MIXER la musique dans l'enregistrement + minuteur + arrêt auto à 75s
   const demarrerFilm = async () => {
     setMsg('');
     try {
+      // Récupérer un flux caméra + micro (nouveau, avec audio pour l'enregistrement)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: cameraFace },
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       });
+      // Couper l'ancien flux d'aperçu s'il existe
+      if (streamRef.current && streamRef.current !== stream) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
 
@@ -9681,6 +9710,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         chansonTitre: chanson?.label || chanson?.titre || '',
         chansonId: chanson?.id || '',
         musiqueDebut,
+        musiqueFin,
         filtre,
         effet,
         videoUrl: data.secure_url,
@@ -9791,11 +9821,16 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                 <p style={{ color:C.gold, fontSize:13, fontWeight:800, margin:'0 0 8px' }}>🎵 {chanson?.label || chanson?.titre || 'Chanson'}</p>
                 {dureeMusique > 0 ? (
                   <>
-                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 6px' }}>
-                      La musique démarrera à <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span>
+                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 8px' }}>
+                      Extrait : <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span> à <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueFin/60)}:{String(musiqueFin%60).padStart(2,'0')}</span> <span style={{ color:'#8098b8' }}>({musiqueFin - musiqueDebut}s)</span>
                     </p>
+                    <label style={{ color:'#8098b8', fontSize:11, display:'block', marginBottom:2 }}>Début</label>
                     <input type="range" min={0} max={Math.max(0, dureeMusique - 5)} value={musiqueDebut}
-                      onChange={e => setMusiqueDebut(parseInt(e.target.value))}
+                      onChange={e => { const v = parseInt(e.target.value); setMusiqueDebut(v); if (musiqueFin <= v) setMusiqueFin(Math.min(dureeMusique, v + 15)); }}
+                      style={{ width:'100%', accentColor:C.gold, marginBottom:10 }} />
+                    <label style={{ color:'#8098b8', fontSize:11, display:'block', marginBottom:2 }}>Fin</label>
+                    <input type="range" min={0} max={dureeMusique} value={musiqueFin}
+                      onChange={e => { const v = parseInt(e.target.value); setMusiqueFin(v); if (v <= musiqueDebut) setMusiqueDebut(Math.max(0, v - 15)); }}
                       style={{ width:'100%', accentColor:C.gold }} />
                     <button onClick={() => {
                         if (!audioRef.current) return;
@@ -9808,14 +9843,16 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                           try { a.currentTime = musiqueDebut; } catch {}
                           a.play().then(() => {
                             setApercuJoue(true);
-                            setTimeout(() => { try { a.pause(); } catch {}; setApercuJoue(false); }, 5000);
+                            // S'arrêter à la fin de l'extrait choisi (max 5s d'aperçu)
+                            const dureeApercu = Math.min(5000, (musiqueFin - musiqueDebut) * 1000);
+                            setTimeout(() => { try { a.pause(); } catch {}; setApercuJoue(false); }, dureeApercu);
                           }).catch(() => { setMsg('Impossible de lire la musique (vérifiez votre connexion).'); });
                         };
                         if (a.readyState >= 2) lancer();
                         else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
                       }}
-                      style={{ marginTop:8, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                      {apercuJoue ? '⏸ Lecture en cours...' : '▶ Écouter ce passage (5s)'}
+                      style={{ marginTop:10, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                      {apercuJoue ? '⏸ Lecture en cours...' : '▶ Écouter ce passage'}
                     </button>
                   </>
                 ) : (
@@ -9841,7 +9878,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                 </>
               )}
             </div>
-            <audio ref={audioRef} />
+            <audio ref={audioRef} playsInline />
 
             {/* Options : caméra avant/arrière + couper le son */}
             {!recording && (
@@ -10081,7 +10118,7 @@ function DecouvrirPage() {
         const pool = candidats.length > 0 ? candidats : contenusFiltres.slice(0, 6);
         const hero = pool[Math.floor(Math.random() * pool.length)];
         return (
-          <Lien href={`/ecoute/${hero.publicLinkId}`} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210 }}>
+          <Lien href={`/ecoute/${hero.publicLinkId}`} state={{ contenu: hero }} style={{ display:'block', textDecoration:'none', margin:'4px 16px 20px', borderRadius:20, overflow:'hidden', position:'relative', height:210 }}>
             {hero.coverUrl ? (
               <img src={hero.coverUrl} alt={hero.label} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
             ) : (
@@ -10192,7 +10229,7 @@ function DecouvrirPage() {
           return (
           <div key={c.id} style={{ marginBottom:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16, overflow:'hidden' }}>
             {/* Média avec lecture automatique */}
-            <Lien href={`/ecoute/${c.publicLinkId}`} style={{ textDecoration:'none', display:'block' }}>
+            <Lien href={`/ecoute/${c.publicLinkId}`} state={{ contenu: c }} style={{ textDecoration:'none', display:'block' }}>
               {fileUrl ? (
                 <AutoPlayMedia fileUrl={fileUrl} isVideo={isVideo} coverUrl={c.coverUrl} label={c.label} publicLinkId={c.publicLinkId} />
               ) : c.coverUrl ? (
@@ -10233,7 +10270,7 @@ function DecouvrirPage() {
                 }} title="Partager" style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 </button>
-                <Lien href={`/ecoute/${c.publicLinkId}`}
+                <Lien href={`/ecoute/${c.publicLinkId}`} state={{ contenu: c }}
                   style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(30,111,255,0.2)', flexShrink:0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="#4da6ff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
                 </Lien>
@@ -14178,8 +14215,11 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
 // ─────────────────────────────────────────────
 function PublicStreamPage() {
   const { publicLinkId } = useParams<{ publicLinkId: string }>();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  // Données passées directement au clic (affichage instantané, sans attendre Firebase)
+  const preload = (location.state as any)?.contenu || null;
+  const [data, setData] = useState<any>(preload);
+  const [loading, setLoading] = useState(!preload); // si on a les données au clic, pas de chargement
   const [showTitres, setShowTitres] = useState(false);
   const [dlOpen, setDlOpen] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
@@ -14233,9 +14273,9 @@ function PublicStreamPage() {
       const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
       if (!snap.empty) {
         const d = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
-        setData(d);
-        setLoading(false); // Afficher TOUT DE SUITE (ne pas attendre les compteurs)
-        // Compter le Buzz EN ARRIÈRE-PLAN (ne bloque plus l'affichage)
+        setData((prev:any) => ({ ...(prev || {}), ...d })); // fusionne avec le preload (complète les infos manquantes)
+        setLoading(false);
+        // Compter le Buzz EN ARRIÈRE-PLAN
         updateDoc(doc(db, 'publicLinks', snap.docs[0].id), { visits: (d.visits || 0) + 1 }).catch(()=>{});
         getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',publicLinkId)))
           .then(dSnap => { if (!dSnap.empty) updateDoc(doc(db,'decouvrir',dSnap.docs[0].id),{ buzz:(dSnap.docs[0].data().buzz||0)+1 }).catch(()=>{}); })
