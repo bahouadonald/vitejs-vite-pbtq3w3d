@@ -2560,6 +2560,7 @@ function FanPage() {
       setStep('done');
     }
   };
+  void startDownload; // conservé pour usage futur (le bouton du haut a été retiré)
 
   return (
     <div style={{ minHeight: '100vh', background: C.bgDeep, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
@@ -2633,43 +2634,8 @@ function FanPage() {
               const isPrivateQR = (qrData.totalScans > 0) && !qrData.publicLinkId;
               const dlsEpuises = isPrivateQR && (qrData.usedScans || 0) >= (qrData.totalScans || 0);
 
-              if (isPrivateQR && !dlsEpuises) return (
-                /* QR privé avec scans restants = téléchargement gratuit */
-                <div style={{ marginBottom:20 }}>
-                  <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>⬇ Télécharger</p>
-                  {!downloaded ? (
-                    onSafari ? (
-                      <button onClick={() => { const f = document.createElement('iframe'); f.style.display='none'; f.src=window.location.href.replace('https://','googlechromes://'); document.body.appendChild(f); setTimeout(()=>{ document.body.removeChild(f); window.location.href='https://apps.apple.com/app/google-chrome/id535886823'; },2500); }}
-                        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 20px rgba(30,111,255,0.4)' }}>
-                        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>🌐</span>
-                        <div style={{ textAlign:'left' }}>
-                          <p style={{ margin:0, fontWeight:800 }}>Ouvrir dans Chrome</p>
-                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>Requis pour télécharger sur iPhone</p>
-                        </div>
-                      </button>
-                    ) : (
-                      <button id="btn-download" onClick={startDownload}
-                        style={{ width:'100%', padding:'15px 20px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#1e6fff,#0050d0)', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 24px rgba(30,111,255,0.45)' }}>
-                        <span style={{ fontSize:22, background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'4px 8px' }}>⬇</span>
-                        <div style={{ textAlign:'left' }}>
-                          <p style={{ margin:0, fontWeight:800 }}>{(qrData.files?.length||0)>1 ? "Télécharger l'album complet" : 'Télécharger'}</p>
-                          <p style={{ margin:0, fontSize:11, opacity:0.7 }}>
-                            {(qrData.totalScans||0) - (qrData.usedScans||0)} téléchargement{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''} gratuit{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''} restant{((qrData.totalScans||0)-(qrData.usedScans||0))>1?'s':''}
-                          </p>
-                        </div>
-                      </button>
-                    )
-                  ) : (
-                    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:14, background:'rgba(30,111,255,0.1)', border:'1px solid rgba(30,111,255,0.3)' }}>
-                      <span style={{ fontSize:22 }}>✅</span>
-                      <div>
-                        <p style={{ fontWeight:700, fontSize:14, color:'#4da6ff', margin:0 }}>Téléchargement effectué</p>
-                        <p style={{ color:'#4a5878', fontSize:11, margin:'2px 0 0' }}>Streaming illimité disponible ci-dessous</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
+              // Bouton "Télécharger l'album complet" du haut RETIRÉ (doublon) — seul le bouton Télécharger du bas est conservé
+              if (isPrivateQR && !dlsEpuises) return null;
 
               // DL épuisés ou lien public → AchatWidget (payant)
               return (
@@ -2738,7 +2704,9 @@ function FanPage() {
                           <p style={{ color:C.textSoft, fontSize:10, margin:'2px 0 0' }}>{formatSize(f.size||0)}</p>
                         </div>
                         <a href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                          style={{ color:C.blueLite, fontSize:18, textDecoration:'none', padding:'4px 6px' }}>⬇</a>
+                          style={{ display:'flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:13, fontWeight:700, textDecoration:'none', padding:'9px 14px', borderRadius:10, flexShrink:0, boxShadow:'0 2px 10px rgba(10,132,255,0.4)' }}>
+                          <span style={{ fontSize:15 }}>⬇</span> Télécharger
+                        </a>
                       </div>
                     ))}
                   </div>
@@ -9496,7 +9464,15 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
   const videoRef = useRef<HTMLVideoElement|null>(null);
-  const audioRef = useRef<HTMLAudioElement|null>(null);
+  const canvasRef = useRef<HTMLCanvasElement|null>(null);
+  const rafRef = useRef<any>(null);
+  const figeRef = useRef<HTMLCanvasElement|null>(null);    // image figée du Time Warp
+  const scanPrevRef = useRef<number>(0);                    // position précédente de la ligne
+  const croquisRef = useRef<HTMLCanvasElement|null>(null);  // tampon du croquis
+  const t0Ref = useRef<number>(0);
+  const filtreRef = useRef('aucun');
+  const effetRef = useRef('aucun');
+  const audioRef = useRef<any>(null); // lecteur d'aperçu (lit audio ET vidéo)
   const mediaRecorderRef = useRef<MediaRecorder|null>(null);
   const streamRef = useRef<MediaStream|null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -9521,16 +9497,177 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   ];
   const filtreCss = FILTRES.find(f => f.id === filtre)?.css || 'none';
 
-  // Effets de MOUVEMENT (zoom animé) — s'ajoutent aux filtres de couleur
-  const EFFETS: {id:string, nom:string, anim:string}[] = [
-    { id:'aucun',    nom:'Fixe',       anim:'none' },
-    { id:'zoomlent', nom:'Zoom lent',  anim:'chZoomLent 8s ease-in-out infinite' },
-    { id:'pulse',    nom:'Pulse',      anim:'chPulse 0.8s ease-in-out infinite' },
-    { id:'balance',  nom:'Balancement', anim:'chBalance 5s ease-in-out infinite' },
-    { id:'zoomin',   nom:'Zoom avant', anim:'chZoomIn 6s ease-out forwards' },
-    { id:'vibe',     nom:'Vibe',       anim:'chVibe 1.6s ease-in-out infinite' },
+  // Garde les réglages à jour pour la boucle de dessin (qui tourne hors du cycle React)
+  useEffect(() => { filtreRef.current = filtre; }, [filtre]);
+  useEffect(() => { effetRef.current = effet; }, [effet]);
+
+  // ── MOTEUR D'EFFETS : dessine chaque image de la caméra sur le canvas ──
+  // C'est le canvas qui est enregistré, donc les effets sont VRAIMENT dans la vidéo.
+  const dessinerBoucle = () => {
+    const cv = canvasRef.current;
+    const vd = videoRef.current;
+    if (!cv || !vd) { rafRef.current = requestAnimationFrame(dessinerBoucle); return; }
+    const ctx = cv.getContext('2d');
+    if (!ctx || !vd.videoWidth) { rafRef.current = requestAnimationFrame(dessinerBoucle); return; }
+
+    // Format portrait 9:16
+    if (cv.width !== 720) { cv.width = 720; cv.height = 1280; }
+    const W = cv.width, H = cv.height;
+    const t = (performance.now() - t0Ref.current) / 1000; // temps écoulé en secondes
+    const eff = effetRef.current;
+
+    // Cadrage de la caméra pour remplir le portrait sans déformer
+    const ratioV = vd.videoWidth / vd.videoHeight;
+    let sw = vd.videoWidth, sh = vd.videoHeight, sx = 0, sy = 0;
+    if (ratioV > W / H) { sw = vd.videoHeight * (W / H); sx = (vd.videoWidth - sw) / 2; }
+    else { sh = vd.videoWidth / (W / H); sy = (vd.videoHeight - sh) / 2; }
+
+    // Réglages de l'effet pour cette image
+    let zoom = 1, dx = 0, dy = 0, alpha = 1;
+    if (eff === 'zoomlent') zoom = 1.08 + Math.sin(t * 0.5) * 0.08;
+    if (eff === 'punch')    zoom = 1 + Math.pow(Math.max(0, Math.sin(t * 3.2)), 6) * 0.35;
+    if (eff === 'shake')    { zoom = 1.08; dx = Math.sin(t * 28) * 10; dy = Math.cos(t * 33) * 8; }
+    if (eff === 'trail')    { zoom = 1.02; alpha = 0.55; }
+    if (eff === 'strobe')   zoom = 1.03;
+    if (eff === 'vhs')      { zoom = 1.04; dy = Math.sin(t * 1.5) * 3; }
+
+    // Traînée : on ne nettoie pas complètement, l'image précédente reste un peu
+    if (eff === 'trail') { ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+    else { ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H); }
+
+    ctx.globalAlpha = alpha;
+    ctx.filter = filtreRef.current === 'aucun' ? 'none' : filtreCss;
+
+    const dw = W * zoom, dh = H * zoom;
+    const ox = (W - dw) / 2 + dx, oy = (H - dh) / 2 + dy;
+
+    if (eff === 'miroir') {
+      // Moitié gauche + son reflet
+      ctx.drawImage(vd, sx, sy, sw / 2, sh, 0, 0, W / 2, H);
+      ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
+      ctx.drawImage(vd, sx, sy, sw / 2, sh, 0, 0, W / 2, H);
+      ctx.restore();
+    } else if (eff === 'kaleido') {
+      // Quatre quartiers en miroir
+      const hw = W / 2, hh = H / 2;
+      ctx.drawImage(vd, sx, sy, sw, sh, 0, 0, hw, hh);
+      ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(vd, sx, sy, sw, sh, 0, 0, hw, hh); ctx.restore();
+      ctx.save(); ctx.translate(0, H); ctx.scale(1, -1); ctx.drawImage(vd, sx, sy, sw, sh, 0, 0, hw, hh); ctx.restore();
+      ctx.save(); ctx.translate(W, H); ctx.scale(-1, -1); ctx.drawImage(vd, sx, sy, sw, sh, 0, 0, hw, hh); ctx.restore();
+    } else if (eff === 'glitch') {
+      // Décalage des couches rouge et bleue (RGB split)
+      const d = 6 + Math.sin(t * 9) * 6;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.45;
+      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCss + ' ') + 'sepia(1) saturate(6) hue-rotate(-50deg)';
+      ctx.drawImage(vd, sx, sy, sw, sh, ox - d, oy, dw, dh);
+      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCss + ' ') + 'sepia(1) saturate(6) hue-rotate(160deg)';
+      ctx.drawImage(vd, sx, sy, sw, sh, ox + d, oy, dw, dh);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
+    } else if (eff === 'timewarp') {
+      // TIME WARP SCAN : une ligne descend ; ce qu'elle a franchi reste figé
+      if (!figeRef.current) { figeRef.current = document.createElement('canvas'); figeRef.current.width = W; figeRef.current.height = H; }
+      const fg = figeRef.current;
+      const fctx = fg.getContext('2d');
+      const cycle = 6;                                  // 6 secondes pour un balayage complet
+      const ligneY = ((t % cycle) / cycle) * H;
+      if (ligneY < scanPrevRef.current) { fctx?.clearRect(0, 0, W, H); } // nouveau passage : on efface
+      // 1) image en direct
+      ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+      // 2) on fige la bande que la ligne vient de franchir
+      if (fctx && ligneY > scanPrevRef.current) {
+        const hBande = Math.max(1, ligneY - scanPrevRef.current);
+        fctx.drawImage(cv, 0, scanPrevRef.current, W, hBande, 0, scanPrevRef.current, W, hBande);
+      }
+      scanPrevRef.current = ligneY;
+      // 3) on recouvre le haut avec l'image figée
+      if (ligneY > 0) ctx.drawImage(fg, 0, 0, W, ligneY, 0, 0, W, ligneY);
+      // 4) la ligne bleue lumineuse
+      ctx.save();
+      ctx.shadowColor = '#4da6ff'; ctx.shadowBlur = 28;
+      ctx.fillStyle = '#9fd4ff'; ctx.fillRect(0, ligneY - 2, W, 4);
+      ctx.restore();
+    } else if (eff === 'sketch') {
+      // DEMI-CROQUIS : moitié gauche normale, moitié droite en dessin au crayon
+      if (!croquisRef.current) { croquisRef.current = document.createElement('canvas'); croquisRef.current.width = W; croquisRef.current.height = H; }
+      const cr = croquisRef.current;
+      const cctx = cr.getContext('2d');
+      if (cctx) {
+        cctx.globalCompositeOperation = 'source-over';
+        cctx.filter = 'grayscale(1) contrast(1.1)';
+        cctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+        // Copie inversée et floutée en color-dodge = rendu crayon
+        cctx.globalCompositeOperation = 'color-dodge';
+        cctx.filter = 'grayscale(1) invert(1) blur(6px)';
+        cctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+        cctx.globalCompositeOperation = 'source-over';
+        cctx.filter = 'none';
+      }
+      ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);          // gauche : normal
+      ctx.drawImage(cr, W / 2, 0, W / 2, H, W / 2, 0, W / 2, H);  // droite : croquis
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(W / 2 - 1, 0, 2, H);                            // trait de séparation
+    } else if (eff === 'clone') {
+      // CLONE : plusieurs copies décalées, la principale bien nette
+      const ecart = W * 0.16;
+      ctx.globalAlpha = 0.4;
+      ctx.drawImage(vd, sx, sy, sw, sh, ox - ecart, oy, dw, dh);
+      ctx.drawImage(vd, sx, sy, sw, sh, ox + ecart, oy, dw, dh);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+    } else {
+      ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+
+    // Habillage par-dessus
+    if (eff === 'vhs') {
+      ctx.globalAlpha = 0.16; ctx.fillStyle = '#000';
+      for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);   // lignes de balayage
+      ctx.globalAlpha = 0.10; ctx.fillStyle = '#2ad';
+      ctx.fillRect(0, (t * 260) % H, W, 40);                      // bande qui défile
+      ctx.globalAlpha = 1;
+    }
+    if (eff === 'strobe' && Math.sin(t * 12) > 0.75) {
+      ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+    }
+
+    rafRef.current = requestAnimationFrame(dessinerBoucle);
+  };
+
+  const lancerRendu = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    t0Ref.current = performance.now();
+    scanPrevRef.current = 0;
+    if (figeRef.current) figeRef.current.getContext('2d')?.clearRect(0, 0, figeRef.current.width, figeRef.current.height);
+    rafRef.current = requestAnimationFrame(dessinerBoucle);
+  };
+  const stopperRendu = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+  };
+
+  // Effets CRÉATIFS — dessinés image par image sur le canvas, donc réellement gravés dans la vidéo
+  const EFFETS: {id:string, nom:string}[] = [
+    { id:'aucun',    nom:'Original' },
+    { id:'zoomlent', nom:'Zoom lent' },
+    { id:'punch',    nom:'Zoom punch' },
+    { id:'shake',    nom:'Shake' },
+    { id:'glitch',   nom:'Glitch RGB' },
+    { id:'vhs',      nom:'VHS' },
+    { id:'strobe',   nom:'Strobe' },
+    { id:'trail',    nom:'Traînée' },
+    { id:'miroir',   nom:'Miroir' },
+    { id:'kaleido',  nom:'Kaléido' },
+    { id:'timewarp', nom:'Time Warp' },
+    { id:'sketch',   nom:'Demi-croquis' },
+    { id:'clone',    nom:'Clone' },
   ];
-  const effetAnim = EFFETS.find(e => e.id === effet)?.anim || 'none';
 
   // Liste des artistes distincts (à partir des contenus officiels)
   const artistes = Array.from(new Set(contenus.map((c:any) => c.artistEmail || c.artist).filter(Boolean)))
@@ -9540,11 +9677,15 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     })
     .filter(a => !recherche || a.nom.toLowerCase().includes(recherche.toLowerCase()));
 
-  // Chansons de l'artiste sélectionné (contenus audio/clip officiels)
-  const chansonsArtiste = contenus.filter((c:any) => (c.artistEmail || c.artist) === artiste);
+  // Même logique que Découvrir : le fichier réel est dans files[0].url, sinon fileUrl.
+  // On lit la BANDE SON du fichier, qu'il soit audio ou vidéo.
+  const urlMedia = (c:any) => (c?.files?.[0]?.url) || c?.fileUrl || c?.fichierUrl || c?.audioUrl || '';
 
-  // URL audio de la chanson choisie
-  const urlChanson = chanson?.fichierUrl || chanson?.url || chanson?.audioUrl || chanson?.fileUrl || (chanson?.files?.[0]?.url) || '';
+  // Chansons de l'artiste sélectionné — seuls les contenus qui ont un vrai fichier lisible
+  const chansonsArtiste = contenus.filter((c:any) => (c.artistEmail || c.artist) === artiste && !!urlMedia(c));
+
+  // Fichier de la chanson choisie
+  const urlChanson = urlMedia(chanson);
 
   // Quand on arrive à l'étape "régler la musique", charger la durée (sans bloquer)
   useEffect(() => {
@@ -9573,6 +9714,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         if (annule) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(()=>{}); }
+        lancerRendu();
       } catch {}
     })();
     return () => {
@@ -9597,6 +9739,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       }
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+      lancerRendu();
+      await new Promise(r => setTimeout(r, 120)); // laisse le canvas se remplir avant la capture
 
       // ── MIXAGE AUDIO : mélanger le micro + la musique dans une seule piste enregistrée ──
       const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -9612,11 +9756,13 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
 
       // 2) La musique de l'artiste (si le son n'est pas coupé)
       if (urlChanson && !sonCoupe) {
-        const musEl = new Audio();
+        // Élément vidéo caché : lit la bande son aussi bien d'un fichier audio que d'une vidéo
+        const musEl = document.createElement('video') as any;
         musEl.crossOrigin = 'anonymous';
         musEl.preload = 'auto';
         musEl.volume = 1;
-        (musEl as any).playsInline = true;
+        musEl.playsInline = true;
+        musEl.style.display = 'none';
         musEl.src = urlChanson;
         musiqueElRef.current = musEl;
         try {
@@ -9648,7 +9794,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       }
 
       // Flux final = vidéo (caméra) + audio mixé (micro + musique)
-      const videoTrack = stream.getVideoTracks()[0];
+      // On enregistre le CANVAS (avec les effets) + l'audio mixé
+      const canvasStream = (canvasRef.current as any).captureStream(30);
+      const videoTrack = canvasStream.getVideoTracks()[0];
       const mixedStream = new MediaStream([videoTrack, ...dest.stream.getAudioTracks()]);
 
       chunksRef.current = [];
@@ -9662,6 +9810,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         if (musiqueElRef.current) musiqueElRef.current.pause();
         if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch {} }
         if (timerRef.current) clearInterval(timerRef.current);
+        stopperRendu();
         setEtape(4);
       };
       mediaRecorderRef.current = mr;
@@ -9862,7 +10011,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             )}
 
             <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'55vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-              <video ref={videoRef} muted playsInline style={{ width:'100%', height:'100%', objectFit:'cover', filter: filtreCss, animation: effetAnim, transformOrigin:'center center' }} />
+              {/* La caméra alimente le canvas en coulisses ; c'est le canvas qui s'affiche et qui est enregistré */}
+              <video ref={videoRef} muted playsInline style={{ display:'none' }} />
+              <canvas ref={canvasRef} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
               {recording && (
                 <>
                   <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
@@ -9878,7 +10029,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                 </>
               )}
             </div>
-            <audio ref={audioRef} playsInline />
+            {/* Lecteur d'aperçu caché : un élément vidéo lit la bande son des fichiers audio ET vidéo */}
+            <video ref={audioRef} playsInline style={{ display:'none' }} />
 
             {/* Options : caméra avant/arrière + couper le son */}
             {!recording && (
