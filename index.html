@@ -113,24 +113,6 @@
       })();
     </script>
 
-    <script>
-      // Chargeur MediaPipe À LA DEMANDE : rien n'est téléchargé au démarrage.
-      // window.__loadFaceMesh() ne charge le modèle QUE lorsqu'un effet visage est choisi.
-      window.__faceMeshReady = null;
-      window.__loadFaceMesh = function () {
-        if (window.__faceMeshReady) return window.__faceMeshReady;
-        window.__faceMeshReady = new Promise(function (resolve, reject) {
-          var s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js';
-          s.crossOrigin = 'anonymous';
-          s.onload = function () { resolve(window.TasksVision || null); };
-          s.onerror = function () { reject(new Error('mediapipe_load_failed')); };
-          document.head.appendChild(s);
-        });
-        return window.__faceMeshReady;
-      };
-    </script>
-
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
