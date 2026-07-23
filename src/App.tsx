@@ -9457,14 +9457,21 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [tempsEcoule, setTempsEcoule] = useState(0);        // secondes filmées
   const [musiqueDebut, setMusiqueDebut] = useState(0);      // départ de l'extrait musique (secondes)
   const [musiqueFin, setMusiqueFin] = useState(60);         // fin de l'extrait musique (secondes)
-  const [dureeMusique, setDureeMusique] = useState(180);   // durée (180 par défaut, jamais bloquant)
+  const [dureeMusique, setDureeMusique] = useState(0);      // durée réelle (0 = pas encore chargée)
+  const [chargeMusique, setChargeMusique] = useState(false); // true quand la durée est connue
   const [filtre, setFiltre] = useState('aucun');            // filtre vidéo appliqué
   const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
+  const [faceStatus, setFaceStatus] = useState('');         // message d'attente chargement visage
   const videoRef = useRef<HTMLVideoElement|null>(null);
   const canvasRef = useRef<HTMLCanvasElement|null>(null);
+  const faceLandmarkerRef = useRef<any>(null);
+  const faceRef = useRef<any>(null);
+  const faceLoadingRef = useRef(false);
+  const bandeRef = useRef<HTMLDivElement|null>(null);      // la bande de sélection musique
+  const poigneeRef = useRef<'debut'|'fin'|null>(null);    // poignée en cours de glissement
   const rafRef = useRef<any>(null);
   const figeRef = useRef<HTMLCanvasElement|null>(null);    // image figée du Time Warp
   const scanPrevRef = useRef<number>(0);                    // position précédente de la ligne
@@ -9501,6 +9508,34 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   useEffect(() => { filtreRef.current = filtre; }, [filtre]);
   useEffect(() => { effetRef.current = effet; }, [effet]);
 
+  // Charge le détecteur de visage MediaPipe UNIQUEMENT quand un effet visage est choisi
+  useEffect(() => {
+    const estEffetVisage = effet.startsWith('face_');
+    if (!estEffetVisage || faceLandmarkerRef.current || faceLoadingRef.current) return;
+    faceLoadingRef.current = true;
+    setFaceStatus('Préparation des effets visage...');
+    (async () => {
+      try {
+        const TV = await (window as any).__loadFaceMesh();
+        const vision = TV || (window as any).TasksVision;
+        if (!vision) throw new Error('no_vision');
+        const fileset = await vision.FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+        );
+        const fl = await vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task' },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+        });
+        faceLandmarkerRef.current = fl;
+        setFaceStatus('');
+      } catch (e) {
+        setFaceStatus('Effets visage indisponibles sur cet appareil.');
+        faceLoadingRef.current = false;
+      }
+    })();
+  }, [effet]);
+
   // ── MOTEUR D'EFFETS : dessine chaque image de la caméra sur le canvas ──
   // C'est le canvas qui est enregistré, donc les effets sont VRAIMENT dans la vidéo.
   const dessinerBoucle = () => {
@@ -9515,6 +9550,16 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     const W = cv.width, H = cv.height;
     const t = (performance.now() - t0Ref.current) / 1000; // temps écoulé en secondes
     const eff = effetRef.current;
+    const estVisage = eff.startsWith('face_');
+
+    // Détection du visage (si un effet visage est actif et le détecteur prêt)
+    if (estVisage && faceLandmarkerRef.current) {
+      try {
+        const res = faceLandmarkerRef.current.detectForVideo(vd, performance.now());
+        faceRef.current = (res && res.faceLandmarks && res.faceLandmarks[0]) ? res.faceLandmarks[0] : null;
+      } catch { /* ignore une image ratée */ }
+    }
+    const face = estVisage ? faceRef.current : null;
 
     // Cadrage de la caméra pour remplir le portrait sans déformer
     const ratioV = vd.videoWidth / vd.videoHeight;
@@ -9530,6 +9575,23 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     if (eff === 'trail')    { zoom = 1.02; alpha = 0.55; }
     if (eff === 'strobe')   zoom = 1.03;
     if (eff === 'vhs')      { zoom = 1.04; dy = Math.sin(t * 1.5) * 3; }
+
+    // Effets visage qui déplacent/zooment le cadrage sur le visage
+    if ((eff === 'face_zoom' || eff === 'face_chant') && face) {
+      // Centre du visage (moyenne de quelques points)
+      let cxF = 0, cyF = 0;
+      const pts = [1, 33, 263, 61, 291, 199]; // nez, yeux, bouche, menton
+      pts.forEach(idx => { cxF += face[idx].x; cyF += face[idx].y; });
+      cxF /= pts.length; cyF /= pts.length;
+      // Taille du visage (écart entre les yeux) pour ajuster le zoom
+      const ecart = Math.abs(face[263].x - face[33].x);
+      const zVisage = eff === 'face_chant' ? 1.9 : 1.5;
+      zoom = zVisage;
+      // Recentrer sur le visage
+      dx = (0.5 - cxF) * W * zoom;
+      dy = (0.5 - cyF) * H * zoom;
+      void ecart;
+    }
 
     // Traînée : on ne nettoie pas complètement, l'image précédente reste un peu
     if (eff === 'trail') { ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
@@ -9638,6 +9700,84 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
     }
 
+    // ── Habillage VISAGE (couronne, lunettes, flou fond, beauté) ──
+    if (estVisage && face) {
+      // Repères en pixels
+      const px = (i:number) => face[i].x * W;
+      const py = (i:number) => face[i].y * H;
+      const yeuxG = { x:px(33), y:py(33) }, yeuxD = { x:px(263), y:py(263) };
+      const largeurVisage = Math.abs(yeuxD.x - yeuxG.x) * 2.6;
+      const centreX = (yeuxG.x + yeuxD.x) / 2;
+      const hautTete = py(10); // sommet du front
+
+      if (eff === 'face_crown') {
+        // Couronne dorée dessinée au-dessus de la tête
+        const cw = largeurVisage, ch = cw * 0.5;
+        const cx = centreX - cw / 2, cy = hautTete - ch * 1.05;
+        ctx.fillStyle = '#F5C84C';
+        ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + ch);
+        ctx.lineTo(cx, cy + ch * 0.35);
+        ctx.lineTo(cx + cw * 0.2, cy + ch * 0.7);
+        ctx.lineTo(cx + cw * 0.35, cy);
+        ctx.lineTo(cx + cw * 0.5, cy + ch * 0.7);
+        ctx.lineTo(cx + cw * 0.65, cy);
+        ctx.lineTo(cx + cw * 0.8, cy + ch * 0.7);
+        ctx.lineTo(cx + cw, cy + ch * 0.35);
+        ctx.lineTo(cx + cw, cy + ch);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Joyaux
+        ctx.fillStyle = '#e0402e';
+        [0.2, 0.5, 0.8].forEach(f => { ctx.beginPath(); ctx.arc(cx + cw * f, cy + ch * 0.72, cw * 0.03, 0, 7); ctx.fill(); });
+      }
+
+      if (eff === 'face_glasses') {
+        // Lunettes de soleil sur les yeux
+        const r = largeurVisage * 0.16;
+        ctx.fillStyle = 'rgba(10,10,20,0.85)';
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(yeuxG.x, yeuxG.y, r, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(yeuxD.x, yeuxD.y, r, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(yeuxG.x + r, yeuxG.y); ctx.lineTo(yeuxD.x - r, yeuxD.y); ctx.stroke();
+        // Reflet
+        ctx.fillStyle = 'rgba(120,180,255,0.35)';
+        ctx.beginPath(); ctx.arc(yeuxG.x - r*0.3, yeuxG.y - r*0.3, r*0.35, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(yeuxD.x - r*0.3, yeuxD.y - r*0.3, r*0.35, 0, 7); ctx.fill();
+      }
+
+      if (eff === 'face_beauty') {
+        // Voile doux sur le visage (peau lissée) — zone autour du visage
+        const r = largeurVisage * 0.62;
+        ctx.save();
+        ctx.beginPath(); ctx.ellipse(centreX, py(1), r*0.8, r, 0, 0, 7); ctx.clip();
+        ctx.globalAlpha = 0.35; ctx.filter = 'blur(6px) brightness(1.08) saturate(1.05)';
+        ctx.drawImage(cv, 0, 0, W, H);
+        ctx.restore();
+        ctx.filter = 'none'; ctx.globalAlpha = 1;
+      }
+    }
+
+    // Flou fond : visage net, reste flou (dessine un cercle net par-dessus une base floue)
+    if (eff === 'face_blur') {
+      if (face) {
+        const px = (i:number) => face[i].x * W, py = (i:number) => face[i].y * H;
+        const centreX = (px(33) + px(263)) / 2;
+        const r = Math.abs(px(263) - px(33)) * 2.4;
+        // On a déjà l'image nette dessinée ; on refloute tout SAUF un disque autour du visage
+        ctx.save();
+        ctx.filter = 'blur(9px)';
+        // redessiner l'image floue partout
+        ctx.drawImage(cv, 0, 0, W, H);
+        ctx.filter = 'none';
+        // re-découper le visage net
+        ctx.beginPath(); ctx.ellipse(centreX, py(1), r*0.8, r, 0, 0, 7); ctx.clip();
+        ctx.drawImage(vd, sx, sy, sw, sh, 0, 0, W, H);
+        ctx.restore();
+      }
+    }
+
     rafRef.current = requestAnimationFrame(dessinerBoucle);
   };
 
@@ -9667,6 +9807,12 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     { id:'timewarp', nom:'Time Warp' },
     { id:'sketch',   nom:'Demi-croquis' },
     { id:'clone',    nom:'Clone' },
+    { id:'face_zoom',   nom:'Zoom visage' },
+    { id:'face_chant',  nom:'Zoom chant' },
+    { id:'face_crown',  nom:'Couronne' },
+    { id:'face_glasses',nom:'Lunettes' },
+    { id:'face_blur',   nom:'Flou fond' },
+    { id:'face_beauty', nom:'Beauté pro' },
   ];
 
   // Liste des artistes distincts (à partir des contenus officiels)
@@ -9687,15 +9833,34 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   // Fichier de la chanson choisie
   const urlChanson = urlMedia(chanson);
 
-  // Quand on arrive à l'étape "régler la musique", charger la durée (sans bloquer)
+  // Découpe l'extrait via Cloudinary (comme les sorties officielles) — léger et rapide
+  const extraitUrl = (url: string, debut: number, fin: number): string => {
+    if (!url || !url.includes('/upload/')) return url;
+    const duree = Math.max(1, fin - debut);
+    return url.replace('/upload/', `/upload/so_${debut},du_${duree}/`);
+  };
+  const DUREE_MAX_MUSIQUE = 90; // 1 min 30 maximum
+
+  // Quand on arrive à l'étape musique, CHARGER la durée réelle (avec progression)
   useEffect(() => {
     if (etape === 3 && urlChanson) {
-      // Valeur par défaut immédiate pour afficher le curseur tout de suite (pas d'attente)
-      setDureeMusique(prev => prev > 0 ? prev : 180);
+      setChargeMusique(false);
+      setDureeMusique(0);
       const a = document.createElement('audio');
       a.preload = 'metadata';
-      a.onloadedmetadata = () => { if (a.duration && isFinite(a.duration) && a.duration > 0) setDureeMusique(Math.floor(a.duration)); };
-      a.onerror = () => {}; // en cas d'échec, on garde la valeur par défaut
+      a.onloadedmetadata = () => {
+        if (a.duration && isFinite(a.duration) && a.duration > 0) {
+          const d = Math.floor(a.duration);
+          setDureeMusique(d);
+          setChargeMusique(true);
+          // Sélection par défaut : les 30 premières secondes (ou toute la musique si courte)
+          setMusiqueDebut(0);
+          setMusiqueFin(Math.min(d, 30));
+        }
+      };
+      a.onerror = () => { setDureeMusique(180); setChargeMusique(true); setMusiqueFin(30); };
+      // Sécurité : si la métadonnée met trop longtemps, on débloque avec une durée par défaut
+      setTimeout(() => { setChargeMusique(prev => { if (!prev) { setDureeMusique(180); setMusiqueFin(30); return true; } return prev; }); }, 12000);
       a.src = urlChanson;
     }
   }, [etape, urlChanson]);
@@ -9763,7 +9928,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         musEl.volume = 1;
         musEl.playsInline = true;
         musEl.style.display = 'none';
-        musEl.src = urlChanson;
+        musEl.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
         musiqueElRef.current = musEl;
         try {
           // Attendre que l'audio soit prêt à jouer (évite le son muet)
@@ -9776,7 +9941,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             musEl.onerror = ok;
             setTimeout(ok, 3000); // sécurité : on n'attend jamais plus de 3s
           });
-          try { musEl.currentTime = musiqueDebut; } catch {}
+          // extrait déjà découpé par Cloudinary, il commence à 0
           // Mixage Web Audio (pour enregistrer la musique dans la vidéo)
           const musSource = ctx.createMediaElementSource(musEl);
           const gain = ctx.createGain();
@@ -9788,7 +9953,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           await musEl.play().catch(()=>{});
         } catch (err) {
           // Si le mixage Web Audio échoue (CORS), au moins jouer le son en direct
-          try { musEl.currentTime = musiqueDebut; } catch {}
+          // extrait déjà découpé par Cloudinary, il commence à 0
           musEl.play().catch(()=>{});
         }
       }
@@ -9905,6 +10070,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     <div style={{ position:'fixed', inset:0, background:C.bgDeep, zIndex:10000, overflowY:'auto', fontFamily:"'DM Sans',sans-serif", color:C.text }}>
       <style>{`
         @keyframes chZoomLent { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
+        @keyframes chLoad { 0% { margin-left:-40%; } 100% { margin-left:100%; } }
         @keyframes chPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
         @keyframes chBalance { 0%,100% { transform:scale(1.1) translateX(-4%); } 50% { transform:scale(1.1) translateX(4%); } }
         @keyframes chZoomIn { 0% { transform:scale(1); } 100% { transform:scale(1.35); } }
@@ -9964,48 +10130,93 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           <>
             <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Filmez votre challenge</p>
 
-            {/* Musique sélectionnée + choix de la partie (avant de filmer) */}
+            {/* Musique sélectionnée + sélection de la partie (avant de filmer) */}
             {!recording && (
               <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.25)', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
                 <p style={{ color:C.gold, fontSize:13, fontWeight:800, margin:'0 0 8px' }}>🎵 {chanson?.label || chanson?.titre || 'Chanson'}</p>
-                {dureeMusique > 0 ? (
+                {!chargeMusique ? (
+                  <div style={{ padding:'8px 0' }}>
+                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 8px' }}>Chargement de la musique...</p>
+                    <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:99, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:'40%', background:C.gold, borderRadius:99, animation:'chLoad 1.2s ease-in-out infinite' }} />
+                    </div>
+                  </div>
+                ) : (
                   <>
-                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 8px' }}>
-                      Extrait : <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span> à <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueFin/60)}:{String(musiqueFin%60).padStart(2,'0')}</span> <span style={{ color:'#8098b8' }}>({musiqueFin - musiqueDebut}s)</span>
+                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 10px' }}>
+                      Extrait : <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span> → <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueFin/60)}:{String(musiqueFin%60).padStart(2,'0')}</span> <span style={{ color:'#8098b8' }}>({musiqueFin - musiqueDebut}s)</span>
                     </p>
-                    <label style={{ color:'#8098b8', fontSize:11, display:'block', marginBottom:2 }}>Début</label>
-                    <input type="range" min={0} max={Math.max(0, dureeMusique - 5)} value={musiqueDebut}
-                      onChange={e => { const v = parseInt(e.target.value); setMusiqueDebut(v); if (musiqueFin <= v) setMusiqueFin(Math.min(dureeMusique, v + 15)); }}
-                      style={{ width:'100%', accentColor:C.gold, marginBottom:10 }} />
-                    <label style={{ color:'#8098b8', fontSize:11, display:'block', marginBottom:2 }}>Fin</label>
-                    <input type="range" min={0} max={dureeMusique} value={musiqueFin}
-                      onChange={e => { const v = parseInt(e.target.value); setMusiqueFin(v); if (v <= musiqueDebut) setMusiqueDebut(Math.max(0, v - 15)); }}
-                      style={{ width:'100%', accentColor:C.gold }} />
+
+                    {/* BANDE UNIQUE avec deux poignées à tirer */}
+                    <div
+                      ref={bandeRef}
+                      onPointerDown={(e) => {
+                        const bande = bandeRef.current; if (!bande) return;
+                        const rect = bande.getBoundingClientRect();
+                        const pos = ((e.clientX - rect.left) / rect.width) * dureeMusique;
+                        // Choisir la poignée la plus proche
+                        const distD = Math.abs(pos - musiqueDebut), distF = Math.abs(pos - musiqueFin);
+                        poigneeRef.current = distD < distF ? 'debut' : 'fin';
+                      }}
+                      onPointerMove={(e) => {
+                        if (!poigneeRef.current) return;
+                        const bande = bandeRef.current; if (!bande) return;
+                        const rect = bande.getBoundingClientRect();
+                        let pos = Math.round(((e.clientX - rect.left) / rect.width) * dureeMusique);
+                        pos = Math.max(0, Math.min(dureeMusique, pos));
+                        if (poigneeRef.current === 'debut') {
+                          const nv = Math.min(pos, musiqueFin - 1);
+                          setMusiqueDebut(Math.max(0, nv));
+                          if (musiqueFin - nv > DUREE_MAX_MUSIQUE) setMusiqueFin(nv + DUREE_MAX_MUSIQUE);
+                        } else {
+                          const nv = Math.max(pos, musiqueDebut + 1);
+                          setMusiqueFin(Math.min(dureeMusique, nv));
+                          if (nv - musiqueDebut > DUREE_MAX_MUSIQUE) setMusiqueDebut(nv - DUREE_MAX_MUSIQUE);
+                        }
+                      }}
+                      onPointerUp={() => { poigneeRef.current = null; }}
+                      onPointerLeave={() => { poigneeRef.current = null; }}
+                      style={{ position:'relative', height:52, background:'rgba(255,255,255,0.06)', borderRadius:10, marginBottom:10, cursor:'pointer', touchAction:'none', overflow:'hidden' }}>
+                      {/* Fausse forme d'onde décorative */}
+                      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', gap:2, padding:'0 6px', opacity:0.3 }}>
+                        {Array.from({length:40}).map((_,i) => (
+                          <div key={i} style={{ flex:1, height:`${20 + Math.abs(Math.sin(i*1.7))*60}%`, background:'#fff', borderRadius:2 }} />
+                        ))}
+                      </div>
+                      {/* Zone sélectionnée */}
+                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueDebut/dureeMusique)*100}%`, width:`${((musiqueFin-musiqueDebut)/dureeMusique)*100}%`, background:'rgba(245,200,76,0.25)', border:'2px solid '+C.gold, borderRadius:6 }} />
+                      {/* Poignée début */}
+                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueDebut/dureeMusique)*100}%`, width:14, marginLeft:-7, background:C.gold, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 6px rgba(0,0,0,0.4)' }}>
+                        <div style={{ width:2, height:20, background:'#7a5a00' }} />
+                      </div>
+                      {/* Poignée fin */}
+                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueFin/dureeMusique)*100}%`, width:14, marginLeft:-7, background:C.gold, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 6px rgba(0,0,0,0.4)' }}>
+                        <div style={{ width:2, height:20, background:'#7a5a00' }} />
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#8098b8', marginBottom:10 }}>
+                      <span>0:00</span>
+                      <span>{Math.floor(dureeMusique/60)}:{String(dureeMusique%60).padStart(2,'0')}</span>
+                    </div>
+
+                    {/* Aperçu via Cloudinary (extrait découpé, léger) */}
                     <button onClick={() => {
                         if (!audioRef.current) return;
                         const a = audioRef.current;
                         if (!a.paused) { a.pause(); setApercuJoue(false); return; }
-                        a.src = urlChanson;
+                        a.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
                         a.volume = 1;
                         a.load();
-                        const lancer = () => {
-                          try { a.currentTime = musiqueDebut; } catch {}
-                          a.play().then(() => {
-                            setApercuJoue(true);
-                            // S'arrêter à la fin de l'extrait choisi (max 5s d'aperçu)
-                            const dureeApercu = Math.min(5000, (musiqueFin - musiqueDebut) * 1000);
-                            setTimeout(() => { try { a.pause(); } catch {}; setApercuJoue(false); }, dureeApercu);
-                          }).catch(() => { setMsg('Impossible de lire la musique (vérifiez votre connexion).'); });
-                        };
-                        if (a.readyState >= 2) lancer();
-                        else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
+                        a.play().then(() => {
+                          setApercuJoue(true);
+                          a.onended = () => setApercuJoue(false);
+                        }).catch(() => { setMsg('Impossible de lire l\'extrait.'); });
                       }}
-                      style={{ marginTop:10, padding:'6px 14px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                      {apercuJoue ? '⏸ Lecture en cours...' : '▶ Écouter ce passage'}
+                      style={{ padding:'8px 16px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                      {apercuJoue ? '⏸ Lecture...' : '▶ Écouter la sélection'}
                     </button>
+                    <p style={{ color:'#8098b8', fontSize:10, margin:'8px 0 0' }}>Glissez les poignées dorées pour choisir la partie (max 1 min 30).</p>
                   </>
-                ) : (
-                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Chargement de la musique...</p>
                 )}
               </div>
             )}
@@ -10014,6 +10225,11 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
               {/* La caméra alimente le canvas en coulisses ; c'est le canvas qui s'affiche et qui est enregistré */}
               <video ref={videoRef} muted playsInline style={{ display:'none' }} />
               <canvas ref={canvasRef} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+              {faceStatus && (
+                <div style={{ position:'absolute', bottom:12, left:12, right:12, background:'rgba(0,0,0,0.7)', borderRadius:10, padding:'8px 12px', textAlign:'center' }}>
+                  <span style={{ color:'#fff', fontSize:12, fontWeight:600 }}>{faceStatus}</span>
+                </div>
+              )}
               {recording && (
                 <>
                   <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
