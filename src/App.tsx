@@ -746,6 +746,34 @@ function Lien({ href, children, style, className, onClick, state }: { href: stri
   );
 }
 
+// Icône SVG affichée sur la vignette de chaque effet du challenge (aucun emoji)
+function IconeEffet({ id }: { id: string }) {
+  const p = { width:26, height:26, viewBox:'0 0 24 24', fill:'none', stroke:'#fff', strokeWidth:1.7,
+              strokeLinecap:'round' as const, strokeLinejoin:'round' as const };
+  switch (id) {
+    case 'aucun':    return <svg {...p}><circle cx="12" cy="12" r="8"/></svg>;
+    case 'zoomlent': return <svg {...p}><circle cx="11" cy="11" r="6"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="8" y1="11" x2="14" y2="11"/></svg>;
+    case 'punch':    return <svg {...p}><path d="M12 2l2.6 6.2L21 9l-5 4.2L17.4 20 12 16.6 6.6 20 8 13.2 3 9l6.4-.8z"/></svg>;
+    case 'shake':    return <svg {...p}><line x1="4" y1="8" x2="4" y2="16"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="8" x2="20" y2="16"/></svg>;
+    case 'glitch':   return <svg {...p}><rect x="3" y="6" width="14" height="4"/><rect x="7" y="14" width="14" height="4"/></svg>;
+    case 'vhs':      return <svg {...p}><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg>;
+    case 'strobe':   return <svg {...p}><path d="M13 2L4 14h7l-1 8 10-12h-7z"/></svg>;
+    case 'trail':    return <svg {...p}><circle cx="18" cy="12" r="3.5"/><circle cx="11" cy="12" r="2.2" opacity="0.6"/><circle cx="5" cy="12" r="1.4" opacity="0.35"/></svg>;
+    case 'miroir':   return <svg {...p}><line x1="12" y1="3" x2="12" y2="21"/><path d="M9 6L3 12l6 6z"/><path d="M15 6l6 6-6 6z" opacity="0.45"/></svg>;
+    case 'kaleido':  return <svg {...p}><path d="M12 3l5 5-5 5-5-5z"/><path d="M12 11l5 5-5 5-5-5z" opacity="0.5"/></svg>;
+    case 'timewarp': return <svg {...p}><line x1="3" y1="9" x2="21" y2="9"/><polyline points="8 14 12 18 16 14"/><line x1="12" y1="18" x2="12" y2="11"/></svg>;
+    case 'sketch':   return <svg {...p}><path d="M15 3l6 6L9 21H3v-6z"/><line x1="13" y1="5" x2="19" y2="11"/></svg>;
+    case 'clone':    return <svg {...p}><rect x="3" y="5" width="12" height="14" rx="2"/><rect x="9" y="5" width="12" height="14" rx="2" opacity="0.5"/></svg>;
+    case 'face_zoom':return <svg {...p}><circle cx="12" cy="12" r="7"/><polyline points="3 8 3 3 8 3"/><polyline points="21 16 21 21 16 21"/></svg>;
+    case 'face_chant':return <svg {...p}><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg>;
+    case 'face_crown':return <svg {...p}><path d="M3 8l3.5 4L12 5l5.5 7L21 8v10H3z"/></svg>;
+    case 'face_glasses':return <svg {...p}><circle cx="6.5" cy="13" r="3.5"/><circle cx="17.5" cy="13" r="3.5"/><path d="M10 13h4"/><path d="M3 10l2-3M21 10l-2-3"/></svg>;
+    case 'face_blur':return <svg {...p}><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8" opacity="0.35" strokeDasharray="3 3"/></svg>;
+    case 'face_beauty':return <svg {...p}><path d="M12 4l1.6 4L18 9.6 13.6 11 12 15l-1.6-4L6 9.6 10.4 8z"/><path d="M18 15l.7 1.7L20.4 17l-1.7.8L18 20l-.7-2.2L15.6 17l1.7-.3z"/></svg>;
+    default:         return <svg {...p}><circle cx="12" cy="12" r="8"/></svg>;
+  }
+}
+
 // Petit badge rouge avec le nombre de notifications non lues (pour la barre de navigation).
 function BadgeNotif() {
   const [email, setEmail] = useState<string | undefined>(auth.currentUser?.email || undefined);
@@ -9465,6 +9493,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
   const [faceStatus, setFaceStatus] = useState('');         // message d'attente chargement visage
+  const [panneau, setPanneau] = useState<'aucun'|'filtres'|'effets'|'musique'>('aucun');
   const videoRef = useRef<HTMLVideoElement|null>(null);
   const canvasRef = useRef<HTMLCanvasElement|null>(null);
   const faceLandmarkerRef = useRef<any>(null);
@@ -9516,9 +9545,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     setFaceStatus('Préparation des effets visage...');
     (async () => {
       try {
-        const TV = await (window as any).__loadFaceMesh();
-        const vision = TV || (window as any).TasksVision;
-        if (!vision) throw new Error('no_vision');
+        // Import ESM depuis le CDN — méthode officielle, plus fiable qu'un script global
+        const vision: any = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
         const fileset = await vision.FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
         );
@@ -9529,8 +9557,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         });
         faceLandmarkerRef.current = fl;
         setFaceStatus('');
-      } catch (e) {
-        setFaceStatus('Effets visage indisponibles sur cet appareil.');
+      } catch (e:any) {
+        console.error('MediaPipe:', e);
+        setFaceStatus('Chargement des effets visage impossible : ' + (e?.message || 'réseau'));
         faceLoadingRef.current = false;
       }
     })();
@@ -9825,7 +9854,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
 
   // Même logique que Découvrir : le fichier réel est dans files[0].url, sinon fileUrl.
   // On lit la BANDE SON du fichier, qu'il soit audio ou vidéo.
-  const urlMedia = (c:any) => (c?.files?.[0]?.url) || c?.fileUrl || c?.fichierUrl || c?.audioUrl || '';
+  const urlMedia = (c:any) => (c?.files?.[0]?.url) || (c?.files?.[0]?.name) || c?.fileUrl || c?.fichierUrl || c?.audioUrl || '';
 
   // Chansons de l'artiste sélectionné — seuls les contenus qui ont un vrai fichier lisible
   const chansonsArtiste = contenus.filter((c:any) => (c.artistEmail || c.artist) === artiste && !!urlMedia(c));
@@ -9930,6 +9959,16 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         musEl.style.display = 'none';
         musEl.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
         musiqueElRef.current = musEl;
+        // Si l'extrait découpé ne charge pas, on repasse sur le fichier complet
+        let extraitOk = true;
+        musEl.onerror = () => {
+          if (extraitOk) {
+            extraitOk = false;
+            musEl.src = urlChanson;
+            musEl.load();
+            musEl.onloadeddata = () => { try { musEl.currentTime = musiqueDebut; } catch {} };
+          }
+        };
         try {
           // Attendre que l'audio soit prêt à jouer (évite le son muet)
           await new Promise<void>((resolve) => {
@@ -10125,179 +10164,250 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           </>
         )}
 
-        {/* ÉTAPE 3 — Filmer */}
+        {/* ÉTAPE 3 — Filmer (écran plein, façon TikTok) */}
         {etape === 3 && (
-          <>
-            <p style={{ fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Filmez votre challenge</p>
+          <div style={{ position:'fixed', inset:0, background:'#000', zIndex:10002, overflow:'hidden' }}>
 
-            {/* Musique sélectionnée + sélection de la partie (avant de filmer) */}
-            {!recording && (
-              <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.25)', borderRadius:12, padding:'12px 14px', marginBottom:14 }}>
-                <p style={{ color:C.gold, fontSize:13, fontWeight:800, margin:'0 0 8px' }}>🎵 {chanson?.label || chanson?.titre || 'Chanson'}</p>
-                {!chargeMusique ? (
-                  <div style={{ padding:'8px 0' }}>
-                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 8px' }}>Chargement de la musique...</p>
-                    <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:99, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:'40%', background:C.gold, borderRadius:99, animation:'chLoad 1.2s ease-in-out infinite' }} />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 10px' }}>
-                      Extrait : <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')}</span> → <span style={{ color:C.gold, fontWeight:700 }}>{Math.floor(musiqueFin/60)}:{String(musiqueFin%60).padStart(2,'0')}</span> <span style={{ color:'#8098b8' }}>({musiqueFin - musiqueDebut}s)</span>
-                    </p>
-
-                    {/* BANDE UNIQUE avec deux poignées à tirer */}
-                    <div
-                      ref={bandeRef}
-                      onPointerDown={(e) => {
-                        const bande = bandeRef.current; if (!bande) return;
-                        const rect = bande.getBoundingClientRect();
-                        const pos = ((e.clientX - rect.left) / rect.width) * dureeMusique;
-                        // Choisir la poignée la plus proche
-                        const distD = Math.abs(pos - musiqueDebut), distF = Math.abs(pos - musiqueFin);
-                        poigneeRef.current = distD < distF ? 'debut' : 'fin';
-                      }}
-                      onPointerMove={(e) => {
-                        if (!poigneeRef.current) return;
-                        const bande = bandeRef.current; if (!bande) return;
-                        const rect = bande.getBoundingClientRect();
-                        let pos = Math.round(((e.clientX - rect.left) / rect.width) * dureeMusique);
-                        pos = Math.max(0, Math.min(dureeMusique, pos));
-                        if (poigneeRef.current === 'debut') {
-                          const nv = Math.min(pos, musiqueFin - 1);
-                          setMusiqueDebut(Math.max(0, nv));
-                          if (musiqueFin - nv > DUREE_MAX_MUSIQUE) setMusiqueFin(nv + DUREE_MAX_MUSIQUE);
-                        } else {
-                          const nv = Math.max(pos, musiqueDebut + 1);
-                          setMusiqueFin(Math.min(dureeMusique, nv));
-                          if (nv - musiqueDebut > DUREE_MAX_MUSIQUE) setMusiqueDebut(nv - DUREE_MAX_MUSIQUE);
-                        }
-                      }}
-                      onPointerUp={() => { poigneeRef.current = null; }}
-                      onPointerLeave={() => { poigneeRef.current = null; }}
-                      style={{ position:'relative', height:52, background:'rgba(255,255,255,0.06)', borderRadius:10, marginBottom:10, cursor:'pointer', touchAction:'none', overflow:'hidden' }}>
-                      {/* Fausse forme d'onde décorative */}
-                      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', gap:2, padding:'0 6px', opacity:0.3 }}>
-                        {Array.from({length:40}).map((_,i) => (
-                          <div key={i} style={{ flex:1, height:`${20 + Math.abs(Math.sin(i*1.7))*60}%`, background:'#fff', borderRadius:2 }} />
-                        ))}
-                      </div>
-                      {/* Zone sélectionnée */}
-                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueDebut/dureeMusique)*100}%`, width:`${((musiqueFin-musiqueDebut)/dureeMusique)*100}%`, background:'rgba(245,200,76,0.25)', border:'2px solid '+C.gold, borderRadius:6 }} />
-                      {/* Poignée début */}
-                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueDebut/dureeMusique)*100}%`, width:14, marginLeft:-7, background:C.gold, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 6px rgba(0,0,0,0.4)' }}>
-                        <div style={{ width:2, height:20, background:'#7a5a00' }} />
-                      </div>
-                      {/* Poignée fin */}
-                      <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueFin/dureeMusique)*100}%`, width:14, marginLeft:-7, background:C.gold, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 6px rgba(0,0,0,0.4)' }}>
-                        <div style={{ width:2, height:20, background:'#7a5a00' }} />
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#8098b8', marginBottom:10 }}>
-                      <span>0:00</span>
-                      <span>{Math.floor(dureeMusique/60)}:{String(dureeMusique%60).padStart(2,'0')}</span>
-                    </div>
-
-                    {/* Aperçu via Cloudinary (extrait découpé, léger) */}
-                    <button onClick={() => {
-                        if (!audioRef.current) return;
-                        const a = audioRef.current;
-                        if (!a.paused) { a.pause(); setApercuJoue(false); return; }
-                        a.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
-                        a.volume = 1;
-                        a.load();
-                        a.play().then(() => {
-                          setApercuJoue(true);
-                          a.onended = () => setApercuJoue(false);
-                        }).catch(() => { setMsg('Impossible de lire l\'extrait.'); });
-                      }}
-                      style={{ padding:'8px 16px', borderRadius:8, border:'1px solid rgba(245,200,76,0.4)', background: apercuJoue ? 'rgba(245,200,76,0.2)' : 'transparent', color:C.gold, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                      {apercuJoue ? '⏸ Lecture...' : '▶ Écouter la sélection'}
-                    </button>
-                    <p style={{ color:'#8098b8', fontSize:10, margin:'8px 0 0' }}>Glissez les poignées dorées pour choisir la partie (max 1 min 30).</p>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div style={{ position:'relative', width:'100%', aspectRatio:'9/16', maxHeight:'55vh', background:'#000', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-              {/* La caméra alimente le canvas en coulisses ; c'est le canvas qui s'affiche et qui est enregistré */}
-              <video ref={videoRef} muted playsInline style={{ display:'none' }} />
-              <canvas ref={canvasRef} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
-              {faceStatus && (
-                <div style={{ position:'absolute', bottom:12, left:12, right:12, background:'rgba(0,0,0,0.7)', borderRadius:10, padding:'8px 12px', textAlign:'center' }}>
-                  <span style={{ color:'#fff', fontSize:12, fontWeight:600 }}>{faceStatus}</span>
-                </div>
-              )}
-              {recording && (
-                <>
-                  <div style={{ position:'absolute', top:12, left:12, background:'rgba(240,74,106,0.9)', borderRadius:99, padding:'4px 12px', fontSize:12, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ width:8, height:8, borderRadius:99, background:'#fff', animation:'pulse 1s infinite' }} /> REC
-                  </div>
-                  {/* Minuteur + barre de progression vers 1min15 */}
-                  <div style={{ position:'absolute', top:12, right:12, background:'rgba(0,0,0,0.6)', borderRadius:99, padding:'4px 12px', fontSize:13, fontWeight:800, color:'#fff' }}>
-                    {Math.floor(tempsEcoule/60)}:{String(tempsEcoule%60).padStart(2,'0')} / 1:15
-                  </div>
-                  <div style={{ position:'absolute', bottom:0, left:0, right:0, height:4, background:'rgba(255,255,255,0.2)' }}>
-                    <div style={{ height:'100%', width:`${(tempsEcoule/DUREE_MAX)*100}%`, background:'#f04a6a', transition:'width 1s linear' }} />
-                  </div>
-                </>
-              )}
-            </div>
-            {/* Lecteur d'aperçu caché : un élément vidéo lit la bande son des fichiers audio ET vidéo */}
+            {/* CAMÉRA PLEIN ÉCRAN — le canvas porte les filtres et effets */}
+            <video ref={videoRef} muted playsInline style={{ display:'none' }} />
+            <canvas ref={canvasRef} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
             <video ref={audioRef} playsInline style={{ display:'none' }} />
 
-            {/* Options : caméra avant/arrière + couper le son */}
-            {!recording && (
-              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                <button onClick={() => setCameraFace(cameraFace === 'user' ? 'environment' : 'user')}
-                  style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                  {cameraFace === 'user' ? 'Caméra avant' : 'Caméra arrière'} ⟳
-                </button>
-                <button onClick={() => setSonCoupe(!sonCoupe)}
-                  style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${sonCoupe?'#f04a6a':'rgba(255,255,255,0.12)'}`, background: sonCoupe?'rgba(240,74,106,0.12)':'rgba(255,255,255,0.05)', color: sonCoupe?'#f04a6a':C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                  {sonCoupe ? 'Musique coupée' : 'Couper la musique'}
-                </button>
+            {/* Barre de progression de l'enregistrement, tout en haut */}
+            {recording && (
+              <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'rgba(255,255,255,0.2)', zIndex:6 }}>
+                <div style={{ height:'100%', width:`${(tempsEcoule/DUREE_MAX)*100}%`, background:'#fe2c55', transition:'width 1s linear' }} />
               </div>
             )}
 
-            {/* Filtres (sélection avant/pendant le film) */}
-            <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 6px' }}>Filtres (couleur / lumière)</p>
-            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:12 }}>
-              {FILTRES.map(f => (
-                <button key={f.id} onClick={() => setFiltre(f.id)}
-                  style={{ flexShrink:0, padding:'7px 14px', borderRadius:99, border:`1px solid ${filtre===f.id?'#4da6ff':'rgba(255,255,255,0.12)'}`, background: filtre===f.id?'rgba(77,166,255,0.15)':'rgba(255,255,255,0.04)', color: filtre===f.id?'#4da6ff':C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
-                  {f.nom}
+            {/* HAUT — fermer + pilule musique + minuteur */}
+            <div style={{ position:'absolute', top:0, left:0, right:0, padding:'16px 14px 0', display:'flex', alignItems:'center', gap:10, zIndex:5 }}>
+              {!recording && (
+                <button onClick={onClose} aria-label="Fermer"
+                  style={{ width:36, height:36, borderRadius:99, border:'none', background:'rgba(0,0,0,0.4)', color:'#fff', fontSize:22, lineHeight:1, cursor:'pointer', flexShrink:0 }}>×</button>
+              )}
+              <button onClick={() => !recording && setPanneau('musique')}
+                style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center', gap:7, padding:'8px 14px', borderRadius:99, border:'none', background:'rgba(0,0,0,0.45)', backdropFilter:'blur(10px)', color:'#fff', fontSize:13, fontWeight:600, cursor: recording?'default':'pointer' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{chanson?.label || chanson?.titre || 'Choisir la musique'}</span>
+              </button>
+              {recording && (
+                <div style={{ background:'rgba(254,44,85,0.95)', borderRadius:99, padding:'6px 13px', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>
+                  {Math.floor(tempsEcoule/60)}:{String(tempsEcoule%60).padStart(2,'0')}
+                </div>
+              )}
+            </div>
+
+            {/* COLONNE DROITE — outils */}
+            <div style={{ position:'absolute', right:12, top:'20%', display:'flex', flexDirection:'column', gap:20, zIndex:5 }}>
+              {[
+                { id:'flip',    label:'Retourner', actif:false, onTap:() => setCameraFace(cameraFace==='user'?'environment':'user'),
+                  svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><path d="M20 8a8 8 0 0 0-14-3M4 16a8 8 0 0 0 14 3"/><polyline points="4 4 4 9 9 9"/><polyline points="20 20 20 15 15 15"/></svg> },
+                { id:'filtres', label:'Filtres', actif: filtre!=='aucun', onTap:() => setPanneau('filtres'),
+                  svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8"><circle cx="9" cy="9" r="6"/><circle cx="15" cy="15" r="6"/></svg> },
+                { id:'effets',  label:'Effets', actif: effet!=='aucun', onTap:() => setPanneau('effets'),
+                  svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 3l2.2 5.6L20 10l-5.8 1.4L12 17l-2.2-5.6L4 10l5.8-1.4z"/><path d="M18 16l.8 2L21 19l-2.2.9L18 22l-.8-2.1L15 19l2.2-1z"/></svg> },
+                { id:'son',     label: sonCoupe?'Muet':'Musique', actif: sonCoupe, onTap:() => setSonCoupe(!sonCoupe),
+                  svg: sonCoupe
+                    ? <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#fff"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+                    : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#fff"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg> },
+              ].map(o => (
+                <button key={o.id} onClick={o.onTap}
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity: recording && o.id!=='flip' ? 0.45 : 1 }}>
+                  <span style={{ width:46, height:46, borderRadius:99, background: o.actif ? 'rgba(254,44,85,0.9)' : 'rgba(0,0,0,0.35)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {o.svg}
+                  </span>
+                  <span style={{ color:'#fff', fontSize:10.5, fontWeight:600, textShadow:'0 1px 3px rgba(0,0,0,0.6)' }}>{o.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* Effets de mouvement (zoom animé) */}
-            <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, margin:'0 0 6px' }}>Effets de mouvement (zoom)</p>
-            <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:14 }}>
-              {EFFETS.map(e => (
-                <button key={e.id} onClick={() => setEffet(e.id)}
-                  style={{ flexShrink:0, padding:'7px 14px', borderRadius:99, border:`1px solid ${effet===e.id?'#f5c84c':'rgba(255,255,255,0.12)'}`, background: effet===e.id?'rgba(245,200,76,0.15)':'rgba(255,255,255,0.04)', color: effet===e.id?'#f5c84c':C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
-                  {e.nom}
-                </button>
-              ))}
-            </div>
-
-            {!recording ? (
-              <button onClick={demarrerFilm}
-                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#f04a6a,#d0324e)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-                Commencer à filmer
-              </button>
-            ) : (
-              <button onClick={arreterFilm}
-                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'#fff', color:'#f04a6a', fontWeight:800, fontSize:15, cursor:'pointer' }}>
-                Arrêter et voir
-              </button>
+            {/* Message d'état (chargement effets visage, erreurs) */}
+            {(faceStatus || msg) && (
+              <div style={{ position:'absolute', bottom:170, left:16, right:16, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)', borderRadius:12, padding:'10px 14px', textAlign:'center', zIndex:5 }}>
+                <span style={{ color:'#fff', fontSize:12.5, fontWeight:600 }}>{faceStatus || msg}</span>
+              </div>
             )}
-            <p style={{ color:C.textSoft, fontSize:11, textAlign:'center', marginTop:8 }}>Durée maximum : 1 min 15 s (arrêt automatique).</p>
-            {msg && <p style={{ color:'#f04a6a', fontSize:12, textAlign:'center', marginTop:10 }}>{msg}</p>}
-          </>
+
+            {/* BAS — bouton d'enregistrement */}
+            <div style={{ position:'absolute', bottom:0, left:0, right:0, paddingBottom:38, display:'flex', flexDirection:'column', alignItems:'center', gap:12, zIndex:5 }}>
+              {!recording && (
+                <p style={{ color:'rgba(255,255,255,0.75)', fontSize:11.5, margin:0, textShadow:'0 1px 3px rgba(0,0,0,0.6)' }}>Maintenez pour filmer · 1 min 15 max</p>
+              )}
+              <button onClick={recording ? arreterFilm : demarrerFilm} aria-label={recording?'Arrêter':'Filmer'}
+                style={{ position:'relative', width:86, height:86, borderRadius:99, border:'none', background:'none', cursor:'pointer', padding:0 }}>
+                {/* Anneau de progression */}
+                <svg width="86" height="86" viewBox="0 0 86 86" style={{ position:'absolute', inset:0, transform:'rotate(-90deg)' }}>
+                  <circle cx="43" cy="43" r="39" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="5" />
+                  {recording && (
+                    <circle cx="43" cy="43" r="39" fill="none" stroke="#fe2c55" strokeWidth="5" strokeLinecap="round"
+                      strokeDasharray={2*Math.PI*39}
+                      strokeDashoffset={2*Math.PI*39*(1 - tempsEcoule/DUREE_MAX)}
+                      style={{ transition:'stroke-dashoffset 1s linear' }} />
+                  )}
+                </svg>
+                {/* Pastille centrale */}
+                <span style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+                  width: recording ? 30 : 66, height: recording ? 30 : 66,
+                  borderRadius: recording ? 8 : 99, background:'#fe2c55',
+                  transition:'all .22s ease', display:'block' }} />
+              </button>
+            </div>
+
+            {/* ── PANNEAU FILTRES ── */}
+            {panneau === 'filtres' && (
+              <div onClick={() => setPanneau('aucun')} style={{ position:'absolute', inset:0, zIndex:20, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
+                <div onClick={e => e.stopPropagation()} style={{ background:'rgba(18,18,22,0.96)', backdropFilter:'blur(20px)', borderRadius:'18px 18px 0 0', padding:'16px 0 30px' }}>
+                  <div style={{ width:38, height:4, borderRadius:99, background:'rgba(255,255,255,0.25)', margin:'0 auto 14px' }} />
+                  <p style={{ color:'#fff', fontSize:14, fontWeight:700, margin:'0 0 14px', paddingLeft:18 }}>Filtres</p>
+                  <div style={{ display:'flex', gap:12, overflowX:'auto', padding:'0 18px 4px' }}>
+                    {FILTRES.map(f => (
+                      <button key={f.id} onClick={() => { setFiltre(f.id); setPanneau('aucun'); }}
+                        style={{ flexShrink:0, background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:7 }}>
+                        <span style={{ width:62, height:62, borderRadius:14, display:'block',
+                          background:'linear-gradient(135deg,#ff9a6b,#c86a9c 45%,#4a6fd4)',
+                          filter: f.css === 'none' ? 'none' : f.css,
+                          outline: filtre===f.id ? '3px solid #fe2c55' : '2px solid rgba(255,255,255,0.15)', outlineOffset:2 }} />
+                        <span style={{ color: filtre===f.id ? '#fe2c55' : 'rgba(255,255,255,0.85)', fontSize:11, fontWeight:600 }}>{f.nom}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── PANNEAU EFFETS ── */}
+            {panneau === 'effets' && (
+              <div onClick={() => setPanneau('aucun')} style={{ position:'absolute', inset:0, zIndex:20, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
+                <div onClick={e => e.stopPropagation()} style={{ background:'rgba(18,18,22,0.96)', backdropFilter:'blur(20px)', borderRadius:'18px 18px 0 0', padding:'16px 0 30px', maxHeight:'62vh', overflowY:'auto' }}>
+                  <div style={{ width:38, height:4, borderRadius:99, background:'rgba(255,255,255,0.25)', margin:'0 auto 14px' }} />
+                  <p style={{ color:'#fff', fontSize:14, fontWeight:700, margin:'0 0 14px', paddingLeft:18 }}>Effets</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, padding:'0 18px' }}>
+                    {EFFETS.map(e => {
+                      const estVisage = e.id.startsWith('face_');
+                      return (
+                        <button key={e.id} onClick={() => { setEffet(e.id); setPanneau('aucun'); }}
+                          style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+                          <span style={{ width:58, height:58, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24,
+                            background: estVisage ? 'linear-gradient(135deg,#7b3fe4,#c840a0)' : 'linear-gradient(135deg,#2b3350,#4a5578)',
+                            outline: effet===e.id ? '3px solid #fe2c55' : '2px solid rgba(255,255,255,0.12)', outlineOffset:2 }}>
+                            <IconeEffet id={e.id} />
+                          </span>
+                          <span style={{ color: effet===e.id ? '#fe2c55' : 'rgba(255,255,255,0.85)', fontSize:10.5, fontWeight:600, textAlign:'center', lineHeight:1.25 }}>{e.nom}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── PANNEAU MUSIQUE (sélection de l'extrait) ── */}
+            {panneau === 'musique' && (
+              <div onClick={() => setPanneau('aucun')} style={{ position:'absolute', inset:0, zIndex:20, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
+                <div onClick={e => e.stopPropagation()} style={{ background:'rgba(18,18,22,0.96)', backdropFilter:'blur(20px)', borderRadius:'18px 18px 0 0', padding:'16px 18px 30px' }}>
+                  <div style={{ width:38, height:4, borderRadius:99, background:'rgba(255,255,255,0.25)', margin:'0 auto 14px' }} />
+                  <p style={{ color:'#fff', fontSize:14, fontWeight:700, margin:'0 0 4px' }}>{chanson?.label || chanson?.titre || 'Chanson'}</p>
+
+                  {!chargeMusique ? (
+                    <div style={{ padding:'14px 0' }}>
+                      <p style={{ color:'rgba(255,255,255,0.6)', fontSize:12, margin:'0 0 10px' }}>Chargement de la musique...</p>
+                      <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:99, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:'40%', background:'#fe2c55', borderRadius:99, animation:'chLoad 1.2s ease-in-out infinite' }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p style={{ color:'rgba(255,255,255,0.6)', fontSize:12, margin:'0 0 12px' }}>
+                        {Math.floor(musiqueDebut/60)}:{String(musiqueDebut%60).padStart(2,'0')} → {Math.floor(musiqueFin/60)}:{String(musiqueFin%60).padStart(2,'0')} · {musiqueFin - musiqueDebut}s
+                      </p>
+
+                      <div
+                        ref={bandeRef}
+                        onPointerDown={(e) => {
+                          const bande = bandeRef.current; if (!bande) return;
+                          const rect = bande.getBoundingClientRect();
+                          const pos = ((e.clientX - rect.left) / rect.width) * dureeMusique;
+                          poigneeRef.current = Math.abs(pos - musiqueDebut) < Math.abs(pos - musiqueFin) ? 'debut' : 'fin';
+                        }}
+                        onPointerMove={(e) => {
+                          if (!poigneeRef.current) return;
+                          const bande = bandeRef.current; if (!bande) return;
+                          const rect = bande.getBoundingClientRect();
+                          let pos = Math.round(((e.clientX - rect.left) / rect.width) * dureeMusique);
+                          pos = Math.max(0, Math.min(dureeMusique, pos));
+                          if (poigneeRef.current === 'debut') {
+                            const nv = Math.max(0, Math.min(pos, musiqueFin - 1));
+                            setMusiqueDebut(nv);
+                            if (musiqueFin - nv > DUREE_MAX_MUSIQUE) setMusiqueFin(nv + DUREE_MAX_MUSIQUE);
+                          } else {
+                            const nv = Math.min(dureeMusique, Math.max(pos, musiqueDebut + 1));
+                            setMusiqueFin(nv);
+                            if (nv - musiqueDebut > DUREE_MAX_MUSIQUE) setMusiqueDebut(nv - DUREE_MAX_MUSIQUE);
+                          }
+                        }}
+                        onPointerUp={() => { poigneeRef.current = null; }}
+                        onPointerLeave={() => { poigneeRef.current = null; }}
+                        style={{ position:'relative', height:56, background:'rgba(255,255,255,0.06)', borderRadius:10, marginBottom:8, cursor:'pointer', touchAction:'none', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', gap:2, padding:'0 6px', opacity:0.25 }}>
+                          {Array.from({length:44}).map((_,i) => (
+                            <div key={i} style={{ flex:1, height:`${18 + Math.abs(Math.sin(i*1.7))*64}%`, background:'#fff', borderRadius:2 }} />
+                          ))}
+                        </div>
+                        <div style={{ position:'absolute', top:0, bottom:0, left:`${(musiqueDebut/dureeMusique)*100}%`, width:`${((musiqueFin-musiqueDebut)/dureeMusique)*100}%`, background:'rgba(254,44,85,0.22)', border:'2px solid #fe2c55', borderRadius:6 }} />
+                        {[musiqueDebut, musiqueFin].map((v,i) => (
+                          <div key={i} style={{ position:'absolute', top:0, bottom:0, left:`${(v/dureeMusique)*100}%`, width:14, marginLeft:-7, background:'#fe2c55', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 8px rgba(0,0,0,0.5)' }}>
+                            <div style={{ width:2, height:20, background:'rgba(255,255,255,0.7)' }} />
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:14 }}>
+                        <span>0:00</span>
+                        <span>{Math.floor(dureeMusique/60)}:{String(dureeMusique%60).padStart(2,'0')}</span>
+                      </div>
+
+                      <div style={{ display:'flex', gap:10 }}>
+                        <button onClick={() => {
+                            if (!audioRef.current) return;
+                            const a = audioRef.current;
+                            if (!a.paused) { a.pause(); setApercuJoue(false); return; }
+                            a.volume = 1; setMsg('');
+                            a.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
+                            a.onended = () => setApercuJoue(false);
+                            a.load();
+                            a.play().then(() => setApercuJoue(true)).catch(() => {
+                              a.src = urlChanson;
+                              a.load();
+                              const lancer = () => {
+                                try { a.currentTime = musiqueDebut; } catch {}
+                                a.play().then(() => {
+                                  setApercuJoue(true);
+                                  setTimeout(() => { try { a.pause(); } catch {} setApercuJoue(false); }, (musiqueFin - musiqueDebut) * 1000);
+                                }).catch(() => setMsg('Lecture impossible pour cette chanson.'));
+                              };
+                              if (a.readyState >= 2) lancer(); else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
+                            });
+                          }}
+                          style={{ flex:1, padding:'12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.18)', background:'transparent', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                          {apercuJoue
+                            ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" style={{verticalAlign:'-1px', marginRight:6}}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause</>
+                            : <><svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" style={{verticalAlign:'-1px', marginRight:6}}><polygon points="6 4 20 12 6 20"/></svg>Écouter</>}
+                        </button>
+                        <button onClick={() => { setPanneau('aucun'); setEtape(2); }}
+                          style={{ flex:1, padding:'12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.18)', background:'transparent', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                          Changer
+                        </button>
+                        <button onClick={() => setPanneau('aucun')}
+                          style={{ flex:1, padding:'12px', borderRadius:10, border:'none', background:'#fe2c55', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>
+                          OK
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ÉTAPE 4 — Aperçu + Publier */}
