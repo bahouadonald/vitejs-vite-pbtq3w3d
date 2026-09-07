@@ -14362,9 +14362,16 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     if (!user || solde < prixOscart) return;
     setPaying(true);
     try {
+      const kiffsGagnes = prixOscart * 250;
       const snap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
-      if (!snap.empty) await updateDoc(doc(db,'coins_solde',snap.docs[0].id), { solde: solde - prixOscart });
-      logTx(user.uid, 'telechargement', -prixOscart, 0, 'Téléchargement');
+      if (!snap.empty) {
+        const curSolde = snap.docs[0].data();
+        await updateDoc(doc(db,'coins_solde',snap.docs[0].id), {
+          solde: solde - prixOscart,
+          kiffsDispo: (curSolde.kiffsDispo || 0) + kiffsGagnes,
+        });
+      }
+      logTx(user.uid, 'telechargement', -prixOscart, kiffsGagnes, 'Téléchargement');
       const artSnap = await getDocs(query(collection(db,'artists'), where('email','==',artistEmail)));
       const commercialEmail = artSnap.empty ? '' : (artSnap.docs[0].data().commercialEmail || '');
       await addDoc(collection(db,'ventes'), {
@@ -14425,11 +14432,9 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
     </button>
   );
 
-  if (!user) return (
-    <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
-      Connectez-vous pour télécharger
-    </a>
-  );
+  // Pas de solde Oscart suffisant : on n'affiche rien ici, le paiement direct
+  // en devise (bouton géré par AchatWidget) reste toujours disponible.
+  if (!user || solde < prixOscart) return null;
 
   return (
     <div>
@@ -14486,20 +14491,36 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
   const [showDetail, setShowDetail] = useState(false);
 
   const [showPubAfterPay, setShowPubAfterPay] = useState(false);
+  const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
+  const user = auth.currentUser;
+  const prixOscart = Math.ceil(prix / 10);
+  const clePendante = 'dz_vente_pendante_' + qrId;
 
-  // Écouter en temps réel si le paiement a été confirmé (via webhook Wave)
+  // Reprendre l'écoute d'une vente en attente si l'utilisateur revient
+  // d'une redirection de paiement (GeniusPay quitte puis recharge la page).
+  useEffect(() => {
+    if (venteId) return;
+    try {
+      const idSauve = localStorage.getItem(clePendante);
+      if (idSauve) setVenteId(idSauve);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Écouter en temps réel si le paiement a été confirmé (via webhook GeniusPay)
   useEffect(() => {
     if (!venteId) return;
     const unsub = onSnapshot(doc(db, 'ventes', venteId), (d) => {
       if (d.exists() && d.data()?.dlActive) {
         setDlActive(true);
         setShowPubAfterPay(false);
+        try { localStorage.removeItem(clePendante); } catch { /* ignore */ }
       }
     });
     return unsub;
   }, [venteId]);
 
   const handlePay = async () => {
+    if (!user) return;
     if (state === 'loading') return;
     setState('loading');
     setErrMsg('');
@@ -14515,24 +14536,22 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       const partCommercial = Math.round(prix * 0.10);
 
       const venteRef = await addDoc(collection(db, 'ventes'), {
-        qrId, artistId, artistEmail, albumLabel, prix,
+        qrId, artistId, artistEmail, albumLabel, prix, prixOscart,
         partArtiste, partEntreprise, partCommercial,
-        commercialEmail,
+        commercialEmail, userId: user.uid,
         statut: 'en_attente', dlActive: false,
         readByArtist: false, createdAt: new Date().toISOString(),
       });
       setVenteId(venteRef.id);
+      try { localStorage.setItem(clePendante, venteRef.id); } catch { /* ignore */ }
 
-      // 2. Appeler la Vercel Serverless Function pour créer la session Wave
-      const res = await fetch('/api/wave-checkout', {
+      // 2. Appeler la Vercel Serverless Function pour créer le paiement GeniusPay
+      const res = await fetch('/api/creer-paiement-telechargement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: prix,
-          albumLabel,
-          qrId,
-          venteId: venteRef.id,
-          type: 'album',
+          venteId: venteRef.id, prix, prixOscart, qrId, albumLabel,
+          uid: user.uid, email: user.email, nom: user.displayName,
         }),
       });
 
@@ -14541,16 +14560,16 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
         throw new Error(err.error || 'Erreur serveur');
       }
 
-      const { wave_launch_url } = await res.json();
+      const { url } = await res.json();
 
-      // 3. Rediriger vers Wave pour le paiement
-      // Wave redirigera vers /fan/:qrId?payment=success après paiement
-      window.location.href = wave_launch_url;
+      // 3. Rediriger vers la page de paiement (Wave, Orange Money, MTN, carte...)
+      // GeniusPay redirigera vers /fan/:qrId?paiement=succes après paiement
+      window.location.href = url;
 
     } catch (e: any) {
       if (e.message?.includes('permissions')) {
         setErrMsg('Connexion Firestore refusée. Vérifiez les règles de sécurité.');
-      } else if (e.message?.includes('wave-checkout') || e.message?.includes('fetch')) {
+      } else if (e.message?.includes('fetch')) {
         setErrMsg('Service de paiement non disponible. Réessayez plus tard.');
       } else {
         setErrMsg(e.message || 'Erreur lors de la création du paiement');
@@ -14637,12 +14656,39 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
           <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
-            <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 8px' }}>Télécharger {albumLabel || ''}</p>
-            <p style={{ color:C.gold, fontWeight:800, fontSize:24, margin:'0 0 4px', display:'inline-flex', alignItems:'center', gap:6, justifyContent:'center' }}>
-              <img src={COIN_OSCART_SYMBOLE} alt="" style={{ width:24, height:24 }} />{Math.ceil(prix / 10)} Oscart
+            <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 12px' }}>Télécharger {albumLabel || ''}</p>
+
+            {/* Prix affiché directement en devise (sélecteur F CFA / € / $) */}
+            <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:10 }}>
+              {(['fcfa','eur','usd'] as const).map(d => (
+                <button key={d} onClick={() => setDevise(d)}
+                  style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${devise===d?C.gold:C.border}`, background:devise===d?'rgba(255,215,0,0.15)':'transparent', color:devise===d?C.gold:C.textSoft, fontSize:11, cursor:'pointer' }}>
+                  {d === 'fcfa' ? 'F CFA' : d === 'eur' ? '€' : '$'}
+                </button>
+              ))}
+            </div>
+            <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 4px' }}>
+              {devise === 'eur' ? `${(prix * 0.0015).toFixed(2)} €` : devise === 'usd' ? `${(prix * 0.0016).toFixed(2)} $` : `${prix.toLocaleString()} F CFA`}
             </p>
-            <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>1 Oscart = 10 F CFA</p>
-            <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
+            <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>Paiement immédiat — pas besoin de recharger vos Oscart au préalable</p>
+
+            {!user ? (
+              <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
+                Connectez-vous pour télécharger
+              </a>
+            ) : (
+              <>
+                {/* Si l'utilisateur a assez d'Oscart, l'équivalent est prélevé automatiquement */}
+                <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
+                {/* Sinon (ou en plus), paiement direct en devise via Wave / Orange Money / MTN / carte */}
+                <button onClick={handlePay} disabled={state === 'loading'}
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', marginTop:10, background: state==='loading' ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor: state==='loading' ? 'wait' : 'pointer' }}>
+                  {state === 'loading' ? 'Redirection en cours...' : `Payer ${devise === 'eur' ? `${(prix*0.0015).toFixed(2)} €` : devise === 'usd' ? `${(prix*0.0016).toFixed(2)} $` : `${prix.toLocaleString()} F CFA`} directement`}
+                </button>
+                {errMsg && <p style={{ color:'#ff5a5a', fontSize:12, margin:'8px 0 0' }}>{errMsg}</p>}
+              </>
+            )}
+
             <button onClick={() => { setShowDetail(false); onExternalClose?.(); }}
               style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer', marginTop:10 }}>
               Annuler
@@ -14655,7 +14701,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       {!hideButton && (
         <button onClick={() => setShowDetail(true)}
           style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          <span style={{ fontSize:18 }}>⬇</span> Télécharger
+          <span style={{ fontSize:18 }}>⬇</span> Télécharger · {prix.toLocaleString()} F CFA
         </button>
       )}
     </div>

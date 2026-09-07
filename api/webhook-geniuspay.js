@@ -53,6 +53,13 @@ export default async function handler(req, res) {
     }
 
     const meta = payload.data?.metadata || {};
+    const reference0 = payload.data?.reference || '';
+
+    // 3bis. Paiement direct d'un téléchargement (pas de recharge Oscart)
+    if (meta.type === 'telechargement_direct') {
+      return await traiterTelechargementDirect(meta, reference0, res);
+    }
+
     if (meta.type !== 'recharge_oscart' || !meta.uid || !meta.oscart) {
       return res.status(200).json({ ok: true, ignore: 'pas une recharge' });
     }
@@ -124,5 +131,96 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, credite: oscartAcrediter });
   } catch (e) {
     return res.status(500).json({ error: e.message || 'Erreur serveur' });
+  }
+}
+
+// Paiement direct d'un téléchargement (en devise, sans passer par le solde Oscart) :
+// active le téléchargement sur la vente concernée et crédite les kiffs de l'acheteur,
+// exactement comme pour un kiffement (règle : 1 Oscart équivalent = 250 kiffs).
+async function traiterTelechargementDirect(meta, reference, res) {
+  try {
+    if (!meta.venteId || !meta.uid) {
+      return res.status(200).json({ ok: true, ignore: 'paramètres manquants' });
+    }
+
+    const PROJECT = process.env.FIREBASE_PROJECT_ID;
+    const KEY = process.env.FIREBASE_API_KEY;
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+
+    // Anti-doublon : si cette référence a déjà été traitée, on s'arrête
+    const dejaUrl = `${baseUrl}/paiements_traites/${reference}?key=${KEY}`;
+    const dejaResp = await fetch(dejaUrl);
+    if (dejaResp.ok) {
+      return res.status(200).json({ ok: true, ignore: 'déjà traité' });
+    }
+
+    const uid = meta.uid;
+    const venteId = meta.venteId;
+    const prixOscart = parseInt(meta.prixOscart, 10) || 0;
+    const kiffsGagnes = prixOscart * 250;
+
+    // 1. Activer le téléchargement sur la vente
+    await fetch(`${baseUrl}/ventes/${venteId}?key=${KEY}&updateMask.fieldPaths=dlActive&updateMask.fieldPaths=statut`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: {
+        dlActive: { booleanValue: true },
+        statut: { stringValue: 'paid' },
+      } }),
+    });
+
+    // 2. Créditer les kiffs de l'acheteur (celui qui télécharge obtient toujours des kiffs)
+    const queryResp = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'coins_solde' }],
+          where: { fieldFilter: { field: { fieldPath: 'uid' }, op: 'EQUAL', value: { stringValue: uid } } },
+          limit: 1,
+        },
+      }),
+    });
+    const resultats = await queryResp.json();
+    const docTrouve = Array.isArray(resultats) ? resultats.find(r => r.document) : null;
+
+    if (docTrouve && docTrouve.document) {
+      const nomDoc = docTrouve.document.name;
+      const kiffsActuels = parseInt(docTrouve.document.fields?.kiffsDispo?.integerValue || '0', 10);
+      await fetch(`https://firestore.googleapis.com/v1/${nomDoc}?key=${KEY}&updateMask.fieldPaths=kiffsDispo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { kiffsDispo: { integerValue: String(kiffsActuels + kiffsGagnes) } } }),
+      });
+    } else {
+      await fetch(`${baseUrl}/coins_solde?key=${KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: {
+          uid: { stringValue: uid },
+          solde: { integerValue: '0' },
+          kiffsDispo: { integerValue: String(kiffsGagnes) },
+        } }),
+      });
+    }
+
+    // 3. Marquer cette référence comme traitée (anti-doublon)
+    if (reference) {
+      await fetch(`${baseUrl}/paiements_traites?documentId=${reference}&key=${KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: {
+          reference: { stringValue: reference },
+          uid: { stringValue: uid },
+          venteId: { stringValue: venteId },
+          type: { stringValue: 'telechargement_direct' },
+          traiteLe: { stringValue: new Date().toISOString() },
+        } }),
+      });
+    }
+
+    return res.status(200).json({ ok: true, dlActive: true, kiffsGagnes });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'Erreur serveur (téléchargement direct)' });
   }
 }
