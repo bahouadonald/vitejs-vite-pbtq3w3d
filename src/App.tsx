@@ -9657,6 +9657,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const rafRef = useRef<any>(null);
   const figeRef = useRef<HTMLCanvasElement|null>(null);    // image figée du Time Warp
   const scanPrevRef = useRef<number>(0);                    // position précédente de la ligne
+  const compteurImageRef = useRef(0);                        // pour n'analyser le visage qu'une image sur deux (allège le processeur)
   const croquisRef = useRef<HTMLCanvasElement|null>(null);  // tampon du croquis
   const t0Ref = useRef<number>(0);
   const filtreRef = useRef('aucun');
@@ -9753,12 +9754,19 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     const eff = effetRef.current;
     const estVisage = eff.startsWith('face_');
 
-    // Détection du visage (si un effet visage est actif et le détecteur prêt)
+    // Détection du visage (si un effet visage est actif et le détecteur prêt) —
+    // une image sur deux seulement : la détection IA est coûteuse en calcul, et
+    // la position du visage ne change pas assez vite pour justifier de la
+    // relancer à chaque image. Sur les images sautées, on garde la dernière
+    // position connue (le mouvement reste fluide, juste moins souvent recalculé).
     if (estVisage && faceLandmarkerRef.current) {
-      try {
-        const res = faceLandmarkerRef.current.detectForVideo(vd, performance.now());
-        faceRef.current = (res && res.faceLandmarks && res.faceLandmarks[0]) ? res.faceLandmarks[0] : null;
-      } catch { /* ignore une image ratée */ }
+      compteurImageRef.current++;
+      if (compteurImageRef.current % 2 === 0) {
+        try {
+          const res = faceLandmarkerRef.current.detectForVideo(vd, performance.now());
+          faceRef.current = (res && res.faceLandmarks && res.faceLandmarks[0]) ? res.faceLandmarks[0] : null;
+        } catch { /* ignore une image ratée */ }
+      }
     }
     const face = estVisage ? faceRef.current : null;
 
