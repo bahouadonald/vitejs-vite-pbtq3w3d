@@ -9311,6 +9311,7 @@ function MesChallengesPage() {
   const [tousChallenges, setTousChallenges] = useState<any[]>([]);
   const [contenus, setContenus] = useState<any[]>([]);
   const [sortiesTeaser, setSortiesTeaser] = useState<any[]>([]);
+  const [qrContenus, setQrContenus] = useState<any[]>([]);
   const [creer, setCreer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ongletCh, setOngletCh] = useState<'tous'|'mes'>('tous');
@@ -9357,11 +9358,33 @@ function MesChallengesPage() {
         };
       }))
     );
-    return () => { unsub(); unsubTous(); unsubSorties(); };
+    // QR codes (circuit principal de diffusion/téléchargement) — beaucoup de
+    // contenus n'ont jamais été explicitement "publiés sur Découvrir", ce qui
+    // les rendait invisibles pour les challenges alors qu'ils existent bien.
+    const unsubQr = onSnapshot(
+      query(collection(db, 'qrcodes'), orderBy('createdAt','desc')),
+      snap => setQrContenus(snap.docs.map(d => {
+        const q: any = d.data();
+        return {
+          id: 'qr_' + d.id, publicLinkId: q.publicLinkId,
+          artist: q.artist, artistEmail: q.artistEmail,
+          label: q.label, coverUrl: q.coverUrl || '',
+          files: q.files || [],
+        };
+      }).filter((q:any) => q.files && q.files.length > 0))
+    );
+    return () => { unsub(); unsubTous(); unsubSorties(); unsubQr(); };
   }, []);
 
-  // Chansons disponibles pour un challenge = contenus Découvrir + teasers des sorties officielles
-  const contenusChallenge = [...contenus, ...sortiesTeaser];
+  // Chansons disponibles pour un challenge = contenus Découvrir + teasers des
+  // sorties officielles + tout ce qui existe via QR code (sans doublonner un
+  // contenu déjà publié sur Découvrir, reconnu par son publicLinkId).
+  const publicLinkIdsDecouvrir = new Set(contenus.map((c:any) => c.publicLinkId).filter(Boolean));
+  const contenusChallenge = [
+    ...contenus,
+    ...sortiesTeaser,
+    ...qrContenus.filter((q:any) => !q.publicLinkId || !publicLinkIdsDecouvrir.has(q.publicLinkId)),
+  ];
 
   // Kiffer un challenge (like simple, +1)
   const kifferChallenge = async (ch: any) => {
