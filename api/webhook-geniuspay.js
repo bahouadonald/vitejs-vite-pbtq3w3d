@@ -59,6 +59,10 @@ export default async function handler(req, res) {
     if (meta.type === 'telechargement_direct') {
       return await traiterTelechargementDirect(meta, reference0, res);
     }
+    // 3ter. Paiement direct d'une réservation / pré-téléchargement (pas de recharge Oscart)
+    if (meta.type === 'reservation_directe') {
+      return await traiterReservationDirecte(meta, reference0, res);
+    }
 
     if (meta.type !== 'recharge_oscart' || !meta.uid || !meta.oscart) {
       return res.status(200).json({ ok: true, ignore: 'pas une recharge' });
@@ -134,6 +138,45 @@ export default async function handler(req, res) {
   }
 }
 
+// Crédite des kiffs à un utilisateur (celui qui télécharge ou réserve obtient
+// toujours des kiffs — règle : 1 Oscart équivalent = 250 kiffs), qu'il ait payé
+// avec son solde Oscart ou directement en devise.
+async function crediterKiffs(uid, kiffsGagnes, baseUrl, KEY) {
+  const queryResp = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'coins_solde' }],
+        where: { fieldFilter: { field: { fieldPath: 'uid' }, op: 'EQUAL', value: { stringValue: uid } } },
+        limit: 1,
+      },
+    }),
+  });
+  const resultats = await queryResp.json();
+  const docTrouve = Array.isArray(resultats) ? resultats.find(r => r.document) : null;
+
+  if (docTrouve && docTrouve.document) {
+    const nomDoc = docTrouve.document.name;
+    const kiffsActuels = parseInt(docTrouve.document.fields?.kiffsDispo?.integerValue || '0', 10);
+    await fetch(`https://firestore.googleapis.com/v1/${nomDoc}?key=${KEY}&updateMask.fieldPaths=kiffsDispo`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { kiffsDispo: { integerValue: String(kiffsActuels + kiffsGagnes) } } }),
+    });
+  } else {
+    await fetch(`${baseUrl}/coins_solde?key=${KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: {
+        uid: { stringValue: uid },
+        solde: { integerValue: '0' },
+        kiffsDispo: { integerValue: String(kiffsGagnes) },
+      } }),
+    });
+  }
+}
+
 // Paiement direct d'un téléchargement (en devise, sans passer par le solde Oscart) :
 // active le téléchargement sur la vente concernée et crédite les kiffs de l'acheteur,
 // exactement comme pour un kiffement (règle : 1 Oscart équivalent = 250 kiffs).
@@ -170,39 +213,7 @@ async function traiterTelechargementDirect(meta, reference, res) {
     });
 
     // 2. Créditer les kiffs de l'acheteur (celui qui télécharge obtient toujours des kiffs)
-    const queryResp = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: 'coins_solde' }],
-          where: { fieldFilter: { field: { fieldPath: 'uid' }, op: 'EQUAL', value: { stringValue: uid } } },
-          limit: 1,
-        },
-      }),
-    });
-    const resultats = await queryResp.json();
-    const docTrouve = Array.isArray(resultats) ? resultats.find(r => r.document) : null;
-
-    if (docTrouve && docTrouve.document) {
-      const nomDoc = docTrouve.document.name;
-      const kiffsActuels = parseInt(docTrouve.document.fields?.kiffsDispo?.integerValue || '0', 10);
-      await fetch(`https://firestore.googleapis.com/v1/${nomDoc}?key=${KEY}&updateMask.fieldPaths=kiffsDispo`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: { kiffsDispo: { integerValue: String(kiffsActuels + kiffsGagnes) } } }),
-      });
-    } else {
-      await fetch(`${baseUrl}/coins_solde?key=${KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: {
-          uid: { stringValue: uid },
-          solde: { integerValue: '0' },
-          kiffsDispo: { integerValue: String(kiffsGagnes) },
-        } }),
-      });
-    }
+    await crediterKiffs(uid, kiffsGagnes, baseUrl, KEY);
 
     // 3. Marquer cette référence comme traitée (anti-doublon)
     if (reference) {
@@ -222,5 +233,90 @@ async function traiterTelechargementDirect(meta, reference, res) {
     return res.status(200).json({ ok: true, dlActive: true, kiffsGagnes });
   } catch (e) {
     return res.status(500).json({ error: e.message || 'Erreur serveur (téléchargement direct)' });
+  }
+}
+
+// Paiement direct d'une réservation / pré-téléchargement de sortie officielle
+// (en devise, sans passer par le solde Oscart) : confirme la réservation,
+// incrémente le compteur de la sortie et crédite les kiffs de l'acheteur.
+async function traiterReservationDirecte(meta, reference, res) {
+  try {
+    if (!meta.reservationId || !meta.sortieId || !meta.uid) {
+      return res.status(200).json({ ok: true, ignore: 'paramètres manquants' });
+    }
+
+    const PROJECT = process.env.FIREBASE_PROJECT_ID;
+    const KEY = process.env.FIREBASE_API_KEY;
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+
+    // Anti-doublon : si cette référence a déjà été traitée, on s'arrête
+    const dejaUrl = `${baseUrl}/paiements_traites/${reference}?key=${KEY}`;
+    const dejaResp = await fetch(dejaUrl);
+    if (dejaResp.ok) {
+      return res.status(200).json({ ok: true, ignore: 'déjà traité' });
+    }
+
+    const uid = meta.uid;
+    const reservationId = meta.reservationId;
+    const sortieId = meta.sortieId;
+    const prixOscart = parseInt(meta.prixOscart, 10) || 0;
+    const kiffsGagnes = prixOscart * 250;
+
+    // 1. Confirmer la réservation
+    await fetch(`${baseUrl}/reservations/${reservationId}?key=${KEY}&updateMask.fieldPaths=statut`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { statut: { stringValue: 'reserve' } } }),
+    });
+
+    // 2. Incrémenter le compteur de réservations de la sortie (+ part artiste 70%)
+    const sortieResp = await fetch(`${baseUrl}/sorties/${sortieId}?key=${KEY}`);
+    if (sortieResp.ok) {
+      const sortieDoc = await sortieResp.json();
+      const reservationsActuelles = parseInt(sortieDoc.fields?.reservations?.integerValue || '0', 10);
+      await fetch(`https://firestore.googleapis.com/v1/${sortieDoc.name}?key=${KEY}&updateMask.fieldPaths=reservations`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { reservations: { integerValue: String(reservationsActuelles + 1) } } }),
+      });
+      const artistEmail = sortieDoc.fields?.artistEmail?.stringValue || '';
+      const titre = sortieDoc.fields?.titre?.stringValue || '';
+      if (artistEmail) {
+        const partArtiste = Math.round(prixOscart * 0.7);
+        await fetch(`${baseUrl}/ventes?key=${KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: {
+            artistEmail: { stringValue: artistEmail },
+            type: { stringValue: 'reservation' },
+            titre: { stringValue: titre },
+            montantOscart: { integerValue: String(partArtiste) },
+            createdAt: { stringValue: new Date().toISOString() },
+          } }),
+        });
+      }
+    }
+
+    // 3. Créditer les kiffs de l'acheteur (celui qui réserve obtient toujours des kiffs)
+    await crediterKiffs(uid, kiffsGagnes, baseUrl, KEY);
+
+    // 4. Marquer cette référence comme traitée (anti-doublon)
+    if (reference) {
+      await fetch(`${baseUrl}/paiements_traites?documentId=${reference}&key=${KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: {
+          reference: { stringValue: reference },
+          uid: { stringValue: uid },
+          reservationId: { stringValue: reservationId },
+          type: { stringValue: 'reservation_directe' },
+          traiteLe: { stringValue: new Date().toISOString() },
+        } }),
+      });
+    }
+
+    return res.status(200).json({ ok: true, statut: 'reserve', kiffsGagnes });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'Erreur serveur (réservation directe)' });
   }
 }

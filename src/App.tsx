@@ -9012,9 +9012,13 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       const solde = soldeSnap.empty ? 0 : (soldeSnap.docs[0].data().solde || 0);
       if (solde < s.prixOscart) { setMsg(`Solde insuffisant. Il vous faut ${s.prixOscart} Oscart.`); setReserving(false); return; }
-      // Débiter
-      await updateDoc(doc(db,'coins_solde',soldeSnap.docs[0].id), { solde: solde - s.prixOscart });
-      logTx(user.uid, 'reservation', -s.prixOscart, 0, 'Réservation de sortie');
+      const kiffsGagnes = s.prixOscart * 250;
+      // Débiter + créditer les kiffs (celui qui réserve obtient toujours des kiffs)
+      await updateDoc(doc(db,'coins_solde',soldeSnap.docs[0].id), {
+        solde: solde - s.prixOscart,
+        kiffsDispo: (soldeSnap.docs[0].data().kiffsDispo || 0) + kiffsGagnes,
+      });
+      logTx(user.uid, 'reservation', -s.prixOscart, kiffsGagnes, 'Réservation de sortie');
       // Créer la réservation
       await addDoc(collection(db,'reservations'), {
         sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
@@ -9062,7 +9066,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         text: `${user.displayName || 'Quelqu\'un'} a réservé "${s.titre}" de ${s.artistName}. Réserve-la toi aussi avant la sortie !`,
         createdAt: new Date().toISOString(), lu:false,
       });
-      setReserve(true); setMsg('Réservé ! Vous recevrez le contenu le jour de la sortie.');
+      setReserve(true); setShowDetail(false); setMsg('Réservé ! Vous recevrez le contenu le jour de la sortie.');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
   };
@@ -9083,6 +9087,67 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       });
     } catch {}
   };
+
+  // ── Paiement direct en devise (sans passer par une recharge Oscart) ──
+  const [devise, setDevise] = useState<'fcfa'|'eur'|'usd'>('fcfa');
+  const [showDetail, setShowDetail] = useState(false);
+  const [payingDirect, setPayingDirect] = useState(false);
+  const [reservationId, setReservationId] = useState('');
+  const cleReservationPendante = 'dz_reservation_pendante_' + s.id;
+
+  // Reprendre l'écoute d'une réservation en attente au retour d'une redirection de paiement
+  useEffect(() => {
+    if (reservationId) return;
+    try {
+      const idSauve = localStorage.getItem(cleReservationPendante);
+      if (idSauve) setReservationId(idSauve);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Écouter en temps réel la confirmation du paiement direct (via webhook GeniusPay)
+  useEffect(() => {
+    if (!reservationId) return;
+    const unsub = onSnapshot(doc(db, 'reservations', reservationId), (d) => {
+      if (d.exists() && d.data()?.statut === 'reserve') {
+        setReserve(true);
+        setPayingDirect(false);
+        setShowDetail(false);
+        try { localStorage.removeItem(cleReservationPendante); } catch { /* ignore */ }
+      }
+    });
+    return unsub;
+  }, [reservationId]);
+
+  const payerDirect = async () => {
+    if (!user) { window.location.href = '/ziko'; return; }
+    setPayingDirect(true); setMsg('');
+    try {
+      const resRef = await addDoc(collection(db,'reservations'), {
+        sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
+        userId: user.uid, userEmail: user.email, userName: user.displayName || user.email,
+        prixOscart: s.prixOscart, statut:'en_attente', telecharge:false,
+        createdAt: new Date().toISOString(),
+      });
+      setReservationId(resRef.id);
+      try { localStorage.setItem(cleReservationPendante, resRef.id); } catch { /* ignore */ }
+
+      const res = await fetch('/api/creer-paiement-reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId: resRef.id, sortieId: s.id, prix: s.prixMusique, prixOscart: s.prixOscart,
+          uid: user.uid, email: user.email, nom: user.displayName,
+        }),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erreur serveur'); }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (e:any) {
+      setMsg('Erreur : ' + e.message);
+      setPayingDirect(false);
+    }
+  };
+
 
   return (
     <div id={'sortie-' + s.id} style={{ marginBottom:14, background:C.card, border:`1px solid ${cible ? C.blue : C.border}`, boxShadow: cible ? `0 0 0 2px ${C.blue}` : 'none', borderRadius:14, overflow:'hidden' }}>
@@ -9168,6 +9233,46 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
 
         {msg && <p style={{ color: msg.startsWith('') ? C.success:C.alert, fontSize:11, margin:'0 0 6px' }}>{msg}</p>}
 
+        {/* Modal détail prix (paiement direct ou via solde Oscart) */}
+        {showDetail && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+            onClick={() => setShowDetail(false)}>
+            <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
+              <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 12px' }}>Réserver {s.titre}</p>
+              <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:10 }}>
+                {(['fcfa','eur','usd'] as const).map(d => (
+                  <button key={d} onClick={() => setDevise(d)}
+                    style={{ padding:'4px 12px', borderRadius:99, border:`1px solid ${devise===d?C.gold:C.border}`, background:devise===d?'rgba(255,215,0,0.15)':'transparent', color:devise===d?C.gold:C.textSoft, fontSize:11, cursor:'pointer' }}>
+                    {d === 'fcfa' ? 'F CFA' : d === 'eur' ? '€' : '$'}
+                  </button>
+                ))}
+              </div>
+              <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 4px' }}>
+                {devise === 'eur' ? `${(s.prixMusique * 0.0015).toFixed(2)} €` : devise === 'usd' ? `${(s.prixMusique * 0.0016).toFixed(2)} $` : `${s.prixMusique.toLocaleString()} F CFA`}
+              </p>
+              <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>Paiement immédiat — pas besoin de recharger vos Oscart au préalable</p>
+              {msg && <p style={{ color: msg.startsWith('Erreur') || msg.startsWith('Solde') ? C.alert : C.success, fontSize:12, margin:'0 0 12px' }}>{msg}</p>}
+
+              {/* Si assez d'Oscart, prélèvement automatique */}
+              <button onClick={reserver} disabled={reserving}
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:15, cursor: reserving?'wait':'pointer' }}>
+                {reserving ? 'Réservation...' : `Payer avec mon solde (${s.prixOscart} Oscart)`}
+              </button>
+              {/* Sinon, paiement direct en devise via GeniusPay */}
+              <button onClick={payerDirect} disabled={payingDirect}
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', marginTop:10, background: payingDirect ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor: payingDirect?'wait':'pointer' }}>
+                {payingDirect ? 'Redirection en cours...' : `Payer ${devise === 'eur' ? `${(s.prixMusique*0.0015).toFixed(2)} €` : devise === 'usd' ? `${(s.prixMusique*0.0016).toFixed(2)} $` : `${s.prixMusique.toLocaleString()} F CFA`} directement`}
+              </button>
+              <button onClick={() => setShowDetail(false)}
+                style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer', marginTop:10 }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Bouton réserver + partage côte à côte */}
         <div style={{ display:'flex', gap:8 }}>
           {reserve ? (
@@ -9175,9 +9280,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
               <p style={{ color:C.success, fontWeight:700, fontSize:12, margin:0 }}>Réservé</p>
             </div>
           ) : (
-            <button onClick={reserver} disabled={reserving}
-              style={{ flex:1, padding:12, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:13, cursor: reserving?'wait':'pointer' }}>
-              {reserving ? 'Réservation...' : `PRÉ-TÉLÉCHARGER / RÉSERVER${s.prixOscart ? ` (${s.prixOscart} Oscart)` : ''}`}
+            <button onClick={() => setShowDetail(true)}
+              style={{ flex:1, padding:12, borderRadius:10, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+              {`PRÉ-TÉLÉCHARGER / RÉSERVER${s.prixMusique ? ` · ${s.prixMusique.toLocaleString()} F CFA` : ''}`}
             </button>
           )}
           <button onClick={partagerSortie} title="Partager"
