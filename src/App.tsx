@@ -9995,12 +9995,6 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   // Fichier de la chanson choisie
   const urlChanson = urlMedia(chanson);
 
-  // Découpe l'extrait via Cloudinary (comme les sorties officielles) — léger et rapide
-  const extraitUrl = (url: string, debut: number, fin: number): string => {
-    if (!url || !url.includes('/upload/')) return url;
-    const duree = Math.max(1, fin - debut);
-    return url.replace('/upload/', `/upload/so_${debut},du_${duree}/`);
-  };
   const DUREE_MAX_MUSIQUE = 90; // 1 min 30 maximum
 
   // Quand on arrive à l'étape musique, CHARGER la durée réelle (avec progression)
@@ -10090,18 +10084,14 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         musEl.volume = 1;
         musEl.playsInline = true;
         musEl.style.display = 'none';
-        musEl.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
+        // On lit le fichier COMPLET (déjà mis en cache par Cloudinary) et on se
+        // positionne directement au bon endroit, plutôt que de demander à
+        // Cloudinary de générer un extrait à la volée à chaque lecture — cette
+        // découpe à la demande est ce qui provoquait les saccades pendant la
+        // lecture, surtout avec une connexion lente.
+        musEl.src = urlChanson;
         musiqueElRef.current = musEl;
-        // Si l'extrait découpé ne charge pas, on repasse sur le fichier complet
-        let extraitOk = true;
-        musEl.onerror = () => {
-          if (extraitOk) {
-            extraitOk = false;
-            musEl.src = urlChanson;
-            musEl.load();
-            musEl.onloadeddata = () => { try { musEl.currentTime = musiqueDebut; } catch {} };
-          }
-        };
+        musEl.onloadeddata = () => { try { musEl.currentTime = musiqueDebut; } catch {} };
         try {
           // Attendre que l'audio soit prêt à jouer (évite le son muet)
           await new Promise<void>((resolve) => {
@@ -10109,11 +10099,11 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             const ok = () => { if (!fini) { fini = true; resolve(); } };
             musEl.oncanplaythrough = ok;
             musEl.oncanplay = ok;
-            musEl.onloadeddata = ok;
+            musEl.onloadeddata = () => { try { musEl.currentTime = musiqueDebut; } catch {} ok(); };
             musEl.onerror = ok;
             setTimeout(ok, 3000); // sécurité : on n'attend jamais plus de 3s
           });
-          // extrait déjà découpé par Cloudinary, il commence à 0
+          try { musEl.currentTime = musiqueDebut; } catch {}
           // Mixage Web Audio (pour enregistrer la musique dans la vidéo)
           const musSource = ctx.createMediaElementSource(musEl);
           const gain = ctx.createGain();
@@ -10125,7 +10115,6 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           await musEl.play().catch(()=>{});
         } catch (err) {
           // Si le mixage Web Audio échoue (CORS), au moins jouer le son en direct
-          // extrait déjà découpé par Cloudinary, il commence à 0
           musEl.play().catch(()=>{});
         }
       }
@@ -10462,6 +10451,10 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                           const rect = bande.getBoundingClientRect();
                           const pos = ((e.clientX - rect.left) / rect.width) * dureeMusique;
                           poigneeRef.current = Math.abs(pos - musiqueDebut) < Math.abs(pos - musiqueFin) ? 'debut' : 'fin';
+                          // Capture le pointeur : le glissement continue de fonctionner même
+                          // si le doigt sort de la petite bande (fréquent au toucher), au lieu
+                          // de s'arrêter net dès qu'on quitte la zone.
+                          try { (e.currentTarget as any).setPointerCapture?.(e.pointerId); } catch {}
                         }}
                         onPointerMove={(e) => {
                           if (!poigneeRef.current) return;
@@ -10505,21 +10498,20 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                             const a = audioRef.current;
                             if (!a.paused) { a.pause(); setApercuJoue(false); return; }
                             a.volume = 1; setMsg('');
-                            a.src = extraitUrl(urlChanson, musiqueDebut, musiqueFin);
+                            // Fichier complet (déjà mis en cache) + positionnement direct,
+                            // plutôt qu'un extrait généré à la volée par Cloudinary — évite
+                            // les saccades pendant la lecture.
+                            a.src = urlChanson;
                             a.onended = () => setApercuJoue(false);
                             a.load();
-                            a.play().then(() => setApercuJoue(true)).catch(() => {
-                              a.src = urlChanson;
-                              a.load();
-                              const lancer = () => {
-                                try { a.currentTime = musiqueDebut; } catch {}
-                                a.play().then(() => {
-                                  setApercuJoue(true);
-                                  setTimeout(() => { try { a.pause(); } catch {} setApercuJoue(false); }, (musiqueFin - musiqueDebut) * 1000);
-                                }).catch(() => setMsg('Lecture impossible pour cette chanson.'));
-                              };
-                              if (a.readyState >= 2) lancer(); else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
-                            });
+                            const lancer = () => {
+                              try { a.currentTime = musiqueDebut; } catch {}
+                              a.play().then(() => {
+                                setApercuJoue(true);
+                                setTimeout(() => { try { a.pause(); } catch {} setApercuJoue(false); }, (musiqueFin - musiqueDebut) * 1000);
+                              }).catch(() => setMsg('Lecture impossible pour cette chanson.'));
+                            };
+                            if (a.readyState >= 2) lancer(); else { a.oncanplay = () => { a.oncanplay = null; lancer(); }; }
                           }}
                           style={{ flex:1, padding:'12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.18)', background:'transparent', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
                           {apercuJoue
