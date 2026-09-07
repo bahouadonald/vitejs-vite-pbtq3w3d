@@ -9249,10 +9249,9 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
                   </button>
                 ))}
               </div>
-              <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 4px' }}>
+              <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 20px' }}>
                 {devise === 'eur' ? `${(s.prixMusique * 0.0015).toFixed(2)} €` : devise === 'usd' ? `${(s.prixMusique * 0.0016).toFixed(2)} $` : `${s.prixMusique.toLocaleString()} F CFA`}
               </p>
-              <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>Paiement immédiat — pas besoin de recharger vos Oscart au préalable</p>
               {msg && <p style={{ color: msg.startsWith('Erreur') || msg.startsWith('Solde') ? C.alert : C.success, fontSize:12, margin:'0 0 12px' }}>{msg}</p>}
 
               {/* Si assez d'Oscart, prélèvement automatique */}
@@ -14772,10 +14771,9 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
                 </button>
               ))}
             </div>
-            <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 4px' }}>
+            <p style={{ color:C.gold, fontWeight:800, fontSize:26, margin:'0 0 20px' }}>
               {devise === 'eur' ? `${(prix * 0.0015).toFixed(2)} €` : devise === 'usd' ? `${(prix * 0.0016).toFixed(2)} $` : `${prix.toLocaleString()} F CFA`}
             </p>
-            <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 20px' }}>Paiement immédiat — pas besoin de recharger vos Oscart au préalable</p>
 
             {!user ? (
               <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
