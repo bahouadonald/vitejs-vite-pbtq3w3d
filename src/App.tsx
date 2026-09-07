@@ -9622,6 +9622,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [effet, setEffet] = useState('aucun');              // effet de mouvement (zoom animé)
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
+  const [micCoupe, setMicCoupe] = useState(false);          // couper le micro (voix)
+  const micCoupeRef = useRef(false);
+  useEffect(() => { micCoupeRef.current = micCoupe; if (gainMicRef.current) gainMicRef.current.gain.value = micCoupe ? 0 : 1; }, [micCoupe]);
   const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
   const [faceStatus, setFaceStatus] = useState('');         // message d'attente chargement visage
   const [panneau, setPanneau] = useState<'aucun'|'filtres'|'effets'|'musique'>('aucun');
@@ -9646,6 +9649,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const timerRef = useRef<any>(null);
   const audioCtxRef = useRef<any>(null);
   const musiqueElRef = useRef<HTMLAudioElement|null>(null);
+  const gainMicRef = useRef<any>(null); // gain du micro — permet de couper/rétablir la voix en direct
 
   const DUREE_MAX = 75; // 1 min 15 s maximum
 
@@ -10093,10 +10097,15 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       audioCtxRef.current = ctx;
       const dest = ctx.createMediaStreamDestination();
 
-      // 1) Le micro (son ambiant de la personne)
+      // 1) Le micro (son ambiant de la personne) — passe par un gain pour pouvoir
+      // le couper/rétablir en direct via le bouton Micro, sans redémarrer le flux.
       try {
         const micSource = ctx.createMediaStreamSource(stream);
-        micSource.connect(dest);
+        const gainMic = ctx.createGain();
+        gainMic.gain.value = micCoupeRef.current ? 0 : 1;
+        gainMicRef.current = gainMic;
+        micSource.connect(gainMic);
+        gainMic.connect(dest);
       } catch {}
 
       // 2) La musique de l'artiste (si le son n'est pas coupé)
@@ -10166,6 +10175,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         streamRef.current?.getTracks().forEach(t => t.stop());
         if (musiqueElRef.current) musiqueElRef.current.pause();
         if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch {} }
+        gainMicRef.current = null;
         if (timerRef.current) clearInterval(timerRef.current);
         stopperRendu();
         setEtape(4);
@@ -10364,6 +10374,10 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                   svg: sonCoupe
                     ? <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#fff"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
                     : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#fff"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg> },
+                { id:'micro',   label: micCoupe?'Micro coupé':'Micro', actif: micCoupe, onTap:() => setMicCoupe(!micCoupe),
+                  svg: micCoupe
+                    ? <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 5.12 2.12M19 10v2a7 7 0 0 1-11.87 5.03M5 10v2a7 7 0 0 0 .69 3.03M12 19v4M8 23h8"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> },
               ].map(o => (
                 <button key={o.id} onClick={o.onTap}
                   style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity: recording && o.id!=='flip' ? 0.45 : 1 }}>
