@@ -9310,6 +9310,7 @@ function MesChallengesPage() {
   const [mesChallenges, setMesChallenges] = useState<any[]>([]);
   const [tousChallenges, setTousChallenges] = useState<any[]>([]);
   const [contenus, setContenus] = useState<any[]>([]);
+  const [sortiesTeaser, setSortiesTeaser] = useState<any[]>([]);
   const [creer, setCreer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ongletCh, setOngletCh] = useState<'tous'|'mes'>('tous');
@@ -9341,8 +9342,26 @@ function MesChallengesPage() {
       query(collection(db, 'decouvrir'), orderBy('publishedAt','desc')),
       snap => setContenus(snap.docs.map(d => ({id:d.id,...d.data()})).filter((c:any)=>c.masque!==true))
     );
-    return () => { unsub(); unsubTous(); };
+    // Sorties officielles (même pas encore lancées) — leur teaser public peut
+    // aussi servir de chanson pour un challenge, sinon un artiste qui n'a
+    // qu'une sortie à venir se retrouve sans aucune chanson disponible.
+    const unsubSorties = onSnapshot(
+      query(collection(db, 'sorties'), orderBy('createdAt','desc')),
+      snap => setSortiesTeaser(snap.docs.map(d => {
+        const s: any = d.data();
+        return {
+          id: 'sortie_' + d.id,
+          artist: s.artistName, artistEmail: s.artistEmail,
+          label: s.titre, coverUrl: s.pochetteUrl || '',
+          files: [{ url: s.teaserUrl, name: s.teaserUrl }],
+        };
+      }))
+    );
+    return () => { unsub(); unsubTous(); unsubSorties(); };
   }, []);
+
+  // Chansons disponibles pour un challenge = contenus Découvrir + teasers des sorties officielles
+  const contenusChallenge = [...contenus, ...sortiesTeaser];
 
   // Kiffer un challenge (like simple, +1)
   const kifferChallenge = async (ch: any) => {
@@ -9413,7 +9432,7 @@ function MesChallengesPage() {
   return (
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:90 }}>
       {creer && (
-        <ChallengePage artisteEmail="" sigId="" contenus={contenus} onClose={() => setCreer(false)} />
+        <ChallengePage artisteEmail="" sigId="" contenus={contenusChallenge} onClose={() => setCreer(false)} />
       )}
 
       {/* HEADER */}
