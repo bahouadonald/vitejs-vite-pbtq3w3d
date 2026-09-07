@@ -9668,6 +9668,22 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   useEffect(() => { filtreRef.current = filtre; }, [filtre]);
   useEffect(() => { effetRef.current = effet; }, [effet]);
 
+  // Filet de sécurité : dès qu'on quitte le panneau musique ou l'étape de sélection,
+  // on coupe l'aperçu s'il était resté en lecture (évite d'entendre la chanson
+  // deux fois en décalé pendant le filmage ou la relecture finale).
+  useEffect(() => {
+    if (panneau !== 'musique' && audioRef.current) {
+      try { audioRef.current.pause(); } catch {}
+      setApercuJoue(false);
+    }
+  }, [panneau]);
+  useEffect(() => {
+    if (etape !== 3 && audioRef.current) {
+      try { audioRef.current.pause(); } catch {}
+      setApercuJoue(false);
+    }
+  }, [etape]);
+
   // Charge le détecteur de visage MediaPipe UNIQUEMENT quand un effet visage est choisi
   useEffect(() => {
     const estEffetVisage = effet.startsWith('face_');
@@ -10048,6 +10064,11 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   // Démarrer la caméra + MIXER la musique dans l'enregistrement + minuteur + arrêt auto à 75s
   const demarrerFilm = async () => {
     setMsg('');
+    // Couper l'aperçu de la musique (bouton "Écouter") s'il était resté en lecture —
+    // sinon il continue de jouer en parallèle de la musique mixée dans l'enregistrement,
+    // ce qui donne l'impression d'entendre la même chanson deux fois, en décalé.
+    if (audioRef.current) { try { audioRef.current.pause(); } catch {} }
+    setApercuJoue(false);
     try {
       // Récupérer un flux caméra + micro (nouveau, avec audio pour l'enregistrement)
       const stream = await navigator.mediaDevices.getUserMedia({
