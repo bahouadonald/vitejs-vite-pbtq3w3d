@@ -10073,7 +10073,10 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       // Récupérer un flux caméra + micro (nouveau, avec audio pour l'enregistrement)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: cameraFace },
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        // Annulation d'écho ACTIVÉE : sans elle, le micro capte la musique qui
+        // sort du haut-parleur du téléphone et la réenregistre en plus du
+        // mixage propre → on entend la même chanson deux fois, en décalé.
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false }
       });
       // Couper l'ancien flux d'aperçu s'il existe
       if (streamRef.current && streamRef.current !== stream) {
@@ -10127,11 +10130,18 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           try { musEl.currentTime = musiqueDebut; } catch {}
           // Mixage Web Audio (pour enregistrer la musique dans la vidéo)
           const musSource = ctx.createMediaElementSource(musEl);
-          const gain = ctx.createGain();
-          gain.gain.value = 1;
-          musSource.connect(gain);
-          gain.connect(dest);            // vers l'enregistrement
-          gain.connect(ctx.destination); // vers les haut-parleurs (pour entendre)
+          // Deux branches séparées : le volume envoyé à l'ENREGISTREMENT reste
+          // à fond, mais celui envoyé au HAUT-PARLEUR (juste pour s'entendre en
+          // filmant) est baissé — ça réduit fortement ce que le micro peut
+          // recapter par écho, en plus de l'annulation d'écho déjà activée.
+          const gainRec = ctx.createGain();
+          gainRec.gain.value = 1;
+          const gainMonitor = ctx.createGain();
+          gainMonitor.gain.value = 0.35;
+          musSource.connect(gainRec);
+          musSource.connect(gainMonitor);
+          gainRec.connect(dest);              // vers l'enregistrement (plein volume)
+          gainMonitor.connect(ctx.destination); // vers les haut-parleurs (volume réduit, pour s'entendre)
           await ctx.resume().catch(()=>{});
           await musEl.play().catch(()=>{});
         } catch (err) {
