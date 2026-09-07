@@ -10402,15 +10402,18 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                   svg: micCoupe
                     ? <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 5.12 2.12M19 10v2a7 7 0 0 1-11.87 5.03M5 10v2a7 7 0 0 0 .69 3.03M12 19v4M8 23h8"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> },
-              ].map(o => (
-                <button key={o.id} onClick={o.onTap}
-                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity: recording && o.id!=='flip' ? 0.45 : 1 }}>
+              ].map(o => {
+                const bloquePendantEnregistrement = recording && (o.id === 'filtres' || o.id === 'effets');
+                return (
+                <button key={o.id} onClick={() => { if (!bloquePendantEnregistrement) o.onTap(); }}
+                  style={{ background:'none', border:'none', padding:0, cursor: bloquePendantEnregistrement ? 'default' : 'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity: recording && o.id!=='flip' && o.id!=='son' && o.id!=='micro' ? 0.4 : 1 }}>
                   <span style={{ width:46, height:46, borderRadius:99, background: o.actif ? 'rgba(254,44,85,0.9)' : 'rgba(0,0,0,0.35)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                     {o.svg}
                   </span>
                   <span style={{ color:'#fff', fontSize:10.5, fontWeight:600, textShadow:'0 1px 3px rgba(0,0,0,0.6)' }}>{o.label}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {/* Message d'état (chargement effets visage, erreurs) */}
