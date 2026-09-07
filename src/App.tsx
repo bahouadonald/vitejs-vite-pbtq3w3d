@@ -746,6 +746,25 @@ function Lien({ href, children, style, className, onClick, state }: { href: stri
   );
 }
 
+// Petite scène illustrée (dessinée, pas une photo) utilisée comme base des
+// vignettes de filtres — le filtre CSS s'applique dessus pour qu'on voie
+// vraiment son effet (couleurs de peau, ciel, verdure), au lieu d'un simple
+// dégradé plat qui n'illustre rien de concret.
+function ScenePourFiltre() {
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 62 62" preserveAspectRatio="xMidYMid slice">
+      <rect x="0" y="0" width="62" height="62" fill="#7fc8e8" />
+      <circle cx="48" cy="14" r="8" fill="#ffd85e" />
+      <rect x="0" y="40" width="62" height="22" fill="#4a9d5f" />
+      <circle cx="31" cy="34" r="15" fill="#e8b08a" />
+      <path d="M16 30a15 15 0 0 1 30 0v-3a15 15 0 0 0-30 0z" fill="#2b1a12" />
+      <circle cx="25" cy="34" r="2" fill="#2b1a12" />
+      <circle cx="37" cy="34" r="2" fill="#2b1a12" />
+      <path d="M25 41q6 4 12 0" stroke="#7a3d2a" strokeWidth="2" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Icône SVG affichée sur la vignette de chaque effet du challenge (aucun emoji)
 function IconeEffet({ id }: { id: string }) {
   const p = { width:26, height:26, viewBox:'0 0 24 24', fill:'none', stroke:'#fff', strokeWidth:1.7,
@@ -10431,10 +10450,11 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                     {FILTRES.map(f => (
                       <button key={f.id} onClick={() => { setFiltre(f.id); setPanneau('aucun'); }}
                         style={{ flexShrink:0, background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:7 }}>
-                        <span style={{ width:62, height:62, borderRadius:14, display:'block',
-                          background:'linear-gradient(135deg,#ff9a6b,#c86a9c 45%,#4a6fd4)',
+                        <span style={{ width:62, height:62, borderRadius:14, display:'block', overflow:'hidden',
                           filter: f.css === 'none' ? 'none' : f.css,
-                          outline: filtre===f.id ? '3px solid #fe2c55' : '2px solid rgba(255,255,255,0.15)', outlineOffset:2 }} />
+                          outline: filtre===f.id ? '3px solid #fe2c55' : '2px solid rgba(255,255,255,0.15)', outlineOffset:2 }}>
+                          <ScenePourFiltre />
+                        </span>
                         <span style={{ color: filtre===f.id ? '#fe2c55' : 'rgba(255,255,255,0.85)', fontSize:11, fontWeight:600 }}>{f.nom}</span>
                       </button>
                     ))}
