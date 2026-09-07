@@ -9685,7 +9685,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     { id:'vintage', nom:'Vintage',   css:'sepia(0.45) contrast(1.15) brightness(0.98) saturate(1.3)' },
     { id:'cine',    nom:'Ciné',      css:'contrast(1.3) brightness(0.92) saturate(1.25) hue-rotate(-5deg)' },
   ];
-  const filtreCss = FILTRES.find(f => f.id === filtre)?.css || 'none';
+  // (le filtre appliqué au rendu passe par filtreRef + un calcul frais dans la boucle de dessin, voir plus bas)
 
   // Garde les réglages à jour pour la boucle de dessin (qui tourne hors du cycle React)
   useEffect(() => { filtreRef.current = filtre; }, [filtre]);
@@ -9799,7 +9799,12 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     else { ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H); }
 
     ctx.globalAlpha = alpha;
-    ctx.filter = filtreRef.current === 'aucun' ? 'none' : filtreCss;
+    // On relit le filtre CSS à chaque image depuis la ref (toujours à jour),
+    // pas depuis la variable calculée au rendu React : cette boucle tourne en
+    // continu sur sa propre instance et ne voit jamais les nouveaux rendus,
+    // donc un changement de filtre ne passait jamais avant ce correctif.
+    const filtreCssActuel = FILTRES.find(f => f.id === filtreRef.current)?.css || 'none';
+    ctx.filter = filtreRef.current === 'aucun' ? 'none' : filtreCssActuel;
 
     const dw = W * zoom, dh = H * zoom;
     const ox = (W - dw) / 2 + dx, oy = (H - dh) / 2 + dy;
@@ -9824,9 +9829,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.45;
-      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCss + ' ') + 'sepia(1) saturate(6) hue-rotate(-50deg)';
+      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCssActuel + ' ') + 'sepia(1) saturate(6) hue-rotate(-50deg)';
       ctx.drawImage(vd, sx, sy, sw, sh, ox - d, oy, dw, dh);
-      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCss + ' ') + 'sepia(1) saturate(6) hue-rotate(160deg)';
+      ctx.filter = (filtreRef.current === 'aucun' ? '' : filtreCssActuel + ' ') + 'sepia(1) saturate(6) hue-rotate(160deg)';
       ctx.drawImage(vd, sx, sy, sw, sh, ox + d, oy, dw, dh);
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
