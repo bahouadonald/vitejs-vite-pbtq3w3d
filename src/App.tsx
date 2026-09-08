@@ -746,6 +746,21 @@ function Lien({ href, children, style, className, onClick, state }: { href: stri
   );
 }
 
+// Petite vignette vidéo EN DIRECT (flux caméra réel) avec un filtre CSS appliqué —
+// façon Snapchat/TikTok : on voit vraiment son propre visage avec l'effet dessus,
+// pas une icône abstraite. Plusieurs <video> peuvent partager le même flux caméra
+// sans coût supplémentaire de décodage (juste un affichage différent chacune).
+function VignetteFiltreEnDirect({ stream, css, miroir }: { stream: MediaStream | null; css: string; miroir: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current && stream) { ref.current.srcObject = stream; ref.current.play().catch(()=>{}); }
+  }, [stream]);
+  return (
+    <video ref={ref} muted playsInline
+      style={{ width:'100%', height:'100%', objectFit:'cover', filter: css === 'none' ? 'none' : css, transform: miroir ? 'scaleX(-1)' : 'none', background:'#222' }} />
+  );
+}
+
 // Petite scène illustrée (dessinée, pas une photo) utilisée comme base des
 // vignettes de filtres — le filtre CSS s'applique dessus pour qu'on voie
 // vraiment son effet (couleurs de peau, ciel, verdure), au lieu d'un simple
@@ -9642,6 +9657,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [cameraFace, setCameraFace] = useState<'user'|'environment'>('user'); // avant/arrière
   const [sonCoupe, setSonCoupe] = useState(false);          // couper la musique
   const [micCoupe, setMicCoupe] = useState(false);          // couper le micro (voix)
+  const [cameraPrete, setCameraPrete] = useState(false);    // la caméra d'aperçu est prête (pour les vignettes de filtres en direct)
   const micCoupeRef = useRef(false);
   useEffect(() => { micCoupeRef.current = micCoupe; if (gainMicRef.current) gainMicRef.current.gain.value = micCoupe ? 0 : 1; }, [micCoupe]);
   const [apercuJoue, setApercuJoue] = useState(false);      // aperçu musique en lecture
@@ -10087,11 +10103,13 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         if (annule) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(()=>{}); }
+        setCameraPrete(true); // signale aux vignettes de filtres qu'elles peuvent afficher un aperçu en direct
         lancerRendu();
       } catch {}
     })();
     return () => {
       annule = true;
+      setCameraPrete(false);
       // Ne pas couper si on est en train d'enregistrer
       if (!recording && stream) stream.getTracks().forEach(t => t.stop());
     };
@@ -10398,8 +10416,6 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
               {[
                 { id:'flip',    label:'Retourner', actif:false, onTap:() => setCameraFace(cameraFace==='user'?'environment':'user'),
                   svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"><path d="M20 8a8 8 0 0 0-14-3M4 16a8 8 0 0 0 14 3"/><polyline points="4 4 4 9 9 9"/><polyline points="20 20 20 15 15 15"/></svg> },
-                { id:'filtres', label:'Filtres', actif: filtre!=='aucun', onTap:() => setPanneau('filtres'),
-                  svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8"><circle cx="9" cy="9" r="6"/><circle cx="15" cy="15" r="6"/></svg> },
                 { id:'effets',  label:'Effets', actif: effet!=='aucun', onTap:() => setPanneau('effets'),
                   svg:<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 3l2.2 5.6L20 10l-5.8 1.4L12 17l-2.2-5.6L4 10l5.8-1.4z"/><path d="M18 16l.8 2L21 19l-2.2.9L18 22l-.8-2.1L15 19l2.2-1z"/></svg> },
                 { id:'son',     label: sonCoupe?'Muet':'Musique', actif: sonCoupe, onTap:() => setSonCoupe(!sonCoupe),
@@ -10411,7 +10427,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
                     ? <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 5.12 2.12M19 10v2a7 7 0 0 1-11.87 5.03M5 10v2a7 7 0 0 0 .69 3.03M12 19v4M8 23h8"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     : <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> },
               ].map(o => {
-                const bloquePendantEnregistrement = recording && (o.id === 'filtres' || o.id === 'effets');
+                const bloquePendantEnregistrement = recording && o.id === 'effets';
                 return (
                 <button key={o.id} onClick={() => { if (!bloquePendantEnregistrement) o.onTap(); }}
                   style={{ background:'none', border:'none', padding:0, cursor: bloquePendantEnregistrement ? 'default' : 'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity: recording && o.id!=='flip' && o.id!=='son' && o.id!=='micro' ? 0.4 : 1 }}>
@@ -10428,6 +10444,30 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
             {(faceStatus || msg) && (
               <div style={{ position:'absolute', bottom:170, left:16, right:16, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)', borderRadius:12, padding:'10px 14px', textAlign:'center', zIndex:5 }}>
                 <span style={{ color:'#fff', fontSize:12.5, fontWeight:600 }}>{faceStatus || msg}</span>
+              </div>
+            )}
+
+            {/* BANDE DE FILTRES EN DIRECT (façon Snapchat) — toujours visible pendant le cadrage,
+                juste au-dessus du bouton d'enregistrement. Un aperçu caméra réel par filtre. */}
+            {!recording && (
+              <div style={{ position:'absolute', bottom:128, left:0, right:0, zIndex:6, display:'flex', gap:12, padding:'0 18px', overflowX:'auto', WebkitOverflowScrolling:'touch' }}
+                className="masquer-scrollbar">
+                {[{ id:'aucun', nom:'Normal', css:'none' }, ...FILTRES].map(f => {
+                  const actif = filtre === f.id;
+                  const taille = actif ? 60 : 48;
+                  return (
+                    <button key={f.id} onClick={() => setFiltre(f.id)}
+                      style={{ flexShrink:0, background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
+                      <span style={{ width:taille, height:taille, borderRadius:99, overflow:'hidden', display:'block',
+                        border: actif ? '3px solid #fff' : '2px solid rgba(255,255,255,0.35)', boxShadow: actif ? '0 2px 10px rgba(0,0,0,0.4)' : 'none', transition:'width .15s, height .15s' }}>
+                        {cameraPrete && streamRef.current
+                          ? <VignetteFiltreEnDirect stream={streamRef.current} css={f.css} miroir={cameraFace==='user'} />
+                          : <ScenePourFiltre />}
+                      </span>
+                      <span style={{ color: actif ? '#fff' : 'rgba(255,255,255,0.75)', fontSize:10.5, fontWeight:600, textShadow:'0 1px 3px rgba(0,0,0,0.6)' }}>{f.nom}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 

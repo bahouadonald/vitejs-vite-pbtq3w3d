@@ -109,3 +109,12 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Masque la barre de défilement de la bande de filtres du Challenge (garde le défilement, cache juste la barre) */
+.masquer-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.masquer-scrollbar::-webkit-scrollbar {
+  display: none;
+}
