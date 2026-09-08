@@ -804,6 +804,7 @@ function IconeEffet({ id }: { id: string }) {
     case 'face_glasses':return <svg {...p}><circle cx="6.5" cy="13" r="3.5"/><circle cx="17.5" cy="13" r="3.5"/><path d="M10 13h4"/><path d="M3 10l2-3M21 10l-2-3"/></svg>;
     case 'face_blur':return <svg {...p}><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8" opacity="0.35" strokeDasharray="3 3"/></svg>;
     case 'face_beauty':return <svg {...p}><path d="M12 4l1.6 4L18 9.6 13.6 11 12 15l-1.6-4L6 9.6 10.4 8z"/><path d="M18 15l.7 1.7L20.4 17l-1.7.8L18 20l-.7-2.2L15.6 17l1.7-.3z"/></svg>;
+    case 'fond_studio':return <svg {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="10" r="2.5"/><path d="M4 19l5-5 4 4 3-3 4 4"/></svg>;
     default:         return <svg {...p}><circle cx="12" cy="12" r="8"/></svg>;
   }
 }
@@ -9668,6 +9669,12 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const faceLandmarkerRef = useRef<any>(null);
   const faceRef = useRef<any>(null);
   const faceLoadingRef = useRef(false);
+  const imageSegmenterRef = useRef<any>(null);   // détecteur de fond (pour "Fond studio")
+  const segLoadingRef = useRef(false);
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null); // dernier masque personne/fond (petit, mis à jour périodiquement)
+  const compteurFondRef = useRef(0);
+  const backdropCanvasRef = useRef<HTMLCanvasElement | null>(null); // décor "studio" dessiné une seule fois, réutilisé chaque image
+  const personneCanvasRef = useRef<HTMLCanvasElement | null>(null); // toile de travail pour découper la personne du fond
   const bandeRef = useRef<HTMLDivElement|null>(null);      // la bande de sélection musique
   const poigneeRef = useRef<'debut'|'fin'|null>(null);    // poignée en cours de glissement
   const rafRef = useRef<any>(null);
@@ -9754,6 +9761,37 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     })();
   }, [effet]);
 
+  // Charge le détecteur de fond MediaPipe (segmentation personne/arrière-plan)
+  // UNIQUEMENT quand l'effet "Fond studio" est choisi — même principe que les
+  // effets visage : rien n'est téléchargé tant que l'effet n'est pas utilisé.
+  useEffect(() => {
+    const estFond = effet.startsWith('fond_');
+    if (!estFond || imageSegmenterRef.current || segLoadingRef.current) return;
+    segLoadingRef.current = true;
+    setFaceStatus('Préparation du fond studio...');
+    (async () => {
+      try {
+        const importDistant = new Function('u', 'return import(u)') as (u: string) => Promise<any>;
+        const vision: any = await importDistant('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+        const fileset = await vision.FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+        );
+        const seg = await vision.ImageSegmenter.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite' },
+          runningMode: 'VIDEO',
+          outputCategoryMask: true,
+          outputConfidenceMasks: false,
+        });
+        imageSegmenterRef.current = seg;
+        setFaceStatus('');
+      } catch (e:any) {
+        console.error('MediaPipe segmentation:', e);
+        setFaceStatus('Chargement du fond studio impossible : ' + (e?.message || 'réseau'));
+        segLoadingRef.current = false;
+      }
+    })();
+  }, [effet]);
+
   // ── MOTEUR D'EFFETS : dessine chaque image de la caméra sur le canvas ──
   // C'est le canvas qui est enregistré, donc les effets sont VRAIMENT dans la vidéo.
   const dessinerBoucle = () => {
@@ -9785,6 +9823,38 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       }
     }
     const face = estVisage ? faceRef.current : null;
+
+    // Segmentation personne/arrière-plan pour "Fond studio" — même principe :
+    // une image sur deux, résultat asynchrone (callback) stocké dans une petite
+    // toile réutilisable (le masque n'a pas besoin d'être en pleine résolution).
+    const estFond = eff.startsWith('fond_');
+    if (estFond && imageSegmenterRef.current) {
+      compteurFondRef.current++;
+      if (compteurFondRef.current % 2 === 0) {
+        try {
+          imageSegmenterRef.current.segmentForVideo(vd, performance.now(), (res: any) => {
+            const cm = res?.categoryMask;
+            if (!cm) return;
+            const donnees: Uint8Array = cm.getAsUint8Array ? cm.getAsUint8Array() : cm;
+            const mw = cm.width || vd.videoWidth, mh = cm.height || vd.videoHeight;
+            if (!maskCanvasRef.current) maskCanvasRef.current = document.createElement('canvas');
+            const mc = maskCanvasRef.current;
+            mc.width = mw; mc.height = mh;
+            const mctx = mc.getContext('2d');
+            if (mctx) {
+              const img = mctx.createImageData(mw, mh);
+              for (let i = 0; i < mw * mh; i++) {
+                const personne = donnees[i] === 1 ? 255 : 0;
+                img.data[i*4] = 255; img.data[i*4+1] = 255; img.data[i*4+2] = 255;
+                img.data[i*4+3] = personne; // alpha = zone "personne" uniquement
+              }
+              mctx.putImageData(img, 0, 0);
+            }
+            cm.close?.();
+          });
+        } catch { /* ignore une image ratée */ }
+      }
+    }
 
     // Cadrage de la caméra pour remplir le portrait sans déformer
     const ratioV = vd.videoWidth / vd.videoHeight;
@@ -9911,6 +9981,45 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       ctx.drawImage(vd, sx, sy, sw, sh, ox + ecart, oy, dw, dh);
       ctx.globalAlpha = 1;
       ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+    } else if (eff === 'fond_studio') {
+      // FOND STUDIO : décor dessiné une seule fois (mis en cache), puis on
+      // découpe la personne (grâce au masque IA) et on la pose par-dessus.
+      if (!backdropCanvasRef.current) {
+        const bc = document.createElement('canvas'); bc.width = W; bc.height = H;
+        const bctx = bc.getContext('2d');
+        if (bctx) {
+          const grad = bctx.createLinearGradient(0, 0, W, H);
+          grad.addColorStop(0, '#1a1033'); grad.addColorStop(0.55, '#2a1450'); grad.addColorStop(1, '#0d0620');
+          bctx.fillStyle = grad; bctx.fillRect(0, 0, W, H);
+          // quelques halos de lumière de scène
+          [[W*0.25,H*0.2,'#ff9adb'], [W*0.8,H*0.15,'#5bb0ff'], [W*0.5,H*0.85,'#ffd76a']].forEach(([cx,cy,couleur]:any) => {
+            const g = bctx.createRadialGradient(cx, cy, 0, cx, cy, W*0.45);
+            g.addColorStop(0, couleur + '55'); g.addColorStop(1, couleur + '00');
+            bctx.fillStyle = g; bctx.fillRect(0, 0, W, H);
+          });
+        }
+        backdropCanvasRef.current = bc;
+      }
+      ctx.drawImage(backdropCanvasRef.current, 0, 0, W, H);
+      if (maskCanvasRef.current) {
+        if (!personneCanvasRef.current) { personneCanvasRef.current = document.createElement('canvas'); personneCanvasRef.current.width = W; personneCanvasRef.current.height = H; }
+        const pc = personneCanvasRef.current;
+        const pctx = pc.getContext('2d');
+        if (pctx) {
+          pctx.clearRect(0, 0, W, H);
+          pctx.filter = ctx.filter; // même filtre couleur que le reste
+          pctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+          pctx.filter = 'none';
+          pctx.globalCompositeOperation = 'destination-in';
+          pctx.drawImage(maskCanvasRef.current, 0, 0, W, H);
+          pctx.globalCompositeOperation = 'source-over';
+          ctx.filter = 'none';
+          ctx.drawImage(pc, 0, 0, W, H);
+        }
+      } else {
+        // masque pas encore prêt (premières images) : afficher la caméra normalement en attendant
+        ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
+      }
     } else {
       ctx.drawImage(vd, sx, sy, sw, sh, ox, oy, dw, dh);
     }
@@ -10043,6 +10152,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
     { id:'face_glasses',nom:'Lunettes' },
     { id:'face_blur',   nom:'Flou fond' },
     { id:'face_beauty', nom:'Beauté pro' },
+    { id:'fond_studio',  nom:'Fond studio' },
   ];
 
   // Liste des artistes distincts (à partir des contenus officiels)
