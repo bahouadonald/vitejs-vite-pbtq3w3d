@@ -9645,6 +9645,9 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
   const [chanson, setChanson] = useState<any>(null);
   const [videoBlob, setVideoBlob] = useState<Blob|null>(null);
   const [videoUrl, setVideoUrl] = useState('');
+  const videoBlobOriginalRef = useRef<Blob|null>(null); // toujours la version à vitesse normale (1x), pour pouvoir recalculer sans cumuler les vitesses
+  const [vitesse, setVitesse] = useState(1);
+  const [reEncodage, setReEncodage] = useState(false);
   const [recording, setRecording] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [msg, setMsg] = useState('');
@@ -10331,6 +10334,8 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type:'video/webm' });
         setVideoBlob(blob);
+        videoBlobOriginalRef.current = blob; // référence 1x, jamais écrasée par un changement de vitesse
+        setVitesse(1);
         setVideoUrl(URL.createObjectURL(blob));
         streamRef.current?.getTracks().forEach(t => t.stop());
         if (musiqueElRef.current) musiqueElRef.current.pause();
@@ -10362,6 +10367,72 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
       mediaRecorderRef.current.stop();
     }
     setRecording(false);
+  };
+
+  // Change la vitesse de lecture de la vidéo déjà filmée (ralenti/accéléré),
+  // en repartant TOUJOURS de la version à vitesse normale (1x) pour ne pas
+  // cumuler les changements. On "refilme" la lecture de la vidéo d'origine à
+  // la nouvelle vitesse via canvas + MediaRecorder — aucune bibliothèque
+  // externe nécessaire, ça marche dans n'importe quel navigateur.
+  const changerVitesse = async (v: number) => {
+    const original = videoBlobOriginalRef.current;
+    if (!original || reEncodage) return;
+    if (v === vitesse) return;
+    setReEncodage(true); setMsg('');
+    try {
+      const vd = document.createElement('video');
+      vd.src = URL.createObjectURL(original);
+      vd.muted = false;
+      vd.playsInline = true;
+      await new Promise<void>((resolve, reject) => {
+        vd.onloadedmetadata = () => resolve();
+        vd.onerror = () => reject(new Error('Lecture de la vidéo impossible'));
+        setTimeout(() => reject(new Error('Délai dépassé')), 8000);
+      });
+
+      const cv = document.createElement('canvas');
+      cv.width = vd.videoWidth || 720; cv.height = vd.videoHeight || 1280;
+      const cctx = cv.getContext('2d');
+      if (!cctx) throw new Error('Canvas indisponible');
+
+      const ctxAudio = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = ctxAudio.createMediaElementSource(vd);
+      const dest = ctxAudio.createMediaStreamDestination();
+      source.connect(dest);
+      const gainSilencieux = ctxAudio.createGain(); gainSilencieux.gain.value = 0;
+      source.connect(gainSilencieux); gainSilencieux.connect(ctxAudio.destination); // garde le flux actif sans jouer de son à l'écran
+
+      const flux = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      const mr = new MediaRecorder(flux, { mimeType: 'video/webm;codecs=vp9,opus' });
+      const morceaux: Blob[] = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) morceaux.push(e.data); };
+
+      const fini = new Promise<Blob>((resolve) => {
+        mr.onstop = () => resolve(new Blob(morceaux, { type:'video/webm' }));
+      });
+
+      vd.playbackRate = v;
+      let dessineActif = true;
+      const dessiner = () => {
+        if (!dessineActif) return;
+        cctx.drawImage(vd, 0, 0, cv.width, cv.height);
+        requestAnimationFrame(dessiner);
+      };
+      vd.onended = () => { dessineActif = false; if (mr.state !== 'inactive') mr.stop(); ctxAudio.close().catch(()=>{}); };
+
+      mr.start();
+      await vd.play();
+      dessiner();
+
+      const nouveauBlob = await fini;
+      setVideoBlob(nouveauBlob);
+      setVideoUrl(URL.createObjectURL(nouveauBlob));
+      setVitesse(v);
+    } catch (e:any) {
+      setMsg('Changement de vitesse impossible : ' + (e?.message || 'erreur'));
+    } finally {
+      setReEncodage(false);
+    }
   };
 
   // Publier le challenge
@@ -10771,8 +10842,19 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
           <>
             <p style={{ fontWeight:800, fontSize:17, margin:'0 0 14px' }}>Votre challenge</p>
             {videoUrl && (
-              <video src={videoUrl} controls playsInline style={{ width:'100%', borderRadius:16, maxHeight:'55vh', marginBottom:14, background:'#000' }} />
+              <video src={videoUrl} controls playsInline style={{ width:'100%', borderRadius:16, maxHeight:'55vh', marginBottom:10, background:'#000' }} />
             )}
+            {/* Vitesse : ralenti / accéléré, appliqué directement sur le rendu final */}
+            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+              {[0.5, 1, 1.5, 2].map(v => (
+                <button key={v} onClick={() => changerVitesse(v)} disabled={reEncodage}
+                  style={{ flex:1, padding:9, borderRadius:10, border: vitesse===v ? '1.5px solid '+C.gold : '1px solid rgba(255,255,255,0.12)',
+                    background: vitesse===v ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)',
+                    color: vitesse===v ? C.gold : C.text, fontSize:12.5, fontWeight:700, cursor: reEncodage?'wait':'pointer' }}>
+                  {reEncodage && vitesse!==v ? '…' : (v===1 ? 'Normal' : v+'x')}
+                </button>
+              ))}
+            </div>
             <button onClick={publier} disabled={publishing}
               style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,#1a6bff,#4da6ff)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
               {publishing ? 'Publication...' : 'Publier mon challenge'}
@@ -10782,7 +10864,7 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
               <button onClick={() => partager('facebook')} style={{ flex:1, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>Facebook</button>
               <button onClick={() => partager('youtube')} style={{ flex:1, padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:C.text, fontSize:12, fontWeight:700, cursor:'pointer' }}>Shorts</button>
             </div>
-            <button onClick={() => { setVideoBlob(null); setVideoUrl(''); setEtape(3); }}
+            <button onClick={() => { setVideoBlob(null); setVideoUrl(''); videoBlobOriginalRef.current = null; setVitesse(1); setEtape(3); }}
               style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
               Refaire la vidéo
             </button>
