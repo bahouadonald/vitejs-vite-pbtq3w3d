@@ -3244,7 +3244,17 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       createdAt: new Date().toISOString(), lu: false,
     });
   };
+  // Suppression d'UN SEUL mood déjà publié (contrairement à "Nettoyer le fil"
+  // qui les supprime tous). Utile quand un artiste publie un mood alors que son
+  // compte n'a pas encore de musique enregistrée, par exemple.
+  const supprimerMotUnique = async (m: any) => {
+    if (!window.confirm(`Supprimer définitivement ce mood de ${m.artistName} ?`)) return;
+    try {
+      await deleteDoc(doc(db,'mots_artiste',m.id));
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+  };
   const motsEnAttente = mots.filter(m => m.statut === 'en_attente');
+  const motsValides = mots.filter(m => m.statut === 'valide');
 
   const valider = async (s: any) => {
     // Générer un publicLinkId et un QR public pour l'artiste
@@ -3381,6 +3391,32 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
                   <button onClick={() => refuserMot(m)} style={{ flex:1, padding:8, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:12, cursor:'pointer' }}>Refuser</button>
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* MOTS DÉJÀ PUBLIÉS — suppression individuelle (contrairement à "Nettoyer
+          le fil" qui supprime tout d'un coup). Utile pour retirer un mood précis,
+          par exemple un artiste qui a publié un mood avant d'avoir de la musique
+          enregistrée sur son compte. */}
+      {motsValides.length > 0 && canDelete && (
+        <div style={{ marginBottom:24 }}>
+          <h3 style={{ fontWeight:700, fontSize:15, marginBottom:12, color:'#00a040' }}>Moods publiés ({motsValides.length})</h3>
+          {motsValides.map(m => (
+            <div key={m.id} style={{ ...S.card, marginBottom:10, borderLeft:'3px solid #00a040' }}>
+              <p style={{ color:'#1a6bff', fontSize:12, fontWeight:700, margin:'0 0 4px' }}>{m.artistName}</p>
+              {m.texte && <p style={{ fontSize:13, margin:'0 0 8px', color:'#1a2340' }}>{m.texte}</p>}
+              {m.videoUrl && (
+                <a href={m.videoUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display:'block', textAlign:'center', padding:8, borderRadius:8, background:'#eaf1ff', color:'#1a6bff', textDecoration:'none', fontSize:12, fontWeight:700, marginBottom:8 }}>
+                  ▶ Voir la vidéo
+                </a>
+              )}
+              <button onClick={() => supprimerMotUnique(m)}
+                style={{ width:'100%', padding:8, borderRadius:8, border:'1px solid #f04a6a', background:'transparent', color:'#f04a6a', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                Supprimer ce mood
+              </button>
             </div>
           ))}
         </div>
@@ -7492,8 +7528,12 @@ function ZikothequePage({ user }: { user: any }) {
     try {
       const qid = currentAlbum.qrId;
       if (!qid) return;
-      // Retrouver le doc qrcode par qrId
-      const snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qid)));
+      // Retrouver le doc qrcode — par qrId d'abord, sinon par publicLinkId : les
+      // contenus ajoutés à la Zikothèque depuis Découvrir/streaming enregistrent
+      // parfois un publicLinkId à la place du vrai qrId, ce qui empêchait le
+      // comptage de retrouver l'album de l'artiste (écoutes jamais comptées).
+      let snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qid)));
+      if (snap.empty) snap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', qid)));
       if (!snap.empty) {
         const ref0 = snap.docs[0];
         await updateDoc(doc(db, 'qrcodes', ref0.id), { streams: (ref0.data().streams || 0) + 1 });
@@ -14818,6 +14858,27 @@ function PWAInstallBanner() {
 // ─────────────────────────────────────────────
 // OSCART PAY BUTTON — payer avec Oscart ou recharger
 // ─────────────────────────────────────────────
+// Incrémente le compteur de téléchargements de l'artiste (qrcodes.downloads/usedScans).
+// Cherche par qrId d'abord, sinon par publicLinkId : selon la page d'où vient le
+// téléchargement, l'identifiant transmis n'est pas toujours le même champ, et
+// sans ce filet, le téléchargement n'était jamais compté côté artiste alors
+// qu'il apparaissait bien dans Découvrir/les ventes.
+async function compterTelechargementQrcode(identifiant: string) {
+  if (!identifiant) return;
+  try {
+    let snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', identifiant)));
+    if (snap.empty) snap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', identifiant)));
+    if (!snap.empty) {
+      const ref0 = snap.docs[0];
+      const d = ref0.data();
+      await updateDoc(doc(db, 'qrcodes', ref0.id), {
+        downloads: (d.downloads || 0) + 1,
+        usedScans: (d.usedScans || 0) + 1,
+      });
+    }
+  } catch (e) { console.error('compterTelechargementQrcode', e); }
+}
+
 function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
   prix: number, qrId: string, albumLabel: string, artistEmail: string, files: any[]
 }) {
@@ -14863,6 +14924,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
         commercialEmail, dlActive: true,
         statut: 'paid', createdAt: new Date().toISOString(),
       });
+      compterTelechargementQrcode(qrId); // en arrière-plan, ne bloque pas le téléchargement
       setDone(true);
     } catch(e) { console.error(e); }
     setPaying(false);
@@ -15268,8 +15330,18 @@ function PublicStreamPage() {
     if (!data) return;
     setZikoState('adding');
     try {
+      // Retrouver le VRAI qrId du contenu (le doc 'decouvrir'/lien public ne
+      // porte que le publicLinkId) — sinon la Zikothèque enregistre le mauvais
+      // identifiant et plus aucune écoute/téléchargement ne compte jamais pour
+      // l'artiste ensuite. On retombe sur publicLinkId seulement si vraiment
+      // introuvable (mieux vaut un identifiant que rien).
+      let vraiQrId = data.publicLinkId || publicLinkId;
+      try {
+        const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', data.publicLinkId || publicLinkId)));
+        if (!qrSnap.empty) vraiQrId = qrSnap.docs[0].data().qrId || vraiQrId;
+      } catch {}
       const zikoData = {
-        qrId: data.publicLinkId || publicLinkId,
+        qrId: vraiQrId,
         label: data.label || '',
         artist: data.artist || '',
         type: data.type || 'album',
