@@ -8392,142 +8392,142 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Enregistrer un contenu</h3>
-      <p style={{ color:'#8098b8', fontSize:13, marginBottom:16, lineHeight:1.6 }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6, color:C.text }}>Enregistrer un contenu</h3>
+      <p style={{ color:C.textSoft, fontSize:13, marginBottom:16, lineHeight:1.6 }}>
         Enregistrez votre musique ou vidéo sur la plateforme. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation par notre équipe, votre QR public et votre lien seront générés — vous pourrez alors les partager et publier.
       </p>
 
       {/* SÉLECTEUR DE MODE */}
       <div style={{ display:'flex', gap:8, marginBottom:16 }}>
         <button onClick={() => { setMode('simple'); setMsg(''); }}
-          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='simple'?'#1a6bff':'#dce6f7'}`, background:mode==='simple'?'#eaf1ff':'#fff', color:mode==='simple'?'#1a6bff':'#5a7090', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='simple'?C.blue:C.border}`, background:mode==='simple'?'rgba(93,132,255,0.12)':'transparent', color:mode==='simple'?C.blueLite:C.textSoft, fontWeight:700, fontSize:13, cursor:'pointer' }}>
           Enregistrement simple
         </button>
         <button onClick={() => { setMode('sortie'); setMsg(''); }}
-          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='sortie'?'#E0A82E':'#dce6f7'}`, background:mode==='sortie'?'#fff8e6':'#fff', color:mode==='sortie'?'#b07a00':'#5a7090', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          style={{ flex:1, padding:'12px', borderRadius:12, border:`2px solid ${mode==='sortie'?C.gold:C.border}`, background:mode==='sortie'?'rgba(245,200,76,0.12)':'transparent', color:mode==='sortie'?C.gold:C.textSoft, fontWeight:700, fontSize:13, cursor:'pointer' }}>
           Programmer une sortie
         </button>
       </div>
 
       {mode === 'sortie' && (
-        <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
-          <p style={{ color:'#b07a00', fontSize:12, margin:0, lineHeight:1.6 }}>
+        <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
+          <p style={{ color:C.gold, fontSize:12, margin:0, lineHeight:1.6 }}>
             Programmez la sortie officielle de votre œuvre. Vous chargez votre <strong>fichier complet</strong>, puis vous choisissez un <strong>extrait teaser</strong> (15s à 1 min) que les fans découvrent en streaming. Ils réservent leur téléchargement en payant à l'avance. Le jour J, le fichier complet est débloqué automatiquement pour tous ceux qui ont réservé — et il reste protégé jusque-là.
           </p>
         </div>
       )}
 
-      <div style={S.card}>
-        <label style={S.lbl}>Titre du contenu *</label>
-        <input style={S.inp} value={titre} onChange={e => setTitre(e.target.value)} placeholder="Ex: Mon nom — Titre (feat. ...)" />
+      <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:24 }}>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Titre du contenu *</label>
+        <input className="art-inp" value={titre} onChange={e => setTitre(e.target.value)} placeholder="Ex: Mon nom — Titre (feat. ...)" />
 
-        <label style={S.lbl}>Type de publication *</label>
-        <select style={S.inp} value={type} onChange={e => { setType(e.target.value as any); setCategorie('autres'); }}>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Type de publication *</label>
+        <select className="art-inp" value={type} onChange={e => { setType(e.target.value as any); setCategorie('autres'); }}>
           {Object.entries(PRIX_PUBLICATION).map(([k,v]) => (
             <option key={k} value={k}>{v.label} — {v.oscart} Oscart</option>
           ))}
         </select>
 
-        <label style={S.lbl}>Catégorie *</label>
-        <select style={S.inp} value={categorie} onChange={e => setCategorie(e.target.value)}>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Catégorie *</label>
+        <select className="art-inp" value={categorie} onChange={e => setCategorie(e.target.value)}>
           {cats.filter((c:any) => c.id !== 'tous').map((c:any) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
 
-        <label style={S.lbl}>{mode === 'sortie' ? `Fichier complet (${estVideo ? 'vidéo' : 'audio'}) *` : `Fichier (${estVideo ? 'vidéo' : 'audio'}) *`}</label>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>{mode === 'sortie' ? `Fichier complet (${estVideo ? 'vidéo' : 'audio'}) *` : `Fichier (${estVideo ? 'vidéo' : 'audio'}) *`}</label>
         <input type="file" accept={estVideo ? 'video/*' : 'audio/*'} id="inputFichierContenu"
           onChange={e => e.target.files?.[0] && uploadFichier(e.target.files[0])}
           style={{ display:'none' }} />
         <label htmlFor="inputFichierContenu" style={{
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6,
-          border:`2px dashed ${fileUrl ? '#00a040' : '#1a6bff'}`, borderRadius:12, padding:'22px 14px',
-          background: fileUrl ? '#eafaf0' : '#f0f6ff', cursor:'pointer', textAlign:'center', marginBottom:6 }}>
-          <span style={{ fontSize:13, fontWeight:800, color:'#1a6bff' }}>{uploading ? 'Envoi...' : fileUrl ? 'OK' : 'FICHIER'}</span>
-          <span style={{ fontSize:13, fontWeight:700, color: fileUrl ? '#00a040' : '#1a6bff' }}>
+          border:`2px dashed ${fileUrl ? C.success : C.blue}`, borderRadius:12, padding:'22px 14px',
+          background: fileUrl ? 'rgba(0,212,154,0.08)' : 'rgba(93,132,255,0.08)', cursor:'pointer', textAlign:'center', marginBottom:6 }}>
+          <span style={{ fontSize:13, fontWeight:800, color:C.blueLite }}>{uploading ? 'Envoi...' : fileUrl ? 'OK' : 'FICHIER'}</span>
+          <span style={{ fontSize:13, fontWeight:700, color: fileUrl ? C.success : C.blueLite }}>
             {uploading ? 'Upload en cours...' : fileUrl ? 'Fichier chargé — cliquez pour changer' : `Cliquez pour choisir votre ${estVideo ? 'vidéo' : 'audio'}`}
           </span>
-          <span style={{ fontSize:11, color:'#8098b8' }}>
+          <span style={{ fontSize:11, color:C.textSoft }}>
             {file?.name ? file.name : (estVideo ? 'Formats vidéo acceptés' : 'Formats audio acceptés (MP3, WAV...)')}
           </span>
         </label>
-        {fileUrl && <p style={{ color:'#00a040', fontSize:12 }}>Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
+        {fileUrl && <p style={{ color:C.success, fontSize:12 }}>Fichier ajouté{mode === 'sortie' && dureeTotale > 0 ? ` — durée ${Math.floor(dureeTotale/60)}:${String(dureeTotale%60).padStart(2,'0')}` : ''}</p>}
 
-        <label style={S.lbl}>Pochette (image carrée — affichée sur la fan page)</label>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Pochette (image carrée — affichée sur la fan page)</label>
         <input type="file" accept="image/*" id="inputPochetteContenu"
           onChange={e => e.target.files?.[0] && uploadPochette(e.target.files[0])}
           style={{ display:'none' }} />
         <label htmlFor="inputPochetteContenu" style={{
           display:'flex', alignItems:'center', gap:14,
-          border:`2px dashed ${pochetteUrl ? '#00a040' : '#1a6bff'}`, borderRadius:12, padding:'12px 14px',
-          background: pochetteUrl ? '#eafaf0' : '#f0f6ff', cursor:'pointer', marginBottom:6 }}>
+          border:`2px dashed ${pochetteUrl ? C.success : C.blue}`, borderRadius:12, padding:'12px 14px',
+          background: pochetteUrl ? 'rgba(0,212,154,0.08)' : 'rgba(93,132,255,0.08)', cursor:'pointer', marginBottom:6 }}>
           {pochetteUrl ? (
             <img src={pochetteUrl} alt="pochette" style={{ width:64, height:64, objectFit:'cover', borderRadius:10, flexShrink:0 }} />
           ) : (
-            <div style={{ width:64, height:64, borderRadius:10, background:'#dce6f7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:'#5a7090' }}>IMG</div>
+            <div style={{ width:64, height:64, borderRadius:10, background:'rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:C.textSoft }}>IMG</div>
           )}
           <div>
-            <p style={{ fontSize:13, fontWeight:700, color: pochetteUrl ? '#00a040' : '#1a6bff', margin:'0 0 2px' }}>
+            <p style={{ fontSize:13, fontWeight:700, color: pochetteUrl ? C.success : C.blueLite, margin:'0 0 2px' }}>
               {uploadingPoch ? 'Upload de la pochette...' : pochetteUrl ? 'Pochette chargée — cliquez pour changer' : 'Cliquez pour ajouter une pochette'}
             </p>
-            <p style={{ fontSize:11, color:'#8098b8', margin:0 }}>Image carrée recommandée (JPG, PNG)</p>
+            <p style={{ fontSize:11, color:C.textSoft, margin:0 }}>Image carrée recommandée (JPG, PNG)</p>
           </div>
         </label>
 
         {/* Coût */}
         {mode === 'sortie' ? (
           <div style={{ marginTop:14 }}>
-            <label style={S.lbl}>Description du titre (affichée sur la carte sortie)</label>
-            <textarea style={{ ...S.inp, minHeight:64, resize:'vertical' }} value={descSortie} onChange={e => setDescSortie(e.target.value)}
+            <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Description du titre (affichée sur la carte sortie)</label>
+            <textarea className="art-inp" style={{ minHeight:64, resize:'vertical' }} value={descSortie} onChange={e => setDescSortie(e.target.value)}
               placeholder="Ex : Un titre puissant inspiré par la grâce et la fidélité..." />
 
-            <label style={S.lbl}>Date de sortie officielle *</label>
-            <input style={S.inp} type="date" value={dateSortie} onChange={e => setDateSortie(e.target.value)} />
+            <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Date de sortie officielle *</label>
+            <input className="art-inp" type="date" value={dateSortie} onChange={e => setDateSortie(e.target.value)} />
 
             {/* ───── OUTIL DE DÉCOUPE DU TEASER ───── */}
             {fileUrl && (
-              <div style={{ background:'#f0f6ff', border:'1px solid #b8d4f5', borderRadius:14, padding:16, margin:'14px 0' }}>
-                <p style={{ color:'#1a6bff', fontSize:13, fontWeight:800, margin:'0 0 4px' }}>Créer l'extrait teaser</p>
-                <p style={{ color:'#5a7090', fontSize:11, lineHeight:1.6, margin:'0 0 14px' }}>
+              <div style={{ background:'rgba(93,132,255,0.08)', border:'1px solid rgba(93,132,255,0.25)', borderRadius:14, padding:16, margin:'14px 0' }}>
+                <p style={{ color:C.blueLite, fontSize:13, fontWeight:800, margin:'0 0 4px' }}>Créer l'extrait teaser</p>
+                <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.6, margin:'0 0 14px' }}>
                   Choisissez le passage que le public écoutera <strong>avant la sortie</strong>. Le fichier complet reste protégé : il ne sera débloqué que le jour J pour ceux qui ont réservé.
                 </p>
 
                 {/* Durée de l'extrait */}
-                <label style={{ ...S.lbl, marginBottom:6 }}>Durée de l'extrait</label>
+                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Durée de l'extrait</label>
                 <div style={{ display:'flex', gap:8, marginBottom:14 }}>
                   {[15,30,45,60].map(d => (
                     <button key={d} type="button" onClick={() => setTeaserDuree(d)}
-                      style={{ flex:1, padding:'10px 4px', borderRadius:10, border:`2px solid ${teaserDuree===d?'#1a6bff':'#dce6f7'}`, background:teaserDuree===d?'#eaf1ff':'#fff', color:teaserDuree===d?'#1a6bff':'#5a7090', fontWeight:800, fontSize:13, cursor:'pointer' }}>
+                      style={{ flex:1, padding:'10px 4px', borderRadius:10, border:`2px solid ${teaserDuree===d?C.blue:C.border}`, background:teaserDuree===d?'rgba(93,132,255,0.15)':'transparent', color:teaserDuree===d?C.blueLite:C.textSoft, fontWeight:800, fontSize:13, cursor:'pointer' }}>
                       {d === 60 ? '1 min' : d + 's'}
                     </button>
                   ))}
                 </div>
 
                 {/* Point de départ */}
-                <label style={{ ...S.lbl, marginBottom:6 }}>
-                  Début de l'extrait : <span style={{ color:'#1a6bff', fontWeight:800 }}>{Math.floor(teaserDebut/60)}:{String(teaserDebut%60).padStart(2,'0')}</span>
+                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>
+                  Début de l'extrait : <span style={{ color:C.blueLite, fontWeight:800 }}>{Math.floor(teaserDebut/60)}:{String(teaserDebut%60).padStart(2,'0')}</span>
                 </label>
                 {dureeTotale > 0 ? (
                   <>
                     <input type="range" min={0} max={Math.max(0, dureeTotale - teaserDuree)} value={teaserDebut}
                       onChange={e => setTeaserDebut(parseInt(e.target.value))}
-                      style={{ width:'100%', accentColor:'#1a6bff', marginBottom:6 }} />
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#8098b8', marginBottom:12 }}>
+                      style={{ width:'100%', accentColor:C.blue, marginBottom:6 }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:C.textSoft, marginBottom:12 }}>
                       <span>Début 0:00</span>
                       <span>Fin {Math.floor(dureeTotale/60)}:{String(dureeTotale%60).padStart(2,'0')}</span>
                     </div>
                   </>
                 ) : (
-                  <p style={{ color:'#8098b8', fontSize:11, marginBottom:12 }}>Lecture de la durée du fichier... (ou réglez le début manuellement ci-dessous)</p>
+                  <p style={{ color:C.textSoft, fontSize:11, marginBottom:12 }}>Lecture de la durée du fichier... (ou réglez le début manuellement ci-dessous)</p>
                 )}
 
                 {/* Réglage manuel du début (secours) */}
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-                  <span style={{ fontSize:11, color:'#5a7090' }}>Début (secondes) :</span>
+                  <span style={{ fontSize:11, color:C.textSoft }}>Début (secondes) :</span>
                   <input type="number" min={0} value={teaserDebut} onChange={e => setTeaserDebut(Math.max(0, parseInt(e.target.value)||0))}
-                    style={{ ...S.inp, width:90, padding:'6px 10px', margin:0 }} />
+                    className="art-inp" style={{ width:90, padding:'6px 10px', margin:0 }} />
                 </div>
 
                 {/* Aperçu de l'extrait */}
-                <label style={{ ...S.lbl, marginBottom:6 }}>Aperçu de l'extrait ({teaserDuree === 60 ? '1 min' : teaserDuree+'s'})</label>
+                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Aperçu de l'extrait ({teaserDuree === 60 ? '1 min' : teaserDuree+'s'})</label>
                 {estVideo ? (
                   <video key={`${teaserDebut}-${teaserDuree}`} src={construireTeaserUrl(fileUrl, teaserDebut, teaserDuree)} controls playsInline
                     style={{ width:'100%', maxHeight:200, background:'#000', borderRadius:10 }} />
@@ -8535,52 +8535,53 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
                   <audio key={`${teaserDebut}-${teaserDuree}`} src={construireTeaserUrl(fileUrl, teaserDebut, teaserDuree)} controls
                     style={{ width:'100%' }} />
                 )}
-                <p style={{ color:'#00a040', fontSize:11, margin:'8px 0 0' }}>✓ C'est cet extrait que le public {estVideo ? 'verra' : 'entendra'} avant la sortie.</p>
+                <p style={{ color:C.success, fontSize:11, margin:'8px 0 0' }}>✓ C'est cet extrait que le public {estVideo ? 'verra' : 'entendra'} avant la sortie.</p>
               </div>
             )}
 
             <div style={{ display:'flex', gap:10 }}>
               <div style={{ flex:1 }}>
-                <label style={S.lbl}>Objectif téléchargements</label>
-                <input style={S.inp} type="number" min="0" value={objTelech} onChange={e => setObjTelech(e.target.value)} placeholder="Ex: 100000" />
+                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Objectif téléchargements</label>
+                <input className="art-inp" type="number" min="0" value={objTelech} onChange={e => setObjTelech(e.target.value)} placeholder="Ex: 100000" />
               </div>
               <div style={{ flex:1 }}>
-                <label style={S.lbl}>Objectif kiffements</label>
-                <input style={S.inp} type="number" min="0" value={objCadeaux} onChange={e => setObjCadeaux(e.target.value)} placeholder="Ex: 50000" />
+                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Objectif kiffements</label>
+                <input className="art-inp" type="number" min="0" value={objCadeaux} onChange={e => setObjCadeaux(e.target.value)} placeholder="Ex: 50000" />
               </div>
             </div>
 
-            <label style={S.lbl}>Prix du téléchargement (FCFA) *</label>
-            <input style={S.inp} type="number" min="0" value={prixMusique} onChange={e => setPrixMusique(e.target.value)} placeholder="Ex: 2000" />
-            {prixMusique && <p style={{ color:'#8098b8', fontSize:11, margin:'4px 0 0' }}>Soit {Math.round(parseInt(prixMusique||'0')/10)} Oscart par réservation. L'artiste touche 70%.</p>}
+            <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Prix du téléchargement (FCFA) *</label>
+            <input className="art-inp" type="number" min="0" value={prixMusique} onChange={e => setPrixMusique(e.target.value)} placeholder="Ex: 2000" />
+            {prixMusique && <p style={{ color:C.textSoft, fontSize:11, margin:'4px 0 0' }}>Soit {Math.round(parseInt(prixMusique||'0')/10)} Oscart par réservation. L'artiste touche 70%.</p>}
 
-            {msg && <p style={{ color: msg.startsWith('')||msg.includes('prêt')||msg.includes('ajouté') ? '#00a040' : '#f04a6a', fontSize:12, margin:'12px 0' }}>{msg}</p>}
+            {msg && <p style={{ color: msg.startsWith('Erreur')||msg.startsWith('Solde') ? C.alert : C.success, fontSize:12, margin:'12px 0' }}>{msg}</p>}
 
-            <button onClick={soumettreSortie} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:8, background:'linear-gradient(135deg,#E0A82E,#f0c050)', color:'#1a2340' }}>
+            <button onClick={soumettreSortie} disabled={uploading} style={{ width:'100%', padding:14, marginTop:8, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:'linear-gradient(135deg,'+C.gold+',#f0c050)', color:'#1a2340' }}>
               {uploading ? 'Patientez...' : 'Soumettre la sortie programmée'}
             </button>
           </div>
         ) : (
           <>
-        <div style={{ background:'#f5f8ff', borderRadius:10, padding:'12px 14px', margin:'14px 0' }}>
+        <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'12px 14px', margin:'14px 0' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ color:'#5a7090', fontSize:13 }}>Coût de publication</span>
-            <span style={{ color:'#1a6bff', fontWeight:800, fontSize:16 }}>{premierGratuit ? 'OFFERT' : prix+' Oscart'}</span>
+            <span style={{ color:C.textSoft, fontSize:13 }}>Coût de publication</span>
+            <span style={{ color:C.blueLite, fontWeight:800, fontSize:16 }}>{premierGratuit ? 'OFFERT' : prix+' Oscart'}</span>
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6 }}>
-            <span style={{ color:'#8098b8', fontSize:11 }}>Votre solde</span>
-            <span style={{ color: soldeOscart >= prix ? '#00a040' : '#f04a6a', fontWeight:700, fontSize:13 }}>{soldeOscart} Oscart</span>
+            <span style={{ color:C.textSoft, fontSize:11 }}>Votre solde</span>
+            <span style={{ color: soldeOscart >= prix ? C.success : C.alert, fontWeight:700, fontSize:13 }}>{soldeOscart} Oscart</span>
           </div>
         </div>
 
-        {msg && <p style={{ color: msg.startsWith('')||msg.includes('prêt')||msg.includes('ajouté') ? '#00a040' : '#f04a6a', fontSize:12, marginBottom:10 }}>{msg}</p>}
+        {msg && <p style={{ color: msg.startsWith('Erreur')||msg.startsWith('Solde') ? C.alert : C.success, fontSize:12, marginBottom:10 }}>{msg}</p>}
 
         {(!premierGratuit && soldeOscart < prix) ? (
-          <button onClick={onRecharge} style={{ ...S.btn, width:'100%', padding:14, background:'#ffd700', color:'#1a2340' }}>
+          <button onClick={onRecharge} style={{ width:'100%', padding:14, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:C.gold, color:'#1a2340' }}>
             Recharger mes Oscart ({prix} requis)
           </button>
         ) : (
-          <button onClick={soumettre} disabled={uploading || uploadingPoch} style={{ ...S.btn, width:'100%', padding:14 }}>
+          <button onClick={soumettre} disabled={uploading || uploadingPoch}
+            style={{ width:'100%', padding:14, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff' }}>
             {uploading ? 'Patientez...' : premierGratuit ? 'Soumettre — 1er contenu OFFERT' : `Soumettre (${prix} Oscart)`}
           </button>
         )}
@@ -8591,17 +8592,17 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
       {/* Mes soumissions */}
       {mesSubmissions.length > 0 && (
         <div style={{ marginTop:20 }}>
-          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12 }}>Mes soumissions</h4>
+          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12, color:C.text }}>Mes soumissions</h4>
           {mesSubmissions.map(s => (
-            <div key={s.id} style={{ ...S.card, marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div key={s.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:'16px 20px', marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div>
-                <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{s.titre}</p>
-                <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{PRIX_PUBLICATION[s.type as keyof typeof PRIX_PUBLICATION]?.label || s.type}</p>
+                <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{s.titre}</p>
+                <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{PRIX_PUBLICATION[s.type as keyof typeof PRIX_PUBLICATION]?.label || s.type}</p>
               </div>
               <span style={{
                 borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700,
-                background: s.statut==='valide'?'#eaffea':s.statut==='refuse'?'#ffecec':'#fff8e6',
-                color: s.statut==='valide'?'#00a040':s.statut==='refuse'?'#d32f2f':'#b07a00',
+                background: s.statut==='valide'?'rgba(0,212,154,0.15)':s.statut==='refuse'?'rgba(255,100,124,0.15)':'rgba(245,200,76,0.15)',
+                color: s.statut==='valide'?C.success:s.statut==='refuse'?C.alert:C.gold,
               }}>
                 {s.statut==='valide'?'Validé':s.statut==='refuse'?'Refusé':'En attente'}
               </span>
