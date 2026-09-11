@@ -6638,47 +6638,58 @@ function ArtistPage() {
   const logout = async () => { await signOut(auth); };
 
   if (view === 'dashboard' && user) return (
-    <div style={{ minHeight: '100vh', overflowX:'hidden', width:'100%', maxWidth:'100vw', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight: '100vh', overflowX:'hidden', width:'100%', maxWidth:'100vw', background:`radial-gradient(ellipse 900px 500px at 50% -10%, rgba(245,200,76,0.10), transparent), ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif" }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        .vente-row:hover{background:#eaf1ff!important}
-        .art-inp{width:100%;background:#f5f8ff;border:1px solid #c8d8ef;border-radius:10px;padding:12px 14px;color:#1a2340;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:10px;}
-        .art-inp:focus{border-color:#1a6bff}
+        .vente-row:hover{background:rgba(255,255,255,0.05)!important}
+        .art-inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid ${C.border};border-radius:10px;padding:12px 14px;color:${C.text};font-size:14px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+        .art-inp:focus{border-color:${C.blue}}
+        .art-tabs::-webkit-scrollbar{display:none}
       `}</style>
 
       {/* HEADER */}
-      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50, gap:8 }}>
-        <Logo size="sm" />
-        <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flexShrink:1 }}>
+      <div style={{ background:'rgba(14,26,52,0.92)', backdropFilter:'blur(20px)', borderBottom:'1px solid '+C.border, padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:64, position:'sticky', top:0, zIndex:50, gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+          <span style={{ width:38, height:38, borderRadius:99, background:'linear-gradient(135deg,'+C.gold+',#c9922e)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, fontSize:16, color:'#2a1c00', flexShrink:0 }}>
+            {(stats.artistName || user.email || '?').trim().charAt(0).toUpperCase()}
+          </span>
+          <div style={{ minWidth:0 }}>
+            <p style={{ color:C.text, fontSize:14, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', margin:0 }}>{stats.artistName || user.email}</p>
+            <p style={{ color:C.gold, fontSize:10.5, fontWeight:700, letterSpacing:0.5, margin:0 }}>ESPACE ARTISTE</p>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
           {unreadVentes > 0 && (
-            <span style={{ background:'#fff0f3', border:'1px solid #f04a6a', borderRadius:99, padding:'3px 9px', fontSize:11, fontWeight:700, color:'#f04a6a', flexShrink:0 }}>
-              {unreadVentes} new
+            <span style={{ background:'rgba(240,74,106,0.15)', border:'1px solid rgba(240,74,106,0.4)', borderRadius:99, padding:'4px 10px', fontSize:11, fontWeight:800, color:'#ff8095' }}>
+              {unreadVentes} nouveau{unreadVentes>1?'x':''}
             </span>
           )}
-          <span style={{ color:'#a9bedc', fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{stats.artistName || user.email}</span>
-          <button style={{...S.btn2, flexShrink:0}} onClick={async () => await signOut(auth)}>Déconnexion</button>
+          <button style={{ padding:'8px 14px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déconnexion</button>
         </div>
       </div>
 
-      {/* TABS */}
-      <div style={{ borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 12px', display:'flex', background:'rgba(22,27,39,0.6)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
-        <button style={{...tabStyle(dashTab==='stats'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('stats')}>Stats</button>
-        <button style={{...tabStyle(dashTab==='publier'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('publier')}>Enregistrer</button>
-        <button style={{...tabStyle(dashTab==='mot'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('mot')}>Mon Mood</button>
-        <button style={{...tabStyle(dashTab==='pochettes'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('pochettes')}>Pochettes</button>
-        <button style={{...tabStyle(dashTab==='signatures'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('signatures')}>Signatures</button>
-        <button style={{...tabStyle(dashTab==='notifs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setDashTab('notifs')}>Notifs</button>
+      {/* TABS — façon pilules, comme le reste de l'app */}
+      <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+        {[['stats','Stats'],['publier','Enregistrer'],['mot','Mon Mood'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
+          <button key={id} onClick={() => setDashTab(id as any)}
+            style={{ flexShrink:0, whiteSpace:'nowrap', padding:'8px 16px', borderRadius:99, border:'1px solid '+(dashTab===id ? 'transparent' : C.border),
+              background: dashTab===id ? 'linear-gradient(135deg,'+C.blue+',#5d3fff)' : 'transparent',
+              color: dashTab===id ? '#fff' : C.textSoft, fontSize:13, fontWeight: dashTab===id ? 800 : 600, cursor:'pointer' }}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px', boxSizing:'border-box', width:'100%' }}>
-        {msg && <div style={{ background:'#eaf1ff', border:'1px solid #1a6bff', borderRadius:10, padding:'10px 14px', marginBottom:16, color:'#1a6bff', fontSize:13 }}>{msg} <span style={{ cursor:'pointer', float:'right' }} onClick={() => setMsg('')}>✕</span></div>}
+        {msg && <div style={{ background:'rgba(93,132,255,0.1)', border:'1px solid rgba(93,132,255,0.35)', borderRadius:12, padding:'12px 14px', marginBottom:16, color:'#8fb4ff', fontSize:13 }}>{msg} <span style={{ cursor:'pointer', float:'right' }} onClick={() => setMsg('')}>✕</span></div>}
+
 
         {/* ────────── ONGLET STATS ────────── */}
         {dashTab === 'stats' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
 
             {/* PORTEFEUILLE OSCART ARTISTE */}
-            <div style={{ ...S.card, background:'linear-gradient(135deg,#1a2340,#1e2a50)', marginBottom:16 }}>
+            <div style={{ borderRadius:16, padding:24, marginBottom:16, border:'1px solid '+C.border, background:'linear-gradient(135deg,#16214a,#1e2c5c)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                 <div>
                   <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, margin:'0 0 4px' }}>Votre portefeuille</p>
@@ -6720,37 +6731,38 @@ function ArtistPage() {
                 </div>
               </div>
             )}
-            <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:20 }}>Mon tableau de bord</h2>
+            <h2 style={{ fontFamily:'serif', fontSize:23, fontWeight:800, marginBottom:4, color:C.text }}>Mon tableau de bord</h2>
+            <p style={{ color:C.textSoft, fontSize:13, marginBottom:22 }}>Vue d'ensemble de votre activité sur Doniel Zik</p>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               {[
-                { label:'Pochettes créées', value:stats.pochettes||0, color:'#1a6bff' },
-                { label:'Scans effectués', value:stats.scansTotal||0, color:'#1a6bff' },
+                { label:'Pochettes créées', value:stats.pochettes||0 },
+                { label:'Scans effectués', value:stats.scansTotal||0 },
               ].map((s,i) => (
-                <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
-                  <p style={{ fontSize:28, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
-                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
+                <div key={i} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:'20px 12px' }}>
+                  <p style={{ fontSize:28, fontWeight:900, color:C.blueLite, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ color:C.textSoft, fontSize:11 }}>{s.label}</p>
                 </div>
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               {[
-                { label:'Téléchargements', value:stats.downloads||0, color:'#1a6bff' },
-                { label:'Streams', value:stats.streams||0, color:'#1a6bff' },
+                { label:'Téléchargements', value:stats.downloads||0 },
+                { label:'Streams', value:stats.streams||0 },
               ].map((s,i) => (
-                <div key={i} style={{ ...S.card, textAlign:'center', padding:20 }}>
-                  <p style={{ fontSize:28, fontWeight:900, color:s.color, marginBottom:4 }}>{s.value}</p>
-                  <p style={{ color:'#8098b8', fontSize:11 }}>{s.label}</p>
+                <div key={i} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:'20px 12px' }}>
+                  <p style={{ fontSize:28, fontWeight:900, color:C.blueLite, marginBottom:4 }}>{s.value}</p>
+                  <p style={{ color:C.textSoft, fontSize:11 }}>{s.label}</p>
                 </div>
               ))}
             </div>
-            <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#eef4ff,#dce8ff)' }}>
-              <p style={{ fontSize:28, fontWeight:900, color:'#1a6bff', marginBottom:4 }}>{(stats.streams||0).toLocaleString()} F CFA</p>
-              <p style={{ color:'#8098b8', fontSize:11 }}>Revenus streaming · 1 F CFA / écoute · retrait disponible à partir de 15 000 F</p>
+            <div style={{ background:'linear-gradient(135deg, rgba(93,132,255,0.15), rgba(93,63,255,0.15))', border:'1px solid rgba(93,132,255,0.3)', borderRadius:16, textAlign:'center', padding:'22px 16px', marginBottom:20 }}>
+              <p style={{ fontSize:28, fontWeight:900, color:C.blueLite, marginBottom:4 }}>{(stats.streams||0).toLocaleString()} F CFA</p>
+              <p style={{ color:C.textSoft, fontSize:11 }}>Revenus streaming · 1 F CFA / écoute · retrait disponible à partir de 15 000 F</p>
             </div>
 
             {/* SOLDE ARTISTE — portefeuille unique en Oscart + sélecteur devise */}
-            <div style={{ ...S.card, textAlign:'center', padding:20, marginBottom:20, background:'linear-gradient(135deg,#1a2340,#1e2a50)' }}>
+            <div style={{ background:'linear-gradient(135deg,#16214a,#1c2c5c)', border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:'24px 20px', marginBottom:20 }}>
               {/* Sélecteur devise */}
               <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:12 }}>
                 {(['fcfa','eur','usd'] as const).map(d => (
@@ -6794,17 +6806,17 @@ function ArtistPage() {
             {/* LIENS PUBLICS */}
             {stats.publicLinks && stats.publicLinks.length > 0 && (
               <div style={{ marginBottom:20 }}>
-                <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>Mes liens de streaming</h3>
+                <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12, color:C.text }}>Mes liens de streaming</h3>
                 {stats.publicLinks.map((link:any) => (
-                  <div key={link.id} style={{ ...S.card, marginBottom:8 }}>
+                  <div key={link.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
                       <div>
-                        <p style={{ fontWeight:700, fontSize:14 }}>{link.label}</p>
-                        <p style={{ color:'#8098b8', fontSize:12 }}>Streaming illimité · Sans scan limité</p>
+                        <p style={{ fontWeight:700, fontSize:14, color:C.text }}>{link.label}</p>
+                        <p style={{ color:C.textSoft, fontSize:12 }}>Streaming illimité · Sans scan limité</p>
                       </div>
                       <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                         <button onClick={() => { navigator.clipboard.writeText(BASE_URL+'/ecoute/'+link.publicLinkId); alert('Lien copié !'); }}
-                          style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>Copier</button>
+                          style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>Copier</button>
                         <button onClick={() => {
                           const url = BASE_URL+'/ecoute/'+link.publicLinkId;
                           const msg = `${link.label} — Écoutez et téléchargez mon tout nouveau contenu !\n\nCliquez sur le lien pour écouter ${url}`;
@@ -6813,7 +6825,7 @@ function ArtistPage() {
                           } else {
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }
-                        }} style={{ ...S.btn2, padding:'8px 14px', fontSize:12 }}>Partager</button>
+                        }} style={{ padding:'8px 14px', borderRadius:99, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontWeight:700, fontSize:12, cursor:'pointer' }}>Partager</button>
                         <button onClick={async () => {
                           // Publier sur la page Découvrir
                           const snap = await getDocs(query(collection(db, 'decouvrir'), where('publicLinkId','==', link.publicLinkId)));
@@ -6838,7 +6850,7 @@ function ArtistPage() {
                             streams: 0,
                           });
                           alert('Contenu publié sur la page Découvrir !');
-                        }} style={{ ...S.btn, padding:'8px 14px', fontSize:12, background:'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                        }} style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>
                           Publier
                         </button>
                         <button onClick={async () => {
@@ -6856,15 +6868,15 @@ function ArtistPage() {
                             for (const d of decSnap.docs) await deleteDoc(doc(db,'decouvrir',d.id));
                             alert('Contenu supprimé. Actualisez la page.');
                           } catch(e:any) { alert('Erreur : ' + e.message); }
-                        }} style={{ ...S.btnRed, padding:'8px 14px', fontSize:12 }}>
+                        }} style={{ padding:'8px 14px', borderRadius:99, border:'1px solid rgba(240,74,106,0.4)', background:'rgba(240,74,106,0.1)', color:'#ff8095', fontWeight:700, fontSize:12, cursor:'pointer' }}>
                           Supprimer
                         </button>
                       </div>
                     </div>
-                    <p style={{ color:'#8098b8', fontSize:10, marginTop:8, marginBottom:12, wordBreak:'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
-                    {/* QR CODE DU LIEN PUBLIC */}
-                    <div style={{ display:'flex', alignItems:'center', gap:16, background:'#f5f8ff', borderRadius:12, padding:14 }}>
-                      <div style={{ background:'white', padding:8, borderRadius:8, border:'1px solid #dce6f7', flexShrink:0 }}>
+                    <p style={{ color:C.textSoft, fontSize:10, marginTop:8, marginBottom:12, wordBreak:'break-all' }}>{BASE_URL}/ecoute/{link.publicLinkId}</p>
+                    {/* QR CODE DU LIEN PUBLIC (fond blanc volontairement conservé — nécessaire à la lisibilité du QR) */}
+                    <div style={{ display:'flex', alignItems:'center', gap:16, background:'rgba(255,255,255,0.04)', border:'1px solid '+C.border, borderRadius:12, padding:14 }}>
+                      <div style={{ background:'white', padding:8, borderRadius:8, flexShrink:0 }}>
                         <QRCodeCanvas
                           id={'pub-qr-'+link.id}
                           value={BASE_URL+'/ecoute/'+link.publicLinkId}
@@ -6872,8 +6884,8 @@ function ArtistPage() {
                         />
                       </div>
                       <div style={{ flex:1 }}>
-                        <p style={{ fontWeight:700, fontSize:13, marginBottom:4, color:'#1a2340' }}>QR Code du lien public</p>
-                        <p style={{ color:'#8098b8', fontSize:11, marginBottom:10, lineHeight:1.5 }}>Imprimez ce QR code pour que vos fans scannent et écoutent en streaming. Chaque écoute vous rémunère.</p>
+                        <p style={{ fontWeight:700, fontSize:13, marginBottom:4, color:C.text }}>QR Code du lien public</p>
+                        <p style={{ color:C.textSoft, fontSize:11, marginBottom:10, lineHeight:1.5 }}>Imprimez ce QR code pour que vos fans scannent et écoutent en streaming. Chaque écoute vous rémunère.</p>
                         <button onClick={() => {
                           const canvas = document.getElementById('pub-qr-'+link.id) as HTMLCanvasElement;
                           if (!canvas) return;
@@ -6881,7 +6893,7 @@ function ArtistPage() {
                           a.href = canvas.toDataURL('image/png');
                           a.download = (link.label||'streaming')+'-QR-public.png';
                           a.click();
-                        }} style={{ ...S.btn, padding:'8px 14px', fontSize:12 }}>⬇ Télécharger QR PNG</button>
+                        }} style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>⬇ Télécharger QR PNG</button>
                       </div>
                     </div>
                   </div>
@@ -6890,71 +6902,68 @@ function ArtistPage() {
             )}
 
             {/* RÉMUNÉRATION STREAMING */}
-            <div style={{ background:'#ffffff', border:'1px solid #dce6f7', borderRadius:16, padding:24, marginBottom:20, boxShadow:'0 2px 12px rgba(26,107,255,0.08)' }}>
-              <p style={{ color:'#1a6bff', fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>RÉMUNÉRATION STREAMING</p>
-              <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800, marginBottom:12 }}>Ce que vous gagnez</h3>
-              <p style={{ color:'#8098b8', fontSize:13, lineHeight:1.8, marginBottom:16 }}>
+            <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:24, marginBottom:20 }}>
+              <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>RÉMUNÉRATION STREAMING</p>
+              <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800, marginBottom:12, color:C.text }}>Ce que vous gagnez</h3>
+              <p style={{ color:C.textSoft, fontSize:13, lineHeight:1.8, marginBottom:16 }}>
                 Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
               </p>
               <div style={{ display:'grid', gap:10 }}>
                 {[
-                  { label:"Aujourd'hui — pub automatique", range:'0,10 – 0,80 FCFA', tag:'● ACTIF', color:'#1a6bff', icon:'' },
-                  { label:'Bientôt — annonceurs locaux', range:'1 – 4 FCFA', tag:'◎ PROCHAINEMENT', color:'#b07a00', icon:'' },
-                  { label:'Perspective — abonnements fans', range:"jusqu'à 5 FCFA", tag:'◌ EN DEV', color:'#5a7090', icon:'' },
+                  { label:"Aujourd'hui — pub automatique", range:'0,10 – 0,80 FCFA', tag:'● ACTIF', color:C.blueLite },
+                  { label:'Bientôt — annonceurs locaux', range:'1 – 4 FCFA', tag:'◎ PROCHAINEMENT', color:C.gold },
+                  { label:'Perspective — abonnements fans', range:"jusqu'à 5 FCFA", tag:'◌ EN DEV', color:C.textSoft },
                 ].map((r,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'#f5f8ff', border:`1px solid ${r.color}33`, borderRadius:12, padding:'14px 16px' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <span style={{ fontSize:22 }}>{r.icon}</span>
-                      <div>
-                        <p style={{ color:'#8098b8', fontSize:11, marginBottom:2 }}>{r.label}</p>
-                        <p style={{ fontWeight:800, fontSize:16, color:r.color }}>{r.range} <span style={{ fontSize:11, fontWeight:400, color:'#8098b8' }}>/ écoute</span></p>
-                      </div>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(255,255,255,0.04)', border:`1px solid ${r.color}33`, borderRadius:12, padding:'14px 16px' }}>
+                    <div>
+                      <p style={{ color:C.textSoft, fontSize:11, marginBottom:2 }}>{r.label}</p>
+                      <p style={{ fontWeight:800, fontSize:16, color:r.color }}>{r.range} <span style={{ fontSize:11, fontWeight:400, color:C.textSoft }}>/ écoute</span></p>
                     </div>
-                    <span style={{ fontSize:10, padding:'3px 8px', borderRadius:99, background:`${r.color}15`, color:r.color, fontWeight:700 }}>{r.tag}</span>
+                    <span style={{ fontSize:10, padding:'3px 8px', borderRadius:99, background:`${r.color}22`, color:r.color, fontWeight:700, whiteSpace:'nowrap' }}>{r.tag}</span>
                   </div>
                 ))}
               </div>
-              <p style={{ color:'#b0c4d8', fontSize:11, marginTop:14, textAlign:'center' }}>
+              <p style={{ color:C.textSoft, fontSize:11, marginTop:14, textAlign:'center' }}>
                 Retrait sur demande · Orange Money · Wave · MTN MoMo
               </p>
             </div>
 
             {/* POCHETTES */}
-            <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12 }}>Mes pochettes ({stats.qrcodes.length})</h3>
+            <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12, color:C.text }}>Mes pochettes ({stats.qrcodes.length})</h3>
             {stats.qrcodes.map((q:any) => (
-              <div key={q.id} style={S.card}>
+              <div key={q.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
                   <div>
-                    <p style={{ fontWeight:700, marginBottom:4 }}>{q.label}</p>
-                    <p style={{ color:'#8098b8', fontSize:12 }}>{q.usedScans||0}/{q.totalScans||0} scans · {q.downloads!==undefined?q.downloads:(q.usedScans||0)} DL · {q.streams||0} streams</p>
+                    <p style={{ fontWeight:700, marginBottom:4, color:C.text }}>{q.label}</p>
+                    <p style={{ color:C.textSoft, fontSize:12 }}>{q.usedScans||0}/{q.totalScans||0} scans · {q.downloads!==undefined?q.downloads:(q.usedScans||0)} DL · {q.streams||0} streams</p>
                   </div>
                   <span style={badgeStyle(q.status)}>{q.status}</span>
                 </div>
                 <div style={{ marginTop:10, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
                   {[
-                    { label:'Visites', val:q.visits||0, color:'#1a6bff' },
-                    { label:'Streams', val:q.streams||0, color:'#b07a00' },
-                    { label:'DL', val:q.downloads!==undefined?q.downloads:(q.usedScans||0), color:'#1a6bff' },
+                    { label:'Visites', val:q.visits||0, color:C.blueLite },
+                    { label:'Streams', val:q.streams||0, color:C.gold },
+                    { label:'DL', val:q.downloads!==undefined?q.downloads:(q.usedScans||0), color:C.blueLite },
                   ].map((s,i) => (
-                    <div key={i} style={{ background:'#f5f8ff', borderRadius:8, padding:8, textAlign:'center' }}>
+                    <div key={i} style={{ background:'rgba(255,255,255,0.04)', borderRadius:8, padding:8, textAlign:'center' }}>
                       <p style={{ color:s.color, fontWeight:800, fontSize:18 }}>{s.val}</p>
-                      <p style={{ color:'#8098b8', fontSize:10 }}>{s.label}</p>
+                      <p style={{ color:C.textSoft, fontSize:10 }}>{s.label}</p>
                     </div>
                   ))}
                 </div>
                 {/* CONFIDENTIALITÉ : Public ⇄ Privé (masque du fil Découvrir sans rien supprimer) */}
-                <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid #eef3fb', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+                <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
                   <div>
-                    <p style={{ fontSize:12, fontWeight:700, color: q.masque ? '#b07a00' : '#1a6bff', margin:'0 0 2px' }}>
+                    <p style={{ fontSize:12, fontWeight:700, color: q.masque ? C.gold : C.blueLite, margin:'0 0 2px' }}>
                       {q.masque ? 'Privé (masqué du fil)' : 'Public (visible dans Découvrir)'}
                     </p>
-                    <p style={{ fontSize:10, color:'#8098b8', margin:0 }}>
+                    <p style={{ fontSize:10, color:C.textSoft, margin:0 }}>
                       {q.masque ? 'Vos données sont conservées. Repassez en Public quand vous voulez.' : 'Passez en Privé pour masquer sans rien perdre.'}
                     </p>
                   </div>
                   <button onClick={() => basculerPrive(q, !q.masque)} disabled={togglingPrive === q.id}
                     style={{ padding:'8px 16px', borderRadius:99, border:'none', cursor:'pointer', fontWeight:800, fontSize:12,
-                      background: q.masque ? 'linear-gradient(135deg,#1a6bff,#0050d0)' : 'linear-gradient(135deg,#E0A82E,#f0c050)',
+                      background: q.masque ? 'linear-gradient(135deg,'+C.blue+',#0050d0)' : 'linear-gradient(135deg,'+C.gold+',#f0c050)',
                       color: q.masque ? '#fff' : '#1a2340', opacity: togglingPrive === q.id ? 0.6 : 1, whiteSpace:'nowrap' }}>
                     {togglingPrive === q.id ? '...' : (q.masque ? 'Rendre Public' : 'Rendre Privé')}
                   </button>
