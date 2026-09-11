@@ -8065,22 +8065,22 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
         <div style={{ marginBottom:20 }}>
           <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Kiffements reçus</p>
           {fans.map((f, i) => (
-            <div key={i} style={{ ...S.card, marginBottom:10, cursor:'pointer' }}
+            <div key={i} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10, cursor:'pointer' }}
               onClick={() => setOpenFan(openFan === f.nom ? null : f.nom)}>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
                                 <div style={{ flex:1 }}>
-                  <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:"#1a2340" }}>{f.nom} vous a envoyé des kiffements</p>
-                  <p style={{ color:"#5a7090", fontSize:12, margin:0 }}>{f.total} kiffement{f.total>1?'s':''} au total · touchez pour voir le détail</p>
+                  <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{f.nom} vous a envoyé des kiffements</p>
+                  <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>{f.total} kiffement{f.total>1?'s':''} au total · touchez pour voir le détail</p>
                 </div>
-                <span style={{ color:"#5a7090", fontSize:16, transform: openFan === f.nom ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}>›</span>
+                <span style={{ color:C.textSoft, fontSize:16, transform: openFan === f.nom ? 'rotate(90deg)' : 'none', transition:'transform .2s' }}>›</span>
               </div>
               {/* Déroulé : détail par type de cadeau */}
               {openFan === f.nom && (
                 <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid '+C.border }}>
                   {Object.entries(f.types).sort((a,b)=>b[1]-a[1]).map(([lab, nb], j) => (
                     <div key={j} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0' }}>
-                      <span style={{ color:"#1a2340", fontSize:13 }}>{lab}</span>
-                      <span style={{ color:C.blue, fontSize:14, fontWeight:800 }}>×{nb}</span>
+                      <span style={{ color:C.text, fontSize:13 }}>{lab}</span>
+                      <span style={{ color:C.blueLite, fontSize:14, fontWeight:800 }}>×{nb}</span>
                     </div>
                   ))}
                 </div>
@@ -8095,13 +8095,13 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
         <div>
           <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
           {notifs.map(n => (
-            <div key={n.id} style={{ ...S.card, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
+            <div key={n.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
               <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
                 <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
                 <div style={{ flex:1 }}>
-                  <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px', color:"#1a2340" }}>{n.text}</p>
-                  {n.from && <p style={{ color:"#5a7090", fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
-                  <p style={{ color:"#5a7090", fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
+                  <p style={{ fontWeight:600, fontSize:14, margin:'0 0 2px', color:C.text }}>{n.text}</p>
+                  {n.from && <p style={{ color:C.textSoft, fontSize:12, margin:'0 0 4px' }}>De : {n.from}</p>}
+                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{new Date(n.createdAt).toLocaleDateString('fr')} à {new Date(n.createdAt).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
                 {!n.lu && <span style={{ width:8, height:8, borderRadius:99, background:C.blue, flexShrink:0, marginTop:4 }} />}
               </div>
