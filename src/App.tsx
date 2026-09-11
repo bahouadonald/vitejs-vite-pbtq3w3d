@@ -7028,11 +7028,11 @@ function ArtistPage() {
           <div style={{ animation:'fadeUp .3s ease' }}>
             <CommandePochettes user={user} artistName={stats.artistName || user?.displayName || ''}
               contenusValides={(stats.qrcodes || [])} />
-            <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:16 }}>Mes pochettes physiques</h3>
+            <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:16, color:C.text }}>Mes pochettes physiques</h3>
             {(stats.qrcodes || []).filter((q:any) => q.totalScans > 0).length === 0 ? (
-              <div style={{ ...S.card, textAlign:'center', padding:40 }}>
-                <p style={{ color:'#8098b8', fontSize:14 }}>Aucune pochette physique enregistrée.</p>
-                <p style={{ color:'#b0c4d8', fontSize:12, marginTop:8 }}>Contactez votre commercial pour commander vos pochettes.</p>
+              <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:40 }}>
+                <p style={{ color:C.textSoft, fontSize:14 }}>Aucune pochette physique enregistrée.</p>
+                <p style={{ color:C.textSoft, fontSize:12, marginTop:8 }}>Contactez votre commercial pour commander vos pochettes.</p>
               </div>
             ) : (
               (stats.qrcodes || []).filter((q:any) => q.totalScans > 0).map((q:any) => {
@@ -7042,12 +7042,12 @@ function ArtistPage() {
                 const pochettesVendues = Math.floor((q.usedScans||0) / 2);
                 const gainTotal = pochettesVendues * (q.prixVente || 0);
                 return (
-                  <div key={q.id} style={{ ...S.card, marginBottom:16 }}>
+                  <div key={q.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:16 }}>
                     <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:12 }}>
                       {q.coverUrl && <img src={optimImg(q.coverUrl, 120)} style={{ width:56, height:56, borderRadius:10, objectFit:'cover' }} alt="" />}
                       <div style={{ flex:1 }}>
-                        <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{q.label}</p>
-                        <p style={{ color:'#8098b8', fontSize:12, margin:0 }}>{q.artist}</p>
+                        <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{q.label}</p>
+                        <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>{q.artist}</p>
                       </div>
                     </div>
                     {/* Stats pochettes */}
@@ -7057,29 +7057,29 @@ function ArtistPage() {
                         { label:'Pochettes vendues', val:pochettesVendues },
                         { label:'Scans restants', val:scansRestants },
                       ].map((s,i) => (
-                        <div key={i} style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontWeight:800, fontSize:16, color:'#1a6bff', margin:'0 0 2px' }}>{s.val}</p>
-                          <p style={{ color:'#8098b8', fontSize:10, margin:0 }}>{s.label}</p>
+                        <div key={i} style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                          <p style={{ fontWeight:800, fontSize:16, color:C.blueLite, margin:'0 0 2px' }}>{s.val}</p>
+                          <p style={{ color:C.textSoft, fontSize:10, margin:0 }}>{s.label}</p>
                         </div>
                       ))}
                     </div>
                     {/* Barre progression scans */}
                     <div style={{ marginBottom:10 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                        <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Scans utilisés</p>
-                        <p style={{ color:'#1a6bff', fontSize:11, fontWeight:700, margin:0 }}>{pct}%</p>
+                        <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Scans utilisés</p>
+                        <p style={{ color:C.blueLite, fontSize:11, fontWeight:700, margin:0 }}>{pct}%</p>
                       </div>
-                      <div style={{ background:'#dce6f7', borderRadius:99, height:6, overflow:'hidden' }}>
-                        <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,#1a6bff,#4da6ff)', borderRadius:99 }} />
+                      <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:99, height:6, overflow:'hidden' }}>
+                        <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,'+C.blue+',#5bb0ff)', borderRadius:99 }} />
                       </div>
                     </div>
                     {/* Prix vente + gain */}
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <p style={{ color:'#5a7090', fontSize:12, margin:0 }}>
-                        Prix de vente : <strong>{q.prixVente ? q.prixVente.toLocaleString()+' F CFA' : 'Non défini'}</strong>
+                      <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>
+                        Prix de vente : <strong style={{ color:C.text }}>{q.prixVente ? q.prixVente.toLocaleString()+' F CFA' : 'Non défini'}</strong>
                       </p>
                       {gainTotal > 0 && (
-                        <p style={{ color:'#00a040', fontSize:13, fontWeight:700, margin:0 }}>
+                        <p style={{ color:C.success, fontSize:13, fontWeight:700, margin:0 }}>
                           +{gainTotal.toLocaleString()} F CFA
                         </p>
                       )}
@@ -8685,9 +8685,9 @@ function CommandePochettes({ user, artistName, contenusValides }: any) {
   };
 
   return (
-    <div style={{ ...S.card, marginBottom:20, border:'2px solid #1a6bff' }}>
-      <h4 style={{ fontWeight:800, fontSize:16, color:'#1a6bff', margin:'0 0 6px' }}>Commander des pochettes physiques</h4>
-      <p style={{ color:'#8098b8', fontSize:12, marginBottom:14, lineHeight:1.6 }}>
+    <div style={{ background:C.card, border:'2px solid '+C.blue, borderRadius:16, padding:24, marginBottom:20 }}>
+      <h4 style={{ fontWeight:800, fontSize:16, color:C.blueLite, margin:'0 0 6px' }}>Commander des pochettes physiques</h4>
+      <p style={{ color:C.textSoft, fontSize:12, marginBottom:14, lineHeight:1.6 }}>
         Vos pochettes sont au format carré, avec votre QR code en bas et les informations techniques au dos. Vos fans scannent et téléchargent directement votre musique.
       </p>
 
@@ -8698,89 +8698,90 @@ function CommandePochettes({ user, artistName, contenusValides }: any) {
           <span style={{ color:'rgba(255,255,255,0.5)', fontSize:11, textAlign:'center', padding:8 }}>Visuel + titre</span>
           <div style={{ position:'absolute', bottom:8, right:8, width:28, height:28, background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#000' }}>QR</div>
         </div>
-        <div style={{ flex:1, aspectRatio:'1', background:'#f5f8ff', border:'1px dashed #c8d8ef', borderRadius:10, position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ color:'#8098b8', fontSize:10, position:'absolute', top:8, left:8 }}>VERSO</span>
-          <span style={{ color:'#8098b8', fontSize:10, textAlign:'center', padding:8, lineHeight:1.4 }}>Infos techniques :<br/>intervenants, crédits, contact</span>
+        <div style={{ flex:1, aspectRatio:'1', background:'rgba(255,255,255,0.04)', border:'1px dashed '+C.border, borderRadius:10, position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ color:C.textSoft, fontSize:10, position:'absolute', top:8, left:8 }}>VERSO</span>
+          <span style={{ color:C.textSoft, fontSize:10, textAlign:'center', padding:8, lineHeight:1.4 }}>Infos techniques :<br/>intervenants, crédits, contact</span>
         </div>
       </div>
 
-      <label style={S.lbl}>Contenu concerné *</label>
-      <select style={S.inp} value={contenuId} onChange={e => setContenuId(e.target.value)}>
+      <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Contenu concerné *</label>
+      <select className="art-inp" value={contenuId} onChange={e => setContenuId(e.target.value)}>
         <option value="">— Choisir —</option>
         {contenusValides.map((c:any) => <option key={c.id} value={c.id}>{c.label || c.titre}</option>)}
       </select>
 
       <div style={{ display:'flex', gap:10 }}>
         <div style={{ flex:1 }}>
-          <label style={S.lbl}>Nombre de pochettes *</label>
-          <input style={S.inp} type="number" min="1" value={nbPochettes} onChange={e => setNbPochettes(e.target.value)} />
+          <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Nombre de pochettes *</label>
+          <input className="art-inp" type="number" min="1" value={nbPochettes} onChange={e => setNbPochettes(e.target.value)} />
         </div>
         <div style={{ flex:1 }}>
-          <label style={S.lbl}>Scans par pochette *</label>
-          <input style={S.inp} type="number" min="1" value={nbScans} onChange={e => setNbScans(e.target.value)} />
+          <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Scans par pochette *</label>
+          <input className="art-inp" type="number" min="1" value={nbScans} onChange={e => setNbScans(e.target.value)} />
         </div>
       </div>
 
-      <label style={S.lbl}>Position du QR code</label>
+      <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Position du QR code</label>
       <div style={{ display:'flex', gap:8, marginBottom:14 }}>
         {[['bas-droite','En bas à droite'],['bas-gauche','En bas à gauche']].map(([k,l]) => (
           <button key={k} onClick={() => setQrPosition(k as any)}
-            style={{ flex:1, padding:10, borderRadius:8, border:`2px solid ${qrPosition===k?'#1a6bff':'#dce6f7'}`, background:qrPosition===k?'#eaf1ff':'#fff', color:qrPosition===k?'#1a6bff':'#5a7090', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            style={{ flex:1, padding:10, borderRadius:8, border:`2px solid ${qrPosition===k?C.blue:C.border}`, background:qrPosition===k?'rgba(93,132,255,0.15)':'transparent', color:qrPosition===k?C.blueLite:C.textSoft, fontSize:12, fontWeight:600, cursor:'pointer' }}>
             {l}
           </button>
         ))}
       </div>
 
       {/* Option conception */}
-      <div style={{ background:'#fff8e6', border:'1px solid #f0b84a', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+      <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
         <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer' }}>
           <input type="checkbox" checked={creaParNous} onChange={e => setCreaParNous(e.target.checked)} style={{ marginTop:3 }} />
           <span>
-            <span style={{ fontWeight:700, fontSize:13, color:'#1a2340' }}>Concevez ma pochette (+{PRIX_CREA_POCHETTE.toLocaleString()} F)</span>
-            <span style={{ display:'block', color:'#b07a00', fontSize:11, marginTop:2 }}>Notre équipe crée votre pochette. Envoyez une photo et vos informations.</span>
+            <span style={{ fontWeight:700, fontSize:13, color:C.text }}>Concevez ma pochette (+{PRIX_CREA_POCHETTE.toLocaleString()} F)</span>
+            <span style={{ display:'block', color:C.gold, fontSize:11, marginTop:2 }}>Notre équipe crée votre pochette. Envoyez une photo et vos informations.</span>
           </span>
         </label>
       </div>
 
       {creaParNous && (
         <>
-          <label style={S.lbl}>Votre photo *</label>
-          <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} style={{ ...S.inp, padding:8 }} />
-          {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload...</p>}
+          <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Votre photo *</label>
+          <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} className="art-inp" style={{ padding:8 }} />
+          {uploading && <p style={{ color:C.blueLite, fontSize:12 }}>Upload...</p>}
           {photoUrl && <img src={photoUrl} style={{ width:60, height:60, borderRadius:8, objectFit:'cover', margin:'4px 0' }} alt="" />}
-          <label style={S.lbl}>Informations pour la pochette</label>
-          <textarea style={{ ...S.inp, minHeight:70, resize:'vertical', fontFamily:'inherit' }} value={infos}
+          <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Informations pour la pochette</label>
+          <textarea className="art-inp" style={{ minHeight:70, resize:'vertical', fontFamily:'inherit' }} value={infos}
             onChange={e => setInfos(e.target.value)} placeholder="Titre, nom d'artiste, intervenants, crédits, contact à mettre au dos..." />
         </>
       )}
 
-      {msg && <p style={{ color: msg.startsWith('')||msg.includes('ajoutée') ? '#00a040':'#f04a6a', fontSize:12, margin:'8px 0' }}>{msg}</p>}
+      {msg && <p style={{ color: msg.startsWith('Erreur') ? C.alert : C.success, fontSize:12, margin:'8px 0' }}>{msg}</p>}
 
-      <button onClick={commander} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:6 }}>
+      <button onClick={commander} disabled={uploading}
+        style={{ width:'100%', padding:14, marginTop:6, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff' }}>
         {uploading ? 'Patientez...' : 'Commander mes pochettes'}
       </button>
 
       {/* Mes commandes */}
       {mesCommandes.length > 0 && (
         <div style={{ marginTop:18 }}>
-          <p style={{ fontWeight:700, fontSize:13, marginBottom:10 }}>Mes commandes</p>
+          <p style={{ fontWeight:700, fontSize:13, marginBottom:10, color:C.text }}>Mes commandes</p>
           {mesCommandes.map(c => (
-            <div key={c.id} style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 12px', marginBottom:8 }}>
+            <div key={c.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid '+C.border, borderRadius:10, padding:'10px 12px', marginBottom:8 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <div>
-                  <p style={{ fontWeight:700, fontSize:13, margin:0 }}>{c.contenuTitre}</p>
-                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{c.nbPochettes} pochettes · {c.nbScans} scan(s)/pièce{c.creaParNous ? ' · créa incluse' : ''}</p>
+                  <p style={{ fontWeight:700, fontSize:13, margin:0, color:C.text }}>{c.contenuTitre}</p>
+                  <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{c.nbPochettes} pochettes · {c.nbScans} scan(s)/pièce{c.creaParNous ? ' · créa incluse' : ''}</p>
                 </div>
                 <span style={{ borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700,
-                  background: c.statut==='livree'?'#eaffea':c.statut==='en_cours'?'#eaf1ff':'#fff8e6',
-                  color: c.statut==='livree'?'#00a040':c.statut==='en_cours'?'#1a6bff':'#b07a00' }}>
+                  background: c.statut==='livree'?'rgba(0,212,154,0.15)':c.statut==='en_cours'?'rgba(93,132,255,0.15)':'rgba(245,200,76,0.15)',
+                  color: c.statut==='livree'?C.success:c.statut==='en_cours'?C.blueLite:C.gold }}>
                   {c.statut==='livree'?'Livrée':c.statut==='en_cours'?'En cours':'Reçue'}
                 </span>
               </div>
               {/* Créa livrée en PNG */}
               {c.creaUrl && (
                 <a href={c.creaUrl} target="_blank" rel="noopener noreferrer" download
-                  style={{ display:'block', textAlign:'center', marginTop:8, padding:8, borderRadius:8, background:'#00a040', color:'#fff', textDecoration:'none', fontSize:12, fontWeight:700 }}>
+                  style={{ display:'block', textAlign:'center', marginTop:8, padding:8, borderRadius:8, background:C.success, color:'#062018', textDecoration:'none', fontSize:12, fontWeight:700 }}>
                   Télécharger ma pochette (PNG)
                 </a>
               )}
@@ -8843,14 +8844,14 @@ function MotArtisteTab({ user, artistName }: any) {
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6 }}>Mon Mood</h3>
-      <p style={{ color:'#8098b8', fontSize:13, marginBottom:12, lineHeight:1.6 }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6, color:C.text }}>Mon Mood</h3>
+      <p style={{ color:C.textSoft, fontSize:13, marginBottom:12, lineHeight:1.6 }}>
         Votre Mood est votre espace d'expression professionnel, public et validé par notre équipe. Ce n'est pas un espace de buzz ou de divertissement personnel.
       </p>
 
-      <div style={{ background:'#eaffea', border:'1px solid #4dff9a', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
-        <p style={{ color:'#00a040', fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce que vous pouvez publier :</p>
-        <p style={{ color:'#1a7040', fontSize:11, margin:0, lineHeight:1.7 }}>
+      <div style={{ background:'rgba(0,212,154,0.08)', border:'1px solid rgba(0,212,154,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+        <p style={{ color:C.success, fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce que vous pouvez publier :</p>
+        <p style={{ color:C.textSoft, fontSize:11, margin:0, lineHeight:1.7 }}>
           • Vous présenter à votre public<br/>
           • Décrire votre univers, votre projet musical<br/>
           • Promouvoir une sortie, un single, un clip<br/>
@@ -8859,42 +8860,43 @@ function MotArtisteTab({ user, artistName }: any) {
         </p>
       </div>
 
-      <div style={{ background:'#ffecec', border:'1px solid #f0a0a0', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
-        <p style={{ color:'#d32f2f', fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce qui sera refusé :</p>
-        <p style={{ color:'#b03030', fontSize:11, margin:0, lineHeight:1.7 }}>
+      <div style={{ background:'rgba(255,100,124,0.08)', border:'1px solid rgba(255,100,124,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
+        <p style={{ color:C.alert, fontSize:12, fontWeight:700, margin:'0 0 6px' }}>Ce qui sera refusé :</p>
+        <p style={{ color:C.textSoft, fontSize:11, margin:0, lineHeight:1.7 }}>
           • Contenu de type buzz / divertissement (style TikTok)<br/>
           • Sujets personnels, sociaux ou hors musique<br/>
           • Tout ce qui n'est pas professionnel ou promotionnel
         </p>
       </div>
 
-      <div style={S.card}>
-        <label style={S.lbl}>Votre message</label>
-        <textarea style={{ ...S.inp, minHeight:90, resize:'vertical', fontFamily:'inherit' }} value={texte}
+      <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:24 }}>
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Votre message</label>
+        <textarea className="art-inp" style={{ minHeight:90, resize:'vertical', fontFamily:'inherit' }} value={texte}
           onChange={e => setTexte(e.target.value)} placeholder="Ex: Bonjour à tous ! Je serai en concert le... / Mon nouveau single est disponible..." />
 
-        <label style={S.lbl}>Vidéo (optionnel)</label>
-        <input type="file" accept="video/*" onChange={e => e.target.files?.[0] && uploadVideo(e.target.files[0])} style={{ ...S.inp, padding:8 }} />
-        {uploading && <p style={{ color:'#1a6bff', fontSize:12 }}>Upload en cours...</p>}
-        {videoUrl && <p style={{ color:'#00a040', fontSize:12 }}>✓ Vidéo ajoutée</p>}
+        <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Vidéo (optionnel)</label>
+        <input type="file" accept="video/*" onChange={e => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="art-inp" style={{ padding:8 }} />
+        {uploading && <p style={{ color:C.blueLite, fontSize:12 }}>Upload en cours...</p>}
+        {videoUrl && <p style={{ color:C.success, fontSize:12 }}>✓ Vidéo ajoutée</p>}
 
-        {msg && <p style={{ color: msg.startsWith('')||msg.includes('prête') ? '#00a040':'#f04a6a', fontSize:12, margin:'10px 0' }}>{msg}</p>}
+        {msg && <p style={{ color: msg.startsWith('Erreur') ? C.alert : C.success, fontSize:12, margin:'10px 0' }}>{msg}</p>}
 
-        <button onClick={publier} disabled={uploading} style={{ ...S.btn, width:'100%', padding:14, marginTop:8 }}>
+        <button onClick={publier} disabled={uploading}
+          style={{ width:'100%', padding:14, marginTop:8, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff' }}>
           {uploading ? 'Patientez...' : 'Soumettre mon mot'}
         </button>
       </div>
 
       {mesMots.length > 0 && (
         <div style={{ marginTop:20 }}>
-          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12 }}>Mes messages</h4>
+          <h4 style={{ fontWeight:800, fontSize:15, marginBottom:12, color:C.text }}>Mes messages</h4>
           {mesMots.map(m => (
-            <div key={m.id} style={{ ...S.card, marginBottom:10 }}>
+            <div key={m.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:'16px 20px', marginBottom:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
-                <p style={{ fontSize:13, margin:0, flex:1, color:'#1a2340' }}>{m.texte || '(vidéo)'}</p>
+                <p style={{ fontSize:13, margin:0, flex:1, color:C.text }}>{m.texte || '(vidéo)'}</p>
                 <span style={{ borderRadius:99, padding:'3px 10px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
-                  background: m.statut==='valide'?'#eaffea':m.statut==='refuse'?'#ffecec':'#fff8e6',
-                  color: m.statut==='valide'?'#00a040':m.statut==='refuse'?'#d32f2f':'#b07a00' }}>
+                  background: m.statut==='valide'?'rgba(0,212,154,0.15)':m.statut==='refuse'?'rgba(255,100,124,0.15)':'rgba(245,200,76,0.15)',
+                  color: m.statut==='valide'?C.success:m.statut==='refuse'?C.alert:C.gold }}>
                   {m.statut==='valide'?'Publié':m.statut==='refuse'?'Refusé':'En attente'}
                 </span>
               </div>
