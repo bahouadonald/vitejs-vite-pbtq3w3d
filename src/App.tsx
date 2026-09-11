@@ -6438,9 +6438,11 @@ function ArtistPage() {
           loadStats(u.email || '');
           loadArtistOptions(u.uid);
         } else {
+          // Ce compte n'est pas artiste : on affiche simplement l'écran de connexion
+          // artiste SANS déconnecter la session en cours (ex. un mélomane qui arrive
+          // ici par erreur ne doit pas perdre l'accès à son compte mélomane).
           setUser(null); setView('login');
           setMsg("Ce compte n'est pas un compte artiste. Connectez-vous avec votre compte artiste.");
-          await signOut(auth);
         }
       } else { setUser(null); setView('login'); }
     });
@@ -11419,6 +11421,7 @@ function ProfilPage() {
   const [photoEdit, setPhotoEdit] = useState('');
   const [uploadPhoto, setUploadPhoto] = useState(false);
   const [savingProfil, setSavingProfil] = useState(false);
+  const [estArtiste, setEstArtiste] = useState(false); // ce compte est-il aussi un artiste validé ?
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -11436,6 +11439,8 @@ function ProfilPage() {
       setKiffsDispo(sd.kiffsDispo || 0);
       setKiffsOfferts(sd.kiffsOfferts || 0);
       setLoading(false);
+      // Ce compte est-il aussi un artiste validé ? (pour proposer un accès direct au tableau de bord artiste)
+      getDocs(query(collection(db,'artists'), where('email','==', u.email))).then(snap => setEstArtiste(!snap.empty));
       // Écouter mes signatures reçues (temps réel)
       onSnapshot(
         query(collection(db,'signatures'), where('donateurId','==',u.uid)),
@@ -11795,6 +11800,21 @@ function ProfilPage() {
             Pour bientôt
           </div>
         </div>
+
+        {/* Accès direct au tableau de bord artiste, si ce compte est aussi un artiste validé */}
+        {estArtiste && (
+          <a href="/artiste"
+            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'14px 16px', borderRadius:14, marginBottom:16, textDecoration:'none',
+              background:'linear-gradient(135deg, rgba(26,107,255,0.15), rgba(93,63,255,0.15))', border:'1px solid rgba(93,132,255,0.3)' }}>
+            <span style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ width:36, height:36, borderRadius:99, background:'rgba(93,132,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5d84ff" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </span>
+              <span style={{ color:'#dde4f5', fontSize:14, fontWeight:700 }}>Mon tableau de bord artiste</span>
+            </span>
+            <span style={{ color:'#5d84ff', fontSize:18 }}>›</span>
+          </a>
+        )}
 
         {/* INFORMATIONS */}
         <div style={{ marginBottom:16 }}>
