@@ -3028,39 +3028,39 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:8 }}>Vos donateurs</h3>
-      <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:8, color:C.text }}>Vos donateurs</h3>
+      <p style={{ color:C.textSoft, fontSize:13, marginBottom:20 }}>
         Récompensez vos fans qui vous envoient des kiffements en leur offrant une signature exclusive.
       </p>
 
       {donateurs.length === 0 ? (
-        <div style={{ ...S.card, textAlign:'center', padding:40 }}>
-          <p style={{ color:'#8098b8', fontSize:14 }}>Aucun kiffement reçu pour l'instant.</p>
+        <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:40 }}>
+          <p style={{ color:C.textSoft, fontSize:14 }}>Aucun kiffement reçu pour l'instant.</p>
         </div>
       ) : donateurs.map((d, i) => (
-        <div key={i} style={{ ...S.card, marginBottom:12 }}>
+        <div key={i} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:44, height:44, borderRadius:99, background:'linear-gradient(135deg,#ffd700,#f0a500)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, color:'#1a2340', fontSize:18 }}>
+              <div style={{ width:44, height:44, borderRadius:99, background:'linear-gradient(135deg,'+C.gold+',#f0a500)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, color:'#1a2340', fontSize:18 }}>
                 {d.userName[0]?.toUpperCase()}
               </div>
               <div>
-                <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px' }}>{d.userName}</p>
-                <p style={{ color:'#ffd700', fontSize:12, margin:0 }}>{d.totalOscart} Oscart · {d.count} kiffement{d.count>1?'s':''}</p>
+                <p style={{ fontWeight:700, fontSize:14, margin:'0 0 2px', color:C.text }}>{d.userName}</p>
+                <p style={{ color:C.gold, fontSize:12, margin:0 }}>{d.totalOscart} Oscart · {d.count} kiffement{d.count>1?'s':''}</p>
               </div>
             </div>
             <button onClick={() => setOffreModal(d)}
-              style={{ padding:'8px 14px', borderRadius:99, border:'1px solid #1a6bff', background:'rgba(26,107,255,0.08)', color:'#1a6bff', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
+              style={{ padding:'8px 14px', borderRadius:99, border:'1px solid '+C.blue, background:'rgba(93,132,255,0.12)', color:C.blueLite, fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
               Offrir une signature
             </button>
           </div>
           {/* Détail des kiffements envoyés par ce donateur (image + nombre) */}
           {KIFFEMENTS.some(k => d.byType?.[k.id]) && (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:12, paddingTop:12, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:12, paddingTop:12, borderTop:'1px solid '+C.border }}>
               {KIFFEMENTS.filter(k => d.byType?.[k.id]).map(k => (
-                <div key={k.id} title={k.label} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 9px 4px 4px', borderRadius:99, background:'rgba(255,200,0,0.08)', border:'1px solid rgba(255,200,0,0.22)' }}>
+                <div key={k.id} title={k.label} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 9px 4px 4px', borderRadius:99, background:'rgba(245,200,76,0.1)', border:'1px solid rgba(245,200,76,0.25)' }}>
                   <img src={k.image} alt={k.label} style={{ width:24, height:24, objectFit:'contain' }} />
-                  <span style={{ color:'#ffd700', fontSize:12, fontWeight:800 }}>×{d.byType[k.id]}</span>
+                  <span style={{ color:C.gold, fontSize:12, fontWeight:800 }}>×{d.byType[k.id]}</span>
                 </div>
               ))}
             </div>
@@ -3072,47 +3072,47 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
       {offreModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => !sent && !uploadingSig && (setOffreModal(null), setTypeChoisi(null), setMediaUrl(''), setSigMsg(''))}>
-          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'85vh', overflowY:'auto' }}
+          <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxWidth:480, maxHeight:'85vh', overflowY:'auto', border:'1px solid '+C.border, borderBottom:'none' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
+            <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 20px' }} />
             {sent ? (
               <div style={{ textAlign:'center', padding:20 }}>
-                <p style={{ fontWeight:800, fontSize:16, color:'#1a2340' }}>Signature offerte à {offreModal.userName} !</p>
-                <p style={{ color:'#8098b8', fontSize:13, marginTop:6 }}>Publiée dans Actu & Mood.</p>
+                <p style={{ fontWeight:800, fontSize:16, color:C.text }}>Signature offerte à {offreModal.userName} !</p>
+                <p style={{ color:C.textSoft, fontSize:13, marginTop:6 }}>Publiée dans Actu & Mood.</p>
               </div>
             ) : !typeChoisi ? (
               <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4 }}>Offrir à {offreModal.userName}</p>
-                <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>Choisissez ce que vous offrez. Vous ferez ensuite une photo ou vidéo pour l'annoncer.</p>
+                <p style={{ fontWeight:800, fontSize:17, color:C.text, marginBottom:4 }}>Offrir à {offreModal.userName}</p>
+                <p style={{ color:C.textSoft, fontSize:13, marginBottom:20 }}>Choisissez ce que vous offrez. Vous ferez ensuite une photo ou vidéo pour l'annoncer.</p>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {SIGNATURES.map(s => (
                     <button key={s.id} onClick={() => { setTypeChoisi(s); setSigMsg(''); }}
-                      style={{ padding:'14px 10px', borderRadius:14, border:`1px solid ${s.color}44`, background:`${s.color}11`, cursor:'pointer', textAlign:'center' }}>
+                      style={{ padding:'14px 10px', borderRadius:14, border:`1px solid ${s.color}55`, background:`${s.color}18`, cursor:'pointer', textAlign:'center' }}>
                       <div style={{ marginBottom:6 }}><img src={s.image} alt={s.label} style={{ width:40, height:40, objectFit:'contain' }} /></div>
-                      <p style={{ fontWeight:800, fontSize:12, color:'#1a2340', margin:'0 0 2px' }}>{s.label}</p>
-                      <p style={{ color:'#8098b8', fontSize:10, lineHeight:1.4, margin:0 }}>{s.desc}</p>
+                      <p style={{ fontWeight:800, fontSize:12, color:C.text, margin:'0 0 2px' }}>{s.label}</p>
+                      <p style={{ color:C.textSoft, fontSize:10, lineHeight:1.4, margin:0 }}>{s.desc}</p>
                     </button>
                   ))}
                 </div>
                 <button onClick={() => (setOffreModal(null), setMediaUrl(''))}
-                  style={{ width:'100%', marginTop:16, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  style={{ width:'100%', marginTop:16, padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
                   Annuler
                 </button>
               </>
             ) : (
               <>
-                <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:4, display:'flex', alignItems:'center', gap:8 }}><img src={typeChoisi.image} alt="" style={{ width:24, height:24, objectFit:'contain' }} /> {typeChoisi.label}</p>
-                <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>Pour <strong>{offreModal.userName}</strong>.</p>
+                <p style={{ fontWeight:800, fontSize:17, color:C.text, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}><img src={typeChoisi.image} alt="" style={{ width:24, height:24, objectFit:'contain' }} /> {typeChoisi.label}</p>
+                <p style={{ color:C.textSoft, fontSize:13, marginBottom:16 }}>Pour <strong style={{ color:C.text }}>{offreModal.userName}</strong>.</p>
 
                 {/* DÉDICACE VIDÉO → upload d'une vidéo */}
                 {typeChoisi.id === 'dedicace' && (
                   <>
-                    <p style={{ color:'#5a7090', fontSize:12, marginBottom:10 }}>Enregistrez ou ajoutez une vidéo où vous citez {offreModal.userName}.</p>
-                    <label style={{ display:'block', padding:'20px', borderRadius:14, border:'2px dashed #c8d8ef', background:'#f5f8ff', textAlign:'center', cursor:'pointer', marginBottom:14 }}>
+                    <p style={{ color:C.textSoft, fontSize:12, marginBottom:10 }}>Enregistrez ou ajoutez une vidéo où vous citez {offreModal.userName}.</p>
+                    <label style={{ display:'block', padding:'20px', borderRadius:14, border:'2px dashed '+C.border, background:'rgba(255,255,255,0.04)', textAlign:'center', cursor:'pointer', marginBottom:14 }}>
                       {mediaUrl ? (
                         <video src={mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, maxHeight:200 }} />
                       ) : (
-                        <span style={{ color:'#1a6bff', fontSize:13, fontWeight:600 }}>{uploadingSig ? 'Upload en cours...' : 'Toucher pour ajouter votre vidéo'}</span>
+                        <span style={{ color:C.blueLite, fontSize:13, fontWeight:600 }}>{uploadingSig ? 'Upload en cours...' : 'Toucher pour ajouter votre vidéo'}</span>
                       )}
                       <input type="file" accept="video/*" style={{ display:'none' }}
                         onChange={e => e.target.files?.[0] && uploadSignature(e.target.files[0])} />
@@ -3122,8 +3122,8 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
 
                 {/* SIGNATURE SPOT → l'artiste confirme, le fan remplira nom+slogan */}
                 {typeChoisi.id === 'spot' && (
-                  <div style={{ background:'#fffbf0', border:'1px solid #f0e0b0', borderRadius:12, padding:'14px 16px', marginBottom:14 }}>
-                    <p style={{ color:'#8a6d00', fontSize:13, lineHeight:1.6, margin:0 }}>
+                  <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:12, padding:'14px 16px', marginBottom:14 }}>
+                    <p style={{ color:C.gold, fontSize:13, lineHeight:1.6, margin:0 }}>
                       Vous vous engagez à citer et chanter {offreModal.userName} dans une prochaine musique. Après validation, {offreModal.userName} recevra un formulaire pour vous indiquer le nom et le slogan à chanter.
                     </p>
                   </div>
@@ -3132,13 +3132,12 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
                 {/* ACCÈS VIP → date + infos événement */}
                 {typeChoisi.id === 'vip' && (
                   <>
-                    <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Date de l'événement</label>
-                    <input type="date" value={sigDate} onChange={e => setSigDate(e.target.value)}
-                      style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:12, boxSizing:'border-box' as any }} />
-                    <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Infos (lieu, comment accéder...)</label>
-                    <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                    <label style={{ display:'block', color:C.textSoft, fontSize:12, fontWeight:700, marginBottom:6 }}>Date de l'événement</label>
+                    <input className="art-inp" type="date" value={sigDate} onChange={e => setSigDate(e.target.value)} />
+                    <label style={{ display:'block', color:C.textSoft, fontSize:12, fontWeight:700, marginBottom:6 }}>Infos (lieu, comment accéder...)</label>
+                    <textarea className="art-inp" value={sigDetails} onChange={e => setSigDetails(e.target.value)}
                       placeholder="Ex : Concert au Palais de la Culture, présentez-vous à l'entrée VIP avec ce message."
-                      style={{ width:'100%', minHeight:70, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                      style={{ minHeight:70, resize:'none' }} />
                   </>
                 )}
 
@@ -3147,42 +3146,41 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
                   <>
                     <div style={{ display:'flex', gap:8, marginBottom:14 }}>
                       <button onClick={() => setClipMode('presentiel')}
-                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='presentiel'?'#1a6bff':'#d0d8e8'}`, background: clipMode==='presentiel'?'#eaf1ff':'#fff', color: clipMode==='presentiel'?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='presentiel'?C.blue:C.border}`, background: clipMode==='presentiel'?'rgba(93,132,255,0.15)':'transparent', color: clipMode==='presentiel'?C.blueLite:C.textSoft, fontWeight:700, fontSize:12, cursor:'pointer' }}>
                         Tournage en présentiel
                       </button>
                       <button onClick={() => setClipMode('challenge')}
-                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='challenge'?'#1a6bff':'#d0d8e8'}`, background: clipMode==='challenge'?'#eaf1ff':'#fff', color: clipMode==='challenge'?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                        style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${clipMode==='challenge'?C.blue:C.border}`, background: clipMode==='challenge'?'rgba(93,132,255,0.15)':'transparent', color: clipMode==='challenge'?C.blueLite:C.textSoft, fontWeight:700, fontSize:12, cursor:'pointer' }}>
                         Challenge à réaliser
                       </button>
                     </div>
                     {clipMode === 'presentiel' ? (
                       <>
-                        <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Date du tournage</label>
-                        <input type="date" value={sigDate} onChange={e => setSigDate(e.target.value)}
-                          style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:12, boxSizing:'border-box' as any }} />
-                        <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                        <label style={{ display:'block', color:C.textSoft, fontSize:12, fontWeight:700, marginBottom:6 }}>Date du tournage</label>
+                        <input className="art-inp" type="date" value={sigDate} onChange={e => setSigDate(e.target.value)} />
+                        <textarea className="art-inp" value={sigDetails} onChange={e => setSigDetails(e.target.value)}
                           placeholder="Lieu et précisions du tournage (optionnel)."
-                          style={{ width:'100%', minHeight:60, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                          style={{ minHeight:60, resize:'none' }} />
                       </>
                     ) : (
                       <>
-                        <label style={{ display:'block', color:'#5a7090', fontSize:12, fontWeight:700, marginBottom:6 }}>Décrivez le challenge à réaliser</label>
-                        <textarea value={sigDetails} onChange={e => setSigDetails(e.target.value)}
+                        <label style={{ display:'block', color:C.textSoft, fontSize:12, fontWeight:700, marginBottom:6 }}>Décrivez le challenge à réaliser</label>
+                        <textarea className="art-inp" value={sigDetails} onChange={e => setSigDetails(e.target.value)}
                           placeholder="Ex : Fais une vidéo sur ma chanson en reprenant ce pas de danse. Les meilleures seront dans mon clip !"
-                          style={{ width:'100%', minHeight:80, padding:'11px 14px', borderRadius:10, border:'1px solid #d0d8e8', fontSize:14, marginBottom:14, boxSizing:'border-box' as any, resize:'none' as any }} />
+                          style={{ minHeight:80, resize:'none' }} />
                       </>
                     )}
                   </>
                 )}
 
-                {sigMsg && <p style={{ color: sigMsg.includes('prêt') ? '#00a040':'#f04a6a', fontSize:12, margin:'0 0 12px' }}>{sigMsg}</p>}
+                {sigMsg && <p style={{ color: sigMsg.includes('prêt') ? C.success : C.alert, fontSize:12, margin:'0 0 12px' }}>{sigMsg}</p>}
 
                 <button onClick={offrirSignature} disabled={uploadingSig}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#1a6bff,#4da6ff)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer' }}>
                   {uploadingSig ? 'Envoi...' : 'Offrir cette signature'}
                 </button>
                 <button onClick={() => { setTypeChoisi(null); setMediaUrl(''); setSigMsg(''); setSigDate(''); setSigDetails(''); setClipMode('presentiel'); }}
-                  style={{ width:'100%', marginTop:10, padding:12, borderRadius:12, border:'1px solid #dce6f7', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                  style={{ width:'100%', marginTop:10, padding:12, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:13, cursor:'pointer' }}>
                   Retour
                 </button>
               </>
