@@ -6718,7 +6718,11 @@ function ArtistPage() {
               {unreadVentes} nouveau{unreadVentes>1?'x':''}
             </span>
           )}
-          <button style={{ padding:'8px 14px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déconnexion</button>
+          <a href="/profil"
+            style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.blueLite, cursor:'pointer', fontSize:12, fontWeight:600, textDecoration:'none', whiteSpace:'nowrap' }}>
+            Mélomane
+          </a>
+          <button style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déco</button>
         </div>
       </div>
 
