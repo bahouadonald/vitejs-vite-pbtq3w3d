@@ -6718,16 +6718,18 @@ function ArtistPage() {
               {unreadVentes} nouveau{unreadVentes>1?'x':''}
             </span>
           )}
-          <a href="/profil"
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.blueLite, cursor:'pointer', fontSize:12, fontWeight:700, textDecoration:'none', whiteSpace:'nowrap' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.blueLite} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>
-            </svg>
-            Basculer côté mélomane
-          </a>
           <button style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déco</button>
         </div>
       </div>
+
+      {/* BOUTON FLOTTANT — basculer vers le compte mélomane, visible sur tous les onglets */}
+      <a href="/profil" aria-label="Basculer côté mélomane"
+        style={{ position:'fixed', bottom:24, right:20, zIndex:60, display:'flex', alignItems:'center', gap:8, padding:'12px 18px', borderRadius:99, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:13, textDecoration:'none', boxShadow:'0 6px 24px rgba(10,132,255,0.5)' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+        Basculer côté mélomane
+      </a>
 
       {/* TABS — façon pilules, comme le reste de l'app */}
       <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
