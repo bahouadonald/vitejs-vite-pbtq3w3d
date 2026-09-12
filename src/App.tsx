@@ -2472,6 +2472,7 @@ function FanPage() {
     try {
       const zikoData = {
         qrId: qrData.qrId || qrId,
+        source: 'qr',
         label: qrData.label || '',
         artist: qrData.artist || '',
         type: qrData.type || 'album',
@@ -2716,6 +2717,7 @@ function FanPage() {
                     artistEmail={qrData.artistEmail || ''}
                     prix={qrData.price || 0}
                     files={qrData.files || []}
+                    source="qr"
                   />
                 </>
               );
@@ -2754,6 +2756,12 @@ function FanPage() {
                   <span style={{ fontSize:18 }}>⬇</span>
                   Télécharger {qrData.files.length > 1 ? `(${qrData.files.length} titres)` : ''}
                 </button>
+                {downloaded && (
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
+                    <span style={{ color:C.success, fontSize:16 }}>✓</span>
+                    <p style={{ color:C.success, fontSize:12, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
+                  </div>
+                )}
                 {showDlList && (
                   <div style={{ marginTop:10, background:'rgba(20,28,48,0.6)', borderRadius:14, overflow:'hidden', border:'1px solid '+C.border }}>
                     {qrData.files.map((f:any, i:number) => (
@@ -2766,6 +2774,7 @@ function FanPage() {
                           <p style={{ color:C.textSoft, fontSize:10, margin:'2px 0 0' }}>{formatSize(f.size||0)}</p>
                         </div>
                         <a href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
+                          onClick={() => { markAsDownloaded(); if (zikoState === 'idle') setTimeout(() => setShowZikoTuto(true), 800); }}
                           style={{ display:'flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:13, fontWeight:700, textDecoration:'none', padding:'9px 14px', borderRadius:10, flexShrink:0, boxShadow:'0 2px 10px rgba(10,132,255,0.4)' }}>
                           <span style={{ fontSize:15 }}>⬇</span> Télécharger
                         </a>
@@ -6592,9 +6601,13 @@ function ArtistPage() {
     const totalStreams = qrList.reduce((s: number, q: any) => s + (q.streams || 0), 0);
     const totalValidStreams = qrList.reduce((s: number, q: any) => s + (q.validStreams || 0), 0);
     const totalDl = qrList.reduce((s: number, q: any) => s + getDl(q), 0);
-    // Lien public de streaming
+    // Lien public de streaming/monétisation — compteurs strictement séparés des
+    // QR de duplication physique (qrcodes), on les additionne ici pour le total.
     const publicLinks = await getDocs(query(collection(db, 'publicLinks'), where('artistEmail', '==', email)));
     const linksList = publicLinks.docs.map(d => ({ id: d.id, ...d.data() }));
+    const totalVisitsLiens = linksList.reduce((s: number, l: any) => s + (l.visits || 0), 0);
+    const totalStreamsLiens = linksList.reduce((s: number, l: any) => s + (l.streams || 0), 0);
+    const totalDlLiens = linksList.reduce((s: number, l: any) => s + (l.downloads || 0), 0);
     // Kifs reçus + gains kiffements (60% des Oscart de chaque cadeau)
     let kifsRecus = 0, gainsKiffementsOscart = 0;
     try {
@@ -6605,7 +6618,14 @@ function ArtistPage() {
         gainsKiffementsOscart += (c.partArtisteOscart !== undefined ? c.partArtisteOscart : Math.round((c.coins || 0) * 0.70));
       });
     } catch(e) { /* pas de cadeaux */ }
-    setStats({ visits: totalVisits, streams: totalStreams, validStreams: totalValidStreams, downloads: totalDl, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues, artistName: artistName || email, notLinked: false, publicLinks: linksList, kifsRecus, gainsKiffementsOscart });
+    setStats({
+      visits: totalVisits + totalVisitsLiens, streams: totalStreams + totalStreamsLiens, validStreams: totalValidStreams,
+      downloads: totalDl + totalDlLiens, qrcodes: qrList, pochettes: totalPochettes, scansTotal: totalScansEffectues,
+      artistName: artistName || email, notLinked: false, publicLinks: linksList, kifsRecus, gainsKiffementsOscart,
+      // Détail physique (duplication QR) vs en ligne (liens publics), pour un futur affichage séparé
+      visitsPhysique: totalVisits, streamsPhysique: totalStreams, downloadsPhysique: totalDl,
+      visitsEnLigne: totalVisitsLiens, streamsEnLigne: totalStreamsLiens, downloadsEnLigne: totalDlLiens,
+    });
   };
 
   const register = async () => {
@@ -7531,15 +7551,24 @@ function ZikothequePage({ user }: { user: any }) {
     try {
       const qid = currentAlbum.qrId;
       if (!qid) return;
-      // Retrouver le doc qrcode — par qrId d'abord, sinon par publicLinkId : les
-      // contenus ajoutés à la Zikothèque depuis Découvrir/streaming enregistrent
-      // parfois un publicLinkId à la place du vrai qrId, ce qui empêchait le
-      // comptage de retrouver l'album de l'artiste (écoutes jamais comptées).
-      let snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qid)));
-      if (snap.empty) snap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', qid)));
-      if (!snap.empty) {
-        const ref0 = snap.docs[0];
-        await updateDoc(doc(db, 'qrcodes', ref0.id), { streams: (ref0.data().streams || 0) + 1 });
+      if (currentAlbum.source === 'public') {
+        // Contenu ajouté depuis Découvrir/streaming → compteur du LIEN PUBLIC uniquement
+        const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', qid)));
+        if (!snap.empty) {
+          await updateDoc(doc(db, 'publicLinks', snap.docs[0].id), { streams: (snap.docs[0].data().streams || 0) + 1 });
+        }
+      } else {
+        // Contenu ajouté depuis un scan de QR physique → compteur de DUPLICATION uniquement.
+        // Repli sur publicLinkId seulement pour les entrées Zikothèque créées avant
+        // cette séparation (anciennes données sans le champ "source").
+        let snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qid)));
+        if (snap.empty && currentAlbum.source === undefined) {
+          snap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', qid)));
+        }
+        if (!snap.empty) {
+          const ref0 = snap.docs[0];
+          await updateDoc(doc(db, 'qrcodes', ref0.id), { streams: (ref0.data().streams || 0) + 1 });
+        }
       }
       await addDoc(collection(db, 'streams'), {
         qrId: qid, artist: currentAlbum.artist || '', label: currentAlbum.label || '',
@@ -14864,16 +14893,14 @@ function PWAInstallBanner() {
 // ─────────────────────────────────────────────
 // OSCART PAY BUTTON — payer avec Oscart ou recharger
 // ─────────────────────────────────────────────
-// Incrémente le compteur de téléchargements de l'artiste (qrcodes.downloads/usedScans).
-// Cherche par qrId d'abord, sinon par publicLinkId : selon la page d'où vient le
-// téléchargement, l'identifiant transmis n'est pas toujours le même champ, et
-// sans ce filet, le téléchargement n'était jamais compté côté artiste alors
-// qu'il apparaissait bien dans Découvrir/les ventes.
-async function compterTelechargementQrcode(identifiant: string) {
-  if (!identifiant) return;
+// Incrémente le compteur de téléchargements d'un QR code de DUPLICATION physique
+// (qrcodes.downloads/usedScans) — uniquement pour les téléchargements qui viennent
+// réellement du scan d'un QR physique (page /fan/:qrId), jamais depuis Découvrir/
+// streaming, pour ne pas fausser le compte de pochettes physiques vendues.
+async function compterTelechargementQrcode(qrId: string) {
+  if (!qrId) return;
   try {
-    let snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', identifiant)));
-    if (snap.empty) snap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', identifiant)));
+    const snap = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', qrId)));
     if (!snap.empty) {
       const ref0 = snap.docs[0];
       const d = ref0.data();
@@ -14885,8 +14912,23 @@ async function compterTelechargementQrcode(identifiant: string) {
   } catch (e) { console.error('compterTelechargementQrcode', e); }
 }
 
-function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
-  prix: number, qrId: string, albumLabel: string, artistEmail: string, files: any[]
+// Incrémente le compteur de téléchargements d'un LIEN PUBLIC de monétisation
+// (publicLinks.downloads) — pour tout ce qui vient de Découvrir/streaming, séparé
+// à 100% du compteur des QR de duplication physique.
+async function compterTelechargementLienPublic(publicLinkId: string) {
+  if (!publicLinkId) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
+    if (!snap.empty) {
+      const ref0 = snap.docs[0];
+      const d = ref0.data();
+      await updateDoc(doc(db, 'publicLinks', ref0.id), { downloads: (d.downloads || 0) + 1 });
+    }
+  } catch (e) { console.error('compterTelechargementLienPublic', e); }
+}
+
+function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }: {
+  prix: number, qrId: string, albumLabel: string, artistEmail: string, files: any[], source?: 'qr' | 'public'
 }) {
   const [solde, setSolde] = useState(0);
   const [paying, setPaying] = useState(false);
@@ -14930,7 +14972,10 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
         commercialEmail, dlActive: true,
         statut: 'paid', createdAt: new Date().toISOString(),
       });
-      compterTelechargementQrcode(qrId); // en arrière-plan, ne bloque pas le téléchargement
+      // en arrière-plan, ne bloque pas le téléchargement — compteur séparé selon
+      // l'origine : QR de duplication physique VS lien public de monétisation
+      if (source === 'public') compterTelechargementLienPublic(qrId);
+      else compterTelechargementQrcode(qrId);
       setDone(true);
     } catch(e) { console.error(e); }
     setPaying(false);
@@ -15027,9 +15072,9 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files }: {
 // TÉLÉCHARGER WIDGET — paiement Wave automatique
 // Flux : clic → session Wave créée côté serveur → redirection Wave → webhook → DL actif
 // ─────────────────────────────────────────────
-function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen, onExternalClose, hideButton }: {
+function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen, onExternalClose, hideButton, source }: {
   qrId: string; albumLabel: string; artistEmail: string; prix: number; files: any[];
-  externalOpen?: boolean; onExternalClose?: () => void; hideButton?: boolean;
+  externalOpen?: boolean; onExternalClose?: () => void; hideButton?: boolean; source?: 'qr' | 'public';
 }) {
   const [state, setState] = useState<'idle'|'loading'|'done'|'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
@@ -15098,7 +15143,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          venteId: venteRef.id, prix, prixOscart, qrId, albumLabel,
+          venteId: venteRef.id, prix, prixOscart, qrId, albumLabel, source: source || 'qr',
           uid: user.uid, email: user.email, nom: user.displayName,
         }),
       });
@@ -15226,7 +15271,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
             ) : (
               <>
                 {/* Si l'utilisateur a assez d'Oscart, l'équivalent est prélevé automatiquement */}
-                <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} />
+                <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} source={source} />
                 {/* Sinon (ou en plus), paiement direct en devise via Wave / Orange Money / MTN / carte */}
                 <button onClick={handlePay} disabled={state === 'loading'}
                   style={{ width:'100%', padding:14, borderRadius:12, border:'none', marginTop:10, background: state==='loading' ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor: state==='loading' ? 'wait' : 'pointer' }}>
@@ -15282,28 +15327,12 @@ function PublicStreamPage() {
         track, duration: Math.round(duration), valid: true,
         source: 'publicLink', ts: new Date().toISOString(),
       });
-      // Incrémenter le compteur streams du QR code de l'artiste.
-      // On cherche le bon QR par plusieurs méthodes pour que ça compte TOUJOURS
-      // (lien public, QR public, Découvrir — même logique).
-      let qrDoc = null;
-      // par artistEmail + publicLinkId (cas le plus precis)
-      if (data.artistEmail) {
-        const s1 = await getDocs(query(collection(db, 'qrcodes'), where('artistEmail', '==', data.artistEmail), where('publicLinkId', '==', publicLinkId)));
-        if (!s1.empty) qrDoc = s1.docs[0];
-      }
-      // sinon, par publicLinkId seul
-      if (!qrDoc) {
-        const s2 = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', publicLinkId)));
-        if (!s2.empty) qrDoc = s2.docs[0];
-      }
-      // sinon, si data porte un qrId direct
-      if (!qrDoc && data.qrId) {
-        const s3 = await getDocs(query(collection(db, 'qrcodes'), where('qrId', '==', data.qrId)));
-        if (!s3.empty) qrDoc = s3.docs[0];
-      }
-      if (qrDoc) {
-        await updateDoc(doc(db, 'qrcodes', qrDoc.id), {
-          streams: (qrDoc.data().streams || 0) + 1,
+      // Incrémenter le compteur streams du LIEN PUBLIC (jamais celui d'un QR de
+      // duplication physique — les deux compteurs restent strictement séparés).
+      const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
+      if (!snap.empty) {
+        await updateDoc(doc(db, 'publicLinks', snap.docs[0].id), {
+          streams: (snap.docs[0].data().streams || 0) + 1,
         });
       }
     } catch(e) { console.error('pubStream', e); }
@@ -15336,18 +15365,12 @@ function PublicStreamPage() {
     if (!data) return;
     setZikoState('adding');
     try {
-      // Retrouver le VRAI qrId du contenu (le doc 'decouvrir'/lien public ne
-      // porte que le publicLinkId) — sinon la Zikothèque enregistre le mauvais
-      // identifiant et plus aucune écoute/téléchargement ne compte jamais pour
-      // l'artiste ensuite. On retombe sur publicLinkId seulement si vraiment
-      // introuvable (mieux vaut un identifiant que rien).
-      let vraiQrId = data.publicLinkId || publicLinkId;
-      try {
-        const qrSnap = await getDocs(query(collection(db, 'qrcodes'), where('publicLinkId', '==', data.publicLinkId || publicLinkId)));
-        if (!qrSnap.empty) vraiQrId = qrSnap.docs[0].data().qrId || vraiQrId;
-      } catch {}
+      // Ce contenu vient de Découvrir/streaming → identifié par son publicLinkId,
+      // et marqué source:'public' pour que les écoutes/téléchargements comptent
+      // sur le lien public de monétisation, jamais sur un QR de duplication.
       const zikoData = {
-        qrId: vraiQrId,
+        qrId: data.publicLinkId || publicLinkId,
+        source: 'public',
         label: data.label || '',
         artist: data.artist || '',
         type: data.type || 'album',
@@ -15480,6 +15503,7 @@ function PublicStreamPage() {
               hideButton={true}
               externalOpen={dlOpen}
               onExternalClose={() => setDlOpen(false)}
+              source="public"
             />
           );
         })()}

@@ -215,35 +215,31 @@ async function traiterTelechargementDirect(meta, reference, res) {
     // 2. Créditer les kiffs de l'acheteur (celui qui télécharge obtient toujours des kiffs)
     await crediterKiffs(uid, kiffsGagnes, baseUrl, KEY);
 
-    // 2bis. Compter le téléchargement côté artiste (qrcodes.downloads) — cherche
-    // par qrId d'abord, sinon par publicLinkId (selon la page d'origine, ce n'est
-    // pas toujours le même champ qui est transmis).
+    // 2bis. Compter le téléchargement côté artiste — collection séparée selon la
+    // source : 'qr' (duplication physique) → qrcodes ; 'public' (Découvrir/
+    // streaming, monétisation en ligne) → publicLinks. Jamais les deux mélangés.
     if (meta.qrId) {
       try {
-        let docQr = null;
+        const collectionCible = meta.source === 'public' ? 'publicLinks' : 'qrcodes';
+        const champRecherche = meta.source === 'public' ? 'publicLinkId' : 'qrId';
         const q1 = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'qrcodes' }],
-            where: { fieldFilter: { field: { fieldPath: 'qrId' }, op: 'EQUAL', value: { stringValue: meta.qrId } } }, limit: 1 } }),
+          body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collectionCible }],
+            where: { fieldFilter: { field: { fieldPath: champRecherche }, op: 'EQUAL', value: { stringValue: meta.qrId } } }, limit: 1 } }),
         }).then(r => r.json());
-        docQr = (Array.isArray(q1) ? q1.find(r => r.document) : null)?.document || null;
-        if (!docQr) {
-          const q2 = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'qrcodes' }],
-              where: { fieldFilter: { field: { fieldPath: 'publicLinkId' }, op: 'EQUAL', value: { stringValue: meta.qrId } } }, limit: 1 } }),
-          }).then(r => r.json());
-          docQr = (Array.isArray(q2) ? q2.find(r => r.document) : null)?.document || null;
-        }
-        if (docQr) {
-          const dlActuels = parseInt(docQr.fields?.downloads?.integerValue || '0', 10);
-          const usActuels = parseInt(docQr.fields?.usedScans?.integerValue || '0', 10);
-          await fetch(`https://firestore.googleapis.com/v1/${docQr.name}?key=${KEY}&updateMask.fieldPaths=downloads&updateMask.fieldPaths=usedScans`, {
+        const docCible = (Array.isArray(q1) ? q1.find(r => r.document) : null)?.document || null;
+        if (docCible) {
+          const dlActuels = parseInt(docCible.fields?.downloads?.integerValue || '0', 10);
+          const champs = { downloads: { integerValue: String(dlActuels + 1) } };
+          let masque = 'updateMask.fieldPaths=downloads';
+          if (meta.source !== 'public') {
+            const usActuels = parseInt(docCible.fields?.usedScans?.integerValue || '0', 10);
+            champs.usedScans = { integerValue: String(usActuels + 1) };
+            masque += '&updateMask.fieldPaths=usedScans';
+          }
+          await fetch(`https://firestore.googleapis.com/v1/${docCible.name}?key=${KEY}&${masque}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields: {
-              downloads: { integerValue: String(dlActuels + 1) },
-              usedScans: { integerValue: String(usActuels + 1) },
-            } }),
+            body: JSON.stringify({ fields: champs }),
           });
         }
       } catch (e) { console.error('compter téléchargement qrcode', e); }
