@@ -7303,7 +7303,120 @@ async function generatePochettes(qrcodes: any[], templateFile: File, onProgress:
 // ─────────────────────────────────────────────
 // LANDING PAGE — page d'accueil professionnelle
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SCANNER QR CODE — intégré à l'app, aucune redirection externe.
+// Dès qu'un QR de notre plateforme (/fan/... ou /ecoute/...) est détecté,
+// navigation interne immédiate vers la bonne page.
+// ─────────────────────────────────────────────
+function ScannerQR({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
+  const [msg, setMsg] = useState('');
+  const [lienExterne, setLienExterne] = useState('');
+  const scannerRef = useRef<any>(null);
+  const dejaTraiteRef = useRef(false);
+
+  const arreterEtFermer = () => {
+    const s = scannerRef.current;
+    if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+    onClose();
+  };
+
+  const traiterResultat = (texte: string) => {
+    try {
+      const url = new URL(texte, window.location.origin);
+      const chemin = url.pathname + url.search;
+      if (chemin.startsWith('/fan/') || chemin.startsWith('/ecoute/')) {
+        const s = scannerRef.current;
+        if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+        onClose();
+        navigate(chemin);
+        return;
+      }
+      // QR externe (pas à nous) : on affiche, on laisse la personne décider
+      setLienExterne(texte);
+    } catch {
+      // Pas une URL → texte brut
+      setLienExterne(texte);
+    }
+  };
+
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (annule) return;
+        const html5QrCode = new Html5Qrcode('zone-scanner-qr');
+        scannerRef.current = html5QrCode;
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (texteDecoded: string) => {
+            if (dejaTraiteRef.current) return;
+            dejaTraiteRef.current = true;
+            traiterResultat(texteDecoded);
+          },
+          () => { /* image sans QR détecté — bruit normal, on ignore */ }
+        );
+      } catch (e: any) {
+        setMsg("Impossible d'accéder à la caméra. Vérifiez que l'autorisation caméra est activée pour l'application.");
+      }
+    })();
+    return () => {
+      annule = true;
+      const s = scannerRef.current;
+      if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'#000', zIndex:99999, display:'flex', flexDirection:'column' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', flexShrink:0 }}>
+        <p style={{ color:'#fff', fontWeight:800, fontSize:16, margin:0 }}>Scanner un QR code</p>
+        <button onClick={arreterEtFermer}
+          style={{ background:'rgba(255,255,255,0.15)', border:'none', width:36, height:36, borderRadius:99, color:'#fff', fontSize:18, cursor:'pointer' }}>✕</button>
+      </div>
+      <p style={{ color:'rgba(255,255,255,0.6)', fontSize:12, textAlign:'center', margin:'0 0 12px' }}>Cadrez le QR code dans la zone</p>
+      <div id="zone-scanner-qr" style={{ flex:1 }} />
+      {msg && <p style={{ color:'#ff647c', textAlign:'center', padding:20, fontSize:13 }}>{msg}</p>}
+      {lienExterne && (
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, background:C.card, padding:20, borderRadius:'20px 20px 0 0', border:'1px solid '+C.border, borderBottom:'none' }}>
+          <p style={{ color:C.textSoft, fontSize:12, marginBottom:8 }}>Ce QR code ne fait pas partie de Doniel Zik :</p>
+          <p style={{ color:C.text, fontSize:14, wordBreak:'break-all', marginBottom:14 }}>{lienExterne}</p>
+          <div style={{ display:'flex', gap:10 }}>
+            {/^https?:\/\//.test(lienExterne) && (
+              <a href={lienExterne} target="_blank" rel="noreferrer"
+                style={{ flex:1, textAlign:'center', padding:12, borderRadius:10, background:C.blue, color:'#fff', textDecoration:'none', fontWeight:700, fontSize:13 }}>
+                Ouvrir le lien
+              </a>
+            )}
+            <button onClick={() => { setLienExterne(''); dejaTraiteRef.current = false; }}
+              style={{ flex:1, padding:12, borderRadius:10, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, cursor:'pointer', fontSize:13 }}>
+              Scanner à nouveau
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Petite icône scanner réutilisable pour les en-têtes de page
+function IconeScannerBouton({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} aria-label="Scanner un QR code"
+      style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:99, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <rect x="7" y="7" width="4" height="4"/><rect x="13" y="7" width="4" height="4"/><rect x="7" y="13" width="4" height="4"/><line x1="15" y1="15" x2="18" y2="15"/><line x1="15" y1="18" x2="15" y2="18"/><line x1="18" y1="18" x2="18" y2="18"/>
+      </svg>
+    </button>
+  );
+}
+
 function LandingPage() {
+  const [showScanner, setShowScanner] = useState(false);
   useEffect(() => {
     // Enregistrer une visite du site (1 fois par session)
     if (!sessionStorage.getItem('dz_visited')) {
@@ -7336,6 +7449,15 @@ function LandingPage() {
         <a href="/ziko" className="dz-hero-btn" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
           Accéder à ma Zikothèque
         </a>
+        <button onClick={() => setShowScanner(true)}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', maxWidth:360, padding:18, borderRadius:14, border:'2px solid #f5c84c', background:'rgba(245,200,76,0.1)', color:'#f5c84c', fontWeight:800, fontSize:17, cursor:'pointer', marginBottom:12 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f5c84c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+            <rect x="7" y="7" width="4" height="4"/><rect x="13" y="7" width="4" height="4"/><rect x="7" y="13" width="4" height="4"/>
+          </svg>
+          Scanner un QR code
+        </button>
+        {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
         <Lien href="/decouvrir" style={{ display:'block', width:'100%', maxWidth:360, padding:15, borderRadius:14, border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.8)', fontWeight:600, fontSize:15, textDecoration:'none', marginBottom:40 }}>
           Découvrir des contenus
         </Lien>
@@ -7527,6 +7649,7 @@ function UserAuthPage() {
 // ─────────────────────────────────────────────
 function ZikothequePage({ user }: { user: any }) {
   const [items, setItems] = useState<any[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentAlbum, setCurrentAlbum] = useState<any>(null);
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
@@ -7694,6 +7817,7 @@ function ZikothequePage({ user }: { user: any }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <IconeScannerBouton onClick={() => setShowScanner(true)} />
           <Lien href="/decouvrir" style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 20, padding: '6px 12px', color: '#4da6ff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Découvrir</Lien>
           {user.email === ADMIN_EMAIL && (
             <Lien href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</Lien>
@@ -7701,6 +7825,7 @@ function ZikothequePage({ user }: { user: any }) {
           <button onClick={logout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 10px', color: '#8098b8', cursor: 'pointer', fontSize: 11 }}>Déco</button>
         </div>
       </div>
+      {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
 
@@ -9438,6 +9563,7 @@ function MesChallengesPage() {
   const [ongletCh, setOngletCh] = useState<'tous'|'mes'>('tous');
   const [monSolde, setMonSolde] = useState(0);
   const [partageCh, setPartageCh] = useState<any>(null); // challenge à partager
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => {
@@ -9582,8 +9708,12 @@ function MesChallengesPage() {
       {/* HEADER */}
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
-        <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Challenge</p>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14, margin:0 }}>Challenge</p>
+          <IconeScannerBouton onClick={() => setShowScanner(true)} />
+        </div>
       </div>
+      {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'20px 16px' }}>
         <button onClick={() => setCreer(true)}
@@ -10976,6 +11106,7 @@ function DecouvrirPage() {
   const [challengeMode, setChallengeMode] = useState(false);
   const [challengeArtiste, setChallengeArtiste] = useState('');
   const [challengeSig, setChallengeSig] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
   const user = auth.currentUser;
 
   // Lien partagé vers une sortie précise : ?sortie=ID → onglet Bientôt + mise en évidence
@@ -11073,8 +11204,12 @@ function DecouvrirPage() {
       {/* HEADER */}
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
-        <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14 }}>Découvrir</p>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14, margin:0 }}>Découvrir</p>
+          <IconeScannerBouton onClick={() => setShowScanner(true)} />
+        </div>
       </div>
+      {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
       {/* Bannière : invitation à envoyer des kiffements (venu d'une notif éducative) */}
       {banniereKiff && (
@@ -11318,6 +11453,7 @@ function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [vue, setVue] = useState<'perso'|'generale'>('perso');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -11359,10 +11495,14 @@ function NotificationsPage() {
 
   return (
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:80 }}>
-      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
-        <Logo size="sm" />
-        <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center' }}>
+          <Logo size="sm" />
+          <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
+        </div>
+        <IconeScannerBouton onClick={() => setShowScanner(true)} />
       </div>
+      {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
       {/* Onglets Perso / Générale */}
       <div style={{ display:'flex', gap:8, padding:'12px 16px 4px', maxWidth:500, margin:'0 auto' }}>
@@ -11485,6 +11625,7 @@ function NotificationsPage() {
 function ProfilPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  const [showScanner, setShowScanner] = useState(false);
   const [likes, setLikes] = useState(0);
   const [kiffements, setKiffements] = useState(0);
   const [kiffsDispo, setKiffsDispo] = useState(0);
@@ -11603,9 +11744,11 @@ function ProfilPage() {
 
   return (
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
-      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
+        <IconeScannerBouton onClick={() => setShowScanner(true)} />
       </div>
+      {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
       <div style={{ maxWidth:500, margin:'0 auto', padding:'24px 16px' }}>
         {/* Avatar + identité */}
