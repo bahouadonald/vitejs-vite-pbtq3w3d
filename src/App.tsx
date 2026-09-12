@@ -6955,33 +6955,6 @@ function ArtistPage() {
               </div>
             )}
 
-            {/* RÉMUNÉRATION STREAMING */}
-            <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:24, marginBottom:20 }}>
-              <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:2, marginBottom:4 }}>RÉMUNÉRATION STREAMING</p>
-              <h3 style={{ fontFamily:'serif', fontSize:17, fontWeight:800, marginBottom:12, color:C.text }}>Ce que vous gagnez</h3>
-              <p style={{ color:C.textSoft, fontSize:13, lineHeight:1.8, marginBottom:16 }}>
-                Chaque écoute génère un revenu. Les versements se font tous les trimestres via Mobile Money dès 15 000 FCFA cumulés.
-              </p>
-              <div style={{ display:'grid', gap:10 }}>
-                {[
-                  { label:"Aujourd'hui — pub automatique", range:'0,10 – 0,80 FCFA', tag:'● ACTIF', color:C.blueLite },
-                  { label:'Bientôt — annonceurs locaux', range:'1 – 4 FCFA', tag:'◎ PROCHAINEMENT', color:C.gold },
-                  { label:'Perspective — abonnements fans', range:"jusqu'à 5 FCFA", tag:'◌ EN DEV', color:C.textSoft },
-                ].map((r,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(255,255,255,0.04)', border:`1px solid ${r.color}33`, borderRadius:12, padding:'14px 16px' }}>
-                    <div>
-                      <p style={{ color:C.textSoft, fontSize:11, marginBottom:2 }}>{r.label}</p>
-                      <p style={{ fontWeight:800, fontSize:16, color:r.color }}>{r.range} <span style={{ fontSize:11, fontWeight:400, color:C.textSoft }}>/ écoute</span></p>
-                    </div>
-                    <span style={{ fontSize:10, padding:'3px 8px', borderRadius:99, background:`${r.color}22`, color:r.color, fontWeight:700, whiteSpace:'nowrap' }}>{r.tag}</span>
-                  </div>
-                ))}
-              </div>
-              <p style={{ color:C.textSoft, fontSize:11, marginTop:14, textAlign:'center' }}>
-                Retrait sur demande · Orange Money · Wave · MTN MoMo
-              </p>
-            </div>
-
             {/* POCHETTES */}
             <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12, color:C.text }}>Mes pochettes ({stats.qrcodes.length})</h3>
             {stats.qrcodes.map((q:any) => (
