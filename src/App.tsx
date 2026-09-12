@@ -6799,7 +6799,7 @@ function ArtistPage() {
                 </div>
               ))}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
               {[
                 { label:'Téléchargements', value:stats.downloads||0 },
                 { label:'Streams', value:stats.streams||0 },
@@ -6809,10 +6809,6 @@ function ArtistPage() {
                   <p style={{ color:C.textSoft, fontSize:11 }}>{s.label}</p>
                 </div>
               ))}
-            </div>
-            <div style={{ background:'linear-gradient(135deg, rgba(93,132,255,0.15), rgba(93,63,255,0.15))', border:'1px solid rgba(93,132,255,0.3)', borderRadius:16, textAlign:'center', padding:'22px 16px', marginBottom:20 }}>
-              <p style={{ fontSize:28, fontWeight:900, color:C.blueLite, marginBottom:4 }}>{(stats.streams||0).toLocaleString()} F CFA</p>
-              <p style={{ color:C.textSoft, fontSize:11 }}>Revenus streaming · 1 F CFA / écoute · retrait disponible à partir de 15 000 F</p>
             </div>
 
             {/* SOLDE ARTISTE — portefeuille unique en Oscart + sélecteur devise */}
