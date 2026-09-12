@@ -6719,8 +6719,11 @@ function ArtistPage() {
             </span>
           )}
           <a href="/profil"
-            style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.blueLite, cursor:'pointer', fontSize:12, fontWeight:600, textDecoration:'none', whiteSpace:'nowrap' }}>
-            Mélomane
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.blueLite, cursor:'pointer', fontSize:12, fontWeight:700, textDecoration:'none', whiteSpace:'nowrap' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.blueLite} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            Basculer côté mélomane
           </a>
           <button style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déco</button>
         </div>
