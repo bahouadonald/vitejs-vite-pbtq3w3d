@@ -14982,12 +14982,14 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
   };
 
   // Télécharge tout l'album en UN SEUL fichier ZIP (Chrome ne bloque pas un seul téléchargement)
+  const [confirme, setConfirme] = useState(false);
   const downloadAll = async () => {
     if (!files || files.length === 0) return;
     if (files.length === 1) {
       const a = document.createElement('a');
       a.href = files[0].url.replace('/upload/','/upload/fl_attachment/');
       a.download = files[0].name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setConfirme(true); setTimeout(() => setConfirme(false), 4000);
       return;
     }
     try {
@@ -15011,6 +15013,7 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 4000);
       setZipping('');
+      setConfirme(true); setTimeout(() => setConfirme(false), 4000);
     } catch(e) {
       console.error('zip', e);
       setZipping('');
@@ -15019,10 +15022,18 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
   };
 
   if (done) return (
-    <button onClick={downloadAll} disabled={!!zipping}
-      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: zipping ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipping ? '#cfe' : '#000', fontWeight:800, fontSize:15, cursor: zipping ? 'wait' : 'pointer' }}>
-      {zipping ? zipping : (files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant')}
-    </button>
+    <>
+      <button onClick={downloadAll} disabled={!!zipping}
+        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: zipping ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipping ? '#cfe' : '#000', fontWeight:800, fontSize:15, cursor: zipping ? 'wait' : 'pointer' }}>
+        {zipping ? zipping : (files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant')}
+      </button>
+      {confirme && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
+          <span style={{ color:'#00d49a', fontSize:16 }}>✓</span>
+          <p style={{ color:'#00d49a', fontSize:13, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
+        </div>
+      )}
+    </>
   );
 
   // Pas de solde Oscart suffisant : on n'affiche rien ici, le paiement direct
@@ -15081,6 +15092,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
   const [dlActive, setDlActive] = useState(false);
   const [venteId, setVenteId] = useState('');
   const [zipDl, setZipDl] = useState('');
+  const [confirmeDirect, setConfirmeDirect] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
   const [showPubAfterPay, setShowPubAfterPay] = useState(false);
@@ -15218,10 +15230,16 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
         <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>Paiement confirmé !</p>
         <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Wave a confirmé votre paiement. Votre téléchargement est prêt.</p>
-        <button onClick={downloadAll} disabled={!!zipDl}
+        <button onClick={() => { downloadAll(); setConfirmeDirect(true); setTimeout(() => setConfirmeDirect(false), 4000); }} disabled={!!zipDl}
           style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background: zipDl ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipDl ? '#cfe' : '#000', fontWeight:800, fontSize:16, cursor: zipDl ? 'wait' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
           {zipDl ? zipDl : <><span style={{ fontSize:22 }}>⬇</span> {files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant'}</>}
         </button>
+        {confirmeDirect && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
+            <span style={{ color:'#00d49a', fontSize:16 }}>✓</span>
+            <p style={{ color:'#00d49a', fontSize:13, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
+          </div>
+        )}
 
         {/* Téléchargements individuels (piste par piste) */}
         {files && files.length > 1 && (
@@ -15229,6 +15247,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
             <p style={{ color:'#6a88aa', fontSize:11, fontWeight:700, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:1 }}>Ou télécharger piste par piste</p>
             {files.map((f:any, i:number) => (
               <a key={i} href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name}
+                onClick={() => { setConfirmeDirect(true); setTimeout(() => setConfirmeDirect(false), 4000); }}
                 style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', marginBottom:6, borderRadius:10, background:'rgba(255,255,255,0.04)', color:'#cfe', fontSize:13, textDecoration:'none' }}>
                 <span style={{ fontSize:14 }}>⬇</span>
                 <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(f.name || ('Piste ' + (i + 1))).replace(/\.[^/.]+$/, '')}</span>
