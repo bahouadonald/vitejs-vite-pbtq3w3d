@@ -7292,20 +7292,37 @@ function ScannerQR({ onClose }: { onClose: () => void }) {
   const [lienExterne, setLienExterne] = useState('');
   const scannerRef = useRef<any>(null);
   const dejaTraiteRef = useRef(false);
+  const arretFaitRef = useRef(false);
 
-  const arreterEtFermer = () => {
+  // Coupe la caméra une seule fois, quel que soit l'endroit qui le demande
+  // (bouton fermer, résultat de scan, ou démontage du composant). Avant, la
+  // caméra pouvait être coupée deux fois en même temps (une fois manuellement,
+  // une fois via le nettoyage automatique au démontage) — ce chevauchement
+  // pouvait geler la page sur Android (écran figé après un scan réussi).
+  const couperCamera = async () => {
+    if (arretFaitRef.current) return;
+    arretFaitRef.current = true;
     const s = scannerRef.current;
-    if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+    if (s) {
+      try { await s.stop(); } catch { /* déjà arrêtée, sans importance */ }
+      try { await s.clear(); } catch { /* idem */ }
+    }
+  };
+
+  const arreterEtFermer = async () => {
+    await couperCamera();
     onClose();
   };
 
-  const traiterResultat = (texte: string) => {
+  const traiterResultat = async (texte: string) => {
     try {
       const url = new URL(texte, window.location.origin);
       const chemin = url.pathname + url.search;
       if (chemin.startsWith('/fan/') || chemin.startsWith('/ecoute/')) {
-        const s = scannerRef.current;
-        if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+        // On attend que la caméra soit vraiment coupée AVANT de fermer et de
+        // naviguer — sinon la navigation démonte le composant pendant que la
+        // caméra est encore en train de s'arrêter, d'où le blocage.
+        await couperCamera();
         onClose();
         navigate(chemin);
         return;
@@ -7342,8 +7359,7 @@ function ScannerQR({ onClose }: { onClose: () => void }) {
     })();
     return () => {
       annule = true;
-      const s = scannerRef.current;
-      if (s) { s.stop().catch(() => {}).then(() => s.clear().catch(() => {})); }
+      couperCamera();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
