@@ -2704,7 +2704,10 @@ function FanPage() {
             {qrData.files?.length > 0 && (() => {
               // QR privé = a un totalScans défini ET n'est pas un lien public
               // Un lien public a un publicLinkId ou vient de /ecoute/
-              const isPrivateQR = (qrData.totalScans > 0) && !qrData.publicLinkId;
+              // Cette page (/fan/:qrId) EST la fan page de duplication par définition —
+              // qu'un lien public existe aussi en parallèle pour ce même contenu n'a
+              // aucune importance ici. Seul le nombre de scans définis compte.
+              const isPrivateQR = qrData.totalScans > 0;
               const dlsEpuises = isPrivateQR && (qrData.usedScans || 0) >= (qrData.totalScans || 0);
 
               // Bouton "Télécharger l'album complet" du haut RETIRÉ (doublon) — seul le bouton Télécharger du bas est conservé
