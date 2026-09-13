@@ -13,6 +13,16 @@ import {
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
+// Détecte si un fichier est un fichier audio (pour afficher le lecteur de streaming).
+// Vérifie le nom ET l'adresse réelle du fichier — certains fichiers arrivent avec un
+// nom sans extension correcte, mais l'adresse Cloudinary, elle, porte toujours la
+// vraie extension : sans ce filet, le lecteur de streaming n'apparaissait pas.
+function estFichierAudio(f: any): boolean {
+  if (!f) return false;
+  const regex = /\.(mp3|wav|aac|ogg|flac|m4a|wma|opus)(\?|#|$)/i;
+  return !!(f.name?.match(regex) || f.url?.match(regex));
+}
+
 // ─────────────────────────────────────────────
 // PALETTE — Bleu électrique (fond) + Gris électrique (accents) — ADN logo
 // ─────────────────────────────────────────────
@@ -2724,10 +2734,10 @@ function FanPage() {
             })()}
 
             {/* ── LECTEUR AUDIO ── */}
-            {qrData.files?.some((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i)) && (
+            {qrData.files?.some((f:any) => estFichierAudio(f)) && (
               <div style={{ marginBottom:20 }}>
                 <AudioPlayer
-                  files={qrData.files.filter((f:any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i))}
+                  files={qrData.files.filter((f:any) => estFichierAudio(f))}
                   onStream={recordStream}
                   onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }}
                 />
@@ -7867,7 +7877,7 @@ function ZikothequePage({ user }: { user: any }) {
             {/* LISTE ALBUMS */}
             <p style={{ color: '#4a5878', fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 14, textTransform: 'uppercase' }}>Mes contenus</p>
             {items.map((item, idx) => {
-              const audioFiles = (item.files || []).filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i));
+              const audioFiles = (item.files || []).filter((f: any) => estFichierAudio(f));
               const isActive = currentAlbum?.id === item.id;
               return (
                 <div key={item.id} className="album-card"
@@ -15449,7 +15459,7 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       {!hideButton && (
         <button onClick={() => setShowDetail(true)}
           style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          <span style={{ fontSize:18 }}>⬇</span> Télécharger · {prix.toLocaleString()} F CFA
+          <span style={{ fontSize:18 }}>⬇</span> Télécharger
         </button>
       )}
     </div>
@@ -15565,7 +15575,7 @@ function PublicStreamPage() {
     </div>
   );
 
-  const audioFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp3|wav|aac|ogg|flac|m4a)$/i));
+  const audioFiles = (data.files || []).filter((f: any) => estFichierAudio(f));
   const videoFiles = (data.files || []).filter((f: any) => f.name?.match(/\.(mp4|mov|avi|mkv|webm)$/i));
 
   return (
