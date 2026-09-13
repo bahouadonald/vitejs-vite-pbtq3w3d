@@ -7497,6 +7497,8 @@ function LandingPage() {
 }
 
 function UserAuthPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'choose' | 'email' | 'phone' | 'register'>('choose');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -7513,6 +7515,17 @@ function UserAuthPage() {
   useEffect(() => {
     onAuthStateChanged(auth, u => { setUser(u); });
   }, []);
+
+  // Si on est arrivé ici avec un "retour" (ex: depuis un téléchargement sur une
+  // fan page), on y renvoie automatiquement une fois connecté — sinon la
+  // personne se retrouvait bloquée sur la Zikothèque après avoir créé son
+  // compte, sans moyen de revenir terminer son téléchargement.
+  const retour = new URLSearchParams(location.search).get('retour');
+  useEffect(() => {
+    if (user && retour) {
+      navigate(decodeURIComponent(retour), { replace: true });
+    }
+  }, [user, retour]);
 
   // ── Google ──
   const loginGoogle = async () => {
@@ -7566,8 +7579,8 @@ function UserAuthPage() {
     setLoading(false);
   };
 
-  // ── Dashboard si connecté ──
-  if (user != null) return <ZikothequePage user={user} />;
+  // ── Dashboard si connecté (sauf si on doit repartir vers une page de retour) ──
+  if (user != null) return retour ? null : <ZikothequePage user={user} />;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f4fb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -15434,7 +15447,8 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
             </p>
 
             {!user ? (
-              <a href="/ziko" style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
+              <a href={`/ziko?retour=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+                style={{ display:'block', width:'100%', padding:12, borderRadius:12, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'center', textDecoration:'none' }}>
                 Connectez-vous pour télécharger
               </a>
             ) : (
