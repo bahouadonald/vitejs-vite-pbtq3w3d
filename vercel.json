@@ -1,5 +1,15 @@
 {
   "rewrites": [
+    {
+      "source": "/fan/:qrId",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|TelegramBot|Slackbot|LinkedInBot|Discordbot|TikTok|Pinterest|SkypeUriPreview|vkShare|redditbot|Googlebot|bingbot|Applebot).*" }],
+      "destination": "/api/og?type=fan&id=:qrId"
+    },
+    {
+      "source": "/ecoute/:publicLinkId",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|TelegramBot|Slackbot|LinkedInBot|Discordbot|TikTok|Pinterest|SkypeUriPreview|vkShare|redditbot|Googlebot|bingbot|Applebot).*" }],
+      "destination": "/api/og?type=ecoute&id=:publicLinkId"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
