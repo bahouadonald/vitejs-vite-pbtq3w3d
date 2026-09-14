@@ -2656,16 +2656,15 @@ function FanPage() {
       {/* ── READY ── */}
       {step === 'ready' && qrData && (
         <div style={{ animation:'fadeUp .35s ease', paddingBottom:40 }}>
-          {/* Petite barre en haut — prend sa propre place, ne se superpose jamais
-              à la pochette. Profil à gauche (pour basculer vers l'espace artiste
-              ensuite), Découvrir à droite. */}
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px' }}>
-            <Link to="/profil" aria-label="Mon profil" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', textDecoration:'none', flexShrink:0 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          {/* Bulles flottantes en bas à droite — ne prennent aucune place dans la
+              mise en page et ne gênent jamais la pochette. Profil (et depuis là,
+              bascule vers l'espace artiste) + Découvrir. */}
+          <div style={{ position:'fixed', bottom:20, right:16, zIndex:60, display:'flex', flexDirection:'column', gap:10, alignItems:'flex-end' }}>
+            <Link to="/decouvrir" aria-label="Découvrir" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 4px 14px rgba(0,0,0,0.45)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </Link>
-            <Link to="/decouvrir" style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', textDecoration:'none', fontSize:13, fontWeight:700, flexShrink:0 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              Découvrir
+            <Link to="/profil" aria-label="Mon profil" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 4px 14px rgba(0,0,0,0.45)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </Link>
           </div>
 
@@ -15562,15 +15561,14 @@ function PublicStreamPage() {
         .ps-row:hover { background: rgba(255,255,255,0.04) !important; }
       `}</style>
 
-      {/* Petite barre en haut — prend sa propre place, ne se superpose jamais à
-          la pochette. Profil à gauche, Découvrir à droite. */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px' }}>
-        <Link to="/profil" aria-label="Mon profil" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', textDecoration:'none', flexShrink:0 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      {/* Bulles flottantes en bas à droite — ne prennent aucune place dans la
+          mise en page et ne gênent jamais la pochette. */}
+      <div style={{ position:'fixed', bottom:20, right:16, zIndex:60, display:'flex', flexDirection:'column', gap:10, alignItems:'flex-end' }}>
+        <Link to="/decouvrir" aria-label="Découvrir" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 4px 14px rgba(0,0,0,0.45)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </Link>
-        <Link to="/decouvrir" style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', textDecoration:'none', fontSize:13, fontWeight:700, flexShrink:0 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Découvrir
+        <Link to="/profil" aria-label="Mon profil" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:44, height:44, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 4px 14px rgba(0,0,0,0.45)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </Link>
       </div>
 
@@ -15610,7 +15608,6 @@ function PublicStreamPage() {
         {audioFiles.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
-              onDownload={() => setDlOpen(true)}
               onPlayingChange={setCoverPlaying}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
@@ -15670,15 +15667,24 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── TITRES (déroulant, discret) ── */}
-        {(data.files || []).length > 1 && (
+        {/* ── TITRES (déroulant, discret) + bouton Télécharger ── */}
+        {(data.files || []).length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <button onClick={() => setShowTitres(!showTitres)}
-              style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:12, border:'1px solid '+C.border, background:'transparent', cursor:'pointer' }}>
-              <span style={{ color: C.textSoft, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Titres ({data.files.length})</span>
-              <span style={{ color: C.textSoft, fontSize:15, transform: showTitres?'rotate(90deg)':'none', transition:'transform .2s' }}>›</span>
-            </button>
-            {showTitres && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {data.files.length > 1 ? (
+                <button onClick={() => setShowTitres(!showTitres)}
+                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:12, border:'1px solid '+C.border, background:'transparent', cursor:'pointer' }}>
+                  <span style={{ color: C.textSoft, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Titres ({data.files.length})</span>
+                  <span style={{ color: C.textSoft, fontSize:15, transform: showTitres?'rotate(90deg)':'none', transition:'transform .2s' }}>›</span>
+                </button>
+              ) : <div style={{ flex:1 }} />}
+              <button onClick={() => setDlOpen(true)}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
+                Télécharger
+              </button>
+            </div>
+            {showTitres && data.files.length > 1 && (
               <div style={{ marginTop: 8, background: 'rgba(20,28,48,0.5)', borderRadius: 14, overflow: 'hidden', border: '1px solid '+C.border }}>
                 {data.files.map((f: any, i: number) => (
                   <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < data.files.length - 1 ? '1px solid '+C.border : 'none' }}>
