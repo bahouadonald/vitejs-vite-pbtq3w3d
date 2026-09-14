@@ -5320,6 +5320,7 @@ function AdminPage() {
   const [bulkQr, setBulkQr] = useState<any>(null);
   const [bulkCount, setBulkCount] = useState('100');
   const [bulkScans, setBulkScans] = useState('1');
+  const [bulkFormat, setBulkFormat] = useState<'a4' | 'a3'>('a4');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -5603,10 +5604,16 @@ function AdminPage() {
     setBulkProgress(55);
     const QRCode = (await import('qrcode')).default;
     const { jsPDF } = await import('jspdf');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const cols = 6; const rows = 5; const perPage = cols * rows; const qrSize = 27;
-    const marginX = (210 - cols * qrSize) / (cols + 1);
-    const marginY = (297 - rows * qrSize) / (rows + 1);
+    // A3 garde les mêmes marges que l'A4 (juste sur une feuille plus grande),
+    // donc plus de QR codes par page (56 au lieu de 30) sans les rapprocher.
+    const pageW = bulkFormat === 'a3' ? 297 : 210;
+    const pageH = bulkFormat === 'a3' ? 420 : 297;
+    const cols = bulkFormat === 'a3' ? 8 : 6;
+    const rows = bulkFormat === 'a3' ? 7 : 5;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: bulkFormat });
+    const perPage = cols * rows; const qrSize = 27;
+    const marginX = (pageW - cols * qrSize) / (cols + 1);
+    const marginY = (pageH - rows * qrSize) / (rows + 1);
     for (let i = 0; i < qrIds.length; i++) {
       if (i > 0 && i % perPage === 0) pdf.addPage();
       const pos = i % perPage;
@@ -5619,7 +5626,7 @@ function AdminPage() {
       if (i % 5 === 0) setBulkProgress(55 + Math.round((i / qrIds.length) * 40));
     }
     setBulkProgress(100);
-    pdf.save(bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes.pdf');
+    pdf.save(bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes_' + bulkFormat.toUpperCase() + '.pdf');
     setBulkLoading(false); setShowBulk(false); setBulkQr(null);
     setMsg('' + count + ' QR codes generes ! PDF telecharge.');
   };
@@ -5715,14 +5722,23 @@ const pendingPay = payments.filter(p => p.status === 'pending');
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
             <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
               <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
-              <p style={{ color: '#8098b8', fontSize: 11 }}>30 QR codes par page A4 → PDF imprimable</p>
+              <p style={{ color: '#8098b8', fontSize: 11 }}>30 QR/page en A4, 56 QR/page en A3 → PDF imprimable</p>
+            </div>
+            <label style={S.lbl}>Format papier</label>
+            <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+              {[['a4','A4 · 30/page'],['a3','A3 · 56/page']].map(([k,l]) => (
+                <button key={k} onClick={() => setBulkFormat(k as any)}
+                  style={{ flex:1, padding:'10px', borderRadius:10, border:`2px solid ${bulkFormat===k?'#1a6bff':'#dce6f7'}`, background:bulkFormat===k?'#eaf1ff':'#fff', color:bulkFormat===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {l}
+                </button>
+              ))}
             </div>
             <label style={S.lbl}>Nombre de QR codes</label>
             <input style={S.inp} type="number" value={bulkCount} onChange={e => setBulkCount(e.target.value)} placeholder="100" min="1" max="5000" />
             <label style={S.lbl}>Scans par QR code</label>
             <input style={S.inp} type="number" value={bulkScans} onChange={e => setBulkScans(e.target.value)} placeholder="1" min="1" />
             <div style={{ background: '#eaf1ff', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-              <p style={{ color: '#1a6bff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{Math.ceil(parseInt(bulkCount || '0') / 30)} page(s) A4</p>
+              <p style={{ color: '#1a6bff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{Math.ceil(parseInt(bulkCount || '0') / (bulkFormat === 'a3' ? 56 : 30))} page(s) {bulkFormat.toUpperCase()}</p>
               <p style={{ color: '#5a7090', fontSize: 12 }}>{bulkCount} QR × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements</p>
             </div>
             {bulkLoading && (
@@ -6029,7 +6045,7 @@ const pendingPay = payments.filter(p => p.status === 'pending');
               </div>
 ) : groupedQRs.map(({ artist, qs, activeCount, lockedCount }) => (
               <ArtistFolder key={artist} artist={artist} qrcodes={qs} activeCount={activeCount} lockedCount={lockedCount}
-                onEdit={openEdit} onQrModal={setQrModal} onBulk={(q: any) => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setShowBulk(true); }}
+                onEdit={openEdit} onQrModal={setQrModal} onBulk={(q: any) => { setBulkQr(q); setBulkCount('100'); setBulkScans('1'); setBulkFormat('a4'); setShowBulk(true); }}
                 onToggle={(q: any) => updateDoc(doc(db, 'qrcodes', q.id), { status: q.status === 'active' ? 'locked' : 'active' })}
                 onDelete={(id: string) => {
                   if (estSuperAdmin(user?.email)) { setConfirmDelete(id); }
