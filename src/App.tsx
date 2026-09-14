@@ -2431,7 +2431,6 @@ function FanPage() {
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
-  const [showDlList, setShowDlList] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
@@ -2767,10 +2766,23 @@ function FanPage() {
               </div>
             )}
 
-            {/* ── BOUTON TÉLÉCHARGER (déroule la liste des titres) ── */}
-            {qrData.files?.length > 0 && (
+            {/* ── BOUTON TÉLÉCHARGER GRATUIT — uniquement tant que le quota de
+                scans n'est pas épuisé (sinon place au bouton payant plus haut).
+                Un seul bouton, plus de liste déroulante (comme sur le lien
+                public) ── */}
+            {qrData.files?.length > 0 && !(qrData.totalScans > 0 && (qrData.usedScans || 0) >= (qrData.totalScans || 0)) && (
               <div style={{ marginBottom:20 }}>
-                <button onClick={() => setShowDlList(!showDlList)}
+                <button onClick={() => {
+                    markAsDownloaded();
+                    qrData.files.forEach((f:any, i:number) => {
+                      setTimeout(() => {
+                        const a = document.createElement('a');
+                        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+                        a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      }, i * 400); // léger décalage pour que le navigateur ne bloque pas les téléchargements multiples
+                    });
+                    if (zikoState === 'idle') setTimeout(() => setShowZikoTuto(true), 800);
+                  }}
                   style={{ width:'100%', padding:'14px 18px', borderRadius:14, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, boxShadow:'0 4px 18px rgba(10,132,255,0.45)' }}>
                   <span style={{ fontSize:18 }}>⬇</span>
                   Télécharger {qrData.files.length > 1 ? `(${qrData.files.length} titres)` : ''}
@@ -2779,26 +2791,6 @@ function FanPage() {
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
                     <span style={{ color:C.success, fontSize:16 }}>✓</span>
                     <p style={{ color:C.success, fontSize:12, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
-                  </div>
-                )}
-                {showDlList && (
-                  <div style={{ marginTop:10, background:'rgba(20,28,48,0.6)', borderRadius:14, overflow:'hidden', border:'1px solid '+C.border }}>
-                    {qrData.files.map((f:any, i:number) => (
-                      <div key={i} className="fp-row" style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i<qrData.files.length-1?'1px solid '+C.border:'none' }}>
-                        <div style={{ width:34, height:34, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:15 }}>
-                          {f.name?.match(/\.(mp4|mov|avi|mkv)$/i)?'':''}
-                        </div>
-                        <div style={{ flex:1, overflow:'hidden' }}>
-                          <p style={{ fontSize:13, fontWeight:600, color:C.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', margin:0 }}>{f.name?.replace(/\.[^/.]+$/,'')||'Piste '+(i+1)}</p>
-                          <p style={{ color:C.textSoft, fontSize:10, margin:'2px 0 0' }}>{formatSize(f.size||0)}</p>
-                        </div>
-                        <a href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name} target="_blank" rel="noreferrer"
-                          onClick={() => { markAsDownloaded(); if (zikoState === 'idle') setTimeout(() => setShowZikoTuto(true), 800); }}
-                          style={{ display:'flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:13, fontWeight:700, textDecoration:'none', padding:'9px 14px', borderRadius:10, flexShrink:0, boxShadow:'0 2px 10px rgba(10,132,255,0.4)' }}>
-                          <span style={{ fontSize:15 }}>⬇</span> Télécharger
-                        </a>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
