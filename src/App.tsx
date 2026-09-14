@@ -15096,7 +15096,6 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
   const [solde, setSolde] = useState(0);
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
-  const [zipping, setZipping] = useState('');
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
   const user = auth.currentUser;
   const prixOscart = Math.ceil(prix / 10);
@@ -15144,52 +15143,34 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
     setPaying(false);
   };
 
-  // Télécharge tout l'album en UN SEUL fichier ZIP (Chrome ne bloque pas un seul téléchargement)
+  // Téléchargement piste par piste (plus de ZIP — chaque fichier compte comme
+  // un vrai téléchargement individuel, plus fiable pour le suivi).
   const [confirme, setConfirme] = useState(false);
-  const downloadAll = async () => {
-    if (!files || files.length === 0) return;
-    if (files.length === 1) {
-      const a = document.createElement('a');
-      a.href = files[0].url.replace('/upload/','/upload/fl_attachment/');
-      a.download = files[0].name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setConfirme(true); setTimeout(() => setConfirme(false), 4000);
-      return;
-    }
-    try {
-      setZipping('Préparation du ZIP...');
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-      const dossier = zip.folder(albumLabel || 'album') as any;
-      for (let i = 0; i < files.length; i++) {
-        setZipping(`Ajout ${i + 1}/${files.length}...`);
-        const f = files[i];
-        const resp = await fetch(f.url);
-        const blob = await resp.blob();
-        const nom = f.name && /\.[a-z0-9]+$/i.test(f.name) ? f.name : `${f.name || ('piste-' + (i + 1))}.mp3`;
-        dossier.file(nom, blob);
-      }
-      setZipping('Compression...');
-      const contenu = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(contenu);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${albumLabel || 'album'}.zip`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      setZipping('');
-      setConfirme(true); setTimeout(() => setConfirme(false), 4000);
-    } catch(e) {
-      console.error('zip', e);
-      setZipping('');
-      alert('Erreur lors de la création du ZIP. Téléchargez les pistes une par une ci-dessous.');
-    }
+  const telechargerFichier = (f: any) => {
+    const a = document.createElement('a');
+    a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+    a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setConfirme(true); setTimeout(() => setConfirme(false), 4000);
   };
 
   if (done) return (
     <>
-      <button onClick={downloadAll} disabled={!!zipping}
-        style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: zipping ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipping ? '#cfe' : '#000', fontWeight:800, fontSize:15, cursor: zipping ? 'wait' : 'pointer' }}>
-        {zipping ? zipping : (files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant')}
-      </button>
+      {(!files || files.length <= 1) ? (
+        <button onClick={() => files?.[0] && telechargerFichier(files[0])}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          Télécharger maintenant
+        </button>
+      ) : (
+        <div style={{ display:'grid', gap:8 }}>
+          {files.map((f: any, i: number) => (
+            <button key={i} onClick={() => telechargerFichier(f)}
+              style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, border:'none', background:'rgba(0,212,154,0.12)', color:'#4dff9a', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'left' }}>
+              <span style={{ fontSize:16 }}>⬇</span>
+              <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(f.name || 'Piste ' + (i + 1)).replace(/\.[^/.]+$/, '')}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {confirme && (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
           <span style={{ color:'#00d49a', fontSize:16 }}>✓</span>
@@ -15254,7 +15235,6 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
   const [errMsg, setErrMsg] = useState('');
   const [dlActive, setDlActive] = useState(false);
   const [venteId, setVenteId] = useState('');
-  const [zipDl, setZipDl] = useState('');
   const [confirmeDirect, setConfirmeDirect] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
@@ -15346,40 +15326,12 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
     }
   };
 
-  const downloadAll = async () => {
-    if (!files || files.length === 0) return;
-    if (files.length === 1) {
-      const a = document.createElement('a');
-      a.href = files[0].url.replace('/upload/','/upload/fl_attachment/');
-      a.download = files[0].name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      return;
-    }
-    try {
-      setZipDl('Préparation du ZIP...');
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-      const dossier = zip.folder(albumLabel || 'album') as any;
-      for (let i = 0; i < files.length; i++) {
-        setZipDl(`Ajout ${i + 1}/${files.length}...`);
-        const f = files[i];
-        const resp = await fetch(f.url);
-        const blob = await resp.blob();
-        const nom = f.name && /\.[a-z0-9]+$/i.test(f.name) ? f.name : `${f.name || ('piste-' + (i + 1))}.mp3`;
-        dossier.file(nom, blob);
-      }
-      setZipDl('Compression...');
-      const contenu = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(contenu);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${albumLabel || 'album'}.zip`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      setZipDl('');
-    } catch(e) {
-      console.error('zip', e);
-      setZipDl('');
-      alert('Erreur lors de la création du ZIP. Téléchargez les pistes une par une ci-dessous.');
-    }
+  // Téléchargement piste par piste (plus de ZIP)
+  const telechargerFichier = (f: any) => {
+    const a = document.createElement('a');
+    a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+    a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setConfirmeDirect(true); setTimeout(() => setConfirmeDirect(false), 4000);
   };
 
   // Téléchargement activé (après confirmation Wave webhook)
@@ -15393,29 +15345,28 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
       <div style={{ background:'rgba(77,255,154,0.1)', border:'1px solid rgba(77,255,154,0.35)', borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
         <p style={{ fontWeight:800, fontSize:15, color:'#4dff9a', margin:'0 0 4px' }}>Paiement confirmé !</p>
         <p style={{ color:'#6a88aa', fontSize:12, margin:'0 0 14px' }}>Wave a confirmé votre paiement. Votre téléchargement est prêt.</p>
-        <button onClick={() => { downloadAll(); setConfirmeDirect(true); setTimeout(() => setConfirmeDirect(false), 4000); }} disabled={!!zipDl}
-          style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background: zipDl ? '#2a4a6a' : 'linear-gradient(135deg,#4dff9a,#00c060)', color: zipDl ? '#cfe' : '#000', fontWeight:800, fontSize:16, cursor: zipDl ? 'wait' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-          {zipDl ? zipDl : <><span style={{ fontSize:22 }}>⬇</span> {files && files.length > 1 ? 'Télécharger l\'album (ZIP)' : 'Télécharger maintenant'}</>}
-        </button>
+
+        {(!files || files.length <= 1) ? (
+          <button onClick={() => files?.[0] && telechargerFichier(files[0])}
+            style={{ width:'100%', padding:'15px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#4dff9a,#00c060)', color:'#000', fontWeight:800, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+            <span style={{ fontSize:22 }}>⬇</span> Télécharger maintenant
+          </button>
+        ) : (
+          <div style={{ display:'grid', gap:8 }}>
+            {files.map((f: any, i: number) => (
+              <button key={i} onClick={() => telechargerFichier(f)}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, border:'none', background:'rgba(77,255,154,0.15)', color:'#4dff9a', fontWeight:700, fontSize:14, cursor:'pointer', textAlign:'left' }}>
+                <span style={{ fontSize:16 }}>⬇</span>
+                <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(f.name || 'Piste ' + (i + 1)).replace(/\.[^/.]+$/, '')}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {confirmeDirect && (
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
             <span style={{ color:'#00d49a', fontSize:16 }}>✓</span>
             <p style={{ color:'#00d49a', fontSize:13, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
-          </div>
-        )}
-
-        {/* Téléchargements individuels (piste par piste) */}
-        {files && files.length > 1 && (
-          <div style={{ marginTop:14, borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:12 }}>
-            <p style={{ color:'#6a88aa', fontSize:11, fontWeight:700, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:1 }}>Ou télécharger piste par piste</p>
-            {files.map((f:any, i:number) => (
-              <a key={i} href={f.url.replace('/upload/','/upload/fl_attachment/')} download={f.name}
-                onClick={() => { setConfirmeDirect(true); setTimeout(() => setConfirmeDirect(false), 4000); }}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', marginBottom:6, borderRadius:10, background:'rgba(255,255,255,0.04)', color:'#cfe', fontSize:13, textDecoration:'none' }}>
-                <span style={{ fontSize:14 }}>⬇</span>
-                <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(f.name || ('Piste ' + (i + 1))).replace(/\.[^/.]+$/, '')}</span>
-              </a>
-            ))}
           </div>
         )}
       </div>
