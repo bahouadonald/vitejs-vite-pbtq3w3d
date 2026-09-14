@@ -2661,6 +2661,11 @@ function FanPage() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Découvrir
           </Link>
+          {/* Accès profil (et depuis là, bascule vers l'espace artiste) — sinon
+              aucun moyen de sortir de cette page vers le reste de l'app. */}
+          <Link to="/profil" aria-label="Mon profil" style={{ position:'fixed', top:14, left:14, zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </Link>
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO CASCADE — bulles après Play ── */}
@@ -15554,6 +15559,17 @@ function PublicStreamPage() {
         @keyframes fadeUp { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
         .ps-row:hover { background: rgba(255,255,255,0.04) !important; }
       `}</style>
+
+      {/* Accès Découvrir et Profil — cette page n'a aucune barre de navigation,
+          sans ces deux liens flottants il n'y a aucun moyen de sortir vers le
+          reste de l'app (profil, bascule vers l'espace artiste...). */}
+      <Link to="/decouvrir" style={{ position:'fixed', top:14, right:14, zIndex:60, display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', fontSize:13, fontWeight:700, boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Découvrir
+      </Link>
+      <Link to="/profil" aria-label="Mon profil" style={{ position:'fixed', top:14, left:14, zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:99, background:'#1a2340', color:'#fff', textDecoration:'none', boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </Link>
 
       {/* PUB MAISON */}
 
