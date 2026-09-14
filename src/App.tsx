@@ -15450,7 +15450,6 @@ function PublicStreamPage() {
   const preload = (location.state as any)?.contenu || null;
   const [data, setData] = useState<any>(preload);
   const [loading, setLoading] = useState(!preload); // si on a les données au clic, pas de chargement
-  const [showTitres, setShowTitres] = useState(false);
   const [dlOpen, setDlOpen] = useState(false);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showTutoCascade, setShowTutoCascade] = useState(false);
@@ -15667,38 +15666,15 @@ function PublicStreamPage() {
           </div>
         )}
 
-        {/* ── TITRES (déroulant, discret) + bouton Télécharger ── */}
+        {/* ── Bouton Télécharger seul — les titres sont déjà visibles via le
+            hamburger du lecteur, pas besoin de les lister une seconde fois ici ── */}
         {(data.files || []).length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              {data.files.length > 1 ? (
-                <button onClick={() => setShowTitres(!showTitres)}
-                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:12, border:'1px solid '+C.border, background:'transparent', cursor:'pointer' }}>
-                  <span style={{ color: C.textSoft, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Titres ({data.files.length})</span>
-                  <span style={{ color: C.textSoft, fontSize:15, transform: showTitres?'rotate(90deg)':'none', transition:'transform .2s' }}>›</span>
-                </button>
-              ) : <div style={{ flex:1 }} />}
-              <button onClick={() => setDlOpen(true)}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:12, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
-                Télécharger
-              </button>
-            </div>
-            {showTitres && data.files.length > 1 && (
-              <div style={{ marginTop: 8, background: 'rgba(20,28,48,0.5)', borderRadius: 14, overflow: 'hidden', border: '1px solid '+C.border }}>
-                {data.files.map((f: any, i: number) => (
-                  <div key={i} className="ps-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < data.files.length - 1 ? '1px solid '+C.border : 'none' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    </div>
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{f.name?.replace(/\.[^/.]+$/, '') || 'Piste ' + (i + 1)}</p>
-                      <p style={{ color: C.textSoft, fontSize: 10, margin: '2px 0 0' }}>{formatSize(f.size || 0)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <button onClick={() => setDlOpen(true)}
+              style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'14px 16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
+              Télécharger{data.files.length > 1 ? ` (${data.files.length} titres)` : ''}
+            </button>
           </div>
         )}
 
