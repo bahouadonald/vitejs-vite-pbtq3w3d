@@ -3558,9 +3558,10 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
       const data = await res.json();
       if (!data.secure_url) throw new Error('Upload échoué');
       await updateDoc(doc(db,'decouvrir',c.id), { coverUrl: data.secure_url });
+      // Découvrir = public → on ne synchronise que le lien public (publicLinks),
+      // jamais les QR de duplication physique (qrcodes), qui sont un système
+      // totalement séparé et privé, géré par l'artiste dans son tableau de bord.
       if (c.publicLinkId) {
-        const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',c.publicLinkId)));
-        for (const d of qrSnap.docs) await updateDoc(doc(db,'qrcodes',d.id), { coverUrl: data.secure_url });
         const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',c.publicLinkId)));
         for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { coverUrl: data.secure_url });
       }
