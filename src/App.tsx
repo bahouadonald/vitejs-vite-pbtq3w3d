@@ -4002,7 +4002,7 @@ function ProductionTab() {
         const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
         await addDoc(collection(db,'decouvrir'), {
           publicLinkId, artist: sortie.artistName, artistEmail: sortie.artistEmail,
-          label: sortie.titre, categorie: sortie.categorie,
+          label: sortie.titre, categorie: sortie.categorie, coverUrl: sortie.pochetteUrl || '',
           files: [{ url: data.secure_url, name: data.secure_url }],
           publishedAt: new Date().toISOString(),
         });
