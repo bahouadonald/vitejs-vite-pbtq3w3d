@@ -3569,24 +3569,12 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
     setUploadingCoverId('');
   };
 
-  const supprimer = async (c: any) => {
-    if (!window.confirm(`Supprimer "${c.label}" de Découvrir ?\n\n(Le lien public lié sera aussi supprimé. Le QR code de duplication physique, s'il existe, n'est PAS touché — il continue de fonctionner pour les pochettes déjà en circulation.)`)) return;
-    try {
-      const plId = c.publicLinkId;
-      await deleteDoc(doc(db,'decouvrir',c.id));
-      // Découvrir = public → on ne supprime que le lien public (publicLinks),
-      // jamais le QR de duplication physique (qrcodes) : un artiste peut avoir
-      // des pochettes déjà vendues qui doivent continuer à fonctionner même si
-      // le titre est retiré de Découvrir.
-      if (plId) {
-        const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',plId)));
-        for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
-      }
-    } catch(e:any) { alert('Erreur : ' + e.message); }
-  };
-
+  // Retire uniquement la fiche Découvrir — le lien public et le QR de
+  // duplication physique de l'artiste restent intacts et continuent de
+  // fonctionner (le lien public peut être partagé et monétisé indépendamment
+  // de Découvrir, il ne doit jamais être supprimé automatiquement ici).
   const retirerDecouvrir = async (c: any) => {
-    if (!window.confirm(`Retirer "${c.label}" de Découvrir uniquement ?\n\n(Le contenu et ses liens restent, il disparaît juste du fil Découvrir)`)) return;
+    if (!window.confirm(`Retirer "${c.label}" de Découvrir ?\n\n(Le lien public et le QR de duplication de l'artiste restent intacts, le contenu disparaît juste du fil Découvrir)`)) return;
     try { await deleteDoc(doc(db,'decouvrir',c.id)); } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
@@ -3647,14 +3635,8 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
             </label>
             <button onClick={() => retirerDecouvrir(c)}
               style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #f0b84a', background:'#fff8e6', color:'#b07a00', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-              Retirer du fil
+              Retirer de Découvrir
             </button>
-            {canDelete && (
-              <button onClick={() => supprimer(c)}
-                style={{ padding:'6px 12px', borderRadius:8, border:'none', background:'#f04a6a', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                Supprimer (Découvrir + lien public)
-              </button>
-            )}
           </div>
         </div>
         );
