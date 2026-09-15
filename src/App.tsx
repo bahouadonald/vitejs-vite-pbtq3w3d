@@ -3536,6 +3536,7 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
 function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
   const [contenus, setContenus] = useState<any[]>([]);
   const [recherche, setRecherche] = useState('');
+  const [uploadingCoverId, setUploadingCoverId] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -3544,6 +3545,28 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
     );
     return unsub;
   }, []);
+
+  // Resynchronise la pochette d'une fiche Découvrir (utile pour les sorties
+  // officielles publiées avant que la pochette soit correctement enregistrée)
+  // — met aussi à jour le QR code et le lien public liés, pour rester cohérent.
+  const resyncPhoto = async (c: any, file: File) => {
+    setUploadingCoverId(c.id);
+    try {
+      const fd = new FormData();
+      fd.append('file', file); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error('Upload échoué');
+      await updateDoc(doc(db,'decouvrir',c.id), { coverUrl: data.secure_url });
+      if (c.publicLinkId) {
+        const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',c.publicLinkId)));
+        for (const d of qrSnap.docs) await updateDoc(doc(db,'qrcodes',d.id), { coverUrl: data.secure_url });
+        const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',c.publicLinkId)));
+        for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { coverUrl: data.secure_url });
+      }
+    } catch(e:any) { alert('Erreur : ' + e.message); }
+    setUploadingCoverId('');
+  };
 
   const supprimer = async (c: any) => {
     if (!window.confirm(`Supprimer "${c.label}" de Découvrir ?\n\n(Le QR code et le lien public liés seront aussi supprimés)`)) return;
@@ -3604,15 +3627,21 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
                 {c.type || 'single'} · publié le {c.publishedAt ? new Date(c.publishedAt).toLocaleDateString('fr') : '—'}
               </p>
               {!aUnFichier && <p style={{ color:'#f04a6a', fontSize:11, fontWeight:700, margin:'4px 0 0' }}>Pas de fichier audio/vidéo (fiche vide)</p>}
+              {!c.coverUrl && <p style={{ color:'#b07a00', fontSize:11, fontWeight:700, margin:'4px 0 0' }}>Pas de pochette (image générique affichée au partage)</p>}
             </div>
           </div>
-          <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap', alignItems:'center' }}>
             {c.publicLinkId && (
               <a href={`/ecoute/${c.publicLinkId}`} target="_blank" rel="noopener noreferrer"
                 style={{ padding:'6px 12px', borderRadius:8, background:'#eaf1ff', color:'#1a6bff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
                 Voir la page fan
               </a>
             )}
+            <label style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #1a6bff', background: uploadingCoverId===c.id ? '#dce6f7' : '#fff', color:'#1a6bff', fontSize:12, fontWeight:700, cursor: uploadingCoverId===c.id ? 'wait' : 'pointer' }}>
+              {uploadingCoverId===c.id ? 'Envoi...' : (c.coverUrl ? 'Changer la pochette' : 'Ajouter une pochette')}
+              <input type="file" accept="image/*" style={{ display:'none' }} disabled={uploadingCoverId===c.id}
+                onChange={e => e.target.files?.[0] && resyncPhoto(c, e.target.files[0])} />
+            </label>
             <button onClick={() => retirerDecouvrir(c)}
               style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #f0b84a', background:'#fff8e6', color:'#b07a00', fontSize:12, fontWeight:700, cursor:'pointer' }}>
               Retirer du fil
