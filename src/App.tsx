@@ -3570,13 +3570,15 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
   };
 
   const supprimer = async (c: any) => {
-    if (!window.confirm(`Supprimer "${c.label}" de Découvrir ?\n\n(Le QR code et le lien public liés seront aussi supprimés)`)) return;
+    if (!window.confirm(`Supprimer "${c.label}" de Découvrir ?\n\n(Le lien public lié sera aussi supprimé. Le QR code de duplication physique, s'il existe, n'est PAS touché — il continue de fonctionner pour les pochettes déjà en circulation.)`)) return;
     try {
       const plId = c.publicLinkId;
       await deleteDoc(doc(db,'decouvrir',c.id));
+      // Découvrir = public → on ne supprime que le lien public (publicLinks),
+      // jamais le QR de duplication physique (qrcodes) : un artiste peut avoir
+      // des pochettes déjà vendues qui doivent continuer à fonctionner même si
+      // le titre est retiré de Découvrir.
       if (plId) {
-        const qrSnap = await getDocs(query(collection(db,'qrcodes'), where('publicLinkId','==',plId)));
-        for (const d of qrSnap.docs) await deleteDoc(doc(db,'qrcodes',d.id));
         const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',plId)));
         for (const d of plSnap.docs) await deleteDoc(doc(db,'publicLinks',d.id));
       }
@@ -3584,7 +3586,7 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
   };
 
   const retirerDecouvrir = async (c: any) => {
-    if (!window.confirm(`Retirer "${c.label}" de Découvrir uniquement ?\n\n(Le contenu et son QR restent, il disparaît juste du fil Découvrir)`)) return;
+    if (!window.confirm(`Retirer "${c.label}" de Découvrir uniquement ?\n\n(Le contenu et ses liens restent, il disparaît juste du fil Découvrir)`)) return;
     try { await deleteDoc(doc(db,'decouvrir',c.id)); } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
@@ -3650,7 +3652,7 @@ function DecouvrirAdminTab({ canDelete }: { canDelete?: boolean }) {
             {canDelete && (
               <button onClick={() => supprimer(c)}
                 style={{ padding:'6px 12px', borderRadius:8, border:'none', background:'#f04a6a', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                Supprimer tout
+                Supprimer (Découvrir + lien public)
               </button>
             )}
           </div>
