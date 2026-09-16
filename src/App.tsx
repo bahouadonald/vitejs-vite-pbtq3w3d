@@ -4562,7 +4562,13 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
   { artist: string, qrcodes: any[], activeCount: number, lockedCount: number,
     onEdit: (q: any) => void, onQrModal: (q: any) => void, onBulk: (q: any) => void,
     onToggle: (q: any) => void, onDelete: (id: string) => void }) {
-  const [open, setOpen] = useState(true);
+  // Fermé par défaut : un artiste avec des centaines/milliers de QR codes
+  // (génération en masse) n'affiche plus tout d'un coup au chargement de la
+  // page — il faut cliquer pour ouvrir son dossier.
+  const [open, setOpen] = useState(false);
+  // Dans un dossier ouvert, on n'affiche que les N premiers QR codes, avec un
+  // bouton pour en charger plus — évite d'afficher 1000 lignes d'un coup.
+  const [visibles, setVisibles] = useState(50);
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -4586,7 +4592,7 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
       {/* LISTE QR CODES DU DOSSIER */}
       {open && (
         <div style={{ border: '1px solid #c8d8ef', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
-          {qrcodes.map((q, i) => {
+          {qrcodes.slice(0, visibles).map((q, i) => {
             const isLocked = q.status === 'locked' || (q.usedScans || 0) >= (q.totalScans || 1);
             return (
               <div key={q.id} style={{ padding: '16px 18px', borderTop: i === 0 ? 'none' : '1px solid #dce6f7', background: isLocked ? '#fffdf5' : '#fafcff' }}>
@@ -4630,6 +4636,12 @@ function ArtistFolder({ artist, qrcodes, activeCount, lockedCount, onEdit, onQrM
               </div>
             );
           })}
+          {visibles < qrcodes.length && (
+            <button onClick={() => setVisibles(v => v + 50)}
+              style={{ width: '100%', padding: 12, border: 'none', borderTop: '1px solid #dce6f7', background: '#f5f8ff', color: '#1a6bff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              Charger 50 de plus ({qrcodes.length - visibles} restants)
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -5599,9 +5611,18 @@ function AdminPage() {
     const qrIds: string[] = [];
     for (let i = 0; i < count; i++) qrIds.push(Math.random().toString(36).slice(2, 10).toUpperCase());
     const batchSize = 20;
+    let echecs = 0;
+    // Chaque écriture a désormais une limite de 15s — avant, une seule requête
+    // bloquée (réseau instable, etc.) figeait toute la génération au même
+    // pourcentage indéfiniment. Maintenant on continue toujours, même si
+    // certaines écritures échouent (comptées et signalées à la fin).
+    const ecrireAvecDelai = (data: any) => Promise.race([
+      addDoc(collection(db, 'qrcodes'), data),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('délai dépassé')), 15000)),
+    ]).catch(() => { echecs++; return null; });
     for (let i = 0; i < qrIds.length; i += batchSize) {
       await Promise.all(qrIds.slice(i, i + batchSize).map(qrId =>
-        addDoc(collection(db, 'qrcodes'), {
+        ecrireAvecDelai({
           qrId, label: bulkQr.label, artist: bulkQr.artist, type: bulkQr.type,
           price: bulkQr.price, totalScans: scans, usedScans: 0, downloads: 0,
           files: bulkQr.files || [], fileCount: bulkQr.fileCount || 0,
@@ -5642,7 +5663,7 @@ function AdminPage() {
     setBulkProgress(100);
     pdf.save(bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes_' + bulkFormat.toUpperCase() + '.pdf');
     setBulkLoading(false); setShowBulk(false); setBulkQr(null);
-    setMsg('' + count + ' QR codes generes ! PDF telecharge.');
+    setMsg('' + count + ' QR codes generes' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + ' ! PDF telecharge.');
   };
 
   const verifyPayment = async (p: any) => {
