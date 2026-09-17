@@ -5661,9 +5661,17 @@ function AdminPage() {
       if (i % 5 === 0) setBulkProgress(55 + Math.round((i / qrIds.length) * 40));
     }
     setBulkProgress(100);
+    // Laisse le temps au "100%" de s'afficher réellement avant que la
+    // génération finale du PDF (lourde, bloquante) ne fige le navigateur —
+    // sinon la fenêtre semblait disparaître d'un coup sans jamais montrer
+    // la confirmation.
+    await new Promise(r => setTimeout(r, 60));
     pdf.save(bulkQr.label.replace(/[^a-zA-Z0-9]/g, '_') + '_' + count + '_QRcodes_' + bulkFormat.toUpperCase() + '.pdf');
-    setBulkLoading(false); setShowBulk(false); setBulkQr(null);
     setMsg('' + count + ' QR codes generes' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + ' ! PDF telecharge.');
+    // Laisse le message de succès visible un instant avant de refermer la
+    // fenêtre, pour que ce soit clair que c'est terminé.
+    await new Promise(r => setTimeout(r, 1500));
+    setBulkLoading(false); setShowBulk(false); setBulkQr(null);
   };
 
   const verifyPayment = async (p: any) => {
