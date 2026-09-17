@@ -865,13 +865,38 @@ function usePushNotifications(userEmail?: string) {
             if (n.lu) return;
             if (Notification.permission === 'granted') {
               try {
-                const notif = new Notification('Doniel Zik', {
-                  body: n.text || 'Vous avez une nouvelle notification',
-                  icon: '/icons/icon-192x192.png',
-                  badge: '/icons/icon-192x192.png',
-                  tag: ch.doc.id,
-                });
-                notif.onclick = () => { window.focus(); window.location.href = '/notifications'; notif.close(); };
+                // Sur Android, le constructeur Notification() direct échoue souvent
+                // silencieusement (sans erreur visible) — il faut passer par le
+                // service worker déjà installé dans l'app pour que ça s'affiche
+                // vraiment dans la barre de notifications du téléphone.
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                  navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification('Doniel Zik', {
+                      body: n.text || 'Vous avez une nouvelle notification',
+                      icon: '/icons/icon-192x192.png',
+                      badge: '/icons/icon-192x192.png',
+                      tag: ch.doc.id,
+                      data: { url: '/notifications' },
+                    }).catch(() => {
+                      // Filet de sécurité : navigateur sans service worker prêt
+                      try {
+                        const notif = new Notification('Doniel Zik', {
+                          body: n.text || 'Vous avez une nouvelle notification',
+                          icon: '/icons/icon-192x192.png', tag: ch.doc.id,
+                        });
+                        notif.onclick = () => { window.focus(); window.location.href = '/notifications'; notif.close(); };
+                      } catch {}
+                    });
+                  });
+                } else {
+                  const notif = new Notification('Doniel Zik', {
+                    body: n.text || 'Vous avez une nouvelle notification',
+                    icon: '/icons/icon-192x192.png',
+                    badge: '/icons/icon-192x192.png',
+                    tag: ch.doc.id,
+                  });
+                  notif.onclick = () => { window.focus(); window.location.href = '/notifications'; notif.close(); };
+                }
               } catch {}
             }
           }
@@ -966,7 +991,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
         partArtisteOscart,
         kiffs: kiffement.coins * 250,
         userId: user.uid,
-        userName: user.displayName || user.email?.split('@')[0],
+        userName: user.displayName || 'Un mélomane',
         status: 'paid',
         createdAt: new Date().toISOString(),
       });
@@ -996,7 +1021,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
           role: 'artiste',
           type: 'kiffement',
           text: `${user.displayName || 'Un fan'} vous a envoyé un kiffement — ${kiffement.label}`,
-          qrId, from: user.displayName || user.email,
+          qrId, from: user.displayName || 'Un mélomane',
           createdAt: new Date().toISOString(),
           lu: false,
         });
@@ -1214,7 +1239,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
         qrId, text: text.trim(),
         userId: user.uid,
         userEmail: user.email || '',
-        userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
+        userName: user.displayName || 'Anonyme',
         userPhoto: user.photoURL || '',
         createdAt: new Date().toISOString(),
       });
@@ -1225,7 +1250,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
           type: 'commentaire',
           text: `${user.displayName || 'Un fan'} a commenté votre contenu`,
           qrId,
-          from: user.displayName || user.email,
+          from: user.displayName || 'Un mélomane',
           createdAt: new Date().toISOString(),
           lu: false,
         });
@@ -1251,7 +1276,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
         parentId, // marque cette entrée comme une réponse
         userId: user.uid,
         userEmail: user.email || '',
-        userName: user.displayName || user.email?.split('@')[0] || 'Anonyme',
+        userName: user.displayName || 'Anonyme',
         userPhoto: user.photoURL || '',
         createdAt: new Date().toISOString(),
       });
@@ -7864,6 +7889,37 @@ function ZikothequePage({ user }: { user: any }) {
 
   const logout = async () => { await signOut(auth); };
 
+  // Contrôles média en arrière-plan (écran verrouillé, barre de notifications) :
+  // sans ça, le téléphone ne sait proposer que play/pause, jamais
+  // piste suivante/précédente pour un album qui joue en fond.
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentAlbum) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: (currentTrack?.name || 'Piste ' + (currentTrackIdx + 1)).replace(/\.[^/.]+$/, ''),
+        artist: currentAlbum.artist || 'Doniel Zik',
+        album: currentAlbum.label || '',
+        artwork: currentAlbum.coverUrl ? [
+          { src: currentAlbum.coverUrl, sizes: '512x512', type: 'image/png' },
+        ] : [],
+      });
+      navigator.mediaSession.setActionHandler('play', () => audioRef.current?.play().catch(() => {}));
+      navigator.mediaSession.setActionHandler('pause', () => audioRef.current?.pause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        if (currentTrackIdx > 0) { setCurrentTrackIdx(i => i - 1); setPlaying(true); }
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        if (currentTrackIdx < currentFiles.length - 1) { setCurrentTrackIdx(i => i + 1); setPlaying(true); }
+      });
+    } catch { /* MediaSession pas supportée, on ignore */ }
+  }, [currentAlbum, currentTrackIdx, currentFiles.length, currentTrack]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    }
+  }, [playing]);
+
   return (
     <div style={{ minHeight: '100vh', background: `${GLOW_TOP}, ${C.bgDeep}`, color: C.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: currentAlbum ? 148 : 58 }}>
       <style>{`
@@ -9345,7 +9401,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       // Créer la réservation
       await addDoc(collection(db,'reservations'), {
         sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
-        userId: user.uid, userEmail: user.email, userName: user.displayName || user.email,
+        userId: user.uid, userEmail: user.email, userName: user.displayName || 'Un mélomane',
         prixOscart: s.prixOscart, statut:'reserve', telecharge:false,
         createdAt: new Date().toISOString(),
       });
@@ -9366,12 +9422,12 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       // Notif à l'ADMIN (suivi de toutes les réservations)
       await addDoc(collection(db,'notifications'), {
         to: 'bdonaldservices@gmail.com', type:'reservation_admin', sortieId: s.id,
-        text: `Nouvelle réservation : "${s.titre}" de ${s.artistName} — par ${user.displayName || user.email}. Total : ${(s.reservations || 0) + 1}.`,
+        text: `Nouvelle réservation : "${s.titre}" de ${s.artistName} — par ${user.displayName || 'Un mélomane'}. Total : ${(s.reservations || 0) + 1}.`,
         createdAt: new Date().toISOString(), lu:false,
       });
       // Email à l'admin (reçu même app fermée)
       envoyerEmailNotif('bdonaldservices@gmail.com', 'Nouvelle réservation Doniel Zik',
-        `Nouvelle réservation pour "${s.titre}" de ${s.artistName}, faite par ${user.displayName || user.email}. Total : ${(s.reservations || 0) + 1} réservation(s).`);
+        `Nouvelle réservation pour "${s.titre}" de ${s.artistName}, faite par ${user.displayName || 'Un mélomane'}. Total : ${(s.reservations || 0) + 1} réservation(s).`);
       // Notif à l'ARTISTE (sa sortie a été réservée)
       if (s.artistEmail) {
         await addDoc(collection(db,'notifications'), {
@@ -9447,7 +9503,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
     try {
       const resRef = await addDoc(collection(db,'reservations'), {
         sortieId: s.id, titre: s.titre, artistEmail: s.artistEmail, artistName: s.artistName,
-        userId: user.uid, userEmail: user.email, userName: user.displayName || user.email,
+        userId: user.uid, userEmail: user.email, userName: user.displayName || 'Un mélomane',
         prixOscart: s.prixOscart, statut:'en_attente', telecharge:false,
         createdAt: new Date().toISOString(),
       });
