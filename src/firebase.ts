@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBv4kugD9oN0BqQcBKqg6FzTMTp0dft3SE",
@@ -23,5 +24,15 @@ export const auth = getAuth(app);
 
 // Session persistante — le fan reste connecte
 setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+// Firebase Cloud Messaging (notifications push, meme app fermee) — verifie le
+// support du navigateur avant d'initialiser (iOS Safari hors PWA, par exemple,
+// ne supporte pas encore l'API Push).
+export const getMessagingSiSupporte = async () => {
+  try {
+    if (await isSupported()) return getMessaging(app);
+  } catch { /* pas supporte sur ce navigateur */ }
+  return null;
+};
 
 export default app;

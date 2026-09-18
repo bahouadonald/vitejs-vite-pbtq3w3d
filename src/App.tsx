@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import { db, auth } from './firebase';
+import { db, auth, getMessagingSiSupporte } from './firebase';
+import { getToken } from 'firebase/messaging';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
   onSnapshot, query, orderBy, where, getDocs, limit
@@ -105,6 +106,23 @@ async function envoyerEmailNotif(to: string, sujet: string, message: string): Pr
 }
 
 // Notifie l'admin (notif in-app + email) à chaque nouvel enregistrement (artiste/commercial/mélomane...)
+// Écrit une notification ET déclenche un vrai push (même app fermée) — à
+// utiliser à la place d'un addDoc direct sur 'notifications' partout où c'est
+// possible, pour que la personne soit vraiment alertée.
+async function envoyerNotification(data: { to: string, role?: string, type: string, text: string, [cle: string]: any }): Promise<void> {
+  try {
+    await addDoc(collection(db, 'notifications'), { ...data, createdAt: new Date().toISOString(), lu: false });
+  } catch (e) { console.error('envoyerNotification (Firestore)', e); }
+  // Best-effort, ne bloque jamais l'action principale si le push échoue
+  fetch('/api/send-push', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: data.to, title: 'Doniel Zik', body: data.text,
+      url: data.role === 'artiste' ? '/artiste' : '/notifications',
+    }),
+  }).catch(() => {});
+}
+
 async function notifierAdminEnregistrement(quoi: string, details: string): Promise<void> {
   const ADMIN = 'bdonaldservices@gmail.com';
   try {
@@ -201,12 +219,12 @@ async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Prom
     if (artistEmail) {
       await setDoc(doc(db,'kiffs_artiste', artistEmail), { artistEmail, total: increment(1) }, { merge: true });
       // Le Kiff (like gratuit) ne notifiait jamais l'artiste, contrairement aux
-      // commentaires — corrigé pour que ce soit cohérent.
-      await addDoc(collection(db,'notifications'), {
+      // commentaires — corrigé pour que ce soit cohérent, et envoie maintenant
+      // un vrai push (même app fermée).
+      await envoyerNotification({
         to: artistEmail, role: 'artiste', type: 'kiff',
         text: `${auth.currentUser?.displayName || 'Un mélomane'} a kiffé votre contenu`,
         qrId, from: auth.currentUser?.displayName || 'Un mélomane',
-        createdAt: new Date().toISOString(), lu: false,
       });
     }
     logTx(uid, 'kiff_donne', 0, -1, 'Kiff offert');
@@ -843,6 +861,29 @@ function BadgeNotif() {
   );
 }
 
+// Active les notifications push : demande la permission (doit venir d'un vrai
+// clic), puis récupère un jeton FCM et l'enregistre — c'est ce jeton qui
+// permet d'envoyer une notification même quand l'app est complètement fermée
+// (contrairement à l'ancien système qui exigeait que l'app soit ouverte).
+async function activerNotificationsPush(email: string): Promise<string> {
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return permission;
+  try {
+    const messaging = await getMessagingSiSupporte();
+    if (!messaging) return permission; // navigateur non supporté (ex: iOS hors PWA)
+    const reg = await navigator.serviceWorker.ready;
+    const vapidKey = (import.meta as any).env?.VITE_FCM_VAPID_KEY;
+    if (!vapidKey) { console.error('VITE_FCM_VAPID_KEY manquante'); return permission; }
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    if (token) {
+      await setDoc(doc(db, 'fcm_tokens', token), {
+        token, email, updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch (e) { console.error('activerNotificationsPush', e); }
+  return permission;
+}
+
 function usePushNotifications(userEmail?: string) {
   const dejaVus = useRef<Set<string>>(new Set());
   const premierChargement = useRef(true);
@@ -1024,14 +1065,12 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
       }
       // Notification artiste
       if (artistEmail) {
-        await addDoc(collection(db,'notifications'), {
+        await envoyerNotification({
           to: artistEmail,
           role: 'artiste',
           type: 'kiffement',
           text: `${user.displayName || 'Un fan'} vous a envoyé un kiffement — ${kiffement.label}`,
           qrId, from: user.displayName || 'Un mélomane',
-          createdAt: new Date().toISOString(),
-          lu: false,
         });
       }
       setMsg(`Kiffement envoyé ! ${kiffement.coins} Oscart débités. +${(kiffement.coins*250).toLocaleString()} kiffs à offrir.`);
@@ -1252,15 +1291,13 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
         createdAt: new Date().toISOString(),
       });
       if (artistEmail) {
-        await addDoc(collection(db, 'notifications'), {
+        await envoyerNotification({
           to: artistEmail,
           role: 'artiste',
           type: 'commentaire',
           text: `${user.displayName || 'Un fan'} a commenté votre contenu`,
           qrId,
           from: user.displayName || 'Un mélomane',
-          createdAt: new Date().toISOString(),
-          lu: false,
         });
       }
       // Notif activité (message 6) : prévenir les autres mélomanes actifs sur ce contenu
@@ -8369,7 +8406,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
             <p style={{ color:C.text, fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activer les notifications</p>
             <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Pour être alerté quand un fan kiffe, commente, ou vous envoie un cadeau.</p>
           </div>
-          <button onClick={() => { Notification.requestPermission().then(p => setPermNotif(p)); }}
+          <button onClick={() => { activerNotificationsPush(userEmail).then(p => setPermNotif(p)); }}
             style={{ padding:'8px 14px', borderRadius:99, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
             Activer
           </button>
@@ -11678,7 +11715,7 @@ function NotificationsPage() {
             <p style={{ color:C.text, fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activer les notifications</p>
             <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Pour être alerté quand quelqu'un kiffe, commente, ou vous envoie un cadeau.</p>
           </div>
-          <button onClick={() => { Notification.requestPermission().then(p => setPermNotif(p)); }}
+          <button onClick={() => { activerNotificationsPush(user?.email || '').then(p => setPermNotif(p)); }}
             style={{ padding:'8px 14px', borderRadius:99, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
             Activer
           </button>
