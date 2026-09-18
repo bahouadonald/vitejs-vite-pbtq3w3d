@@ -105,11 +105,11 @@ async function envoyerEmailNotif(to: string, sujet: string, message: string): Pr
   } catch { /* échec silencieux : la notif Firestore reste la source principale */ }
 }
 
-// Notifie l'admin (notif in-app + email) à chaque nouvel enregistrement (artiste/commercial/mélomane...)
 // Écrit une notification ET déclenche un vrai push (même app fermée) — à
 // utiliser à la place d'un addDoc direct sur 'notifications' partout où c'est
 // possible, pour que la personne soit vraiment alertée.
-async function envoyerNotification(data: { to: string, role?: string, type: string, text: string, [cle: string]: any }): Promise<void> {
+async function envoyerNotification(data: { to: string | null | undefined, role?: string, type: string, text: string, [cle: string]: any }): Promise<void> {
+  if (!data.to) return; // pas de destinataire connu (ex: email null) — rien à faire
   try {
     await addDoc(collection(db, 'notifications'), { ...data, createdAt: new Date().toISOString(), lu: false });
   } catch (e) { console.error('envoyerNotification (Firestore)', e); }
@@ -123,14 +123,14 @@ async function envoyerNotification(data: { to: string, role?: string, type: stri
   }).catch(() => {});
 }
 
+// Notifie l'admin (notif in-app + email) à chaque nouvel enregistrement (artiste/commercial/mélomane...)
 async function notifierAdminEnregistrement(quoi: string, details: string): Promise<void> {
   const ADMIN = 'bdonaldservices@gmail.com';
   try {
-    await addDoc(collection(db, 'notifications'), {
+    await envoyerNotification({
       to: ADMIN, type: 'enregistrement_admin',
       text: `Nouvel enregistrement — ${quoi} : ${details}`,
-      createdAt: new Date().toISOString(), lu: false,
-    });
+      createdAt: new Date().toISOString(),    });
   } catch(e) { console.error('notif admin enreg', e); }
   // Email à l'admin (reçu même app fermée)
   envoyerEmailNotif(ADMIN, `Nouvel enregistrement : ${quoi}`, `Un nouvel enregistrement vient d'avoir lieu sur Doniel Zik.\n\nType : ${quoi}\n${details}`);
@@ -194,10 +194,9 @@ async function notifierActiviteCommunaute(qrId: string, exclureUid: string, mess
       const emailCible = c.userEmail;
       if (emailCible && c.userId !== exclureUid && !dejaNotifies.has(emailCible)) {
         dejaNotifies.add(emailCible);
-        await addDoc(collection(db, 'notifications'), {
+        await envoyerNotification({
           to: emailCible, type: 'activite',
-          text: message, qrId, createdAt: new Date().toISOString(), lu: false,
-        });
+          text: message, qrId, createdAt: new Date().toISOString(),        });
       }
     }
   } catch(e) { console.error('notif activite communaute', e); }
@@ -1513,14 +1512,12 @@ function Travailleurs({ qrId, artistEmail }: { qrId: string, artistEmail?: strin
 
   const sendReply = async (travailleur: any) => {
     if (!replyMsg) return;
-    await addDoc(collection(db,'notifications'), {
+    await envoyerNotification({
       to: travailleur.userId,
       type: 'remerciement',
       text: replyMsg,
       from: user?.displayName || artistEmail,
       qrId,
-      createdAt: new Date().toISOString(),
-      lu: false,
     });
     setShowReply(null);
     setReplyMsg('');
@@ -1767,11 +1764,10 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
           `${user.displayName || 'Quelqu\'un'} a kiffé ce contenu. Toi aussi, montre ton soutien : kiffe-le !`);
         // Notif à l'ARTISTE (B1), modérée car le kiff arrive souvent
         if (artistEmail && Math.random() < 0.25) {
-          await addDoc(collection(db, 'notifications'), {
+          await envoyerNotification({
             to: artistEmail, role:'artiste', type:'kiff',
             text: `${user.displayName || 'Un fan'} a kiffé votre contenu ! Continuez comme ça.`,
-            createdAt: new Date().toISOString(), lu:false,
-          });
+            createdAt: new Date().toISOString(),          });
         }
       }
     } catch(e) { console.error(e); }
@@ -2573,11 +2569,10 @@ function FanPage() {
         }
         // Notif à l'ARTISTE (B1) : son contenu a été ajouté à une Zikothèque
         if (qrData.artistEmail) {
-          await addDoc(collection(db, 'notifications'), {
+          await envoyerNotification({
             to: qrData.artistEmail, role:'artiste', type:'zikotheque',
             text: `${uZiko?.displayName || 'Un fan'} a ajouté votre contenu "${qrData.label || ''}" à sa Zikothèque.`,
-            createdAt: new Date().toISOString(), lu:false,
-          });
+            createdAt: new Date().toISOString(),          });
         }
       }
       setZikoState('done');
@@ -2637,11 +2632,10 @@ function FanPage() {
       }
       // Notif à l'ARTISTE (B1) : son contenu a été téléchargé
       if (qrData.artistEmail) {
-        await addDoc(collection(db, 'notifications'), {
+        await envoyerNotification({
           to: qrData.artistEmail, role:'artiste', type:'telechargement',
           text: `${u?.displayName || 'Un fan'} a téléchargé votre contenu "${qrData.label || ''}".`,
-          createdAt: new Date().toISOString(), lu:false,
-        });
+          createdAt: new Date().toISOString(),        });
       }
     } catch(e) { console.error('markDL', e); }
   };
@@ -3066,18 +3060,16 @@ function SignaturesArtisteTab({ artistEmail }: { artistEmail: string }) {
     const sousType = t === 'clip' ? clipMode : '';
 
     // 1. Notification PERSONNELLE au fan (mène à Profil → Mes signatures)
-    await addDoc(collection(db,'notifications'), {
+    await envoyerNotification({
       to: offreModal.userEmail || offreModal.userId,
       type: 'signature',
       text: `${artistName} vous a offert une signature : ${typeChoisi.label} ! Retrouvez-la dans votre profil.`,
-      createdAt: new Date().toISOString(), lu: false,
-    });
+      createdAt: new Date().toISOString(),    });
     // 2. Notification GÉNÉRALE
-    await addDoc(collection(db,'notifications'), {
+    await envoyerNotification({
       to: 'all', type: 'generale',
       text: `${artistName} offre "${typeChoisi.label}" à ${offreModal.userName}.`,
-      createdAt: new Date().toISOString(), lu: false,
-    });
+      createdAt: new Date().toISOString(),    });
     // 3. Publier dans le Mood UNIQUEMENT pour la dédicace vidéo (contenu visible)
     if (t === 'dedicace') {
       await addDoc(collection(db,'mots_artiste'), {
@@ -3310,27 +3302,24 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
     try {
       await updateDoc(doc(db,'mots_artiste',m.id), { statut:'valide' });
       // Notification perso à l'artiste
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: m.artistEmail, role:'artiste', type:'mot_valide',
         text: `Votre message est validé et publié dans "Actu & Mood Artistique".`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       // Notification GÉNÉRALE à tous
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'generale',
         text: `${m.artistName} a quelque chose à vous dire. Allez voir dans Découvrir !`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
   const refuserMot = async (m: any) => {
     if (!window.confirm('Refuser ce message ?')) return;
     await updateDoc(doc(db,'mots_artiste',m.id), { statut:'refuse' });
-    await addDoc(collection(db,'notifications'), {
+    await envoyerNotification({
       to: m.artistEmail, role:'artiste', type:'mot_refuse',
       text: `Votre message n'a pas été validé car il ne correspond pas à nos conditions (uniquement professionnel).`,
-      createdAt: new Date().toISOString(), lu: false,
-    });
+      createdAt: new Date().toISOString(),    });
   };
   // Suppression d'UN SEUL mood déjà publié (contrairement à "Nettoyer le fil"
   // qui les supprime tous). Utile quand un artiste publie un mood alors que son
@@ -3374,17 +3363,15 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
       // Marquer la soumission validée
       await updateDoc(doc(db,'soumissions',s.id), { statut:'valide', publicLinkId, totalScans: scans });
       // Notifier l'artiste — félicitations
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: s.artistEmail, type:'validation',
         text: `Félicitations ! Votre contenu "${s.titre}" est validé et publié. Votre lien et votre QR public sont disponibles. Partagez-les à vos fans !`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       // Notif GÉNÉRALE : nouvelle publication, visible par tous les mélomanes
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'generale',
         text: `Nouveau sur Doniel Zik : "${s.titre}" de ${s.artistName} est disponible ! Allez l'écouter et soutenez l'artiste.`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       setScansModal(null); setNbScans('1');
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
@@ -3412,28 +3399,25 @@ function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boolean, can
         createdAt: new Date().toISOString(),
       });
       await updateDoc(doc(db,'soumissions',s.id), { statut:'valide' });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: s.artistEmail, type:'validation',
         text: `Votre sortie "${s.titre}" est validée et publiée dans "Sortie officielle" ! Les fans peuvent réserver dès maintenant. Le jour J, uploadez votre fichier officiel.`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       // Notif GÉNÉRALE : nouvelle sortie officielle à venir, visible par tous les mélomanes
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'generale',
         text: `Sortie officielle à venir : "${s.titre}" de ${s.artistName}, le ${new Date(s.dateSortie).toLocaleDateString('fr', { day:'numeric', month:'long' })}. Réservez et envoyez des kiffements pour soutenir l'artiste !`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
   const refuser = async (s: any) => {
     if (!window.confirm(`Refuser "${s.titre}" ?`)) return;
     await updateDoc(doc(db,'soumissions',s.id), { statut:'refuse' });
-    await addDoc(collection(db,'notifications'), {
+    await envoyerNotification({
       to: s.artistEmail, type:'refus',
       text: `Votre contenu "${s.titre}" n'a pas pu être validé car il ne correspond pas à nos conditions. Contactez-nous pour plus d'informations.`,
-      createdAt: new Date().toISOString(), lu: false,
-    });
+      createdAt: new Date().toISOString(),    });
   };
 
   const enAttente = soumissions.filter(s => s.statut === 'en_attente');
@@ -3752,11 +3736,10 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
         createdAt: new Date().toISOString(),
       });
       await updateDoc(doc(db,'soumissions',s.id), { statut:'valide' });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: s.artistEmail, type:'validation',
         text: `Votre sortie officielle "${s.titre}" est validée et publiée ! Les fans peuvent réserver. Le jour J, le fichier officiel sera mis en ligne.`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
       alert('Sortie officielle validée et publiée !');
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
@@ -3765,11 +3748,10 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
     if (!window.confirm(`Refuser la sortie "${s.titre}" ?`)) return;
     try {
       await updateDoc(doc(db,'soumissions',s.id), { statut:'refuse' });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: s.artistEmail, type:'refus',
         text: `Votre demande de sortie officielle "${s.titre}" n'a pas été retenue. Contactez-nous pour plus d'informations.`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
     } catch(e:any) { alert('Erreur : ' + e.message); }
   };
 
@@ -3784,12 +3766,11 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
       const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
       for (const r of resaSnap.docs) {
         await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: urlComplete });
-        await addDoc(collection(db,'notifications'), {
+        await envoyerNotification({
           to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
           fichierUrl: urlComplete, titre: sortie.titre, artistName: sortie.artistName,
           text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
-          boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
-        });
+          boutonStatut:'vert', createdAt: new Date().toISOString(),        });
       }
       const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
       await addDoc(collection(db,'decouvrir'), {
@@ -3815,12 +3796,11 @@ function SortiesAdminTab({ canValidate, canDelete }: { canValidate?: boolean, ca
         const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
         for (const r of resaSnap.docs) {
           await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: data.secure_url });
-          await addDoc(collection(db,'notifications'), {
+          await envoyerNotification({
             to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
             fichierUrl: data.secure_url, titre: sortie.titre, artistName: sortie.artistName,
             text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
-            boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
-          });
+            boutonStatut:'vert', createdAt: new Date().toISOString(),          });
         }
         const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
         await addDoc(collection(db,'decouvrir'), {
@@ -4041,12 +4021,11 @@ function ProductionTab() {
       const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
       for (const r of resaSnap.docs) {
         await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: urlComplete });
-        await addDoc(collection(db,'notifications'), {
+        await envoyerNotification({
           to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
           fichierUrl: urlComplete, titre: sortie.titre, artistName: sortie.artistName,
           text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
-          boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
-        });
+          boutonStatut:'vert', createdAt: new Date().toISOString(),        });
       }
       const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
       await addDoc(collection(db,'decouvrir'), {
@@ -4075,12 +4054,11 @@ function ProductionTab() {
         const resaSnap = await getDocs(query(collection(db,'reservations'), where('sortieId','==',sortie.id)));
         for (const r of resaSnap.docs) {
           await updateDoc(doc(db,'reservations',r.id), { statut:'disponible', fichierOfficiel: data.secure_url });
-          await addDoc(collection(db,'notifications'), {
+          await envoyerNotification({
             to: r.data().userEmail, type:'sortie_dispo', sortieId: sortie.id,
             fichierUrl: data.secure_url, titre: sortie.titre, artistName: sortie.artistName,
             text: `"${sortie.titre}" de ${sortie.artistName} est sorti ! Téléchargez votre contenu maintenant.`,
-            boutonStatut:'vert', createdAt: new Date().toISOString(), lu:false,
-          });
+            boutonStatut:'vert', createdAt: new Date().toISOString(),          });
         }
         // Publier dans Découvrir (devient un contenu normal)
         const publicLinkId = 'pl_' + Math.random().toString(36).substr(2, 12);
@@ -4107,11 +4085,10 @@ function ProductionTab() {
         const cmd = commandes.find(c => c.id === cmdId);
         await updateDoc(doc(db,'commandes_pochettes',cmdId), { creaUrl: data.secure_url, statut:'livree' });
         // Notifier l'artiste
-        if (cmd) await addDoc(collection(db,'notifications'), {
+        if (cmd) await envoyerNotification({
           to: cmd.artistEmail, type:'pochette_livree',
           text: `Votre pochette est prête ! Téléchargez-la en PNG depuis l'onglet Pochettes.`,
-          createdAt: new Date().toISOString(), lu: false,
-        });
+          createdAt: new Date().toISOString(),        });
       }
     } catch {}
     setUploadingCmd('');
@@ -5169,11 +5146,10 @@ function NotifsEducativesTab() {
     if (!texte.trim()) { setMsg('Écrivez un message.'); return; }
     setEnvoi(true); setMsg('');
     try {
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'educative',
         text: texte.trim(),
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       setMsg('Notification envoyée à tous les mélomanes.');
       setMessage('');
     } catch(e:any) { setMsg('Erreur : ' + (e?.message || '')); }
@@ -8713,11 +8689,10 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         setPremierGratuit(false);
       }
       // Notifier l'admin
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'soumission',
         text: `Nouvelle soumission de ${artistName} : "${titre.trim()}" (${PRIX_PUBLICATION[type].label}). À écouter et valider.`,
-        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
-      });
+        lien: fileUrl, createdAt: new Date().toISOString(),      });
       setMsg('Soumis ! Votre contenu sera écouté et validé sous peu.');
       setTitre(''); setFile(null); setFileUrl(''); setPochetteUrl('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
@@ -8749,11 +8724,10 @@ function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }: any) {
         statut: 'en_attente',
         createdAt: new Date().toISOString(),
       });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'soumission',
         text: `SORTIE PROGRAMMÉE de ${artistName} : "${titre.trim()}" — sortie le ${dateSortie}. À valider.`,
-        lien: teaserDecoupe, createdAt: new Date().toISOString(), lu: false,
-      });
+        lien: teaserDecoupe, createdAt: new Date().toISOString(),      });
       setMsg('Sortie programmée soumise ! Elle sera validée puis publiée dans "Sortie officielle".');
       setTitre(''); setFile(null); setFileUrl(''); setDateSortie(''); setObjTelech(''); setObjCadeaux(''); setPrixMusique('');
       setTeaserDebut(0); setTeaserDuree(30); setDureeTotale(0); setDescSortie(''); setPochetteUrl('');
@@ -9044,11 +9018,10 @@ function CommandePochettes({ user, artistName, contenusValides }: any) {
         statut: 'nouvelle',
         createdAt: new Date().toISOString(),
       });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'commande_pochette',
         text: `${artistName} commande ${nbP} pochettes${creaParNous ? ' + conception (5000 F)' : ''}.`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       setMsg('Commande envoyée ! Nous vous recontactons pour le paiement et la livraison.');
       setNbPochettes('100'); setNbScans('1'); setCreaParNous(false); setPhotoUrl(''); setInfos('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
@@ -9202,11 +9175,10 @@ function MotArtisteTab({ user, artistName }: any) {
         statut: 'en_attente',
         createdAt: new Date().toISOString(),
       });
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'mot_artiste',
         text: `${artistName} a soumis un mot à valider.`,
-        createdAt: new Date().toISOString(), lu: false,
-      });
+        createdAt: new Date().toISOString(),      });
       setMsg('Soumis ! Votre mot sera validé puis publié.');
       setTexte(''); setVideoUrl('');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
@@ -9494,37 +9466,33 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         montantOscart: partArtiste, createdAt: new Date().toISOString(),
       });
       // Notif perso au fan — bouton rouge (en attente du jour J)
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: user.email, type:'reservation', sortieId: s.id, dateSortie: s.dateSortie,
         text: `Réservation confirmée pour "${s.titre}" de ${s.artistName}. Disponible le ${s.dateSortie}.`,
-        boutonStatut:'rouge', createdAt: new Date().toISOString(), lu:false,
-      });
+        boutonStatut:'rouge', createdAt: new Date().toISOString(),      });
       // Notif à l'ADMIN (suivi de toutes les réservations)
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'reservation_admin', sortieId: s.id,
         text: `Nouvelle réservation : "${s.titre}" de ${s.artistName} — par ${user.displayName || 'Un mélomane'}. Total : ${(s.reservations || 0) + 1}.`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
       // Email à l'admin (reçu même app fermée)
       envoyerEmailNotif('bdonaldservices@gmail.com', 'Nouvelle réservation Doniel Zik',
         `Nouvelle réservation pour "${s.titre}" de ${s.artistName}, faite par ${user.displayName || 'Un mélomane'}. Total : ${(s.reservations || 0) + 1} réservation(s).`);
       // Notif à l'ARTISTE (sa sortie a été réservée)
       if (s.artistEmail) {
-        await addDoc(collection(db,'notifications'), {
+        await envoyerNotification({
           to: s.artistEmail, type:'reservation_artiste', sortieId: s.id,
           text: `Quelqu'un a réservé votre sortie "${s.titre}" ! Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`,
-          createdAt: new Date().toISOString(), lu:false,
-        });
+          createdAt: new Date().toISOString(),        });
         // Email à l'artiste
         envoyerEmailNotif(s.artistEmail, 'Votre sortie a été réservée !',
           `Bonne nouvelle ! Quelqu'un vient de réserver votre sortie "${s.titre}". Vous avez maintenant ${(s.reservations || 0) + 1} réservation(s).`);
       }
       // Notif GÉNÉRALE (message 11) : une réservation pousse les autres à réserver aussi
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'generale',
         text: `${user.displayName || 'Quelqu\'un'} a réservé "${s.titre}" de ${s.artistName}. Réserve-la toi aussi avant la sortie !`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
       setReserve(true); setShowDetail(false); setMsg('Réservé ! Vous recevrez le contenu le jour de la sortie.');
     } catch(e:any) { setMsg('Erreur : ' + e.message); }
     setReserving(false);
@@ -9539,11 +9507,10 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       else { await navigator.clipboard.writeText(`${texte} ${url}`); setMsg('Lien copié ! Partagez-le.'); }
       // Notif générale (message 12) : un partage pousse les autres à partager aussi
       const u = auth.currentUser;
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: 'all', type:'generale',
         text: `${u?.displayName || 'Quelqu\'un'} a partagé "${s.titre}" de ${s.artistName}. Partage-le toi aussi pour soutenir l'artiste !`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
     } catch {}
   };
 
@@ -9880,11 +9847,10 @@ function MesChallengesPage() {
       // Incrémenter le compteur affiché
       await updateDoc(doc(db,'challenges', ch.id), { kiffements: (ch.kiffements || 0) + coins });
       // Notifier le créateur du challenge
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: ch.userEmail || ch.userId, type:'activite',
         text: `${user.displayName || 'Une personne'} vous a envoye un kiffement sur votre challenge !`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
     } catch(e) { console.error(e); alert('Erreur lors de l\'envoi.'); }
   };
 
@@ -10901,11 +10867,10 @@ function ChallengePage({ artisteEmail, sigId, contenus, onClose }: { artisteEmai
         } catch {}
       }
       // Notifier l'artiste (tag auto)
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: artiste, role:'artiste', type:'challenge_realise',
         text: `${user?.displayName || 'Un mélomane'} a réalisé un challenge sur votre chanson "${chanson?.label || chanson?.titre || ''}" !`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
       setMsg('Challenge publié ! Votre artiste a été notifié.');
       setTimeout(() => onClose(), 1800);
     } catch (e:any) {
@@ -11919,11 +11884,10 @@ function ProfilPage() {
         spotNom: spotNom.trim(), spotSlogan: spotSlogan.trim(), statutSpot: 'rempli',
       });
       // Notifier l'artiste que le fan a rempli son nom + slogan
-      await addDoc(collection(db,'notifications'), {
+      await envoyerNotification({
         to: spotModal.artistEmail, role:'artiste', type:'spot_rempli',
         text: `${spotModal.donateurName} a renseigné son nom (${spotNom.trim()}) à citer dans votre musique.`,
-        createdAt: new Date().toISOString(), lu:false,
-      });
+        createdAt: new Date().toISOString(),      });
       setSpotModal(null); setSpotNom(''); setSpotSlogan('');
     } catch(e) { console.error(e); }
   };
@@ -12818,11 +12782,10 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
       });
 
       // Notifier l'admin
-      await addDoc(collection(db, 'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'soumission',
         text: `${commercialEmail} a enregistré "${titreContenu.trim()}" pour l'artiste ${nom.trim()}. À écouter et valider.`,
-        lien: fileUrl, createdAt: new Date().toISOString(), lu: false,
-      });
+        lien: fileUrl, createdAt: new Date().toISOString(),      });
 
       setDone({ nom: nom.trim(), email: email.trim(), titre: titreContenu.trim(), tarif });
       setNom(''); setEmail(''); setWhatsapp(''); setTypeContenu(''); setTitreContenu(''); setCategorieContenu('autres'); setFileUrl('');
@@ -14212,11 +14175,10 @@ function ProductionPage() {
         createdAt: now.toISOString(),
       });
       // Notifier l'admin
-      await addDoc(collection(db, 'notifications'), {
+      await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type: 'production',
         text: `Nouvelle demande de production musicale : ${nom.trim()} (${tel.trim()}). Contrat signé en ligne.`,
-        createdAt: now.toISOString(), lu: false,
-      });
+        createdAt: now.toISOString(),      });
       envoyerEmailNotif('bdonaldservices@gmail.com', 'Nouvelle demande de production Doniel Zik',
         `${nom.trim()} vient de s'inscrire pour une production musicale et a signé le contrat en ligne. Téléphone : ${tel.trim()}, Email : ${emailArt.trim()}.`);
       setEtape('fait');
@@ -16116,11 +16078,10 @@ export default function App() {
         }
         // Envoyer le message suivant dans l'ordre (index = nombre déjà envoyés aujourd'hui)
         const idx = dejaEnvoyesAuj % MESSAGES_EDU.length;
-        await addDoc(collection(db,'notifications'), {
+        await envoyerNotification({
           to: 'all', type:'educative', text: MESSAGES_EDU[idx],
           ordre: idx + 1,
-          createdAt: new Date().toISOString(), lu: false,
-        });
+          createdAt: new Date().toISOString(),        });
       } catch(e) { console.error('edu auto', e); }
     })();
   }, [user]);
@@ -16152,10 +16113,9 @@ export default function App() {
         }
         if (envoyer) {
           const texte = MESSAGES_TUTO_ARTISTE[Math.floor(Math.random() * MESSAGES_TUTO_ARTISTE.length)];
-          await addDoc(collection(db,'notifications'), {
+          await envoyerNotification({
             to: user.email, role:'artiste', type:'tuto_artiste', text: texte,
-            createdAt: new Date().toISOString(), lu: false,
-          });
+            createdAt: new Date().toISOString(),          });
         }
       } catch(e) { console.error('tuto artiste', e); }
     })();
