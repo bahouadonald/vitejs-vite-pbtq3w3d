@@ -200,6 +200,14 @@ async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Prom
     await setDoc(doc(db,'kiffs_compteur', qrId), { qrId, artistEmail: artistEmail || '', total: increment(1) }, { merge: true });
     if (artistEmail) {
       await setDoc(doc(db,'kiffs_artiste', artistEmail), { artistEmail, total: increment(1) }, { merge: true });
+      // Le Kiff (like gratuit) ne notifiait jamais l'artiste, contrairement aux
+      // commentaires — corrigé pour que ce soit cohérent.
+      await addDoc(collection(db,'notifications'), {
+        to: artistEmail, role: 'artiste', type: 'kiff',
+        text: `${auth.currentUser?.displayName || 'Un mélomane'} a kiffé votre contenu`,
+        qrId, from: auth.currentUser?.displayName || 'Un mélomane',
+        createdAt: new Date().toISOString(), lu: false,
+      });
     }
     logTx(uid, 'kiff_donne', 0, -1, 'Kiff offert');
     return 'ok';
