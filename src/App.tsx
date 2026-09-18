@@ -5662,13 +5662,16 @@ function AdminPage() {
       coverUrl: editCover,
       status: (editModal.usedScans || 0) < newTotal ? 'active' : 'locked',
     });
-    // Synchroniser prix ET image dans publicLinks + decouvrir via publicLinkId du qrcode
+    // Synchroniser prix, image ET fichier(s) dans publicLinks + decouvrir via
+    // publicLinkId du qrcode — avant, un remplacement de fichier ne se
+    // répercutait jamais sur Découvrir/le lien public, seuls prix et pochette
+    // l'étaient.
     const pid = editModal.publicLinkId || editModal.qrId;
     if (pid) {
       const plSnap = await getDocs(query(collection(db,'publicLinks'), where('publicLinkId','==',pid)));
-      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { price: newPriceVal, coverUrl: editCover });
+      for (const d of plSnap.docs) await updateDoc(doc(db,'publicLinks',d.id), { price: newPriceVal, coverUrl: editCover, files: editFiles });
       const dSnap = await getDocs(query(collection(db,'decouvrir'), where('publicLinkId','==',pid)));
-      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { price: newPriceVal, coverUrl: editCover });
+      for (const d of dSnap.docs) await updateDoc(doc(db,'decouvrir',d.id), { price: newPriceVal, coverUrl: editCover, files: editFiles });
     }
     setEditModal(null); setMsg('QR mis à jour !');
   };
@@ -7028,7 +7031,18 @@ function ArtistPage() {
                         <button onClick={async () => {
                           // Publier sur la page Découvrir
                           const snap = await getDocs(query(collection(db, 'decouvrir'), where('publicLinkId','==', link.publicLinkId)));
-                          if (!snap.empty) { alert('Ce contenu est déjà publié sur Découvrir !'); return; }
+                          if (!snap.empty) {
+                            const docExistant = snap.docs[0];
+                            if (docExistant.data().masque) {
+                              // La fiche existe déjà mais était rendue privée — on la
+                              // republie simplement, au lieu de bloquer avec "déjà publié".
+                              await updateDoc(doc(db,'decouvrir', docExistant.id), { masque: false });
+                              alert('Contenu republié sur la page Découvrir !');
+                            } else {
+                              alert('Ce contenu est déjà publié sur Découvrir !');
+                            }
+                            return;
+                          }
                           // Récupérer les fichiers depuis le QR code lié
                           let files = link.files || [];
                           if (files.length === 0) {
