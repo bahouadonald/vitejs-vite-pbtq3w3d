@@ -8310,6 +8310,7 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
   const [notifs, setNotifs] = useState<any[]>([]);
   const [cadeaux, setCadeaux] = useState<any[]>([]);
   const [openFan, setOpenFan] = useState<string | null>(null);
+  const [permNotif, setPermNotif] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
 
   useEffect(() => {
     // Notifs classiques (commentaires, mots validés...) — SAUF kiffements (gérés à part, groupés)
@@ -8359,6 +8360,26 @@ function NotificationsTab({ userEmail }: { userEmail: string }) {
   return (
     <div>
       <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:20, color:C.text }}>Notifications</h2>
+
+      {/* Activation des notifications système — voir explication côté mélomane */}
+      {permNotif === 'default' && (
+        <div style={{ marginBottom:20, background:'rgba(93,132,255,0.1)', border:'1px solid rgba(93,132,255,0.3)', borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
+          <div style={{ flex:1 }}>
+            <p style={{ color:C.text, fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activer les notifications</p>
+            <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Pour être alerté quand un fan kiffe, commente, ou vous envoie un cadeau.</p>
+          </div>
+          <button onClick={() => { Notification.requestPermission().then(p => setPermNotif(p)); }}
+            style={{ padding:'8px 14px', borderRadius:99, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+            Activer
+          </button>
+        </div>
+      )}
+      {permNotif === 'denied' && (
+        <div style={{ marginBottom:20, background:'rgba(255,100,124,0.1)', border:'1px solid rgba(255,100,124,0.3)', borderRadius:12, padding:'12px 16px' }}>
+          <p style={{ color:C.alert, fontSize:12, margin:0, lineHeight:1.6 }}>Les notifications sont bloquées pour cette application. Pour les activer, va dans les réglages du téléphone → Applications → Doniel Zik → Notifications.</p>
+        </div>
+      )}
 
       {/* KIFFEMENTS REÇUS — groupés par mélomane */}
       {fans.length > 0 && (
@@ -11595,6 +11616,7 @@ function NotificationsPage() {
   const [vue, setVue] = useState<'perso'|'generale'>('perso');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [showScanner, setShowScanner] = useState(false);
+  const [permNotif, setPermNotif] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -11644,6 +11666,29 @@ function NotificationsPage() {
         <IconeScannerBouton onClick={() => setShowScanner(true)} />
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
+
+      {/* Activation des notifications système — la demande automatique au
+          chargement de la page est ignorée par la plupart des navigateurs
+          (surtout sur Android) : il faut un vrai clic pour que le téléphone
+          accepte de proposer la fenêtre d'autorisation. */}
+      {permNotif === 'default' && (
+        <div style={{ margin:'12px 16px 0', maxWidth:500, marginLeft:'auto', marginRight:'auto', background:'rgba(93,132,255,0.1)', border:'1px solid rgba(93,132,255,0.3)', borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
+          <div style={{ flex:1 }}>
+            <p style={{ color:C.text, fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activer les notifications</p>
+            <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>Pour être alerté quand quelqu'un kiffe, commente, ou vous envoie un cadeau.</p>
+          </div>
+          <button onClick={() => { Notification.requestPermission().then(p => setPermNotif(p)); }}
+            style={{ padding:'8px 14px', borderRadius:99, border:'none', background:C.blue, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+            Activer
+          </button>
+        </div>
+      )}
+      {permNotif === 'denied' && (
+        <div style={{ margin:'12px 16px 0', maxWidth:500, marginLeft:'auto', marginRight:'auto', background:'rgba(255,100,124,0.1)', border:'1px solid rgba(255,100,124,0.3)', borderRadius:12, padding:'12px 16px' }}>
+          <p style={{ color:C.alert, fontSize:12, margin:0, lineHeight:1.6 }}>Les notifications sont bloquées pour cette application. Pour les activer, va dans les réglages du téléphone → Applications → Doniel Zik → Notifications.</p>
+        </div>
+      )}
 
       {/* Onglets Perso / Générale */}
       <div style={{ display:'flex', gap:8, padding:'12px 16px 4px', maxWidth:500, margin:'0 auto' }}>
