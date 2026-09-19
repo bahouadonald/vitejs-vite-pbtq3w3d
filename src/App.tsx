@@ -16061,7 +16061,7 @@ export default function App() {
       // 10. Devenir artiste
       "Tu as un talent ? Publie ton contenu sur Doniel Zik et obtiens le maximum de visibilité et de revenus. Qu'attends-tu ?",
     ];
-    (async () => {
+    const verifierEtEnvoyer = async () => {
       try {
         // Combien de messages éducatifs sont déjà partis aujourd'hui, et quand le dernier ?
         const debutJour = new Date(); debutJour.setHours(0,0,0,0);
@@ -16081,9 +16081,16 @@ export default function App() {
         await envoyerNotification({
           to: 'all', type:'educative', text: MESSAGES_EDU[idx],
           ordre: idx + 1,
-          createdAt: new Date().toISOString(),        });
+        });
       } catch(e) { console.error('edu auto', e); }
-    })();
+    };
+    // Vérification immédiate à l'ouverture, PUIS toutes les 30 min tant que
+    // l'app reste ouverte — avant, ça ne se vérifiait qu'une seule fois à
+    // l'ouverture, donc rien ne se déclenchait si personne ne rouvrait l'app
+    // assez souvent dans la journée.
+    verifierEtEnvoyer();
+    const intervalle = setInterval(verifierEtEnvoyer, 30 * 60 * 1000);
+    return () => clearInterval(intervalle);
   }, [user]);
 
   // Notifications TUTO pour l'ARTISTE (B2) : si l'utilisateur est un artiste, on lui envoie
@@ -16098,7 +16105,7 @@ export default function App() {
       "Vos fans peuvent vous offrir des kiffements. Encouragez-les : chaque kiffement vous rapproche de vos objectifs.",
       "N'oubliez pas : vous pouvez offrir des signatures (dédicaces) à vos fans les plus fidèles pour les récompenser et les fidéliser !",
     ];
-    (async () => {
+    const verifierEtEnvoyer = async () => {
       try {
         // Vérifier que l'utilisateur est bien un artiste
         const artSnap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
@@ -16115,10 +16122,15 @@ export default function App() {
           const texte = MESSAGES_TUTO_ARTISTE[Math.floor(Math.random() * MESSAGES_TUTO_ARTISTE.length)];
           await envoyerNotification({
             to: user.email, role:'artiste', type:'tuto_artiste', text: texte,
-            createdAt: new Date().toISOString(),          });
+          });
         }
       } catch(e) { console.error('tuto artiste', e); }
-    })();
+    };
+    // Vérification immédiate + toutes les 30 min tant que l'app reste ouverte
+    // (même raison que pour les notifications éducatives ci-dessus).
+    verifierEtEnvoyer();
+    const intervalle = setInterval(verifierEtEnvoyer, 30 * 60 * 1000);
+    return () => clearInterval(intervalle);
   }, [user]);
 
   useEffect(() => {
