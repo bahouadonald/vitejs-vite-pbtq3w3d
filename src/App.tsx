@@ -1935,7 +1935,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const src = ctx.createMediaElementSource(ref.current);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
-      analyser.smoothingTimeConstant = 0.75; // lissage pour un mouvement continu
+      analyser.smoothingTimeConstant = 0.35; // plus réactif pour un spectrogramme "vivant" (le zoom de la pochette a son propre lissage séparé)
       src.connect(analyser);
       analyser.connect(ctx.destination); // reconnecte le son aux HP
       audioCtxRef.current = ctx;
@@ -2005,41 +2005,50 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     const left = rectCover.left - rectConteneur.left;
     const top = rectCover.top - rectConteneur.top;
     const w = rectCover.width, h = rectCover.height;
-    const nbBarres = 16; // par côté
-    const barLargeurH = w / nbBarres;   // largeur d'une barre sur les côtés horizontaux
-    const barLargeurV = h / nbBarres;   // hauteur d'une barre sur les côtés verticaux
-    const maxHauteur = Math.max(14, Math.min(36, w * 0.1));
+    const nbBarres = 20; // par côté — plus de barres, plus fines
+    const slotH = w / nbBarres;   // emplacement d'une barre sur les côtés horizontaux
+    const slotV = h / nbBarres;   // emplacement d'une barre sur les côtés verticaux
+    const epaisseurBarre = Math.max(2, Math.min(slotH, slotV) * 0.32); // barre FINE, pas un carré
+    const maxHauteur = Math.max(18, Math.min(46, w * 0.14));
     const total = nbBarres * 4;
     const nBins = data.length; // 64 avec fftSize=128
 
     const couleurPour = (i: number) => {
       const t = (i / total) % 1;
       const hue = t < 0.5 ? 180 + 140 * (t / 0.5) : 320 + 70 * ((t - 0.5) / 0.5);
-      return `hsl(${hue % 360},100%,60%)`;
+      return hue % 360;
     };
     const magnitude = (i: number) => {
       const bin = Math.min(nBins - 1, Math.floor((i / total) * nBins));
-      return Math.max(4, (data[bin] / 255) * maxHauteur);
+      // Léger renforcement (racine) : les sons faibles restent visibles, pas juste les gros pics
+      const v = data[bin] / 255;
+      return Math.max(5, Math.sqrt(v) * maxHauteur);
     };
 
     let gi = 0;
-    ctx.lineCap = 'round';
-    const barre = (x: number, y: number, w2: number, h2: number) => {
-      const c = couleurPour(gi); gi++;
+    // Barre fine avec un vrai double halo néon : un grand flou doux derrière,
+    // puis un cœur net et lumineux par-dessus (look "tube néon").
+    const barre = (cx: number, cy: number, w2: number, h2: number) => {
+      const hue = couleurPour(gi); gi++;
+      const x = cx - w2 / 2, y = cy - h2 / 2;
       ctx.save();
-      ctx.shadowColor = c; ctx.shadowBlur = 9;
-      ctx.fillStyle = c;
+      ctx.shadowColor = `hsl(${hue},100%,55%)`;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = `hsla(${hue},100%,55%,0.55)`;
+      ctx.fillRect(x, y, w2, h2);
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = `hsl(${hue},100%,72%)`; // cœur plus clair/vif par-dessus
       ctx.fillRect(x, y, w2, h2);
       ctx.restore();
     };
     // Haut (gauche → droite), pointe vers le haut
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + i * barLargeurH + 1, top - m, barLargeurH - 2, m); }
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + i * slotH + slotH / 2, top - m / 2, epaisseurBarre, m); }
     // Droite (haut → bas), pointe vers la droite
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w, top + i * barLargeurV + 1, m, barLargeurV - 2); }
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w + m / 2, top + i * slotV + slotV / 2, m, epaisseurBarre); }
     // Bas (droite → gauche), pointe vers le bas
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w - (i + 1) * barLargeurH + 1, top + h, barLargeurH - 2, m); }
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w - (i + 1) * slotH + slotH / 2, top + h + m / 2, epaisseurBarre, m); }
     // Gauche (bas → haut), pointe vers la gauche
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left - m, top + h - (i + 1) * barLargeurV + 1, m, barLargeurV - 2); }
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left - m / 2, top + h - (i + 1) * slotV + slotV / 2, m, epaisseurBarre); }
   };
   const stopLevelLoop = () => {
     loopRunning.current = false;
