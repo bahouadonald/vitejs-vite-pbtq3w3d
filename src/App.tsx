@@ -16031,6 +16031,16 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   void progress; // la barre de progression est gérée par le splash HTML désormais
+  const [permNotifGlobal, setPermNotifGlobal] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+  const [bannièreFermée, setBannièreFermée] = useState(false);
+
+  // Redemande le statut à chaque fois que l'app revient au premier plan —
+  // utile si la personne a changé le réglage depuis les paramètres du téléphone
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible' && typeof Notification !== 'undefined') setPermNotifGlobal(Notification.permission); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   // Notifications système : prévient l'utilisateur connecté dès qu'une notif arrive (même app en arrière-plan)
   usePushNotifications(user?.email);
@@ -16211,6 +16221,37 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
           authLoading ? null : user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
       </Routes>
+
+      {/* Bannière d'activation des notifications — visible sur TOUTE l'app tant
+          que ce n'est pas activé, pas seulement sur la page Notifications, pour
+          que ce soit vraiment impossible à manquer. */}
+      {user && permNotifGlobal === 'default' && !bannièreFermée && (
+        <div style={{ position:'fixed', left:12, right:12, bottom:12, zIndex:9999, background:'#12213f', border:'1px solid rgba(93,132,255,0.4)', borderRadius:14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
+          <span style={{ fontSize:22, flexShrink:0 }}>🔔</span>
+          <div style={{ flex:1 }}>
+            <p style={{ color:'#fff', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activez les notifications</p>
+            <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>Pour ne rien manquer : kiffs, commentaires, cadeaux...</p>
+          </div>
+          <button onClick={() => { activerNotificationsPush(user.email).then(p => setPermNotifGlobal(p)); }}
+            style={{ padding:'8px 14px', borderRadius:99, border:'none', background:'#1a6bff', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+            Activer
+          </button>
+          <button onClick={() => setBannièreFermée(true)} aria-label="Fermer"
+            style={{ background:'transparent', border:'none', color:'#5a7090', fontSize:18, cursor:'pointer', flexShrink:0, padding:0, lineHeight:1 }}>
+            ×
+          </button>
+        </div>
+      )}
+      {user && permNotifGlobal === 'denied' && !bannièreFermée && (
+        <div style={{ position:'fixed', left:12, right:12, bottom:12, zIndex:9999, background:'rgba(255,100,124,0.15)', border:'1px solid rgba(255,100,124,0.4)', borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
+          <span style={{ fontSize:18, flexShrink:0 }}>🔕</span>
+          <p style={{ color:'#ff647c', fontSize:11, margin:0, flex:1, lineHeight:1.5 }}>Notifications bloquées — réglages du téléphone → Applications → Doniel Zik → Notifications.</p>
+          <button onClick={() => setBannièreFermée(true)} aria-label="Fermer"
+            style={{ background:'transparent', border:'none', color:'#ff647c', fontSize:18, cursor:'pointer', flexShrink:0, padding:0, lineHeight:1 }}>
+            ×
+          </button>
+        </div>
+      )}
     </BrowserRouter>
   );
 }
