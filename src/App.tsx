@@ -1970,29 +1970,84 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
       const level = smoothLevel.current;
       const img = document.getElementById('cover-reactive');
       // Marge de jeu musical : zoom de 0% (silence) à 12% (grosse caisse saturée)
-      // + FLASH lumineux : la pochette s'illumine et un halo lumineux pulse en rythme
-      // Tout est piloté ici dans la même boucle audio → AUCUNE latence
+      // La pochette continue de "danser" légèrement sur le rythme.
       if (img) {
         const zoom = 1 + level * 0.12;
-        // Halo lumineux blanc/doré qui flashe avec l'intensité (rayon + opacité suivent le son)
-        const glowRadius = Math.round(level * 55);          // 0 → 55px
-        const glowOpacity = Math.min(0.9, level * 1.1);      // 0 → 0.9
-        const glow2 = Math.round(level * 110);               // halo large secondaire
-        // Éclat de lumière (brightness) : flash bref sur les beats forts
-        const brightness = 1 + level * 0.35;                 // 1 → 1.35
         img.style.transform = `scale(${zoom})`;
-        img.style.boxShadow = `0 0 ${glowRadius}px ${Math.round(glowRadius/2)}px rgba(255,245,210,${glowOpacity}), 0 0 ${glow2}px ${Math.round(glow2/3)}px rgba(255,220,130,${glowOpacity * 0.5})`;
-        img.style.filter = `brightness(${brightness})`;
       }
+      // Spectrogramme néon tout autour de la pochette (remplace l'ancien halo
+      // blanc unique) : chaque barre suit une vraie fréquence du son, réparties
+      // sur les 4 côtés, avec un dégradé cyan → rose → orange qui parcourt tout
+      // le cadre, comme un vrai analyseur de spectre.
+      dessinerSpectre(data);
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
+  };
+  const dessinerSpectre = (data: Uint8Array) => {
+    const canvas = document.getElementById('spectre-pochette') as HTMLCanvasElement | null;
+    const cover = document.getElementById('cover-reactive');
+    if (!canvas || !cover) return;
+    const rectCover = cover.getBoundingClientRect();
+    const rectConteneur = canvas.getBoundingClientRect();
+    if (rectConteneur.width < 2 || rectConteneur.height < 2) return;
+    const dpr = window.devicePixelRatio || 1;
+    const largeurVoulue = Math.round(rectConteneur.width * dpr);
+    const hauteurVoulue = Math.round(rectConteneur.height * dpr);
+    if (canvas.width !== largeurVoulue || canvas.height !== hauteurVoulue) {
+      canvas.width = largeurVoulue; canvas.height = hauteurVoulue;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rectConteneur.width, rectConteneur.height);
+
+    const left = rectCover.left - rectConteneur.left;
+    const top = rectCover.top - rectConteneur.top;
+    const w = rectCover.width, h = rectCover.height;
+    const nbBarres = 16; // par côté
+    const barLargeurH = w / nbBarres;   // largeur d'une barre sur les côtés horizontaux
+    const barLargeurV = h / nbBarres;   // hauteur d'une barre sur les côtés verticaux
+    const maxHauteur = Math.max(14, Math.min(36, w * 0.1));
+    const total = nbBarres * 4;
+    const nBins = data.length; // 64 avec fftSize=128
+
+    const couleurPour = (i: number) => {
+      const t = (i / total) % 1;
+      const hue = t < 0.5 ? 180 + 140 * (t / 0.5) : 320 + 70 * ((t - 0.5) / 0.5);
+      return `hsl(${hue % 360},100%,60%)`;
+    };
+    const magnitude = (i: number) => {
+      const bin = Math.min(nBins - 1, Math.floor((i / total) * nBins));
+      return Math.max(4, (data[bin] / 255) * maxHauteur);
+    };
+
+    let gi = 0;
+    ctx.lineCap = 'round';
+    const barre = (x: number, y: number, w2: number, h2: number) => {
+      const c = couleurPour(gi); gi++;
+      ctx.save();
+      ctx.shadowColor = c; ctx.shadowBlur = 9;
+      ctx.fillStyle = c;
+      ctx.fillRect(x, y, w2, h2);
+      ctx.restore();
+    };
+    // Haut (gauche → droite), pointe vers le haut
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + i * barLargeurH + 1, top - m, barLargeurH - 2, m); }
+    // Droite (haut → bas), pointe vers la droite
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w, top + i * barLargeurV + 1, m, barLargeurV - 2); }
+    // Bas (droite → gauche), pointe vers le bas
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w - (i + 1) * barLargeurH + 1, top + h, barLargeurH - 2, m); }
+    // Gauche (bas → haut), pointe vers la gauche
+    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left - m, top + h - (i + 1) * barLargeurV + 1, m, barLargeurV - 2); }
   };
   const stopLevelLoop = () => {
     loopRunning.current = false;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const img = document.getElementById('cover-reactive');
-    if (img) { img.style.transform = 'scale(1)'; img.style.boxShadow = 'none'; img.style.filter = 'none'; }
+    if (img) { img.style.transform = 'scale(1)'; }
+    const canvas = document.getElementById('spectre-pochette') as HTMLCanvasElement | null;
+    if (canvas) { const ctx = canvas.getContext('2d'); ctx?.clearRect(0, 0, canvas.width, canvas.height); }
   };
   useEffect(() => () => { stopLevelLoop(); if (audioCtxRef.current) audioCtxRef.current.close?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Relance la boucle si elle s'est arrêtée pendant la lecture (sécurité anti-blocage)
@@ -2741,19 +2796,23 @@ function FanPage() {
 
       {/* PUB MAISON — supprimée sur FanPage, remplacée par tuto */}
 
-          {/* POCHETTE — grande, visible, centrée en haut */}
-          <div style={{ position:'relative', width:'100%', background:C.bgDeep }}>
-            {qrData.coverUrl ? (
-              <img
-                src={optimImg(qrData.coverUrl, 800)}
-                alt={qrData.label}
-                style={{ width:'100%', maxHeight:360, objectFit:'cover', display:'block' }}
-              />
-            ) : (
-              <div style={{ width:'100%', height:260, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <img src={LOGO_B64} alt="DZ" style={{ width:100, opacity:0.35 }} />
-              </div>
-            )}
+          {/* POCHETTE — spectrogramme néon tout autour, qui suit vraiment le son */}
+          <div style={{ position:'relative', width:'100%', background:C.bgDeep, padding:36, boxSizing:'border-box', display:'flex', justifyContent:'center' }}>
+            <div style={{ position:'relative', width:'100%' }}>
+              <canvas id="spectre-pochette" style={{ position:'absolute', top:-36, left:-36, right:-36, bottom:-36, width:'calc(100% + 72px)', height:'calc(100% + 72px)', pointerEvents:'none', zIndex:1 }} />
+              {qrData.coverUrl ? (
+                <img
+                  id="cover-reactive"
+                  src={optimImg(qrData.coverUrl, 800)}
+                  alt={qrData.label}
+                  style={{ width:'100%', maxHeight:360, objectFit:'cover', display:'block', borderRadius:8, position:'relative', zIndex:2, transition:'transform .06s ease-out', willChange:'transform' }}
+                />
+              ) : (
+                <div style={{ width:'100%', height:260, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, position:'relative', zIndex:2 }}>
+                  <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width:100, opacity:0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* TITRE + ARTISTE */}
@@ -15749,19 +15808,20 @@ function PublicStreamPage() {
       {/* ── TUTO CASCADE — bulles après Play ── */}
       {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
-      {/* ── POCHETTE — zoom + flash lumineux qui dansent avec la musique ── */}
+      {/* ── POCHETTE — spectrogramme néon tout autour, qui suit vraiment le son ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '20px 16px 0', display:'flex', justifyContent:'center' }}>
         <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2, width:'90%' }}>
+          <canvas id="spectre-pochette" style={{ position:'absolute', top:-36, left:-36, right:-36, bottom:-36, width:'calc(100% + 72px)', height:'calc(100% + 72px)', pointerEvents:'none', zIndex:1 }} />
           {data.coverUrl ? (
             <img
               id="cover-reactive"
               src={optimImg(data.coverUrl, 800)}
               alt={data.label}
-              style={{ width: '100%', maxHeight: '54vh', objectFit: 'cover', display: 'block', borderRadius: 8,
-                transition: 'transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out', willChange: 'transform, box-shadow, filter' }}
+              style={{ width: '100%', maxHeight: '54vh', objectFit: 'cover', display: 'block', borderRadius: 8, position:'relative', zIndex:2,
+                transition: 'transform .06s ease-out', willChange: 'transform' }}
             />
           ) : (
-            <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
+            <div style={{ width: '100%', height: 260, background: 'linear-gradient(135deg,#0d1535,#1a3a6e)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, position:'relative', zIndex:2 }}>
               <img id="cover-reactive" src={LOGO_B64} alt="DZ" style={{ width: 100, opacity: 0.35, transition:'transform .06s ease-out', willChange:'transform' }} />
             </div>
           )}
