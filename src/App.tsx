@@ -2005,11 +2005,11 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     const left = rectCover.left - rectConteneur.left;
     const top = rectCover.top - rectConteneur.top;
     const w = rectCover.width, h = rectCover.height;
-    const nbBarres = 20; // par côté — plus de barres, plus fines
-    const slotH = w / nbBarres;   // emplacement d'une barre sur les côtés horizontaux
-    const slotV = h / nbBarres;   // emplacement d'une barre sur les côtés verticaux
-    const epaisseurBarre = Math.max(2, Math.min(slotH, slotV) * 0.32); // barre FINE, pas un carré
-    const maxHauteur = Math.max(18, Math.min(46, w * 0.14));
+    const nbBarres = 14; // par côté — moins nombreuses mais plus présentes
+    const slotH = w / nbBarres;
+    const slotV = h / nbBarres;
+    const epaisseurBarre = Math.min(slotH, slotV) * 0.6; // large, peu d'espace entre les barres
+    const maxHauteur = Math.max(20, Math.min(50, w * 0.15));
     const total = nbBarres * 4;
     const nBins = data.length; // 64 avec fftSize=128
 
@@ -2020,35 +2020,66 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange }: {
     };
     const magnitude = (i: number) => {
       const bin = Math.min(nBins - 1, Math.floor((i / total) * nBins));
-      // Léger renforcement (racine) : les sons faibles restent visibles, pas juste les gros pics
       const v = data[bin] / 255;
-      return Math.max(5, Math.sqrt(v) * maxHauteur);
+      return Math.max(6, Math.sqrt(v) * maxHauteur);
     };
 
     let gi = 0;
-    // Barre fine avec un vrai double halo néon : un grand flou doux derrière,
-    // puis un cœur net et lumineux par-dessus (look "tube néon").
-    const barre = (cx: number, cy: number, w2: number, h2: number) => {
+    // Barre néon en 3 passes : halo large flouté (vrai flou, pas juste une ombre
+    // légère) → cœur saturé → étincelle lumineuse blanche au bout, façon
+    // particule qui jaillit. C'est ce qui donne l'effet "vivant".
+    const barre = (cx: number, cy: number, w2: number, h2: number, boutX: number, boutY: number) => {
       const hue = couleurPour(gi); gi++;
       const x = cx - w2 / 2, y = cy - h2 / 2;
+
+      // 1) Halo large et doux (flou réel appliqué au canvas)
       ctx.save();
-      ctx.shadowColor = `hsl(${hue},100%,55%)`;
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = `hsla(${hue},100%,55%,0.55)`;
+      ctx.filter = 'blur(7px)';
+      ctx.fillStyle = `hsla(${hue},100%,60%,0.85)`;
       ctx.fillRect(x, y, w2, h2);
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = `hsl(${hue},100%,72%)`; // cœur plus clair/vif par-dessus
+      ctx.restore();
+
+      // 2) Cœur saturé, net
+      ctx.save();
+      ctx.filter = 'none';
+      ctx.fillStyle = `hsl(${hue},100%,58%)`;
       ctx.fillRect(x, y, w2, h2);
+      ctx.restore();
+
+      // 3) Étincelle lumineuse au bout de la barre (particule qui brille)
+      ctx.save();
+      ctx.filter = 'blur(3px)';
+      const rayon = Math.max(2.5, Math.min(w2, h2) * 0.9);
+      const grad = ctx.createRadialGradient(boutX, boutY, 0, boutX, boutY, rayon * 2);
+      grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.4, `hsla(${hue},100%,75%,0.8)`);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(boutX, boutY, rayon * 2, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     };
     // Haut (gauche → droite), pointe vers le haut
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + i * slotH + slotH / 2, top - m / 2, epaisseurBarre, m); }
+    for (let i = 0; i < nbBarres; i++) {
+      const m = magnitude(gi); const cx = left + i * slotH + slotH / 2;
+      barre(cx, top - m / 2, epaisseurBarre, m, cx, top - m);
+    }
     // Droite (haut → bas), pointe vers la droite
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w + m / 2, top + i * slotV + slotV / 2, m, epaisseurBarre); }
+    for (let i = 0; i < nbBarres; i++) {
+      const m = magnitude(gi); const cy = top + i * slotV + slotV / 2;
+      barre(left + w + m / 2, cy, m, epaisseurBarre, left + w + m, cy);
+    }
     // Bas (droite → gauche), pointe vers le bas
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left + w - (i + 1) * slotH + slotH / 2, top + h + m / 2, epaisseurBarre, m); }
+    for (let i = 0; i < nbBarres; i++) {
+      const m = magnitude(gi); const cx = left + w - (i + 1) * slotH + slotH / 2;
+      barre(cx, top + h + m / 2, epaisseurBarre, m, cx, top + h + m);
+    }
     // Gauche (bas → haut), pointe vers la gauche
-    for (let i = 0; i < nbBarres; i++) { const m = magnitude(gi); barre(left - m / 2, top + h - (i + 1) * slotV + slotV / 2, m, epaisseurBarre); }
+    for (let i = 0; i < nbBarres; i++) {
+      const m = magnitude(gi); const cy = top + h - (i + 1) * slotV + slotV / 2;
+      barre(left - m / 2, cy, m, epaisseurBarre, left - m, cy);
+    }
   };
   const stopLevelLoop = () => {
     loopRunning.current = false;
@@ -2806,9 +2837,9 @@ function FanPage() {
       {/* PUB MAISON — supprimée sur FanPage, remplacée par tuto */}
 
           {/* POCHETTE — spectrogramme néon tout autour, qui suit vraiment le son */}
-          <div style={{ position:'relative', width:'100%', background:C.bgDeep, padding:36, boxSizing:'border-box', display:'flex', justifyContent:'center' }}>
+          <div style={{ position:'relative', width:'100%', background:C.bgDeep, padding:70, boxSizing:'border-box', display:'flex', justifyContent:'center' }}>
             <div style={{ position:'relative', width:'100%' }}>
-              <canvas id="spectre-pochette" style={{ position:'absolute', top:-36, left:-36, right:-36, bottom:-36, width:'calc(100% + 72px)', height:'calc(100% + 72px)', pointerEvents:'none', zIndex:1 }} />
+              <canvas id="spectre-pochette" style={{ position:'absolute', top:-70, left:-70, right:-70, bottom:-70, width:'calc(100% + 140px)', height:'calc(100% + 140px)', pointerEvents:'none', zIndex:1 }} />
               {qrData.coverUrl ? (
                 <img
                   id="cover-reactive"
@@ -15820,7 +15851,7 @@ function PublicStreamPage() {
       {/* ── POCHETTE — spectrogramme néon tout autour, qui suit vraiment le son ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '20px 16px 0', display:'flex', justifyContent:'center' }}>
         <div style={{ position:'relative', overflow:'visible', borderRadius:8, zIndex:2, width:'90%' }}>
-          <canvas id="spectre-pochette" style={{ position:'absolute', top:-36, left:-36, right:-36, bottom:-36, width:'calc(100% + 72px)', height:'calc(100% + 72px)', pointerEvents:'none', zIndex:1 }} />
+          <canvas id="spectre-pochette" style={{ position:'absolute', top:-70, left:-70, right:-70, bottom:-70, width:'calc(100% + 140px)', height:'calc(100% + 140px)', pointerEvents:'none', zIndex:1 }} />
           {data.coverUrl ? (
             <img
               id="cover-reactive"
