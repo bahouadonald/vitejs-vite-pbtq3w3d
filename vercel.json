@@ -11,6 +11,11 @@
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|TelegramBot|Slackbot|LinkedInBot|Discordbot|TikTok|Pinterest|SkypeUriPreview|vkShare|redditbot|Googlebot|bingbot|Applebot).*" }],
       "destination": "/api/og?type=ecoute&id=:publicLinkId"
     },
+    {
+      "source": "/artiste-bio/:slug",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|Twitterbot|WhatsApp|TelegramBot|Slackbot|LinkedInBot|Discordbot|TikTok|Pinterest|SkypeUriPreview|vkShare|redditbot|Googlebot|bingbot|Applebot).*" }],
+      "destination": "/api/og?type=artiste&id=:slug"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

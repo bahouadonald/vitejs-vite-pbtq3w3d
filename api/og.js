@@ -15,9 +15,10 @@ export default async function handler(req, res) {
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
     const estEcoute = type === 'ecoute';
-    const champ = estEcoute ? 'publicLinkId' : 'qrId';
-    const collectionId = estEcoute ? 'publicLinks' : 'qrcodes';
-    const chemin = estEcoute ? 'ecoute' : 'fan';
+    const estArtiste = type === 'artiste';
+    const champ = estEcoute ? 'publicLinkId' : (estArtiste ? 'slug' : 'qrId');
+    const collectionId = estEcoute ? 'publicLinks' : (estArtiste ? 'artists' : 'qrcodes');
+    const chemin = estEcoute ? 'ecoute' : (estArtiste ? 'artiste-bio' : 'fan');
 
     let titre = 'Doniel Zik';
     let description = "L'écosystème des créateurs africains. Musique, cinéma, humour, publicité.";
@@ -40,14 +41,23 @@ export default async function handler(req, res) {
       const docTrouve = (Array.isArray(resultats) ? resultats.find(r => r.document) : null)?.document;
       if (docTrouve) {
         const f = docTrouve.fields || {};
-        const label = f.label?.stringValue || '';
-        const artist = f.artist?.stringValue || '';
-        const cover = f.coverUrl?.stringValue || '';
-        if (label) titre = artist ? `${label} — ${artist} | Doniel Zik` : `${label} | Doniel Zik`;
-        if (label) description = artist
-          ? `Écoutez et téléchargez "${label}" de ${artist} sur Doniel Zik.`
-          : `Écoutez et téléchargez "${label}" sur Doniel Zik.`;
-        if (cover) image = cover;
+        if (estArtiste) {
+          const nom = f.bioFormulaire?.mapValue?.fields?.nom?.stringValue || f.artistName?.stringValue || '';
+          const bioTexte = f.bioTexte?.stringValue || '';
+          const cover = f.coverUrl?.stringValue || '';
+          if (nom) titre = `${nom} | Doniel Zik`;
+          if (bioTexte) description = bioTexte.split('\n').find(p => p.trim())?.slice(0, 200) || description;
+          if (cover) image = cover;
+        } else {
+          const label = f.label?.stringValue || '';
+          const artist = f.artist?.stringValue || '';
+          const cover = f.coverUrl?.stringValue || '';
+          if (label) titre = artist ? `${label} — ${artist} | Doniel Zik` : `${label} | Doniel Zik`;
+          if (label) description = artist
+            ? `Écoutez et téléchargez "${label}" de ${artist} sur Doniel Zik.`
+            : `Écoutez et téléchargez "${label}" sur Doniel Zik.`;
+          if (cover) image = cover;
+        }
       }
     }
 

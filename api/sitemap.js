@@ -38,6 +38,25 @@ export default async function handler(req, res) {
           urls.push({ loc: `https://doniel.art/ecoute/${publicLinkId}`, freq: 'weekly', priority: '0.7' });
         }
       }
+
+      // Pages bio artiste (celles qui ont une bio publiée)
+      const reponseArtistes = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          structuredQuery: { from: [{ collectionId: 'artists' }], limit: 1000 },
+        }),
+      });
+      const resultatsArtistes = await reponseArtistes.json();
+      const docsArtistes = Array.isArray(resultatsArtistes) ? resultatsArtistes.filter(r => r.document).map(r => r.document) : [];
+      for (const doc of docsArtistes) {
+        const f = doc.fields || {};
+        const slug = f.slug?.stringValue || '';
+        const bioTexte = f.bioTexte?.stringValue || '';
+        if (slug && bioTexte) {
+          urls.push({ loc: `https://doniel.art/artiste-bio/${slug}`, freq: 'monthly', priority: '0.8' });
+        }
+      }
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>

@@ -6530,7 +6530,7 @@ function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'publier'|'mot'|'pochettes'|'signatures'|'notifs'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'publier'|'mot'|'bio'|'pochettes'|'signatures'|'notifs'>('stats');
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
   const [artistNom, setArtistNom] = useState('');
@@ -6852,7 +6852,7 @@ function ArtistPage() {
 
       {/* TABS — façon pilules, comme le reste de l'app */}
       <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
-        {[['stats','Stats'],['publier','Enregistrer'],['mot','Mon Mood'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
+        {[['stats','Stats'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
           <button key={id} onClick={() => setDashTab(id as any)}
             style={{ flexShrink:0, whiteSpace:'nowrap', padding:'8px 16px', borderRadius:99, border:'1px solid '+(dashTab===id ? 'transparent' : C.border),
               background: dashTab===id ? 'linear-gradient(135deg,'+C.blue+',#5d3fff)' : 'transparent',
@@ -7148,6 +7148,7 @@ function ArtistPage() {
 
         {/* ── MON MOT ── */}
         {dashTab === 'mot' && <MotArtisteTab user={user} artistName={stats.artistName || user?.displayName || ''} />}
+        {dashTab === 'bio' && <BioArtisteTab user={user} artistName={stats.artistName || user?.displayName || ''} coverUrl={stats.qrcodes?.[0]?.coverUrl || ''} />}
 
         {/* ── POCHETTES PHYSIQUES ── */}
         {dashTab === 'pochettes' && (
@@ -9249,6 +9250,144 @@ function MotArtisteTab({ user, artistName }: any) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────
+// BIO ARTISTE — formulaire "Personne physique" + génération IA de la bio pro
+// ─────────────────────────────────────────────
+function BioArtisteTab({ user, artistName, coverUrl }: any) {
+  const [form, setForm] = useState({
+    nom: artistName || '', fonction: '', nationalite: '', residence: '',
+    passionDecouverte: '', sourceMotivation: '', inspiration: '',
+    expertise: '', impact: '', vision: '', background: '',
+  });
+  const [bioTexte, setBioTexte] = useState('');
+  const [generation, setGeneration] = useState<'idle'|'loading'|'error'>('idle');
+  const [sauvegarde, setSauvegarde] = useState<'idle'|'saving'|'done'>('idle');
+  const [charge, setCharge] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
+        if (!snap.empty) {
+          const d = snap.docs[0].data();
+          if (d.bioFormulaire) setForm((f) => ({ ...f, ...d.bioFormulaire }));
+          if (d.bioTexte) setBioTexte(d.bioTexte);
+        }
+      } catch (e) { console.error(e); }
+      setCharge(false);
+    })();
+  }, [user.email]);
+
+  const champ = (cle: string, val: string) => setForm((f) => ({ ...f, [cle]: val }));
+
+  const genererBio = async () => {
+    setGeneration('loading');
+    try {
+      const res = await fetch('/api/generer-bio', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.bio) throw new Error(data.error || 'Erreur de génération');
+      setBioTexte(data.bio);
+      setGeneration('idle');
+    } catch (e) { console.error(e); setGeneration('error'); }
+  };
+
+  const enregistrer = async () => {
+    setSauvegarde('saving');
+    try {
+      const slug = (form.nom || artistName || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // retire les accents
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const snap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
+      if (!snap.empty) {
+        await updateDoc(doc(db,'artists',snap.docs[0].id), { bioFormulaire: form, bioTexte, bioMiseAJour: new Date().toISOString(), slug, coverUrl });
+      }
+      setSauvegarde('done');
+      setTimeout(() => setSauvegarde('idle'), 2500);
+    } catch (e) { console.error(e); setSauvegarde('idle'); }
+  };
+  const slugActuel = (form.nom || artistName || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+  if (charge) return <div style={{ textAlign:'center', padding:40, color:C.textSoft }}>Chargement...</div>;
+
+  const champStyle: React.CSSProperties = { width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid '+C.border, borderRadius:10, padding:'10px 12px', color:C.text, fontSize:13, marginBottom:12, boxSizing:'border-box' };
+  const labelStyle: React.CSSProperties = { display:'block', color:C.textSoft, fontSize:11, fontWeight:700, marginBottom:5, textTransform:'uppercase', letterSpacing:0.5 };
+
+  return (
+    <div>
+      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6, color:C.text }}>Ma Bio</h2>
+      <p style={{ color:C.textSoft, fontSize:12, marginBottom:20, lineHeight:1.6 }}>
+        Remplis le formulaire, l'IA rédige ta bio professionnelle. Elle sera visible sur ta page publique (avec ta pochette), que n'importe qui pourra consulter — y compris sur Google.
+      </p>
+
+      {coverUrl && (
+        <div style={{ marginBottom:20, textAlign:'center' }}>
+          <img src={optimImg(coverUrl,300)} alt="" style={{ width:90, height:90, objectFit:'cover', borderRadius:12, border:'1px solid '+C.border }} />
+          <p style={{ color:C.textSoft, fontSize:10, marginTop:6 }}>Ta pochette la plus récente sert d'image sur ta page bio</p>
+        </div>
+      )}
+
+      <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:20 }}>
+        <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:1.5, marginBottom:14, textTransform:'uppercase' }}>État civil</p>
+        <label style={labelStyle}>Nom de scène</label>
+        <input style={champStyle} value={form.nom} onChange={e=>champ('nom',e.target.value)} placeholder="Ton nom d'artiste" />
+        <label style={labelStyle}>Fonction (précise ta spécialité)</label>
+        <input style={champStyle} value={form.fonction} onChange={e=>champ('fonction',e.target.value)} placeholder="Ex : Chanteur gospel, ténor" />
+        <label style={labelStyle}>Nationalité</label>
+        <input style={champStyle} value={form.nationalite} onChange={e=>champ('nationalite',e.target.value)} placeholder="Ex : Ivoirienne" />
+        <label style={labelStyle}>Lieu de résidence</label>
+        <input style={{...champStyle, marginBottom:0}} value={form.residence} onChange={e=>champ('residence',e.target.value)} placeholder="Ex : Abidjan" />
+      </div>
+
+      <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:20 }}>
+        <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:1.5, marginBottom:14, textTransform:'uppercase' }}>Profil professionnel</p>
+        <label style={labelStyle}>Quand as-tu découvert ta passion ?</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.passionDecouverte} onChange={e=>champ('passionDecouverte',e.target.value)} />
+        <label style={labelStyle}>Qui a été ta source de motivation ?</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.sourceMotivation} onChange={e=>champ('sourceMotivation',e.target.value)} />
+        <label style={labelStyle}>D'où tires-tu ton inspiration ?</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.inspiration} onChange={e=>champ('inspiration',e.target.value)} />
+        <label style={labelStyle}>Décris ton expertise (talent, spécialisation)</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.expertise} onChange={e=>champ('expertise',e.target.value)} />
+        <label style={labelStyle}>Quel impact veux-tu produire ?</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.impact} onChange={e=>champ('impact',e.target.value)} />
+        <label style={labelStyle}>Ta vision / ambition</label>
+        <textarea style={{...champStyle, minHeight:60}} value={form.vision} onChange={e=>champ('vision',e.target.value)} />
+        <label style={labelStyle}>Ton background / parcours</label>
+        <textarea style={{...champStyle, minHeight:60, marginBottom:0}} value={form.background} onChange={e=>champ('background',e.target.value)} />
+      </div>
+
+      <button onClick={genererBio} disabled={generation==='loading'}
+        style={{ width:'100%', padding:14, borderRadius:14, border:'none', background: generation==='loading' ? '#2a4a6a' : 'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor: generation==='loading' ? 'wait' : 'pointer', marginBottom:20 }}>
+        {generation==='loading' ? 'Génération en cours...' : (bioTexte ? '✨ Régénérer ma bio' : '✨ Générer ma bio')}
+      </button>
+      {generation === 'error' && <p style={{ color:C.alert, fontSize:12, marginTop:-14, marginBottom:16, textAlign:'center' }}>Erreur lors de la génération. Réessaie.</p>}
+
+      {bioTexte && (
+        <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20 }}>
+          <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:1.5, marginBottom:12, textTransform:'uppercase' }}>Ta bio (modifiable)</p>
+          <textarea value={bioTexte} onChange={e=>setBioTexte(e.target.value)}
+            style={{ width:'100%', minHeight:260, background:'rgba(255,255,255,0.05)', border:'1px solid '+C.border, borderRadius:10, padding:14, color:C.text, fontSize:13, lineHeight:1.7, boxSizing:'border-box', fontFamily:'inherit', marginBottom:14 }} />
+          <button onClick={enregistrer} disabled={sauvegarde==='saving'}
+            style={{ width:'100%', padding:13, borderRadius:12, border:'none', background: sauvegarde==='done' ? C.success : '#00d49a', color:'#04231a', fontWeight:800, fontSize:14, cursor: sauvegarde==='saving' ? 'wait' : 'pointer' }}>
+            {sauvegarde==='saving' ? 'Enregistrement...' : sauvegarde==='done' ? '✓ Publié sur ta page bio' : 'Publier sur ma page bio'}
+          </button>
+          {sauvegarde==='done' && slugActuel && (
+            <a href={`/artiste-bio/${slugActuel}`} target="_blank" rel="noreferrer"
+              style={{ display:'block', textAlign:'center', marginTop:10, color:C.blueLite, fontSize:12, fontWeight:700, textDecoration:'none' }}>
+              Voir ma page publique →
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function AutoPlayMedia({ fileUrl, isVideo, coverUrl, label, publicLinkId }: any) {
   const mediaRef = useRef<any>(null);
@@ -15616,6 +15755,105 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
 // ─────────────────────────────────────────────
 // PAGE STREAMING PUBLIC — /ecoute/:publicLinkId
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PAGE BIO PUBLIQUE ARTISTE — accessible à tous, indexable par Google.
+// Pochette + bio pro + liste des titres publiés.
+// ─────────────────────────────────────────────
+function ArtisteBioPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [artiste, setArtiste] = useState<any>(null);
+  const [titres, setTitres] = useState<any[]>([]);
+  const [statut, setStatut] = useState<'chargement'|'ok'|'introuvable'>('chargement');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db,'artists'), where('slug','==',slug)));
+        if (snap.empty) { setStatut('introuvable'); return; }
+        const data = snap.docs[0].data();
+        setArtiste(data);
+        if (data.email) {
+          const decSnap = await getDocs(query(collection(db,'decouvrir'), where('artistEmail','==',data.email)));
+          setTitres(decSnap.docs.map(d => ({ id:d.id, ...d.data() })).filter((t:any) => !t.masque));
+        }
+        setStatut('ok');
+      } catch (e) { console.error(e); setStatut('introuvable'); }
+    })();
+  }, [slug]);
+
+  if (statut === 'chargement') return (
+    <div style={{ minHeight:'100vh', background:C.bgDeep, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <p style={{ color:C.textSoft }}>Chargement...</p>
+    </div>
+  );
+  if (statut === 'introuvable') return (
+    <div style={{ minHeight:'100vh', background:C.bgDeep, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <p style={{ color:C.text, fontWeight:700, marginBottom:8 }}>Artiste introuvable</p>
+      <Link to="/decouvrir" style={{ color:C.blueLite, fontSize:13 }}>← Retour à Découvrir</Link>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:60 }}>
+      <div style={{ padding:'14px 16px' }}>
+        <Logo size="sm" />
+      </div>
+
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'0 20px' }}>
+        {/* En-tête façon Wikipédia : pochette + identité */}
+        <div style={{ display:'flex', gap:18, alignItems:'flex-start', marginBottom:24, flexWrap:'wrap' }}>
+          {artiste.coverUrl ? (
+            <img src={optimImg(artiste.coverUrl,300)} alt={artiste.artistName || artiste.nom}
+              style={{ width:120, height:120, objectFit:'cover', borderRadius:14, border:'1px solid '+C.border, flexShrink:0 }} />
+          ) : (
+            <div style={{ width:120, height:120, borderRadius:14, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <img src={LOGO_B64} alt="" style={{ width:50, opacity:0.4 }} />
+            </div>
+          )}
+          <div style={{ flex:1, minWidth:180 }}>
+            <h1 style={{ fontFamily:'serif', fontSize:24, fontWeight:800, margin:'0 0 4px' }}>{artiste.bioFormulaire?.nom || artiste.artistName || artiste.nom}</h1>
+            {artiste.bioFormulaire?.fonction && <p style={{ color:C.gold, fontSize:13, fontWeight:600, margin:'0 0 8px' }}>{artiste.bioFormulaire.fonction}</p>}
+            <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>
+              {[artiste.bioFormulaire?.nationalite, artiste.bioFormulaire?.residence].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        </div>
+
+        {/* Bio */}
+        {artiste.bioTexte ? (
+          <div style={{ marginBottom:32 }}>
+            {artiste.bioTexte.split('\n').filter((p:string) => p.trim()).map((p:string, i:number) => (
+              <p key={i} style={{ color:C.text, fontSize:14, lineHeight:1.8, marginBottom:14, fontStyle: p.trim().startsWith('«') || p.trim().startsWith('"') ? 'italic' : 'normal' }}>{p}</p>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color:C.textSoft, fontSize:13, marginBottom:32, fontStyle:'italic' }}>Cet artiste n'a pas encore publié sa bio.</p>
+        )}
+
+        {/* Titres publiés */}
+        {titres.length > 0 && (
+          <div>
+            <p style={{ color:C.gold, fontSize:11, fontWeight:800, letterSpacing:1.5, textTransform:'uppercase', marginBottom:14 }}>Titres publiés ({titres.length})</p>
+            <div style={{ display:'grid', gap:10 }}>
+              {titres.map((t) => (
+                <Link key={t.id} to={`/ecoute/${t.publicLinkId}`}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, background:C.card, border:'1px solid '+C.border, textDecoration:'none' }}>
+                  {t.coverUrl ? (
+                    <img src={optimImg(t.coverUrl,120)} alt="" style={{ width:44, height:44, borderRadius:8, objectFit:'cover', flexShrink:0 }} />
+                  ) : (
+                    <div style={{ width:44, height:44, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', flexShrink:0 }} />
+                  )}
+                  <p style={{ color:C.text, fontSize:13, fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PublicStreamPage() {
   const { publicLinkId } = useParams<{ publicLinkId: string }>();
   const location = useLocation();
@@ -16201,6 +16439,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/ziko/login" element={<UserAuthPage />} />
         <Route path="/artiste" element={<ArtistPage />} />
         <Route path="/artiste/login" element={<ArtistPage />} />
+        <Route path="/artiste-bio/:slug" element={<ArtisteBioPage />} />
         <Route path="/annonceurs" element={<AnnonceursPage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/decouvrir" element={<DecouvrirPage />} />
