@@ -1,0 +1,242 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estAdmin() {
+      return request.auth != null && request.auth.token.email.lower() in [
+        'bdonaldservices@gmail.com',
+        'bigb80313@icloud.com',
+        'ruthssgoudo@gmail.com',
+        'w.biastace@gmail.com'
+      ];
+    }
+
+    match /qrcodes/{id} {
+      allow read: if true;
+      allow update: if request.auth != null
+                    || request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status']);
+      allow create, delete: if request.auth != null;
+    }
+
+    match /publicLinks/{id} {
+      allow read: if true;
+      allow update: if request.auth != null
+                    || request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['visits', 'streams', 'downloads']);
+      allow create, delete: if request.auth != null;
+    }
+
+    match /fcm_tokens/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /artists/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /decouvrir/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /pubs/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /commentaires/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /mots_artiste/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Écoutes : création ouverte (visiteurs anonymes) mais JAMAIS de
+    // modification ni de suppression — protège Tendances et stats artistes.
+    match /streams/{id} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    // Visites : même logique — création anonyme possible, le reste interdit.
+    match /visits/{id} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    match /likes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /kiffs_compteur/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /kiffs_artiste/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /ventes/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /retraits/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /coins_solde/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && ( estAdmin()
+                         || request.resource.data.uid == request.auth.uid );
+      allow update, delete: if request.auth != null
+                    && ( estAdmin()
+                         || resource.data.uid == request.auth.uid );
+    }
+
+    match /transactions/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && ( estAdmin()
+                         || request.resource.data.uid == request.auth.uid );
+      allow update, delete: if false;
+    }
+
+    match /cadeaux/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /notifications/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /commerciaux/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /responsables/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /annonceurs/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /payments/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /zikotheque/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── PLAYLISTS (nouveau) ────────────────────────────────────────────────
+    // Chaque fan ne voit et ne modifie que SES playlists.
+    match /playlists/{plId} {
+      allow read, update, delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nom is string
+        && request.resource.data.nom.size() > 0
+        && request.resource.data.nom.size() <= 60
+        && request.resource.data.titres is list;
+    }
+
+    // ── HISTORIQUE ÉCOUTE (nouveau — alimente « Pour toi ») ───────────────
+    // Un doc par fan+contenu (id = {uid}__{contenuId}) ; seul le propriétaire
+    // lit et écrit.
+    match /historique_ecoute/{histId} {
+      allow read, write: if request.auth != null
+        && histId.split('__')[0] == request.auth.uid;
+    }
+
+    match /recharges/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /signatures/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /demandes_production/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /artistOptions/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /soumissions/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /signalements/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /commandes_pochettes/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /adminChats/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /leads/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /leadMessages/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /venteMessages/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /sorties/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Partages : création ouverte (bouton partager sans compte), le reste interdit.
+    match /partages/{id} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    match /reservations/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /config/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /challenges/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /challenge_kiffements/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    match /inscriptions_artistes/{id} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}
