@@ -9256,7 +9256,7 @@ function MotArtisteTab({ user, artistName }: any) {
 // ─────────────────────────────────────────────
 function BioArtisteTab({ user, artistName, coverUrl }: any) {
   const [form, setForm] = useState({
-    nom: artistName || '', fonction: '', nationalite: '', residence: '',
+    nom: artistName || '', genre: '', fonction: '', nationalite: '', residence: '',
     passionDecouverte: '', sourceMotivation: '', inspiration: '',
     expertise: '', impact: '', vision: '', background: '',
   });
@@ -9336,6 +9336,15 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
         <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:1.5, marginBottom:14, textTransform:'uppercase' }}>État civil</p>
         <label style={labelStyle}>Nom de scène</label>
         <input style={champStyle} value={form.nom} onChange={e=>champ('nom',e.target.value)} placeholder="Ton nom d'artiste" />
+        <label style={labelStyle}>Genre</label>
+        <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+          {[['homme','Homme'],['femme','Femme']].map(([val,lab]) => (
+            <button key={val} type="button" onClick={()=>champ('genre',val)}
+              style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${form.genre===val?C.blue:C.border}`, background: form.genre===val?'rgba(30,111,255,0.15)':'rgba(255,255,255,0.05)', color: form.genre===val?C.blueLite:C.textSoft, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              {lab}
+            </button>
+          ))}
+        </div>
         <label style={labelStyle}>Fonction (précise ta spécialité)</label>
         <input style={champStyle} value={form.fonction} onChange={e=>champ('fonction',e.target.value)} placeholder="Ex : Chanteur gospel, ténor" />
         <label style={labelStyle}>Nationalité</label>

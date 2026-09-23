@@ -13,6 +13,8 @@ export default async function handler(req, res) {
 
     const prompt = `Tu es un rédacteur spécialisé dans les biographies professionnelles d'artistes musicaux africains. Rédige une bio professionnelle en français, dans le style d'un communiqué de presse artistique — chaleureux, valorisant, fluide, jamais robotique ni sous forme de liste. Structure : un court paragraphe d'ouverture (identité + genre musical), puis le parcours et la découverte de la passion, puis l'inspiration et l'ambition, et termine par une courte citation en italique qui résume l'artiste (une phrase inventée dans son esprit, crédible, pas cliché). Longueur : 4 à 6 paragraphes courts. N'invente aucun fait qui ne soit pas dans les informations fournies ci-dessous — si une information manque, ne la mentionne simplement pas, ne comble jamais les vides par des suppositions.
 
+IMPORTANT — accords grammaticaux : cet artiste est ${form.genre === 'femme' ? 'une femme (utilise "elle", "chanteuse", "née", etc. — tous les accords au féminin)' : form.genre === 'homme' ? 'un homme (utilise "il", "chanteur", "né", etc. — tous les accords au masculin)' : "de genre non précisé — reste neutre, évite les pronoms genrés autant que possible, utilise le nom ou la fonction directement"}.
+
 Informations fournies par l'artiste :
 - Nom de scène : ${form.nom || ''}
 - Fonction / spécialité : ${form.fonction || ''}
