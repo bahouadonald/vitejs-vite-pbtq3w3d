@@ -1917,7 +1917,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, autoStartIdx, autoStartCle, onFinAlbum }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, autoStartIdx?: number, autoStartCle?: number, onFinAlbum?: () => void }) {
+function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, autoStartIdx, autoStartCle, onFinAlbum, albumTitre, albumArtiste, albumCover }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, autoStartIdx?: number, autoStartCle?: number, onFinAlbum?: () => void, albumTitre?: string, albumArtiste?: string, albumCover?: string }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1927,6 +1927,7 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, aut
   const ref = useRef<HTMLAudioElement>(null);
   const streamStart = useRef<number>(0);
   const stopTimer = useRef<any>(null);
+  const derniereCleAuto = useRef<number>(0);
   const cur = files[idx];
 
   // ── Analyseur audio (avec protection : si échec, le son continue) ──
@@ -2041,12 +2042,42 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, aut
   useEffect(() => () => { if (stopTimer.current) clearTimeout(stopTimer.current); }, []);
 
   const prev = () => {
-    if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>{}); }
+    if (idx > 0) { setIdx(i => i - 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>setPlaying(false)); }
   };
 
   const next = () => {
-    if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>{}); }
+    if (idx < files.length - 1) { setIdx(i => i + 1); setPlaying(true); streamStart.current = Date.now() / 1000; if (ref.current) ref.current.play().catch(()=>setPlaying(false)); }
   };
+
+  // ── MEDIA SESSION — expose la piste courante à l'OS (écran de verrouillage,
+  // notification système, touches média). Les handlers sont (ré)enregistrés
+  // par le lecteur qui joue réellement — mini-lecteur ou pleine page.
+  const msNavRef = useRef({ prev: () => {}, next: () => {}, toggle: () => {} });
+  useEffect(() => { msNavRef.current = { prev, next, toggle }; });
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.setActionHandler('play', () => msNavRef.current.toggle());
+      navigator.mediaSession.setActionHandler('pause', () => msNavRef.current.toggle());
+      navigator.mediaSession.setActionHandler('previoustrack', () => msNavRef.current.prev());
+      navigator.mediaSession.setActionHandler('nexttrack', () => msNavRef.current.next());
+    } catch { /* action non supportée */ }
+  }, []);
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    try { navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'; } catch { /* ignore */ }
+  }, [playing]);
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || !cur) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: (cur.name || 'Piste').replace(/\.[^/.]+$/, ''),
+        artist: albumArtiste || '',
+        album: albumTitre || 'Doniel Zik',
+        artwork: albumCover ? [{ src: optimImg(albumCover, 512), sizes: '512x512', type: 'image/jpeg' }] : [],
+      });
+    } catch { /* ignore */ }
+  }, [cur, albumArtiste, albumTitre, albumCover]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lecture automatique demandée par le parent (enchaînement playlists/albums).
   // autoStartCle change à chaque demande → (re)lance la piste autoStartIdx.
@@ -2055,16 +2086,26 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, aut
   useEffect(() => {
     if (!autoStartCle || autoStartIdx === undefined) return; // 0 = aucune demande d'auto-start
     if (!files[autoStartIdx]) return;
-    setIdx(autoStartIdx);
+    // Garde anti-doublon : StrictMode (dev) invoque chaque effet 2× — sans
+    // cette garde, load()+play() partent en parallèle et l'horloge audio se fige.
+    if (derniereCleAuto.current === autoStartCle) return;
+    derniereCleAuto.current = autoStartCle;
+    const srcCible = files[autoStartIdx]?.url || '';
+    const memeSrc = !!ref.current?.currentSrc && !!srcCible && ref.current.currentSrc.includes(srcCible.split('/').pop() || '___');
+    if (idx !== autoStartIdx) setIdx(autoStartIdx);
+    if (memeSrc && ref.current && !ref.current.paused) return; // déjà en lecture sur la bonne piste
     setPlaying(true);
     streamStart.current = Date.now() / 1000;
     const a = ref.current;
     if (a) {
-      a.load();
+      // load() uniquement si la source réelle change — sinon on coupe une lecture en cours
+      if (!memeSrc) a.load();
       const lancer = () => {
         if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
         setupAnalyser();
-        a.play().then(() => startLevelLoop()).catch(() => {});
+        // Si le navigateur bloque la lecture (autoplay strict), rétablir
+        // l'état « en pause » pour que le 1er tap sur ▶ lance vraiment le son.
+        a.play().then(() => startLevelLoop()).catch(() => setPlaying(false));
       };
       lancer();
       a.addEventListener('canplay', lancer, { once: true });
@@ -2076,12 +2117,13 @@ function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, aut
   useEffect(() => {
     const a = ref.current;
     if (!a || !cur) return;
-    a.load();
+    // load() uniquement si la source change vraiment — sinon on coupe une lecture en cours
+    if (!a.currentSrc || !(cur.url || '') || !a.currentSrc.includes((cur.url || '').split('/').pop() || '___')) a.load();
     if (playing) {
       const lancer = () => {
         if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
         setupAnalyser();
-        a.play().then(() => { startLevelLoop(); }).catch(() => {});
+        a.play().then(() => { startLevelLoop(); }).catch(() => setPlaying(false));
       };
       lancer();
       a.addEventListener('canplay', lancer, { once: true });
@@ -16713,18 +16755,36 @@ function PublicStreamPage() {
     [1, 2].forEach(offset => precharger(fileAttente[idxFile + offset]));
   }, [fileAttente, idxFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Récupère un contenu par publicLinkId (avec cache) — utilisé pour l'auto-
+  // enchaînement si le préchargement n'a pas (encore) abouti.
+  const fetchContenu = async (cle: string) => {
+    if (cacheContenus.has(cle)) return cacheContenus.get(cle);
+    try {
+      const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', cle)));
+      if (!snap.empty) {
+        const d = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+        setCacheContenus(prev => { const m = new Map(prev); m.set(cle, d); return m; });
+        return d;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
+
   // Fin du dernier titre de l'album : enchaîner sur le contenu suivant de la
   // playlist (échange à chaud du lecteur) ou afficher la suggestion.
-  const finDeLecture = () => {
+  const finDeLecture = async () => {
     const suivant = enchainement && fileAttente ? fileAttente[idxFile + 1] : null;
-    const docSuivant = suivant ? cacheContenus.get(suivant.publicLinkId) : null;
-    if (suivant && docSuivant) {
+    console.log('[DZ-CHAIN] fin album', { idx: idxFile, suivant: suivant?.publicLinkId, ench: enchainement });
+    if (!suivant) { setFinAtteinte(true); return; }
+    const docSuivant = await fetchContenu(suivant.publicLinkId);
+    if (docSuivant) {
       setData(docSuivant);
       setIdxFile(i => i + 1);
       setAutoStartIdx(0);
       setAutoStartCle(Date.now());
       setFinAtteinte(false);
     } else {
+      console.log('[DZ-CHAIN] contenu suivant introuvable dans publicLinks');
       setFinAtteinte(true);
     }
   };
@@ -16868,6 +16928,7 @@ function PublicStreamPage() {
             <AudioPlayer files={audioFiles} onStream={recordPublicStream}
               onPlayingChange={setCoverPlaying}
               autoStartIdx={autoStartIdx} autoStartCle={autoStartCle} onFinAlbum={finDeLecture}
+              albumTitre={data.label || ''} albumArtiste={data.artist || ''} albumCover={data.coverUrl || ''}
               onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
         )}
