@@ -215,6 +215,14 @@ async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Prom
       kiffsOfferts: (sDoc.data().kiffsOfferts || 0) + 1,
     });
     await setDoc(doc(db,'kiffs_compteur', qrId), { qrId, artistEmail: artistEmail || '', total: increment(1) }, { merge: true });
+    // Signal de recommandation : le fan a kiffé ce contenu — 1 doc par fan+contenu,
+    // incrémenté à chaque kiff. Alimente la section « Pour toi » de Découvrir.
+    if (uid && qrId) {
+      setDoc(doc(db, 'historique_ecoute', `${uid}__${qrId}`), {
+        uid, qrId, artistEmail: artistEmail || '', type: 'kiff',
+        nb: increment(1), ts: new Date().toISOString(),
+      }, { merge: true }).catch(() => {});
+    }
     if (artistEmail) {
       await setDoc(doc(db,'kiffs_artiste', artistEmail), { artistEmail, total: increment(1) }, { merge: true });
       // Le Kiff (like gratuit) ne notifiait jamais l'artiste, contrairement aux
@@ -11562,6 +11570,97 @@ function TendancesSection({ contenus }: { contenus: any[] }) {
   );
 }
 
+// ─────────────────────────────────────────────
+// POUR TOI — recommandations personnalisées.
+// Se base sur l'historique du fan (collection historique_ecoute : écoutes +
+// kiffs) : artistes et catégories qu'il aime → contenus publiés correspondants,
+// en excluant ceux qu'il connaît déjà (Zikothèque ou déjà écoutés).
+// Visiteur / fan sans historique → fallback : les contenus les plus populaires.
+// ─────────────────────────────────────────────
+function PourToiSection({ contenus }: { contenus: any[] }) {
+  const user = auth.currentUser;
+  const [historique, setHistorique] = useState<any[]>([]);
+  const [zikoIds, setZikoIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user) { setHistorique([]); setZikoIds(new Set()); return; }
+    // Historique d'écoute/kiffs du fan (temps réel)
+    const unsub = onSnapshot(
+      query(collection(db, 'historique_ecoute'), where('uid', '==', user.uid), limit(200)),
+      snap => setHistorique(snap.docs.map(d => d.data())),
+      () => {}
+    );
+    // Contenus déjà dans sa Zikothèque → à exclure des recommandations
+    getDocs(query(collection(db, 'zikotheque'), where('uid', '==', user.uid)))
+      .then(s => setZikoIds(new Set(s.docs.map(d => d.data().qrId))))
+      .catch(() => {});
+    return () => unsub();
+  }, [user]);
+
+  // Recommandations personnalisées : score = artistes suivis (10/8 pts) + catégories écoutées
+  const recommandes = (() => {
+    if (!user || historique.length === 0) return [];
+    const emailsArtistes = new Set<string>();
+    const nomsArtistes = new Set<string>();
+    const catsAimees = new Map<string, number>();
+    for (const h of historique) {
+      if (h.artistEmail) emailsArtistes.add(h.artistEmail);
+      if (h.artist) nomsArtistes.add((h.artist || '').toLowerCase().trim());
+      if (h.categorie) catsAimees.set(h.categorie, (catsAimees.get(h.categorie) || 0) + (h.nb || 1));
+    }
+    const connus = new Set([...zikoIds, ...historique.map(h => h.qrId)]);
+    return contenus
+      .filter(c => !connus.has(c.publicLinkId))
+      .map((c: any) => {
+        let s = 0;
+        if (c.artistEmail && emailsArtistes.has(c.artistEmail)) s += 10;
+        if (nomsArtistes.has((c.artist || '').toLowerCase().trim())) s += 8;
+        s += (catsAimees.get(c.categorie) || 0) * 0.5;
+        return { c, s };
+      })
+      .filter(x => x.s > 0)
+      .sort((a, b) => b.s - a.s || ((b.c.kiffs||0)+(b.c.buzz||0)) - ((a.c.kiffs||0)+(a.c.buzz||0)))
+      .slice(0, 4)
+      .map(x => x.c);
+  })();
+
+  // Fallback visiteur / fan sans historique : populaires (kiffs + buzz + partages)
+  const populaires = contenus
+    .filter(c => !zikoIds.has(c.publicLinkId))
+    .map((c: any) => ({ c, s: (c.kiffs || 0) * 2 + (c.buzz || 0) + (c.partages || 0) }))
+    .filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 4)
+    .map(x => x.c);
+
+  const estPersonnalise = !!user && recommandes.length > 0;
+  const liste = estPersonnalise ? recommandes : populaires;
+  if (liste.length === 0) return null;
+  const titre = estPersonnalise ? '✨ Pour toi' : '🔥 Populaire en ce moment';
+
+  return (
+    <div style={{ margin:'4px 0 20px' }}>
+      <h3 style={{ fontSize:16, fontWeight:800, color:C.text, margin:'0 16px 10px', display:'flex', alignItems:'center', gap:6 }}>{titre}</h3>
+      <div style={{ display:'flex', gap:10, overflowX:'auto', padding:'0 16px 4px', scrollbarWidth:'none' }}>
+        {liste.map(c => (
+          <Lien key={c.id} href={`/ecoute/${c.publicLinkId}`} state={{ contenu: c }}
+            style={{ flexShrink:0, width:150, textDecoration:'none', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, overflow:'hidden' }}>
+            {c.coverUrl ? (
+              <img src={optimImg(c.coverUrl, 300)} alt={c.label} style={{ width:'100%', height:150, objectFit:'cover', objectPosition:'top', display:'block' }} />
+            ) : (
+              <div style={{ width:'100%', height:150, background:'linear-gradient(135deg,#0a1535,#1e3a6e)' }} />
+            )}
+            <div style={{ padding:'8px 10px' }}>
+              <p style={{ color:C.text, fontSize:12, fontWeight:700, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.label}</p>
+              <p style={{ color:'#4da6ff', fontSize:11, margin:'2px 0 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.artist}</p>
+            </div>
+          </Lien>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DecouvrirPage() {
   const navigate = useNavigate();
   const [contenus, setContenus] = useState<any[]>([]);
@@ -11782,6 +11881,8 @@ function DecouvrirPage() {
       {!loading && (
         <div style={{ display: (typeFiltre === 'tous' && !termeRecherche) ? 'block' : 'none' }}>
           <TendancesSection contenus={contenus} />
+          {/* POUR TOI — recommandations personnalisées (ou populaires pour les visiteurs) */}
+          <PourToiSection contenus={contenus} />
         </div>
       )}
 
@@ -16080,6 +16181,16 @@ function PublicStreamPage() {
         track, duration: Math.round(duration), valid: true,
         source: 'publicLink', ts: new Date().toISOString(),
       });
+      // Signal de recommandation : écoute du fan connecté — 1 doc par fan+contenu,
+      // incrémenté à chaque écoute. Alimente la section « Pour toi » de Découvrir.
+      const uReco = auth.currentUser;
+      if (uReco) {
+        setDoc(doc(db, 'historique_ecoute', `${uReco.uid}__${publicLinkId}`), {
+          uid: uReco.uid, qrId: publicLinkId, artist: data.artist || '', label: data.label || '',
+          categorie: data.categorie || '', type: 'ecoute',
+          nb: increment(1), ts: new Date().toISOString(),
+        }, { merge: true }).catch(() => {});
+      }
       // Incrémenter le compteur streams du LIEN PUBLIC (jamais celui d'un QR de
       // duplication physique — les deux compteurs restent strictement séparés).
       const snap = await getDocs(query(collection(db, 'publicLinks'), where('publicLinkId', '==', publicLinkId)));
