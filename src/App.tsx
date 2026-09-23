@@ -9262,6 +9262,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
   });
   const [bioTexte, setBioTexte] = useState('');
   const [generation, setGeneration] = useState<'idle'|'loading'|'error'>('idle');
+  const [erreurGeneration, setErreurGeneration] = useState('');
   const [sauvegarde, setSauvegarde] = useState<'idle'|'saving'|'done'>('idle');
   const [charge, setCharge] = useState(true);
 
@@ -9282,7 +9283,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
   const champ = (cle: string, val: string) => setForm((f) => ({ ...f, [cle]: val }));
 
   const genererBio = async () => {
-    setGeneration('loading');
+    setGeneration('loading'); setErreurGeneration('');
     try {
       const res = await fetch('/api/generer-bio', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -9292,7 +9293,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
       if (!res.ok || !data.bio) throw new Error(data.error || 'Erreur de génération');
       setBioTexte(data.bio);
       setGeneration('idle');
-    } catch (e) { console.error(e); setGeneration('error'); }
+    } catch (e: any) { console.error(e); setErreurGeneration(e.message || String(e)); setGeneration('error'); }
   };
 
   const enregistrer = async () => {
@@ -9365,7 +9366,11 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
         style={{ width:'100%', padding:14, borderRadius:14, border:'none', background: generation==='loading' ? '#2a4a6a' : 'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:14, cursor: generation==='loading' ? 'wait' : 'pointer', marginBottom:20 }}>
         {generation==='loading' ? 'Génération en cours...' : (bioTexte ? '✨ Régénérer ma bio' : '✨ Générer ma bio')}
       </button>
-      {generation === 'error' && <p style={{ color:C.alert, fontSize:12, marginTop:-14, marginBottom:16, textAlign:'center' }}>Erreur lors de la génération. Réessaie.</p>}
+      {generation === 'error' && (
+        <p style={{ color:C.alert, fontSize:12, marginTop:-14, marginBottom:16, textAlign:'center' }}>
+          Erreur : {erreurGeneration || 'inconnue'}. Réessaie, ou copie ce message pour qu'on te dise quoi faire.
+        </p>
+      )}
 
       {bioTexte && (
         <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20 }}>
