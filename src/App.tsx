@@ -9264,6 +9264,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
   const [generation, setGeneration] = useState<'idle'|'loading'|'error'>('idle');
   const [erreurGeneration, setErreurGeneration] = useState('');
   const [sauvegarde, setSauvegarde] = useState<'idle'|'saving'|'done'>('idle');
+  const [dejaPublie, setDejaPublie] = useState(false);
   const [charge, setCharge] = useState(true);
 
   useEffect(() => {
@@ -9273,7 +9274,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
         if (!snap.empty) {
           const d = snap.docs[0].data();
           if (d.bioFormulaire) setForm((f) => ({ ...f, ...d.bioFormulaire }));
-          if (d.bioTexte) setBioTexte(d.bioTexte);
+          if (d.bioTexte) { setBioTexte(d.bioTexte); setDejaPublie(true); }
         }
       } catch (e) { console.error(e); }
       setCharge(false);
@@ -9306,7 +9307,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
       if (!snap.empty) {
         await updateDoc(doc(db,'artists',snap.docs[0].id), { bioFormulaire: form, bioTexte, bioMiseAJour: new Date().toISOString(), slug, coverUrl });
       }
-      setSauvegarde('done');
+      setSauvegarde('done'); setDejaPublie(true);
       setTimeout(() => setSauvegarde('idle'), 2500);
     } catch (e) { console.error(e); setSauvegarde('idle'); }
   };
@@ -9390,7 +9391,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
             style={{ width:'100%', padding:13, borderRadius:12, border:'none', background: sauvegarde==='done' ? C.success : '#00d49a', color:'#04231a', fontWeight:800, fontSize:14, cursor: sauvegarde==='saving' ? 'wait' : 'pointer' }}>
             {sauvegarde==='saving' ? 'Enregistrement...' : sauvegarde==='done' ? '✓ Publié sur ta page bio' : 'Publier sur ma page bio'}
           </button>
-          {sauvegarde==='done' && slugActuel && (
+          {dejaPublie && slugActuel && (
             <a href={`/artiste-bio/${slugActuel}`} target="_blank" rel="noreferrer"
               style={{ display:'block', textAlign:'center', marginTop:10, color:C.blueLite, fontSize:12, fontWeight:700, textDecoration:'none' }}>
               Voir ma page publique →
