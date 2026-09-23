@@ -9266,6 +9266,8 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
   const [sauvegarde, setSauvegarde] = useState<'idle'|'saving'|'done'>('idle');
   const [dejaPublie, setDejaPublie] = useState(false);
   const [charge, setCharge] = useState(true);
+  const [bioPhotoUrl, setBioPhotoUrl] = useState('');
+  const [uploadPhoto, setUploadPhoto] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -9275,6 +9277,7 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
           const d = snap.docs[0].data();
           if (d.bioFormulaire) setForm((f) => ({ ...f, ...d.bioFormulaire }));
           if (d.bioTexte) { setBioTexte(d.bioTexte); setDejaPublie(true); }
+          if (d.bioPhotoUrl) setBioPhotoUrl(d.bioPhotoUrl);
         }
       } catch (e) { console.error(e); }
       setCharge(false);
@@ -9282,6 +9285,21 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
   }, [user.email]);
 
   const champ = (cle: string, val: string) => setForm((f) => ({ ...f, [cle]: val }));
+
+  const changerPhoto = async (file: File) => {
+    setUploadPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file); fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body: fd });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error('Upload échoué');
+      setBioPhotoUrl(data.secure_url);
+      const snap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
+      if (!snap.empty) await updateDoc(doc(db,'artists',snap.docs[0].id), { bioPhotoUrl: data.secure_url });
+    } catch (e:any) { alert('Erreur : ' + e.message); }
+    setUploadPhoto(false);
+  };
 
   const genererBio = async () => {
     setGeneration('loading'); setErreurGeneration('');
@@ -9326,12 +9344,23 @@ function BioArtisteTab({ user, artistName, coverUrl }: any) {
         Remplis le formulaire, l'IA rédige ta bio professionnelle. Elle sera visible sur ta page publique (avec ta pochette), que n'importe qui pourra consulter — y compris sur Google.
       </p>
 
-      {coverUrl && (
-        <div style={{ marginBottom:20, textAlign:'center' }}>
-          <img src={optimImg(coverUrl,300)} alt="" style={{ width:90, height:90, objectFit:'cover', borderRadius:12, border:'1px solid '+C.border }} />
-          <p style={{ color:C.textSoft, fontSize:10, marginTop:6 }}>Ta pochette la plus récente sert d'image sur ta page bio</p>
-        </div>
-      )}
+      <div style={{ marginBottom:20, textAlign:'center' }}>
+        {(bioPhotoUrl || coverUrl) ? (
+          <img src={optimImg(bioPhotoUrl || coverUrl,500)} alt="" style={{ width:180, height:180, objectFit:'cover', borderRadius:16, border:'1px solid '+C.border }} />
+        ) : (
+          <div style={{ width:180, height:180, borderRadius:16, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto' }}>
+            <img src={LOGO_B64} alt="" style={{ width:60, opacity:0.4 }} />
+          </div>
+        )}
+        <p style={{ color:C.textSoft, fontSize:10, marginTop:8 }}>
+          {bioPhotoUrl ? 'Photo choisie pour ta page bio' : "Pochette utilisée par défaut — choisis ta propre photo ci-dessous"}
+        </p>
+        <label style={{ display:'inline-block', marginTop:10, padding:'9px 16px', borderRadius:99, border:'1px solid '+C.blue, background: uploadPhoto ? 'rgba(30,111,255,0.1)' : 'transparent', color:C.blueLite, fontSize:12, fontWeight:700, cursor: uploadPhoto ? 'wait' : 'pointer' }}>
+          {uploadPhoto ? 'Envoi en cours...' : (bioPhotoUrl ? 'Changer la photo' : 'Choisir ma propre photo')}
+          <input type="file" accept="image/*" style={{ display:'none' }} disabled={uploadPhoto}
+            onChange={e => e.target.files?.[0] && changerPhoto(e.target.files[0])} />
+        </label>
+      </div>
 
       <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:20 }}>
         <p style={{ color:C.gold, fontSize:10, fontWeight:800, letterSpacing:1.5, marginBottom:14, textTransform:'uppercase' }}>État civil</p>
@@ -15817,12 +15846,12 @@ function ArtisteBioPage() {
       <div style={{ maxWidth:640, margin:'0 auto', padding:'0 20px' }}>
         {/* En-tête façon Wikipédia : pochette + identité */}
         <div style={{ display:'flex', gap:18, alignItems:'flex-start', marginBottom:24, flexWrap:'wrap' }}>
-          {artiste.coverUrl ? (
-            <img src={optimImg(artiste.coverUrl,300)} alt={artiste.artistName || artiste.nom}
-              style={{ width:120, height:120, objectFit:'cover', borderRadius:14, border:'1px solid '+C.border, flexShrink:0 }} />
+          {(artiste.bioPhotoUrl || artiste.coverUrl) ? (
+            <img src={optimImg(artiste.bioPhotoUrl || artiste.coverUrl,500)} alt={artiste.artistName || artiste.nom}
+              style={{ width:180, height:180, objectFit:'cover', borderRadius:16, border:'1px solid '+C.border, flexShrink:0 }} />
           ) : (
-            <div style={{ width:120, height:120, borderRadius:14, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-              <img src={LOGO_B64} alt="" style={{ width:50, opacity:0.4 }} />
+            <div style={{ width:180, height:180, borderRadius:16, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <img src={LOGO_B64} alt="" style={{ width:70, opacity:0.4 }} />
             </div>
           )}
           <div style={{ flex:1, minWidth:180 }}>

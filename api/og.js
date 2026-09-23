@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         if (estArtiste) {
           const nom = f.bioFormulaire?.mapValue?.fields?.nom?.stringValue || f.artistName?.stringValue || '';
           const bioTexte = f.bioTexte?.stringValue || '';
-          const cover = f.coverUrl?.stringValue || '';
+          const cover = f.bioPhotoUrl?.stringValue || f.coverUrl?.stringValue || '';
           if (nom) titre = `${nom} | Doniel Zik`;
           if (bioTexte) description = bioTexte.split('\n').find(p => p.trim())?.slice(0, 200) || description;
           if (cover) image = cover;
