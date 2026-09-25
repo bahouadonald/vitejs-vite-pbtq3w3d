@@ -21,8 +21,7 @@
     "client_mode": "navigate-existing"
   },
   "scope_extensions": [
-    { "origin": "https://doniel.art" },
-    { "origin": "https://doniel.vercel.app" }
+    { "origin": "https://doniel.art" }
   ],
   "edge_side_panel": {
     "preferred_width": 400
