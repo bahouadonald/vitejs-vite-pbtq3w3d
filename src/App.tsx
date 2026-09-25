@@ -11727,395 +11727,6 @@ function PourToiSection({ contenus }: { contenus: any[] }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// PLAYLISTS — modal d'ajout d'un contenu à une playlist du fan.
-// Collection 'playlists' : { uid, nom, titres: [{publicLinkId,label,artist,coverUrl}] }.
-// Les infos du titre sont dénormalisées (comme la Zikothèque) → aucun lookup
-// supplémentaire à l'affichage. Le bouton bascule Ajouter ↔ Retirer.
-// ─────────────────────────────────────────────
-function ModalPlaylist({ contenu, onClose }: { contenu: any, onClose: () => void }) {
-  const user = auth.currentUser;
-  const [playlists, setPlaylists] = useState<any[] | null>(null);
-  const [nom, setNom] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(
-      query(collection(db, 'playlists'), where('uid', '==', user.uid)),
-      snap => setPlaylists(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a: any, b: any) => (b.majLe || '').localeCompare(a.majLe || ''))),
-      () => setPlaylists([])
-    );
-    return () => unsub();
-  }, [user]);
-
-  const item = {
-    publicLinkId: contenu.publicLinkId, label: contenu.label || '',
-    artist: contenu.artist || '', coverUrl: contenu.coverUrl || '',
-  };
-  const dedans = (p: any) => (p.titres || []).some((t: any) => t.publicLinkId === item.publicLinkId);
-
-  const basculer = async (p: any) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const titres = dedans(p)
-        ? p.titres.filter((t: any) => t.publicLinkId !== item.publicLinkId)
-        : [...(p.titres || []), item];
-      await updateDoc(doc(db, 'playlists', p.id), { titres, majLe: new Date().toISOString() });
-    } catch (e) { console.error('playlist toggle', e); }
-    setBusy(false);
-  };
-
-  const creer = async () => {
-    if (!nom.trim() || !user || busy) return;
-    setBusy(true);
-    try {
-      await addDoc(collection(db, 'playlists'), {
-        uid: user.uid, nom: nom.trim(), titres: [item],
-        creeLe: new Date().toISOString(), majLe: new Date().toISOString(),
-      });
-      setNom('');
-    } catch (e) { console.error('playlist create', e); }
-    setBusy(false);
-  };
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-      onClick={onClose}>
-      <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'20px 20px 34px', width:'100%', maxWidth:480, maxHeight:'80vh', overflowY:'auto', animation:'tutoSlide .3s ease' }}
-        onClick={e => e.stopPropagation()}>
-        <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 16px' }} />
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:4 }}>
-          <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', margin:0 }}>Ajouter à une playlist</p>
-          <button onClick={onClose} style={{ width:28, height:28, borderRadius:99, border:'none', background:'#f0f4fb', color:'#1a2340', fontSize:16, cursor:'pointer', lineHeight:1 }}>×</button>
-        </div>
-        <p style={{ color:'#8098b8', fontSize:12, margin:'0 0 18px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🎵 {item.label} — {item.artist}</p>
-
-        {/* Créer une nouvelle playlist */}
-        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-          <input value={nom} onChange={e => setNom(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') creer(); }}
-            placeholder="Nom de la nouvelle playlist…" maxLength={60}
-            style={{ flex:1, padding:'11px 14px', borderRadius:12, border:'1px solid #dce6f7', fontSize:14, outline:'none', color:'#1a2340' }} />
-          <button onClick={creer} disabled={!nom.trim() || busy}
-            style={{ padding:'0 18px', borderRadius:12, border:'none', background: nom.trim() ? 'linear-gradient(135deg,#1a6bff,#0050d0)' : '#dce6f7', color: nom.trim() ? '#fff' : '#8098b8', fontWeight:700, fontSize:13, cursor: nom.trim() ? 'pointer' : 'default' }}>
-            Créer
-          </button>
-        </div>
-
-        {/* Playlists existantes */}
-        {playlists === null ? (
-          <p style={{ color:'#8098b8', fontSize:13, textAlign:'center', padding:10 }}>Chargement…</p>
-        ) : playlists.length === 0 ? (
-          <p style={{ color:'#8098b8', fontSize:13, textAlign:'center', padding:10 }}>
-            Aucune playlist — crée la première ci-dessus 👆
-          </p>
-        ) : (
-          playlists.map(p => {
-            const present = dedans(p);
-            return (
-              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, border:'1px solid #eef2fa', marginBottom:8 }}>
-                {(p.titres || []).slice(0, 3).map((t: any, i: number) => t.coverUrl
-                  ? <img key={i} src={optimImg(t.coverUrl, 80)} alt="" style={{ width:34, height:34, borderRadius:8, objectFit:'cover', marginLeft: i > 0 ? -22 : 0, border:'2px solid #fff' }} />
-                  : <div key={i} style={{ width:34, height:34, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', marginLeft: i > 0 ? -22 : 0, border:'2px solid #fff' }} />)}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ color:'#1a2340', fontWeight:700, fontSize:14, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.nom}</p>
-                  <p style={{ color:'#8098b8', fontSize:11, margin:0 }}>{(p.titres || []).length} titre{(p.titres || []).length > 1 ? 's' : ''}</p>
-                </div>
-                <button onClick={() => basculer(p)} disabled={busy}
-                  style={{ padding:'7px 14px', borderRadius:99, border:`1px solid ${present ? '#00c853' : '#1a6bff'}`, background: present ? 'rgba(0,200,83,0.08)' : 'rgba(26,107,255,0.08)', color: present ? '#00a344' : '#1a6bff', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
-                  {present ? '✓ Retirer' : '+ Ajouter'}
-                </button>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// PLAYLISTS — section « Mes playlists » dans le Profil.
-// Liste les playlists du fan : écouter (1er titre), retirer un titre,
-// supprimer une playlist entière.
-// ─────────────────────────────────────────────
-function PlaylistsFanSection() {
-  const navigate = useNavigate();
-  const user = auth.currentUser;
-  const [playlists, setPlaylists] = useState<any[] | null>(null);
-  const [ouvert, setOuvert] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(
-      query(collection(db, 'playlists'), where('uid', '==', user.uid)),
-      snap => setPlaylists(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a: any, b: any) => (b.majLe || '').localeCompare(a.majLe || ''))),
-      () => setPlaylists([])
-    );
-    return () => unsub();
-  }, [user]);
-
-  if (!user || playlists === null) return null;
-
-  const supprimerPlaylist = async (p: any) => {
-    if (!window.confirm(`Supprimer la playlist « ${p.nom} » ?`)) return;
-    await deleteDoc(doc(db, 'playlists', p.id));
-  };
-  const retirerTitre = async (p: any, publicLinkId: string) => {
-    const titres = (p.titres || []).filter((t: any) => t.publicLinkId !== publicLinkId);
-    await updateDoc(doc(db, 'playlists', p.id), { titres, majLe: new Date().toISOString() });
-  };
-  const ecouter = (t: any) => navigate(`/ecoute/${t.publicLinkId}`, { state: { contenu: t } });
-  // Écoute ENCHAÎNÉE dans le LECTEUR PLEINE PAGE : le premier titre démarre
-  // avec toute la playlist en file d'attente — à la fin de chaque album, le
-  // contenu suivant (préchargé) prend le relais automatiquement.
-  const ecouterPlaylist = (p: any) => {
-    const titres = (p.titres || []).filter((t: any) => t.publicLinkId);
-    if (titres.length === 0) return;
-    navigate(`/ecoute/${titres[0].publicLinkId}`, { state: { contenu: titres[0], fileAttente: titres } });
-  };
-
-  return (
-    <div style={{ marginBottom:16 }}>
-      <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10, paddingLeft:4 }}>Mes playlists</p>
-      {playlists.length === 0 ? (
-        <div style={{ background:C.card, border:'1px dashed '+C.border, borderRadius:14, padding:'16px', textAlign:'center' }}>
-          <p style={{ color:C.text, fontSize:13, fontWeight:700, margin:'0 0 4px' }}>🎵 Aucune playlist pour l'instant</p>
-          <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>Ajoute des titres depuis Découvrir ou une page d'écoute</p>
-        </div>
-      ) : playlists.map(p => {
-        const titres = p.titres || [];
-        const estOuvert = ouvert === p.id;
-        return (
-          <div key={p.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:14, padding:'12px 14px', marginBottom:10 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }} onClick={() => setOuvert(estOuvert ? null : p.id)}>
-              {/* Mini-pochettes empilées */}
-              <div style={{ display:'flex', flexShrink:0 }}>
-                {titres.length === 0 ? (
-                  <div style={{ width:42, height:42, borderRadius:10, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🎵</div>
-                ) : titres.slice(0, 3).map((t: any, i: number) => t.coverUrl
-                  ? <img key={i} src={optimImg(t.coverUrl, 80)} alt="" style={{ width:34, height:34, borderRadius:8, objectFit:'cover', marginLeft: i > 0 ? -16 : 0, border:'2px solid '+C.card }} />
-                  : <div key={i} style={{ width:34, height:34, borderRadius:8, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', marginLeft: i > 0 ? -16 : 0, border:'2px solid '+C.card }} />)}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <p style={{ color:'#fff', fontWeight:800, fontSize:14, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.nom}</p>
-                <p style={{ color:C.textSoft, fontSize:11, margin:0 }}>{titres.length} titre{titres.length > 1 ? 's' : ''}</p>
-              </div>
-              <span style={{ color:C.textSoft, fontSize:18, flexShrink:0 }}>{estOuvert ? '▾' : '▸'}</span>
-            </div>
-
-            {estOuvert && (
-              <div style={{ marginTop:10, borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:8 }}>
-                {titres.length === 0 ? (
-                  <p style={{ color:C.textSoft, fontSize:12, margin:'4px 0 8px', textAlign:'center' }}>Playlist vide</p>
-                ) : titres.map((t: any) => (
-                  <div key={t.publicLinkId} style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 2px' }}>
-                    {t.coverUrl
-                      ? <img src={optimImg(t.coverUrl, 80)} alt="" style={{ width:34, height:34, borderRadius:7, objectFit:'cover', flexShrink:0 }} />
-                      : <div style={{ width:34, height:34, borderRadius:7, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', flexShrink:0 }} />}
-                    <div style={{ flex:1, minWidth:0, cursor:'pointer' }} onClick={() => ecouter(t)}>
-                      <p style={{ color:C.text, fontSize:12.5, fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</p>
-                      <p style={{ color:'#4da6ff', fontSize:11, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.artist}</p>
-                    </div>
-                    <button onClick={() => ecouter(t)} title="Écouter"
-                      style={{ width:32, height:32, borderRadius:99, border:'none', background:'rgba(30,111,255,0.2)', cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#4da6ff"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-                    </button>
-                    <button onClick={() => retirerTitre(p, t.publicLinkId)} title="Retirer de la playlist"
-                      style={{ width:32, height:32, borderRadius:99, border:'none', background:'rgba(255,100,124,0.12)', color:'#FF647C', fontSize:15, cursor:'pointer', flexShrink:0, lineHeight:1 }}>×</button>
-                  </div>
-                ))}
-                {titres.length > 0 && (
-                  <button onClick={() => ecouterPlaylist(p)}
-                    style={{ width:'100%', marginTop:8, padding:'9px 0', borderRadius:10, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12.5, cursor:'pointer' }}>
-                    ▶ Écouter la playlist
-                  </button>
-                )}
-                <button onClick={() => supprimerPlaylist(p)}
-                  style={{ width:'100%', marginTop:6, padding:'9px 0', borderRadius:10, border:'1px solid rgba(255,100,124,0.3)', background:'transparent', color:'#FF647C', fontWeight:600, fontSize:12, cursor:'pointer' }}>
-                  Supprimer la playlist
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// MINI-LECTEUR PERSISTANT — l'audio vit HORS des routes (élément <audio>
-// impératif créé au niveau du module) : la musique CONTINUE pendant que le fan
-// navigue entre les pages. Alimenté par « ▶ Écouter la playlist » (Profil —
-// toute la playlist en file, enchaînement auto) ou par le bouton
-// « Écouter en mini-lecteur » de la page d'écoute.
-// ─────────────────────────────────────────────
-type PisteMini = { publicLinkId: string, label: string, artist: string, coverUrl: string, url: string };
-
-const lecteurGlobal = (() => {
-  const etat = {
-    piste: null as PisteMini | null,
-    file: [] as PisteMini[],
-    idx: 0,
-    playing: false,
-    ct: 0,
-    dur: 0,
-  };
-  const abonnes = new Set<() => void>();
-  let audio: HTMLAudioElement | null = null;
-  let msHandlersInit = false;
-  const notifier = () => abonnes.forEach(f => { try { f(); } catch { /* ignore */ } });
-  // ── MEDIA SESSION — contrôles sur l'écran de verrouillage / notification ──
-  // Métadonnées (titre, artiste, pochette) + actions play/pause/précédent/
-  // suivant/seek. Inerte sur les navigateurs sans support.
-  const msDispo = () => typeof navigator !== 'undefined' && 'mediaSession' in navigator;
-  const msEtat = (s: MediaSessionPlaybackState) => {
-    if (!msDispo()) return;
-    try { navigator.mediaSession.playbackState = s; } catch { /* ignore */ }
-  };
-  const msPosition = () => {
-    if (!msDispo() || !audio) return;
-    const d = audio.duration;
-    if (!Number.isFinite(d) || d <= 0) return;
-    try {
-      navigator.mediaSession.setPositionState({
-        duration: d, position: Math.min(audio.currentTime, d), playbackRate: audio.playbackRate || 1,
-      });
-    } catch { /* position > duration entre deux ticks — on ignore */ }
-  };
-  const msHandlers = () => {
-    if (!msDispo() || msHandlersInit || !audio) return;
-    msHandlersInit = true;
-    const ms = navigator.mediaSession;
-    try {
-      ms.setActionHandler('play', () => audio!.play().catch(() => {}));
-      ms.setActionHandler('pause', () => audio!.pause());
-      ms.setActionHandler('previoustrack', () => lecteurGlobal.precedent());
-      ms.setActionHandler('nexttrack', () => lecteurGlobal.suivant());
-      ms.setActionHandler('seekbackward', () => { audio!.currentTime = Math.max(0, audio!.currentTime - 10); });
-      ms.setActionHandler('seekforward', () => { audio!.currentTime = Math.min(etat.dur || audio!.duration, audio!.currentTime + 10); });
-      ms.setActionHandler('seekto', (details) => { if (details.seekTime != null) audio!.currentTime = details.seekTime; });
-    } catch { /* action non supportée par le navigateur */ }
-  };
-  const msMetadonnees = (p: PisteMini) => {
-    if (!msDispo()) return;
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: p.label,
-        artist: p.artist,
-        album: 'Doniel Zik',
-        artwork: p.coverUrl ? [{ src: optimImg(p.coverUrl, 512), sizes: '512x512', type: 'image/jpeg' }] : [],
-      });
-    } catch { /* ignore */ }
-  };
-  const jouerPiste = (idx: number) => {
-    const p = etat.file[idx];
-    if (!p) return;
-    etat.idx = idx; etat.piste = p; etat.ct = 0; etat.dur = 0;
-    const a = audioEl();
-    a.src = p.url;
-    msHandlers();
-    msMetadonnees(p);
-    msEtat('playing');
-    a.play().catch(() => {});
-    notifier();
-  };
-  const audioEl = () => {
-    if (audio) return audio;
-    audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.addEventListener('timeupdate', () => { etat.ct = audio!.currentTime; notifier(); msPosition(); });
-    audio.addEventListener('loadedmetadata', () => { etat.dur = audio!.duration || 0; notifier(); msPosition(); });
-    audio.addEventListener('play', () => { etat.playing = true; msEtat('playing'); notifier(); });
-    audio.addEventListener('pause', () => { etat.playing = false; msEtat('paused'); notifier(); });
-    audio.addEventListener('ended', () => {
-      // Enchaînement automatique dans la file (playlist)
-      if (etat.idx < etat.file.length - 1) jouerPiste(etat.idx + 1);
-      else notifier();
-    });
-    return audio;
-  };
-  return {
-    etat,
-    sAbonner(f: () => void) { abonnes.add(f); return () => { abonnes.delete(f); }; },
-    lancer(file: PisteMini[], idx = 0) {
-      if (file.length === 0) return;
-      etat.file = file;
-      jouerPiste(Math.min(Math.max(0, idx), file.length - 1));
-    },
-    toggle() {
-      if (!etat.piste) return;
-      const a = audioEl();
-      if (a.paused) a.play().catch(() => {}); else a.pause();
-    },
-    suivant() { if (etat.idx < etat.file.length - 1) jouerPiste(etat.idx + 1); },
-    precedent() { if (etat.idx > 0) jouerPiste(etat.idx - 1); },
-    seek(pct: number) { if (audio && etat.dur > 0) audio.currentTime = Math.min(etat.dur, Math.max(0, (pct / 100) * etat.dur)); },
-    fermer() {
-      audio?.pause();
-      etat.piste = null; etat.file = []; etat.playing = false; etat.ct = 0; etat.dur = 0;
-      if (msDispo()) {
-        try {
-          navigator.mediaSession.metadata = null;
-          navigator.mediaSession.playbackState = 'none';
-        } catch { /* ignore */ }
-      }
-      notifier();
-    },
-  };
-})();
-
-function MiniLecteurBar() {
-  const navigate = useNavigate();
-  const [, forcer] = useState(0);
-  useEffect(() => lecteurGlobal.sAbonner(() => forcer(n => n + 1)), []);
-  const e = lecteurGlobal.etat;
-  if (!e.piste) return null;
-  const pct = e.dur > 0 ? Math.min(100, (e.ct / e.dur) * 100) : 0;
-  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  return (
-    <div style={{ position:'fixed', bottom:74, left:10, right:10, zIndex:9800, background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', border:'1px solid '+C.border, borderRadius:16, padding:'8px 12px', boxShadow:'0 8px 30px rgba(0,0,0,0.5)' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-        {e.piste.coverUrl
-          ? <img src={optimImg(e.piste.coverUrl, 80)} alt="" style={{ width:40, height:40, borderRadius:9, objectFit:'cover', flexShrink:0, cursor:'pointer' }}
-              onClick={() => navigate(`/ecoute/${e.piste!.publicLinkId}`)} />
-          : <div onClick={() => navigate(`/ecoute/${e.piste!.publicLinkId}`)} style={{ width:40, height:40, borderRadius:9, background:'linear-gradient(135deg,#0a1535,#1e3a6e)', flexShrink:0, cursor:'pointer' }} />}
-        <div style={{ flex:1, minWidth:0, cursor:'pointer' }} onClick={() => navigate(`/ecoute/${e.piste!.publicLinkId}`)}>
-          <p style={{ color:C.text, fontSize:12.5, fontWeight:700, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.piste.label}</p>
-          <p style={{ color:'#4da6ff', fontSize:11, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.piste.artist}</p>
-        </div>
-        {e.file.length > 1 && (
-          <button onClick={() => lecteurGlobal.precedent()} disabled={e.idx === 0}
-            style={{ background:'none', border:'none', color: e.idx === 0 ? 'rgba(120,160,220,0.25)' : C.textSoft, fontSize:15, cursor: e.idx === 0 ? 'default' : 'pointer', padding:2, flexShrink:0 }}>⏮</button>
-        )}
-        <button onClick={() => lecteurGlobal.toggle()}
-          style={{ width:36, height:36, borderRadius:99, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          {e.playing ? '⏸' : '▶'}
-        </button>
-        {e.file.length > 1 && (
-          <button onClick={() => lecteurGlobal.suivant()} disabled={e.idx === e.file.length - 1}
-            style={{ background:'none', border:'none', color: e.idx === e.file.length - 1 ? 'rgba(120,160,220,0.25)' : C.textSoft, fontSize:15, cursor: e.idx === e.file.length - 1 ? 'default' : 'pointer', padding:2, flexShrink:0 }}>⏭</button>
-        )}
-        <button onClick={() => lecteurGlobal.fermer()} title="Fermer le mini-lecteur"
-          style={{ width:26, height:26, borderRadius:99, border:'none', background:'rgba(255,255,255,0.08)', color:C.textSoft, fontSize:13, cursor:'pointer', flexShrink:0, lineHeight:1 }}>×</button>
-      </div>
-      {/* Barre de progression cliquable */}
-      <div onClick={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); lecteurGlobal.seek(((ev.clientX - r.left) / r.width) * 100); }}
-        style={{ height:4, background:'rgba(255,255,255,0.1)', borderRadius:99, marginTop:7, cursor:'pointer' }}>
-        <div style={{ height:'100%', width:pct+'%', background:'linear-gradient(90deg,'+C.blue+','+C.blueLite+')', borderRadius:99 }} />
-      </div>
-      <div style={{ display:'flex', justifyContent:'space-between', marginTop:3 }}>
-        <span style={{ color:C.textSoft, fontSize:9 }}>{fmt(e.ct)}</span>
-        <span style={{ color:C.textSoft, fontSize:9 }}>{e.dur > 0 ? fmt(e.dur) : ''}</span>
-      </div>
-    </div>
-  );
-}
 
 function DecouvrirPage() {
   const navigate = useNavigate();
@@ -12126,8 +11737,6 @@ function DecouvrirPage() {
   const [typeFiltre, setTypeFiltre] = useState('tous');
   const [categorieFiltre, setCategorieFiltre] = useState('tous');
   const [recherche, setRecherche] = useState('');
-  const [playlistCible, setPlaylistCible] = useState<any>(null);
-  const [msgLogin, setMsgLogin] = useState('');
   const [loading, setLoading] = useState(true);
   const [sortieCiblee, setSortieCiblee] = useState('');
   const [banniereKiff, setBanniereKiff] = useState(false);
@@ -12253,10 +11862,6 @@ function DecouvrirPage() {
         </div>
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
-
-      {/* PLAYLISTS — modal d'ajout + connexion requise */}
-      {playlistCible && <ModalPlaylist contenu={playlistCible} onClose={() => setPlaylistCible(null)} />}
-      {msgLogin && <LoginModal message={msgLogin} onClose={() => setMsgLogin('')} />}
 
       {/* Bannière : invitation à envoyer des kiffements (venu d'une notif éducative) */}
       {banniereKiff && (
@@ -12492,13 +12097,6 @@ function DecouvrirPage() {
                   }
                 }} title="Partager" style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                </button>
-                <button onClick={() => {
-                  if (!auth.currentUser) { setMsgLogin('Connectez-vous pour créer des playlists'); return; }
-                  setPlaylistCible(c);
-                }} title="Ajouter à une playlist"
-                  style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(255,255,255,0.06)', border:'none', cursor:'pointer', flexShrink:0 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffd700" strokeWidth="2" strokeLinecap="round"><path d="M3 6h13M3 12h13M3 18h9"/><circle cx="19" cy="16" r="2.5"/><path d="M21.5 16V8l-3 1"/></svg>
                 </button>
                 <Lien href={`/ecoute/${c.publicLinkId}`} state={{ contenu: c }}
                   style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:40, height:40, borderRadius:99, background:'rgba(30,111,255,0.2)', flexShrink:0 }}>
@@ -12906,9 +12504,6 @@ function ProfilPage() {
             ))}
           </div>
         </div>
-
-        {/* MES PLAYLISTS */}
-        <PlaylistsFanSection />
 
         {/* MES SIGNATURES */}
         {mesSignatures.length > 0 && (
@@ -16650,8 +16245,6 @@ function PublicStreamPage() {
 
   // Déclencher tuto cascade après play
   // (déclenché depuis recordPublicStream)
-  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
-  const [msgLoginPl, setMsgLoginPl] = useState('');
   // ── LECTURE ENCHAÎNÉE (playlists / file d'attente) ──
   const [fileAttente, setFileAttente] = useState<any[] | null>(null);
   const [idxFile, setIdxFile] = useState(0);
@@ -17027,30 +16620,6 @@ function PublicStreamPage() {
             <p style={{ color: '#4a5878', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>Vidéos</p>
             <VideoPlayer files={videoFiles} onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }} />
           </div>
-        )}
-
-        {/* ── AJOUTER À UNE PLAYLIST ── */}
-        <button onClick={() => {
-          if (!auth.currentUser) { setMsgLoginPl('Connectez-vous pour créer des playlists'); return; }
-          setShowPlaylistModal(true);
-        }}
-          style={{ width:'100%', padding:'14px 20px', borderRadius:14, border:'1px solid rgba(245,200,76,0.4)', background:'rgba(245,200,76,0.07)', color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:24 }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round"><path d="M3 6h13M3 12h13M3 18h9"/><circle cx="19" cy="16" r="2.5"/><path d="M21.5 16V8l-3 1"/></svg>
-          Ajouter à une playlist
-        </button>
-        {showPlaylistModal && data && <ModalPlaylist contenu={data} onClose={() => setShowPlaylistModal(false)} />}
-        {msgLoginPl && <LoginModal message={msgLoginPl} onClose={() => setMsgLoginPl('')} />}
-
-        {/* ── ÉCOUTER EN MINI-LECTEUR (persistant entre les pages) ── */}
-        {audioFiles.length > 0 && (
-          <button onClick={() => lecteurGlobal.lancer([{
-            publicLinkId: data.publicLinkId || publicLinkId || '',
-            label: data.label || '', artist: data.artist || '',
-            coverUrl: data.coverUrl || '', url: audioFiles[0].url,
-          }], 0)}
-            style={{ width:'100%', padding:'12px 16px', borderRadius:14, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.text, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:20 }}>
-            🎧 Écouter en mini-lecteur (et naviguer librement)
-          </button>
         )}
 
         {/* ── Bouton Télécharger seul — les titres sont déjà visibles via le
@@ -17436,9 +17005,6 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
           authLoading ? null : user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
       </Routes>
-
-      {/* MINI-LECTEUR PERSISTANT — monté HORS des routes : l'audio survit à la navigation */}
-      <MiniLecteurBar />
 
       {/* Bannière d'activation des notifications — visible sur TOUTE l'app tant
           que ce n'est pas activé, pas seulement sur la page Notifications, pour
