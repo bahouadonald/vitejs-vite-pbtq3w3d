@@ -17046,7 +17046,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
           que ce n'est pas activé, pas seulement sur la page Notifications, pour
           que ce soit vraiment impossible à manquer. */}
       {user && permNotifGlobal === 'default' && !bannièreFermée && (
-        <div style={{ position:'fixed', left:12, right:12, bottom:12, zIndex:9999, background:'#12213f', border:'1px solid rgba(93,132,255,0.4)', borderRadius:14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
+        <div style={{ position:'fixed', left:12, right:12, bottom:84, zIndex:9999, background:'#12213f', border:'1px solid rgba(93,132,255,0.4)', borderRadius:14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
           <span style={{ fontSize:22, flexShrink:0 }}>🔔</span>
           <div style={{ flex:1 }}>
             <p style={{ color:'#fff', fontSize:13, fontWeight:700, margin:'0 0 2px' }}>Activez les notifications</p>
@@ -17063,7 +17063,7 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         </div>
       )}
       {user && permNotifGlobal === 'denied' && !bannièreFermée && (
-        <div style={{ position:'fixed', left:12, right:12, bottom:12, zIndex:9999, background:'rgba(255,100,124,0.15)', border:'1px solid rgba(255,100,124,0.4)', borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
+        <div style={{ position:'fixed', left:12, right:12, bottom:84, zIndex:9999, background:'rgba(255,100,124,0.15)', border:'1px solid rgba(255,100,124,0.4)', borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, boxShadow:'0 8px 28px rgba(0,0,0,0.5)', maxWidth:460, margin:'0 auto' }}>
           <span style={{ fontSize:18, flexShrink:0 }}>🔕</span>
           <p style={{ color:'#ff647c', fontSize:11, margin:0, flex:1, lineHeight:1.5 }}>Notifications bloquées — réglages du téléphone → Applications → Doniel Zik → Notifications.</p>
           <button onClick={() => setBannièreFermée(true)} aria-label="Fermer"
