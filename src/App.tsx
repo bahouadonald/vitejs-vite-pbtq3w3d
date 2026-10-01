@@ -114,11 +114,14 @@ async function envoyerNotification(data: { to: string | null | undefined, role?:
     await addDoc(collection(db, 'notifications'), { ...data, createdAt: new Date().toISOString(), lu: false });
   } catch (e) { console.error('envoyerNotification (Firestore)', e); }
   // Best-effort, ne bloque jamais l'action principale si le push échoue
+  const urlCible = data.qrId
+    ? (data.source === 'public' ? `/ecoute/${data.qrId}` : `/fan/${data.qrId}`)
+    : (data.role === 'artiste' ? '/artiste' : '/notifications');
   fetch('/api/send-push', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: data.to, title: 'Doniel Zik', body: data.text,
-      url: data.role === 'artiste' ? '/artiste' : '/notifications',
+      url: urlCible,
     }),
   }).catch(() => {});
 }
@@ -203,7 +206,7 @@ async function notifierActiviteCommunaute(qrId: string, exclureUid: string, mess
 }
 
 // Donner UN kiff (Option A) : dépense le stock du donneur, compte les offerts, crédite l'artiste
-async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Promise<'ok'|'vide'|'erreur'> {
+async function donnerKiff(uid: string, qrId: string, artistEmail?: string, source: 'qr' | 'public' = 'qr'): Promise<'ok'|'vide'|'erreur'> {
   try {
     const sSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',uid)));
     if (sSnap.empty) return 'vide';
@@ -231,7 +234,7 @@ async function donnerKiff(uid: string, qrId: string, artistEmail?: string): Prom
       await envoyerNotification({
         to: artistEmail, role: 'artiste', type: 'kiff',
         text: `${auth.currentUser?.displayName || 'Un mélomane'} a kiffé votre contenu`,
-        qrId, from: auth.currentUser?.displayName || 'Un mélomane',
+        qrId, source, from: auth.currentUser?.displayName || 'Un mélomane',
       });
     }
     logTx(uid, 'kiff_donne', 0, -1, 'Kiff offert');
@@ -986,7 +989,7 @@ const KIFFEMENTS = [
   { id:"univers",  label:"Univers DZ",       coins:5000, partArtiste:350000, desc:"Distinction ultime Doniel Zik",   image:KIF_UNIVERS_B64 },
 ];
 
-function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void }) {
+function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose, source = 'qr' }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void, source?: 'qr' | 'public' }) {
   const [open, setOpen] = useState(autoOpen || false);
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeModal, setRechargeModal] = useState<{fcfa:number,oscart:number}|null>(null);
@@ -1078,7 +1081,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
           role: 'artiste',
           type: 'kiffement',
           text: `${user.displayName || 'Un fan'} vous a envoyé un kiffement — ${kiffement.label}`,
-          qrId, from: user.displayName || 'Un mélomane',
+          qrId, source, from: user.displayName || 'Un mélomane',
         });
       }
       setMsg(`Kiffement envoyé ! ${kiffement.coins} Oscart débités. +${(kiffement.coins*250).toLocaleString()} kiffs à offrir.`);
@@ -1241,7 +1244,7 @@ function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose }: { q
 // ─────────────────────────────────────────────
 // SECTION COMMENTAIRES — style TikTok
 // ─────────────────────────────────────────────
-function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void }) {
+function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose, source = 'qr' }: { qrId: string, artistEmail?: string, compact?: boolean, autoOpen?: boolean, onClose?: () => void, source?: 'qr' | 'public' }) {
   const [comments, setComments] = useState<any[]>([]);
   const [count, setCount] = useState(0);
   const [text, setText] = useState('');
@@ -1304,7 +1307,7 @@ function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose }: { qrI
           role: 'artiste',
           type: 'commentaire',
           text: `${user.displayName || 'Un fan'} a commenté votre contenu`,
-          qrId,
+          qrId, source,
           from: user.displayName || 'Un mélomane',
         });
       }
@@ -1712,8 +1715,8 @@ function TutoPointer({ step, onNext, onSkip }: { step: number, onNext: () => voi
 // ─────────────────────────────────────────────
 // ACTION BAR — barre horizontale Kiff · Commenter · Kiffement · Buzz
 // ─────────────────────────────────────────────
-function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
-  qrId: string, artistEmail?: string, buzz: number, tutoStep: number, onTutoNext: () => void
+function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext, source = 'qr' }: {
+  qrId: string, artistEmail?: string, buzz: number, tutoStep: number, onTutoNext: () => void, source?: 'qr' | 'public'
 }) {
   const [kiffs, setKiffs] = useState(0);
   const kiffsBase = useRef(0); // dernier total connu de Firestore
@@ -1765,7 +1768,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
     if (tutoStep === 3) onTutoNext();
     // Enregistrement en arrière-plan : si plus de kiffs disponibles, on propose d'en offrir
     try {
-      const r = await donnerKiff(user.uid, qrId, artistEmail);
+      const r = await donnerKiff(user.uid, qrId, artistEmail, source);
       if (r === 'vide') { setShowKiffements(true); }
       else if (r === 'ok') {
         // Notif activité (message 4) : quelqu'un a kiffé ce contenu
@@ -1859,10 +1862,10 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
       </div>
 
       {/* Section commentaires dépliable */}
-      {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowComments(false)} />}
+      {showComments && <CommentSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowComments(false)} source={source} />}
 
       {/* Section kiffements dépliable */}
-      {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowKiffements(false)} />}
+      {showKiffements && <KiffementSection qrId={qrId} artistEmail={artistEmail} autoOpen={true} onClose={() => setShowKiffements(false)} source={source} />}
     </div>
   );
 }
@@ -1870,7 +1873,7 @@ function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext }: {
 // ─────────────────────────────────────────────
 // LIKE BUTTON — like sur un contenu
 // ─────────────────────────────────────────────
-function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: boolean, artistEmail?: string }) {
+function LikeButton({ qrId, compact, artistEmail, source = 'qr' }: { qrId: string, compact?: boolean, artistEmail?: string, source?: 'qr' | 'public' }) {
   const [justKiffed, setJustKiffed] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -1895,7 +1898,7 @@ function LikeButton({ qrId, compact, artistEmail }: { qrId: string, compact?: bo
     setLoading(true);
     // Enregistrement en arrière-plan (ne bloque pas l'animation)
     try {
-      const r = await donnerKiff(user.uid, qrId, artistEmail);
+      const r = await donnerKiff(user.uid, qrId, artistEmail, source);
       if (r === 'vide') { alert('Offre un kiffement pour obtenir des kiffs à donner.'); }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -2892,7 +2895,7 @@ function FanPage() {
             )}
 
             {/* ── BARRE ACTIONS HORIZONTALE — Kiff · Commenter · Kiffement · Buzz ── */}
-            <ActionBar qrId={qrId || ''} artistEmail={qrData?.artistEmail} buzz={(qrData?.visits||0)+(qrData?.streams||0)} tutoStep={tutoStep} onTutoNext={() => setTutoStep(s => s+1)} />
+            <ActionBar qrId={qrId || ''} artistEmail={qrData?.artistEmail} buzz={(qrData?.visits||0)+(qrData?.streams||0)} tutoStep={tutoStep} onTutoNext={() => setTutoStep(s => s+1)} source="qr" />
 
             {/* ── TRAVAILLEURS — classement donateurs ── */}
             {qrId && <Travailleurs qrId={qrId} artistEmail={qrData?.artistEmail} />}
@@ -12165,9 +12168,9 @@ function DecouvrirPage() {
               </div>
               {/* Actions — une seule ligne, tout compact et visible */}
               <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                <LikeButton qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
-                <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
-                <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact />
+                <LikeButton qrId={c.publicLinkId} artistEmail={c.artistEmail} compact source="public" />
+                <CommentSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact source="public" />
+                <KiffementSection qrId={c.publicLinkId} artistEmail={c.artistEmail} compact source="public" />
                 <button onClick={async () => {
                   const url = `${window.location.origin}/ecoute/${c.publicLinkId}`;
                   // Compter le partage (collection decouvrir = ce qui s'affiche, + qrcodes pour stats artiste)
@@ -12338,8 +12341,11 @@ function NotificationsPage() {
               if (n.type === 'reservation') { setExpanded(x => ({ ...x, [n.id]: !x[n.id] })); return; }
               // Signature reçue → profil (section Mes signatures)
               if (n.type === 'signature') { navigate('/profil'); return; }
-              // Rediriger vers l'endroit concerné selon le type de notification
-              if (n.qrId) { navigate(`/fan?id=${n.qrId}`); return; }
+              // Rediriger vers l'endroit concerné selon le type de notification —
+              // adresse corrigée (l'ancienne "/fan?id=" n'existait dans aucune
+              // route, ça retombait toujours sur la Zikothèque par défaut) et
+              // distinction qr/public pour renvoyer vers la bonne page.
+              if (n.qrId) { navigate(n.source === 'public' ? `/ecoute/${n.qrId}` : `/fan/${n.qrId}`); return; }
               if (n.type === 'educative' || n.type === 'generale' || n.type === 'activite') {
                 // Si la notif parle de kiffements → bannière d'invitation ; sinon Découvrir
                 if (n.text && n.text.toLowerCase().includes('kiffement')) {
@@ -16663,6 +16669,7 @@ function PublicStreamPage() {
           buzz={(data.visits||0)+(data.streams||0)}
           tutoStep={0}
           onTutoNext={() => {}}
+          source="public"
         />
         <div id="zone-telecharger">
         {(() => {
