@@ -5473,6 +5473,7 @@ function AdminPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
   const [pubs, setPubs] = useState<any[]>([]);
+  const [retraits, setRetraits] = useState<any[]>([]);
   const [pubModal, setPubModal] = useState(false);
   const [pubForm, setPubForm] = useState<{ titre:string; sousTitre:string; lien:string; lienType:string; btnLabel:string; imageUrl:string; mediaType:string; active:boolean }>({ titre:'', sousTitre:'', lien:'', lienType:'url', btnLabel:'', imageUrl:'', mediaType:'', active:true });
   const [pubUploading, setPubUploading] = useState(false);
@@ -5531,6 +5532,7 @@ function AdminPage() {
     const u2 = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), s => setPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(collection(db, 'annonceurs'), orderBy('createdAt', 'desc')), s => setAnnonceurs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u4 = onSnapshot(query(collection(db, 'pubs'), orderBy('createdAt', 'desc')), s => setPubs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u5 = onSnapshot(query(collection(db, 'retraits'), orderBy('createdAt', 'desc')), s => setRetraits(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     // Stats audience globale en temps réel
     const uArtistes = onSnapshot(collection(db, 'artists'), s => {
@@ -5554,7 +5556,7 @@ function AdminPage() {
       setAudienceStats(prev => ({ ...prev, visites: s.size }));
     });
 
-    return () => { u1(); u2(); u3(); u4(); uArtistes(); uMelomanes(); uStreams(); uVentes(); uKiffements(); uVisites(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); uArtistes(); uMelomanes(); uStreams(); uVentes(); uKiffements(); uVisites(); };
   }, [user]);
 
   // ── Chat admin ↔ annonceur ──
@@ -6079,6 +6081,9 @@ const pendingPay = payments.filter(p => p.status === 'pending');
         <button style={{...tabStyle(tab === 'pubs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('pubs')}>
           Pubs {pubs.length > 0 ? `(${pubs.length})` : ''}
         </button>
+        <button style={{...tabStyle(tab === 'retraits'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('retraits')}>
+          Retraits {retraits.filter((r:any) => r.statut === 'en_attente').length > 0 ? `(${retraits.filter((r:any) => r.statut === 'en_attente').length})` : ''}
+        </button>
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
@@ -6419,6 +6424,53 @@ const pendingPay = payments.filter(p => p.status === 'pending');
                     </div>
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'retraits' && (
+          <div>
+            <h2 style={{ fontFamily:'serif', fontSize:22, fontWeight:800, marginBottom:6 }}>Demandes de retrait</h2>
+            <p style={{ color:'#8098b8', fontSize:13, marginBottom:20 }}>{retraits.filter((r:any) => r.statut === 'en_attente').length} en attente sur {retraits.length} au total</p>
+            {retraits.length === 0 && <p style={{ color:'#8098b8', textAlign:'center', padding:40 }}>Aucune demande de retrait pour l'instant.</p>}
+            {retraits.map((r:any) => (
+              <div key={r.id} style={{ background:'#fff', border:'1px solid '+(r.statut==='en_attente'?'#f0b84a':'#dce6f7'), borderRadius:14, padding:18, marginBottom:14 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                  <div>
+                    <p style={{ fontWeight:800, fontSize:16 }}>{r.montant?.toLocaleString()} F CFA</p>
+                    <p style={{ color:'#5a7090', fontSize:12 }}>{r.artistEmail}</p>
+                  </div>
+                  <span style={{ padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:700,
+                    background: r.statut==='en_attente' ? '#fff3dc' : r.statut==='paye' ? '#e6f9f0' : '#fde8ea',
+                    color: r.statut==='en_attente' ? '#b07a00' : r.statut==='paye' ? '#00a876' : '#d0344c' }}>
+                    {r.statut==='en_attente' ? 'En attente' : r.statut==='paye' ? 'Payé' : 'Rejeté'}
+                  </span>
+                </div>
+                <div style={{ background:'#f5f8ff', borderRadius:10, padding:'10px 14px', marginBottom:12, fontSize:13 }}>
+                  <p style={{ color:'#1a2340' }}><strong>Méthode :</strong> {r.methode}</p>
+                  <p style={{ color:'#1a2340' }}><strong>Numéro / IBAN :</strong> {r.numero}</p>
+                  <p style={{ color:'#8098b8', fontSize:11, marginTop:4 }}>{r.oscart} Oscart · {r.createdAt ? new Date(r.createdAt).toLocaleString('fr-FR') : ''}</p>
+                </div>
+                {r.statut === 'en_attente' && (
+                  <div style={{ display:'flex', gap:10 }}>
+                    <button onClick={async () => {
+                      await updateDoc(doc(db,'retraits',r.id), { statut:'paye', traiteLe: new Date().toISOString() });
+                      await envoyerNotification({ to: r.artistEmail, role:'artiste', type:'retrait_paye',
+                        text: `Votre retrait de ${r.montant?.toLocaleString()} F CFA a été payé.` });
+                    }} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'#00c876', color:'#fff', fontWeight:700, cursor:'pointer' }}>
+                      ✓ Marquer payé
+                    </button>
+                    <button onClick={async () => {
+                      if (!window.confirm('Rejeter cette demande de retrait ?')) return;
+                      await updateDoc(doc(db,'retraits',r.id), { statut:'rejete', traiteLe: new Date().toISOString() });
+                      await envoyerNotification({ to: r.artistEmail, role:'artiste', type:'retrait_rejete',
+                        text: `Votre demande de retrait de ${r.montant?.toLocaleString()} F CFA a été rejetée. Contactez le support pour plus d'infos.` });
+                    }} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid #f04a6a', background:'#fff', color:'#f04a6a', fontWeight:700, cursor:'pointer' }}>
+                      Rejeter
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -16740,6 +16792,13 @@ function RetraitModal({ montant, oscart, artistEmail }: { montant:number, oscart
       numero: numero || iban,
       statut: 'en_attente',
       createdAt: new Date().toISOString(),
+    });
+    // Alerte admin immédiate (push + in-app) — avant, aucune notification n'était
+    // envoyée, la demande restait invisible tant que personne n'allait vérifier
+    // la base de données à la main.
+    await envoyerNotification({
+      to: ADMIN_EMAIL, role: 'admin', type: 'demande_retrait',
+      text: `Nouvelle demande de retrait — ${artistEmail} : ${montant.toLocaleString()} F CFA via ${methode}`,
     });
     setSent(true);
   };
