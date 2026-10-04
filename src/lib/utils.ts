@@ -278,3 +278,55 @@ export const S = {
 export const tabStyle = (a: boolean): CSSProperties => ({ padding: '10px 18px', border: 'none', background: 'transparent', color: a ? '#1a6bff' : '#8098b8', cursor: 'pointer', fontSize: 13, fontWeight: a ? 700 : 400, borderBottom: '2px solid ' + (a ? '#1a6bff' : 'transparent') });
 export const badgeStyle = (s: string): CSSProperties => { const m: any = { active: ['#eaf1ff', '#1a6bff'], locked: ['#fff8e6', '#b07a00'], pending: ['#fff8e6', '#b07a00'], verified: ['#eaf1ff', '#1a6bff'], rejected: ['#fff0f3', '#e04060'] }; const [bg, c] = m[s] || ['#f0f4fb', '#8098b8']; return { fontSize: 11, padding: '3px 10px', borderRadius: 99, background: bg, color: c, fontWeight: 700 }; };
 export const formatSize = (bytes: number) => { if (!bytes) return ''; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB'; return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; };
+
+export const KIFFEMENTS = [
+  { id:"rose",     label:"Rose d'Or",        coins:1,    partArtiste:70,     desc:"J'aime ton œuvre",                image:KIF_ROSE_B64 },
+  { id:"etoile",   label:"Étoile",           coins:5,    partArtiste:350,    desc:"Je te soutiens",                  image:KIF_ETOILE_B64 },
+  { id:"trophee",  label:"Trophée",          coins:10,   partArtiste:700,    desc:"Beau travail",                    image:KIF_TROPHEE_B64 },
+  { id:"couronne", label:"Couronne",         coins:25,   partArtiste:1750,   desc:"Tu te démarques",                 image:KIF_COURONNE_B64 },
+  { id:"palme",    label:"Palme Prestige",   coins:50,   partArtiste:3500,   desc:"Tu m'impressionnes",              image:KIF_PALME_B64 },
+  { id:"diamant",  label:"Diamant",          coins:100,  partArtiste:7000,   desc:"Grande valeur artistique",        image:KIF_DIAMANT_B64 },
+  { id:"trone",    label:"Trône Royal",      coins:250,  partArtiste:17500,  desc:"Niveau exceptionnel",             image:KIF_TRONE_B64 },
+  { id:"medaille", label:"Médaille d'Or DZ", coins:500,  partArtiste:35000,  desc:"Distinction d'excellence",        image:KIF_MEDAILLE_B64 },
+  { id:"hall",     label:"Hall of Fame",     coins:1000, partArtiste:70000,  desc:"Œuvre mémorable",                 image:KIF_HALL_B64 },
+  { id:"univers",  label:"Univers DZ",       coins:5000, partArtiste:350000, desc:"Distinction ultime Doniel Zik",   image:KIF_UNIVERS_B64 },
+];
+
+export const CATEGORIES_AUDIO = [
+  { id:'tous', label:'Tous' },
+  { id:'gospel', label:'Gospel / Religieux' },
+  { id:'coupe_decale', label:'Coupé décalé' },
+  { id:'afrobeat', label:'Afrobeat / Afropop' },
+  { id:'afrotrap', label:'Afro trap' },
+  { id:'rnb', label:'R&B / Soul' },
+  { id:'hiphop', label:'Hip-hop / Rap' },
+  { id:'zouk', label:'Zouk / Kompa' },
+  { id:'reggae', label:'Reggae / Dancehall' },
+  { id:'traditionnel', label:'Musique traditionnelle' },
+  { id:'pop', label:'Pop / Variété' },
+  { id:'jazz', label:'Jazz / Blues' },
+  { id:'classique', label:'Classique' },
+  { id:'comedie', label:'Comédie musicale' },
+  { id:'slam', label:'Spoken word / Slam' },
+  { id:'humour_audio', label:'Humour audio' },
+  { id:'autres', label:'Autres' },
+];
+
+export const CATEGORIES_VIDEO = [
+  { id:'tous', label:'Tous' },
+  { id:'clip_officiel', label:'Clip officiel' },
+  { id:'clip_danse', label:'Clip de danse' },
+  { id:'court_metrage', label:'Court-métrage' },
+  { id:'serie', label:'Série / Drama' },
+  { id:'documentaire', label:'Documentaire' },
+  { id:'humour_video', label:'Humour / Sketches' },
+  { id:'autres', label:'Autres' },
+];
+
+export const PRIX_PUBLICATION = {
+  single: { oscart: 500, label: 'Single / Titre solo' },
+  album: { oscart: 1500, label: 'Album' },
+  video: { oscart: 500, label: 'Vidéo / Clip' },
+  serie: { oscart: 2500, label: 'Série / Film complet' },
+};
+
