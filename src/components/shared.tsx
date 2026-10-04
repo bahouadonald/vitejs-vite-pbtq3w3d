@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import {
   GoogleAuthProvider, signInWithPopup, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
+  onAuthStateChanged,
 } from 'firebase/auth';
 import { C, S, LOGO_B64, demanderResetPassword } from '../lib/utils';
 
@@ -544,3 +545,19 @@ export function VignetteFiltreEnDirect({ stream, css, miroir }: { stream: MediaS
 // vignettes de filtres — le filtre CSS s'applique dessus pour qu'on voie
 // vraiment son effet (couleurs de peau, ciel, verdure), au lieu d'un simple
 // dégradé plat qui n'illustre rien de concret.
+// Petit badge rouge avec le nombre de notifications non lues (pour la barre de navigation).
+export function BadgeNotif() {
+  const [email, setEmail] = useState<string | undefined>(auth.currentUser?.email || undefined);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, u => setEmail(u?.email || undefined));
+    return () => unsub();
+  }, []);
+  const n = useNotifsNonLues(email);
+  if (!n) return null;
+  return (
+    <span style={{ position:'absolute', top:-4, right:-8, minWidth:16, height:16, padding:'0 4px', borderRadius:99, background:'#f04a6a', color:'#fff', fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, boxSizing:'border-box' }}>
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
