@@ -4,11 +4,12 @@
 // des appels Firestore/réseau directs.
 // ─────────────────────────────────────────────
 import type { CSSProperties } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, getMessagingSiSupporte } from '../firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, increment,
   onSnapshot, query, orderBy, where, getDocs, limit
 } from 'firebase/firestore';
+import { getToken } from 'firebase/messaging';
 
 // Détecte si un fichier est un fichier audio (pour afficher le lecteur de streaming).
 // Vérifie le nom ET l'adresse réelle du fichier — certains fichiers arrivent avec un
@@ -329,4 +330,45 @@ export const PRIX_PUBLICATION = {
   video: { oscart: 500, label: 'Vidéo / Clip' },
   serie: { oscart: 2500, label: 'Série / Film complet' },
 };
+
+
+// Active les notifications push : demande la permission (doit venir d'un vrai
+// clic), puis récupère un jeton FCM et l'enregistre — c'est ce jeton qui
+// permet d'envoyer une notification même quand l'app est complètement fermée
+// (contrairement à l'ancien système qui exigeait que l'app soit ouverte).
+export async function activerNotificationsPush(email: string): Promise<string> {
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return permission;
+  try {
+    const messaging = await getMessagingSiSupporte();
+    if (!messaging) return permission; // navigateur non supporté (ex: iOS hors PWA)
+    const reg = await navigator.serviceWorker.ready;
+    const vapidKey = (import.meta as any).env?.VITE_FCM_VAPID_KEY;
+    if (!vapidKey) { console.error('VITE_FCM_VAPID_KEY manquante'); return permission; }
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    if (token) {
+      await setDoc(doc(db, 'fcm_tokens', token), {
+        token, email, updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch (e) { console.error('activerNotificationsPush', e); }
+  return permission;
+}
+
+export const RECHARGES = [
+  { fcfa:500,   oscart:35  },
+  { fcfa:1000,  oscart:80  },
+  { fcfa:2000,  oscart:175 },
+  { fcfa:3000,  oscart:270 },
+  { fcfa:5000,  oscart:460 },
+  { fcfa:10000, oscart:950 },
+];
+
+export const TYPES_CONTENU = [
+  { id:'tous', label:'Actu & Mood', titre:'Actu & Mood Artistique', icon:'M3 3h18v4H3V3zm0 6h18v4H3V9zm0 6h12v4H3v-4z' },
+  { id:'audio', label:'Musique', titre:'Musique', icon:'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z' },
+  { id:'video', label:'Vidéo', titre:'Vidéo', icon:'M23 7l-7 5 7 5V7zM1 5h14a2 2 0 012 2v10a2 2 0 01-2 2H1a2 2 0 01-2-2V7a2 2 0 012-2z' },
+  { id:'challenge', label:'Challenge', titre:'Challenges', icon:'M13 2L3 14h7l-1 8 10-12h-7l1-8z' },
+  { id:'bientot', label:'Sorties', titre:'Sorties officielles', icon:'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z' },
+];
 
