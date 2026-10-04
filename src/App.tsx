@@ -9752,6 +9752,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
   const navigate = useNavigate();
   const [reserve, setReserve] = useState(false);
   const [reserving, setReserving] = useState(false);
+  const [rechargeModalRes, setRechargeModalRes] = useState<{fcfa:number,oscart:number}|null>(null);
   const [msg, setMsg] = useState('');
   const [maintenant, setMaintenant] = useState(Date.now());
   const [ouvert, setOuvert] = useState(!!cible); // plié par défaut ; ouvert si on arrive via lien partagé
@@ -9790,7 +9791,11 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
       // Vérifier le solde
       const soldeSnap = await getDocs(query(collection(db,'coins_solde'), where('uid','==',user.uid)));
       const solde = soldeSnap.empty ? 0 : (soldeSnap.docs[0].data().solde || 0);
-      if (solde < s.prixOscart) { setMsg(`Solde insuffisant. Il vous faut ${s.prixOscart} Oscart.`); setReserving(false); return; }
+      if (solde < s.prixOscart) {
+        setMsg(`Solde insuffisant. Il vous faut ${s.prixOscart} Oscart.`);
+        setRechargeModalRes({ oscart: s.prixOscart, fcfa: s.prixOscart * 10 });
+        setReserving(false); return;
+      }
       const kiffsGagnes = s.prixOscart * 250;
       // Débiter + créditer les kiffs (celui qui réserve obtient toujours des kiffs)
       await updateDoc(doc(db,'coins_solde',soldeSnap.docs[0].id), {
@@ -10028,14 +10033,47 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
               </p>
               {msg && <p style={{ color: msg.startsWith('Erreur') || msg.startsWith('Solde') ? C.alert : C.success, fontSize:12, margin:'0 0 12px' }}>{msg}</p>}
 
-              {/* Si assez d'Oscart, prélèvement automatique */}
+              {rechargeModalRes && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+                  onClick={() => setRechargeModalRes(null)}>
+                  <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+                    onClick={e => e.stopPropagation()}>
+                    <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+                    <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
+                      Recharger {rechargeModalRes.oscart} Oscart
+                    </p>
+                    <RechargeDeviseSelector fcfa={rechargeModalRes.fcfa} />
+                    <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+                      Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+                    </p>
+                    <button onClick={async () => {
+                      const err = await lancerPaiementGeniusPay(rechargeModalRes.oscart, rechargeModalRes.fcfa);
+                      if (err) alert(err);
+                    }}
+                      style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                      Payer {rechargeModalRes.fcfa.toLocaleString()} F CFA
+                    </button>
+                    <button onClick={() => setRechargeModalRes(null)}
+                      style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Oscart = moyen de paiement mis en avant (plus fiable que le direct) */}
               <button onClick={reserver} disabled={reserving}
-                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:`linear-gradient(135deg,${C.blue},#0050d0)`, color:'#fff', fontWeight:800, fontSize:15, cursor: reserving?'wait':'pointer' }}>
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor: reserving?'wait':'pointer' }}>
                 {reserving ? 'Réservation...' : `Payer avec mon solde (${s.prixOscart} Oscart)`}
               </button>
-              {/* Sinon, paiement direct en devise via GeniusPay */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 10px' }}>
+                <div style={{ flex:1, height:1, background:C.border }} />
+                <span style={{ color:C.textSoft, fontSize:11 }}>ou</span>
+                <div style={{ flex:1, height:1, background:C.border }} />
+              </div>
+              {/* Paiement direct en devise — option secondaire, discrète */}
               <button onClick={payerDirect} disabled={payingDirect}
-                style={{ width:'100%', padding:14, borderRadius:12, border:'none', marginTop:10, background: payingDirect ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor: payingDirect?'wait':'pointer' }}>
+                style={{ width:'100%', padding:11, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontWeight:600, fontSize:13, cursor: payingDirect?'wait':'pointer' }}>
                 {payingDirect ? 'Redirection en cours...' : `Payer ${devise === 'eur' ? `${(s.prixMusique*0.0015).toFixed(2)} €` : devise === 'usd' ? `${(s.prixMusique*0.0016).toFixed(2)} $` : `${s.prixMusique.toLocaleString()} F CFA`} directement`}
               </button>
               <button onClick={() => setShowDetail(false)}
@@ -15969,9 +16007,52 @@ function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, source }:
     </>
   );
 
-  // Pas de solde Oscart suffisant : on n'affiche rien ici, le paiement direct
-  // en devise (bouton géré par AchatWidget) reste toujours disponible.
-  if (!user || solde < prixOscart) return null;
+  if (!user) return null; // géré par le bouton "Connectez-vous" de AchatWidget
+
+  // Solde insuffisant : avant, le bouton disparaissait purement et simplement
+  // (la fenêtre de recharge existait déjà dans le code mais rien ne la
+  // déclenchait jamais). Oscart reste le moyen de paiement mis en avant —
+  // plus fiable que le paiement direct — donc on propose de recharger
+  // directement ici plutôt que de laisser le paiement direct comme seule
+  // option visible.
+  if (solde < prixOscart) {
+    return (
+      <div>
+        {rechargeModal && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+            onClick={() => setRechargeModal(null)}>
+            <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
+              <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
+                Recharger {rechargeModal.oscart} Oscart
+              </p>
+              <RechargeDeviseSelector fcfa={rechargeModal.fcfa} />
+              <p style={{ color:'#8098b8', fontSize:12, textAlign:'center', margin:'0 0 14px' }}>
+                Paiement sécurisé via Wave, Orange Money, MTN, Moov ou carte bancaire
+              </p>
+              <button onClick={async () => {
+                const err = await lancerPaiementGeniusPay(rechargeModal.oscart, rechargeModal.fcfa);
+                if (err) alert(err);
+              }}
+                style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                Payer {rechargeModal.fcfa.toLocaleString()} F CFA
+              </button>
+              <button onClick={() => setRechargeModal(null)}
+                style={{ width:'100%', padding:12, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+        <button onClick={() => setRechargeModal({ oscart: prixOscart, fcfa: prixOscart * 10 })}
+          style={{ width:'100%', padding:14, borderRadius:12, border:'none', background:'linear-gradient(135deg,#ffd700,#f0a500)', color:'#1a2340', fontWeight:800, fontSize:15, cursor:'pointer' }}>
+          Recharger {prixOscart} Oscart pour télécharger
+        </button>
+        <p style={{ color:'#5a7090', fontSize:11, textAlign:'center', margin:'6px 0 0' }}>Solde actuel : {solde} Oscart</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -16193,11 +16274,17 @@ function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, externalOpen,
               </a>
             ) : (
               <>
-                {/* Si l'utilisateur a assez d'Oscart, l'équivalent est prélevé automatiquement */}
+                {/* Oscart = moyen de paiement mis en avant (plus fiable que le
+                    paiement direct, qui échoue parfois selon l'opérateur) */}
                 <OscartPayButton prix={prix} qrId={qrId} albumLabel={albumLabel} artistEmail={artistEmail} files={files} source={source} />
-                {/* Sinon (ou en plus), paiement direct en devise via Wave / Orange Money / MTN / carte */}
+                <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 10px' }}>
+                  <div style={{ flex:1, height:1, background:C.border }} />
+                  <span style={{ color:C.textSoft, fontSize:11 }}>ou</span>
+                  <div style={{ flex:1, height:1, background:C.border }} />
+                </div>
+                {/* Paiement direct en devise — option secondaire, discrète */}
                 <button onClick={handlePay} disabled={state === 'loading'}
-                  style={{ width:'100%', padding:14, borderRadius:12, border:'none', marginTop:10, background: state==='loading' ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor: state==='loading' ? 'wait' : 'pointer' }}>
+                  style={{ width:'100%', padding:11, borderRadius:12, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontWeight:600, fontSize:13, cursor: state==='loading' ? 'wait' : 'pointer' }}>
                   {state === 'loading' ? 'Redirection en cours...' : `Payer ${devise === 'eur' ? `${(prix*0.0015).toFixed(2)} €` : devise === 'usd' ? `${(prix*0.0016).toFixed(2)} $` : `${prix.toLocaleString()} F CFA`} directement`}
                 </button>
                 {errMsg && <p style={{ color:'#ff5a5a', fontSize:12, margin:'8px 0 0' }}>{errMsg}</p>}
