@@ -16,7 +16,7 @@ service cloud.firestore {
       allow read: if true;
       allow update: if request.auth != null
                     || request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status']);
+                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status', 'titresTelecharges']);
       allow create, delete: if request.auth != null;
     }
 

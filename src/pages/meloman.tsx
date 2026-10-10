@@ -8,7 +8,7 @@ import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { auth, db } from '../firebase';
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs,
+  collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, arrayUnion, increment,
 } from 'firebase/firestore';
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -27,6 +27,33 @@ import {
 import { AchatWidget } from '../components/achat';
 import { PubOverlay, AdminPage } from './admin';
 
+// Petit bouton "payant" compact pour UN titre précis déjà téléchargé
+// gratuitement — se déplie en widget d'achat juste pour ce fichier-là,
+// sans jamais quitter la page.
+function AchatAccordeon({ fichier, qrData, qrId }: { fichier: any, qrData: any, qrId: string }) {
+  const [ouvert, setOuvert] = useState(false);
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)}
+        style={{ padding:'8px 14px', borderRadius:10, border:'1px solid rgba(255,200,0,0.4)', background:'rgba(255,200,0,0.08)', color:'#ffd700', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+        Racheter
+      </button>
+    );
+  }
+  return (
+    <div style={{ width:'100%', flexBasis:'100%', marginTop:4 }}>
+      <AchatWidget
+        qrId={qrData.qrId || qrId || ''}
+        albumLabel={fichier.name?.replace(/\.[^/.]+$/, '') || qrData.label || ''}
+        artistEmail={qrData.artistEmail || ''}
+        prix={qrData.price || 0}
+        files={[fichier]}
+        source="qr"
+      />
+    </div>
+  );
+}
+
 export function FanPage() {
   const { qrId } = useParams<{ qrId: string }>();
   const [step, setStep] = useState<'loading' | 'ready' | 'zipping' | 'done'>('loading');
@@ -34,6 +61,12 @@ export function FanPage() {
   const [dlProgress, setDlProgress] = useState(0);
   const [dlStatus, setDlStatus] = useState('');
   const [downloaded, setDownloaded] = useState(false);
+  // Suivi titre par titre : une fois qu'un titre précis a été téléchargé
+  // gratuitement, il bascule en payant — sans quitter la page. On combine
+  // ce qui est déjà enregistré côté serveur (qrData.titresTelecharges) et
+  // ce qui vient d'être fait dans cette visite (mise à jour immédiate).
+  const [titresTelDejaFaits, setTitresTelDejaFaits] = useState<string[]>([]);
+  const [artisteSlug, setArtisteSlug] = useState('');
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
@@ -68,6 +101,13 @@ export function FanPage() {
       qrDocId.current = docId;
       const data = { id: docId, ...snap.docs[0].data() } as any;
       setQrData(data);
+      setTitresTelDejaFaits(data.titresTelecharges || []);
+      // Chercher la page bio publique de l'artiste (si elle existe) pour le bouton "Voir la bio"
+      if (data.artistEmail) {
+        getDocs(query(collection(db,'artists'), where('email','==',data.artistEmail.toLowerCase())))
+          .then(s => { if (!s.empty && s.docs[0].data().slug) setArtisteSlug(s.docs[0].data().slug); })
+          .catch(() => {});
+      }
       // Afficher la page TOUT DE SUITE (ne pas attendre l'écriture des stats)
       setStep('ready');
       // Enregistrer la visite EN ARRIÈRE-PLAN (ne bloque plus l'affichage)
@@ -175,6 +215,34 @@ export function FanPage() {
           createdAt: new Date().toISOString(),        });
       }
     } catch(e) { console.error('markDL', e); }
+  };
+
+  // Téléchargement d'UN SEUL titre, avec bascule immédiate en payant pour
+  // CE titre précis une fois fait (sans recharger la page).
+  const telechargerTitre = async (f: any) => {
+    if (!qrData || !qrDocId.current) return;
+    const nom = f.name;
+    if (titresTelDejaFaits.includes(nom)) return; // déjà fait, le bouton payant a pris le relais
+
+    const a = document.createElement('a');
+    a.href = f.url.replace('/upload/','/upload/fl_attachment/');
+    a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+    setTitresTelDejaFaits(prev => [...prev, nom]); // bascule immédiate, pas d'attente réseau
+    try {
+      await updateDoc(doc(db,'qrcodes',qrDocId.current), {
+        titresTelecharges: arrayUnion(nom),
+        usedScans: increment(1), downloads: increment(1),
+        status: 'active',
+      });
+      const u = auth.currentUser;
+      if (qrData.artistEmail) {
+        await envoyerNotification({
+          to: qrData.artistEmail, role:'artiste', type:'telechargement',
+          text: `${u?.displayName || 'Un fan'} a téléchargé "${nom}" (${qrData.label || ''}).`,
+        });
+      }
+    } catch (e) { console.error('telechargerTitre', e); }
   };
 
   const startDownload = async () => {
@@ -296,7 +364,13 @@ export function FanPage() {
           {/* TITRE + ARTISTE */}
           <div style={{ padding:'14px 18px 0', marginBottom:20 }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:26, fontWeight:900, color:'#fff', marginBottom:4, lineHeight:1.1 }}>{qrData.label}</h1>
-            <p style={{ color:'#6a88aa', fontSize:13 }}>par <strong style={{ color:'#4da6ff' }}>{qrData.artist}</strong></p>
+            <p style={{ color:'#6a88aa', fontSize:13, marginBottom: artisteSlug ? 10 : 0 }}>par <strong style={{ color:'#4da6ff' }}>{qrData.artist}</strong></p>
+            {artisteSlug && (
+              <Link to={`/artiste-bio/${artisteSlug}`}
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:99, border:'1px solid rgba(77,166,255,0.4)', color:'#4da6ff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                👤 Voir la bio de l'artiste
+              </Link>
+            )}
           </div>
 
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
@@ -367,28 +441,39 @@ export function FanPage() {
               </div>
             )}
 
-            {/* ── BOUTON TÉLÉCHARGER GRATUIT — uniquement tant que le quota de
-                scans n'est pas épuisé (sinon place au bouton payant plus haut).
-                Un seul bouton, plus de liste déroulante (comme sur le lien
-                public) ── */}
+            {/* ── LISTE DES TITRES — téléchargement unitaire. Dès qu'un titre
+                précis a été téléchargé gratuitement une fois, SON bouton
+                bascule en payant (lui seul), sans recharger la page ni
+                toucher aux autres titres de la liste. ── */}
             {qrData.files?.length > 0 && !(qrData.totalScans > 0 && (qrData.usedScans || 0) >= (qrData.totalScans || 0)) && (
               <div style={{ marginBottom:20 }}>
-                <button onClick={() => {
-                    markAsDownloaded();
-                    qrData.files.forEach((f:any, i:number) => {
-                      setTimeout(() => {
-                        const a = document.createElement('a');
-                        a.href = f.url.replace('/upload/','/upload/fl_attachment/');
-                        a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                      }, i * 400); // léger décalage pour que le navigateur ne bloque pas les téléchargements multiples
-                    });
-                    if (zikoState === 'idle') setTimeout(() => setShowZikoTuto(true), 800);
-                  }}
-                  style={{ width:'100%', padding:'14px 18px', borderRadius:14, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, boxShadow:'0 4px 18px rgba(10,132,255,0.45)' }}>
-                  <span style={{ fontSize:18 }}>⬇</span>
-                  Télécharger {qrData.files.length > 1 ? `(${qrData.files.length} titres)` : ''}
-                </button>
-                {downloaded && (
+                <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>
+                  {qrData.files.length > 1 ? `${qrData.files.length} titres` : 'Titre'}
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {qrData.files.map((f:any, i:number) => {
+                    const dejaFait = titresTelDejaFaits.includes(f.name);
+                    return (
+                      <div key={i} style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid '+C.border }}>
+                        <p style={{ flex:1, color:C.text, fontSize:13, fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {f.name?.replace(/\.[^/.]+$/, '') || `Titre ${i+1}`}
+                        </p>
+                        {dejaFait ? (
+                          <AchatAccordeon fichier={f} qrData={qrData} qrId={qrId || ''} />
+                        ) : (
+                          <button onClick={() => {
+                              telechargerTitre(f);
+                              if (zikoState === 'idle') setTimeout(() => setShowZikoTuto(true), 800);
+                            }}
+                            style={{ padding:'8px 14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                            ⬇ Télécharger
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {titresTelDejaFaits.length > 0 && (
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, padding:'10px 14px', borderRadius:10, background:'rgba(0,212,154,0.1)', border:'1px solid rgba(0,212,154,0.3)' }}>
                     <span style={{ color:C.success, fontSize:16 }}>✓</span>
                     <p style={{ color:C.success, fontSize:12, fontWeight:700, margin:0 }}>Téléchargement effectué</p>
