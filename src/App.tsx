@@ -36,7 +36,7 @@ import {
   compterTelechargementQrcode, compterTelechargementLienPublic, OscartPayButton, AchatWidget,
 } from './components/achat';
 import {
-  FanPage, generatePochettes, ScannerQR, IconeScannerBouton, LandingPage, UserAuthPage, ZikothequePage,
+  FanPage, ScannerQR, IconeScannerBouton, LandingPage, UserAuthPage, ZikothequePage,
 } from './pages/meloman';
 import {
   SignaturesArtisteTab, SoumissionsTab, DecouvrirAdminTab, SortiesAdminTab, ProductionTab,

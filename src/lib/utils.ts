@@ -372,3 +372,68 @@ export const TYPES_CONTENU = [
   { id:'bientot', label:'Sorties', titre:'Sorties officielles', icon:'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z' },
 ];
 
+// ─────────────────────────────────────────────
+// POCHETTE GENERATOR (dans AdminPage — onglet Pochettes)
+// ─────────────────────────────────────────────
+export async function generatePochettes(
+  qrcodes: any[], templateFile: File, onProgress: (p: number) => void,
+  position?: { xPct: number, yPct: number, sizePct: number }
+): Promise<void> {
+  const QRCode = (await import('qrcode')).default;
+  const templateUrl = URL.createObjectURL(templateFile);
+  const templateImg = await new Promise<HTMLImageElement>((res, rej) => {
+    const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = templateUrl;
+  });
+  const SIZE = 1000; // canvas carré 1000x1000px
+  // Position choisie par l'admin (coin haut-gauche du QR + sa taille, en % de
+  // l'image) — avant, c'était toujours figé en bas à gauche, 22% de large.
+  const QR_SIZE = Math.round(SIZE * ((position?.sizePct ?? 22) / 100));
+  const QR_X = Math.round(SIZE * ((position?.xPct ?? 3) / 100));
+  const QR_Y = Math.round(SIZE * ((position?.yPct ?? 72) / 100));
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  const folder = zip.folder('pochettes') as any;
+
+  for (let i = 0; i < qrcodes.length; i++) {
+    const q = qrcodes[i];
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE; canvas.height = SIZE;
+    const ctx = canvas.getContext('2d')!;
+    // Dessiner la pochette template
+    ctx.drawImage(templateImg, 0, 0, SIZE, SIZE);
+    // Générer QR code
+    const qrDataUrl = await QRCode.toDataURL(BASE_URL + '/fan/' + q.qrId, {
+      width: QR_SIZE, margin: 1, errorCorrectionLevel: 'H',
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+    const qrImg = await new Promise<HTMLImageElement>((res, rej) => {
+      const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = qrDataUrl;
+    });
+    // Fond blanc sous le QR
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(QR_X - 4, QR_Y - 4, QR_SIZE + 8, QR_SIZE + 8);
+    // Dessiner le QR code
+    ctx.drawImage(qrImg, QR_X, QR_Y, QR_SIZE, QR_SIZE);
+    // Texte "Scannez et Téléchargez"
+    ctx.fillStyle = '#000000';
+    ctx.font = `bold ${Math.round(SIZE * 0.022)}px Arial`;
+    const textY = QR_Y + QR_SIZE + Math.round(SIZE * 0.035);
+    ctx.fillStyle = '#000000';
+    ctx.fillText('Scannez et ', QR_X, textY);
+    const scannezWidth = ctx.measureText('Scannez et ').width;
+    ctx.fillStyle = '#1a6bff';
+    ctx.fillText('Téléchargez', QR_X + scannezWidth, textY);
+    // Exporter en PNG
+    const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png', 0.95));
+    folder.file((q.label || 'pochette').replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + q.qrId + '.png', blob);
+    onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
+  }
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = 'pochettes_' + qrcodes[0]?.label?.replace(/[^a-zA-Z0-9_-]/g, '_') + '.zip';
+  a.click();
+  URL.revokeObjectURL(templateUrl);
+}
+

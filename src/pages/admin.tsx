@@ -17,6 +17,7 @@ import {
   notifierAdminEnregistrement, CLOUDINARY_CLOUD, CLOUDINARY_UPLOAD_PRESET, BASE_URL, optimImg,
   logTx, lancerPaiementGeniusPay, MSG_INVIT_ARTISTE, tabStyle, badgeStyle, formatSize,
   COIN_OSCART_SYMBOLE, KIFFEMENTS, CATEGORIES_AUDIO, CATEGORIES_VIDEO, PRIX_PUBLICATION,
+  generatePochettes,
 } from '../lib/utils';
 import {
   WhatsAppLink, BoutonResetAdmin, ChangerMotDePasse, cleanName, Logo, SIGNATURES, Lien,
@@ -2432,6 +2433,12 @@ export function AdminPage() {
   const [bulkFormat, setBulkFormat] = useState<'a4' | 'a3'>('a4');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
+  // Mode pochette : coller le QR directement sur le design de la pochette
+  // (au lieu d'une simple feuille de QR nus à découper/coller soi-même).
+  const [bulkMode, setBulkMode] = useState<'feuille' | 'pochette'>('feuille');
+  const [pochetteTemplate, setPochetteTemplate] = useState<File | null>(null);
+  const [pochettePreviewUrl, setPochettePreviewUrl] = useState('');
+  const [pochettePos, setPochettePos] = useState({ xPct: 3, yPct: 72, sizePct: 22 });
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
   const [pubs, setPubs] = useState<any[]>([]);
@@ -2725,6 +2732,20 @@ export function AdminPage() {
       setBulkProgress(Math.round(((i + batchSize) / count) * 50));
     }
     setBulkProgress(55);
+
+    if (bulkMode === 'pochette' && pochetteTemplate) {
+      // Mode pochette : le QR est collé directement sur le design, prêt à
+      // imprimer — plus besoin de découper/coller les QR à la main.
+      const qrcodesPourPochettes = qrIds.map(qrId => ({ qrId, label: bulkQr.label }));
+      await generatePochettes(qrcodesPourPochettes, pochetteTemplate,
+        (p) => setBulkProgress(55 + Math.round(p * 0.45)), pochettePos);
+      setBulkProgress(100);
+      setMsg('' + count + ' pochettes generees' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + ' ! ZIP telecharge.');
+      await new Promise(r => setTimeout(r, 1500));
+      setBulkLoading(false); setShowBulk(false); setBulkQr(null);
+      return;
+    }
+
     const QRCode = (await import('qrcode')).default;
     const { jsPDF } = await import('jspdf');
     // A3 garde les mêmes marges que l'A4 (juste sur une feuille plus grande),
@@ -2853,29 +2874,78 @@ export function AdminPage() {
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
             <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
               <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
-              <p style={{ color: '#8098b8', fontSize: 11 }}>30 QR/page en A4, 56 QR/page en A3 → PDF imprimable</p>
+              <p style={{ color: '#8098b8', fontSize: 11 }}>
+                {bulkMode === 'feuille' ? '30 QR/page en A4, 56 QR/page en A3 → PDF imprimable' : 'Le QR est collé directement sur ton design → une image prête à imprimer par pochette, dans un ZIP'}
+              </p>
             </div>
-            <label style={S.lbl}>Format papier</label>
+
+            <label style={S.lbl}>Mode de génération</label>
             <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-              {[['a4','A4 · 30/page'],['a3','A3 · 56/page']].map(([k,l]) => (
-                <button key={k} onClick={() => setBulkFormat(k as any)}
-                  style={{ flex:1, padding:'10px', borderRadius:10, border:`2px solid ${bulkFormat===k?'#1a6bff':'#dce6f7'}`, background:bulkFormat===k?'#eaf1ff':'#fff', color:bulkFormat===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              {[['feuille','Feuille de QR (PDF)'],['pochette','QR sur la pochette (ZIP)']].map(([k,l]) => (
+                <button key={k} onClick={() => setBulkMode(k as any)}
+                  style={{ flex:1, padding:'10px', borderRadius:10, border:`2px solid ${bulkMode===k?'#1a6bff':'#dce6f7'}`, background:bulkMode===k?'#eaf1ff':'#fff', color:bulkMode===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
                   {l}
                 </button>
               ))}
             </div>
+
+            {bulkMode === 'feuille' ? (
+              <>
+                <label style={S.lbl}>Format papier</label>
+                <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                  {[['a4','A4 · 30/page'],['a3','A3 · 56/page']].map(([k,l]) => (
+                    <button key={k} onClick={() => setBulkFormat(k as any)}
+                      style={{ flex:1, padding:'10px', borderRadius:10, border:`2px solid ${bulkFormat===k?'#1a6bff':'#dce6f7'}`, background:bulkFormat===k?'#eaf1ff':'#fff', color:bulkFormat===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div style={{ marginBottom:14 }}>
+                <label style={S.lbl}>Design de la pochette (une seule image)</label>
+                <input type="file" accept="image/*" onChange={e => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  setPochetteTemplate(f);
+                  setPochettePreviewUrl(URL.createObjectURL(f));
+                }} style={{ ...S.inp, padding:8 }} />
+
+                {pochettePreviewUrl && (
+                  <>
+                    <p style={{ color:'#5a7090', fontSize:11, margin:'10px 0 6px' }}>Clique sur l'image pour placer le QR :</p>
+                    <div style={{ position:'relative', width:'100%', borderRadius:10, overflow:'hidden', border:'1px solid #dce6f7', cursor:'crosshair' }}
+                      onClick={e => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                        const yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                        setPochettePos(p => ({ ...p, xPct: Math.max(0, Math.min(100 - p.sizePct, xPct)), yPct: Math.max(0, Math.min(100 - p.sizePct, yPct)) }));
+                      }}>
+                      <img src={pochettePreviewUrl} alt="" style={{ width:'100%', display:'block' }} />
+                      <div style={{ position:'absolute', left:pochettePos.xPct+'%', top:pochettePos.yPct+'%', width:pochettePos.sizePct+'%', aspectRatio:'1/1', background:'rgba(26,107,255,0.35)', border:'2px solid #1a6bff', borderRadius:4, pointerEvents:'none' }} />
+                    </div>
+                    <label style={{ ...S.lbl, marginTop:10 }}>Taille du QR ({pochettePos.sizePct}%)</label>
+                    <input type="range" min={8} max={40} value={pochettePos.sizePct}
+                      onChange={e => setPochettePos(p => ({ ...p, sizePct: parseInt(e.target.value) }))}
+                      style={{ width:'100%' }} />
+                  </>
+                )}
+              </div>
+            )}
+
             <label style={S.lbl}>Nombre de QR codes</label>
             <input style={S.inp} type="number" value={bulkCount} onChange={e => setBulkCount(e.target.value)} placeholder="100" min="1" max="5000" />
             <label style={S.lbl}>Scans par QR code</label>
             <input style={S.inp} type="number" value={bulkScans} onChange={e => setBulkScans(e.target.value)} placeholder="1" min="1" />
             <div style={{ background: '#eaf1ff', border: '1px solid #2a4a1a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-              <p style={{ color: '#1a6bff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{Math.ceil(parseInt(bulkCount || '0') / (bulkFormat === 'a3' ? 56 : 30))} page(s) {bulkFormat.toUpperCase()}</p>
+              {bulkMode === 'feuille' && (
+                <p style={{ color: '#1a6bff', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{Math.ceil(parseInt(bulkCount || '0') / (bulkFormat === 'a3' ? 56 : 30))} page(s) {bulkFormat.toUpperCase()}</p>
+              )}
               <p style={{ color: '#5a7090', fontSize: 12 }}>{bulkCount} QR × {bulkScans} scan(s) = {parseInt(bulkCount || '0') * parseInt(bulkScans || '0')} telechargements</p>
             </div>
             {bulkLoading && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5a7090', marginBottom: 6 }}>
-                  <span>{bulkProgress < 55 ? 'Creation des QR codes...' : 'Generation du PDF...'}</span>
+                  <span>{bulkProgress < 55 ? 'Creation des QR codes...' : (bulkMode === 'pochette' ? 'Collage sur les pochettes...' : 'Generation du PDF...')}</span>
                   <span style={{ color: '#1a6bff', fontWeight: 700 }}>{bulkProgress}%</span>
                 </div>
                 <div style={{ height: 8, background: '#dce6f7', borderRadius: 99 }}>
@@ -2885,9 +2955,9 @@ export function AdminPage() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); }} disabled={bulkLoading}>Annuler</button>
-              <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading}>
-                {bulkLoading ? 'Generation...' : 'Generer ' + bulkCount + ' QR codes'}
+              <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); setPochetteTemplate(null); setPochettePreviewUrl(''); setBulkMode('feuille'); }} disabled={bulkLoading}>Annuler</button>
+              <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading || (bulkMode === 'pochette' && !pochetteTemplate)}>
+                {bulkLoading ? 'Generation...' : bulkMode === 'pochette' ? 'Generer ' + bulkCount + ' pochettes' : 'Generer ' + bulkCount + ' QR codes'}
               </button>
             </div>
           </div>
