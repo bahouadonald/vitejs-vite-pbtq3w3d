@@ -82,7 +82,6 @@ export default async function handler(req, res) {
 <meta name="twitter:title" content="${echapper(titre)}" />
 <meta name="twitter:description" content="${echapper(description)}" />
 <meta name="twitter:image" content="${echapper(image)}" />
-<meta http-equiv="refresh" content="0;url=${echapper(urlFinale)}" />
 </head>
 <body>
 <p><a href="${echapper(urlFinale)}">${echapper(titre)}</a></p>
