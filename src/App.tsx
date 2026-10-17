@@ -11,6 +11,7 @@ import {
   createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup,
   RecaptchaVerifier, signInWithPhoneNumber, updateProfile,
   sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
+  deleteUser,
 } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import {
@@ -3087,6 +3088,11 @@ function ProfilPage() {
   const [uploadPhoto, setUploadPhoto] = useState(false);
   const [savingProfil, setSavingProfil] = useState(false);
   const [estArtiste, setEstArtiste] = useState(false); // ce compte est-il aussi un artiste validé ?
+  // Suppression de compte & données associées (Conformité Google Play / RGPD)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteRaison, setDeleteRaison] = useState('');
+  const [deleteConfirmCheck, setDeleteConfirmCheck] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     onAuthStateChanged(auth, async (u) => {
@@ -3162,6 +3168,40 @@ function ProfilPage() {
       setEditProfil(false);
     } catch(e) { console.error(e); }
     setSavingProfil(false);
+  };
+
+  // Demande de suppression de compte et des données (conforme Google Play / RGPD)
+  const executerSuppressionCompte = async () => {
+    if (!user || !deleteConfirmCheck) return;
+    setDeletingAccount(true);
+    try {
+      // 1. Enregistrer la demande officielle dans Firestore
+      await addDoc(collection(db, 'demandes_suppression'), {
+        userId: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        soldeOscart: soldeOscart || 0,
+        raison: deleteRaison.trim() || 'Non spécifiée',
+        dateDemande: new Date().toISOString(),
+        statut: 'en_attente',
+        source: 'profil_in_app',
+      });
+
+      // 2. Tenter la suppression immédiate du compte d'authentification
+      try {
+        await deleteUser(user);
+        alert("Votre compte a été supprimé avec succès. L'ensemble de vos données associées seront définitivement purgées sous 30 jours conformément à nos règles de confidentialité.");
+      } catch (authErr: any) {
+        console.warn("Suppression directe auth (session ancienne ou reconnexion requise) :", authErr);
+        alert("Votre demande de suppression de compte et des données associées a bien été enregistrée. Elle sera définitivement traitée sous 30 jours.");
+        await signOut(auth);
+      }
+      window.location.href = '/';
+    } catch (e: any) {
+      console.error("Erreur suppression compte :", e);
+      alert("Une erreur est survenue lors de l'enregistrement de votre demande : " + (e?.message || 'Veuillez réessayer'));
+      setDeletingAccount(false);
+    }
   };
 
   const envoyerProjet = async () => {
@@ -3490,6 +3530,7 @@ function ProfilPage() {
               { label:'À propos de Doniel Zik', path:'/apropos' },
               { label:"Conditions d'utilisation", path:'/conditions' },
               { label:'Confidentialité', path:'/privacy' },
+              { label:'Suppression de compte & données', path:'/suppression-compte' },
             ].map((it, i) => (
               <a key={it.path} href={it.path}
                 style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', textDecoration:'none', color:'#dde4f5', fontSize:14, borderTop: i>0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
@@ -3505,6 +3546,67 @@ function ProfilPage() {
           style={{ width:'100%', padding:14, borderRadius:12, border:'1px solid rgba(240,74,106,0.3)', background:'rgba(240,74,106,0.08)', color:'#f04a6a', fontWeight:700, fontSize:14, cursor:'pointer' }}>
           Se déconnecter
         </button>
+
+        {/* Demande de suppression de compte & données */}
+        <div style={{ marginTop:16, textAlign:'center' }}>
+          <button onClick={() => setShowDeleteModal(true)}
+            style={{ background:'none', border:'none', color:'#f04a6a', fontSize:12, fontWeight:600, cursor:'pointer', textDecoration:'underline', opacity:0.85, padding:'8px 12px' }}>
+            Demander la suppression de mon compte et de mes données
+          </button>
+        </div>
+
+        {/* MODAL — Demande de suppression de compte (Google Play / RGPD) */}
+        {showDeleteModal && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+            onClick={() => !deletingAccount && setShowDeleteModal(false)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background:'#161c2e', border:'1px solid rgba(240,74,106,0.35)', borderRadius:20, padding:'24px 20px', width:'100%', maxWidth:440, color:'#dde4f5', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+                <span style={{ width:40, height:40, borderRadius:99, background:'rgba(240,74,106,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+                  ⚠️
+                </span>
+                <div>
+                  <h3 style={{ margin:0, fontSize:17, fontWeight:800, color:'#fff' }}>Suppression du compte</h3>
+                  <p style={{ margin:'2px 0 0', fontSize:11, color:'#f04a6a', fontWeight:700 }}>Action irréversible</p>
+                </div>
+              </div>
+
+              <p style={{ fontSize:13, lineHeight:1.6, color:'#a8b7d4', margin:'0 0 14px' }}>
+                Vous êtes sur le point de demander la suppression définitive de votre compte (<strong>{user?.email || user?.displayName}</strong>) et de toutes les données associées :
+              </p>
+
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px 14px', marginBottom:14, fontSize:12, color:'#c5d1eb', lineHeight:1.8 }}>
+                • Profil utilisateur et identifiants de connexion<br/>
+                • Solde restant ({soldeOscart} Oscart) et kiffs offerts<br/>
+                • Favoris, kiffements, playlists et accès à la Zikothèque<br/>
+                • Signatures et historique de téléchargements
+              </div>
+
+              <label style={{ display:'block', fontSize:12, fontWeight:700, color:'#8098b8', marginBottom:6 }}>
+                Raison de votre départ (optionnel)
+              </label>
+              <input value={deleteRaison} onChange={e => setDeleteRaison(e.target.value)}
+                placeholder="Ex : Je n'utilise plus l'application..."
+                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #283556', background:'#0e1424', color:'#fff', fontSize:13, marginBottom:14, boxSizing:'border-box' as any }} />
+
+              <label style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:12, color:'#dde4f5', marginBottom:18, cursor:'pointer' }}>
+                <input type="checkbox" checked={deleteConfirmCheck} onChange={e => setDeleteConfirmCheck(e.target.checked)}
+                  style={{ marginTop:2 }} />
+                <span>Je confirme vouloir supprimer définitivement mon compte et l'ensemble de mes données personnelles.</span>
+              </label>
+
+              <button onClick={executerSuppressionCompte} disabled={!deleteConfirmCheck || deletingAccount}
+                style={{ width:'100%', padding:13, borderRadius:12, border:'none', background: (deleteConfirmCheck && !deletingAccount) ? '#f04a6a' : 'rgba(240,74,106,0.3)', color:'#fff', fontWeight:800, fontSize:14, cursor: (deleteConfirmCheck && !deletingAccount) ? 'pointer' : 'not-allowed', marginBottom:10 }}>
+                {deletingAccount ? 'Traitement en cours...' : 'Confirmer la suppression définitive'}
+              </button>
+
+              <button onClick={() => setShowDeleteModal(false)} disabled={deletingAccount}
+                style={{ width:'100%', padding:11, borderRadius:12, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#8098b8', fontSize:13, cursor:'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* BARRE NAVIGATION */}
@@ -7043,7 +7145,7 @@ function PrivacyPage() {
           { titre:'4. Partage des données', texte:'Vos données personnelles ne sont jamais vendues. Elles peuvent être partagées uniquement avec nos prestataires techniques — Firebase (Google), Cloudinary — ou les autorités compétentes sur demande légale.' },
           { titre:'5. Sécurité', texte:'Vos données sont stockées de manière sécurisée sur les serveurs Firebase de Google. Nous mettons en œuvre toutes les mesures nécessaires contre tout accès non autorisé.' },
           { titre:'6. Conservation', texte:'Vos données sont conservées tant que votre compte est actif. En cas de suppression, vos données sont effacées sous 30 jours.' },
-          { titre:'7. Vos droits', texte:'Droit d\'accès, de rectification, de suppression et d\'opposition. Pour exercer ces droits : bdonaldservices@gmail.com' },
+          { titre:'7. Vos droits et suppression de compte', texte:'Droit d\'accès, de rectification, de suppression et d\'opposition. Vous pouvez demander la suppression définitive de votre compte et de toutes vos données associées directement depuis votre page Profil ou via notre formulaire en ligne : doniel.art/suppression-compte, ou par email à bdonaldservices@gmail.com.' },
           { titre:'8. Cookies', texte:'Doniel Zik utilise uniquement des cookies techniques nécessaires au bon fonctionnement. Aucun cookie publicitaire tiers.' },
           { titre:'9. Contact', texte:'BDE SARL · bdonaldservices@gmail.com · +225 05 02 10 14 52 · doniel.art · Abidjan, Côte d\'Ivoire' },
         ].map((s,i) => (
@@ -7052,6 +7154,135 @@ function PrivacyPage() {
             <p style={{ color:'#5a7090', fontSize:14, lineHeight:1.8 }}>{s.texte}</p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PAGE SUPPRESSION DE COMPTE & DONNÉES (Conformité Google Play / RGPD)
+// ─────────────────────────────────────────────
+function SuppressionComptePage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [email, setEmail] = useState('');
+  const [raison, setRaison] = useState('');
+  const [confirme, setConfirme] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [envoye, setEnvoye] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        setCurrentUser(u);
+        if (u.email) setEmail(u.email);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const soumettreDemande = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !confirme) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'demandes_suppression'), {
+        userId: currentUser?.uid || null,
+        email: email.trim().toLowerCase(),
+        displayName: currentUser?.displayName || '',
+        raison: raison.trim() || 'Non spécifiée',
+        statut: 'en_attente',
+        dateDemande: new Date().toISOString(),
+        source: 'web_page',
+      });
+
+      // Si l'utilisateur est connecté, tenter aussi la suppression du compte Firebase Auth
+      if (currentUser) {
+        try {
+          await deleteUser(currentUser);
+        } catch (authErr) {
+          console.warn('Suppression auth directe nécessitant reconnexion récente :', authErr);
+          await signOut(auth);
+        }
+      }
+      setEnvoye(true);
+    } catch (err: any) {
+      alert('Une erreur est survenue : ' + (err?.message || 'Veuillez réessayer plus tard'));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0b0f1e', color:'#dde4f5', fontFamily:"'DM Sans',sans-serif", padding:'40px 20px' }}>
+      <div style={{ maxWidth:540, margin:'0 auto' }}>
+        <Lien href="/" style={{ color:'#4da6ff', fontSize:13, textDecoration:'none', display:'inline-block', marginBottom:24 }}>
+          ← Retour à l'accueil
+        </Lien>
+
+        <h1 style={{ fontFamily:'serif', fontSize:26, fontWeight:900, color:'#fff', marginBottom:8 }}>
+          Suppression de compte et données
+        </h1>
+        <p style={{ color:'#8098b8', fontSize:13, marginBottom:24, lineHeight:1.6 }}>
+          Conformément aux règles de confidentialité et aux exigences de Google Play, vous pouvez demander à tout moment la suppression définitive de votre compte Doniel Zik et de toutes les données personnelles associées.
+        </p>
+
+        {envoye ? (
+          <div style={{ background:'rgba(0,196,140,0.1)', border:'1px solid rgba(0,196,140,0.3)', borderRadius:16, padding:'24px 20px', textAlign:'center' }}>
+            <span style={{ fontSize:36, display:'block', marginBottom:12 }}>✅</span>
+            <h2 style={{ fontSize:18, fontWeight:800, color:'#00c48c', margin:'0 0 8px' }}>Demande enregistrée</h2>
+            <p style={{ fontSize:14, color:'#c5d1eb', lineHeight:1.6, margin:0 }}>
+              Votre demande de suppression pour <strong>{email}</strong> a bien été prise en compte. Votre compte et vos données associées seront définitivement purgés sous un délai maximal de 30 jours.
+            </p>
+            <Lien href="/" style={{ display:'inline-block', marginTop:20, padding:'10px 20px', borderRadius:99, background:'#1a6bff', color:'#fff', textDecoration:'none', fontWeight:700, fontSize:13 }}>
+              Retour à l'accueil
+            </Lien>
+          </div>
+        ) : (
+          <form onSubmit={soumettreDemande} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:18, padding:'24px 20px' }}>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', color:'#8098b8', fontSize:12, fontWeight:700, marginBottom:6 }}>
+                Adresse e-mail associée au compte *
+              </label>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="votre-email@exemple.com"
+                style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.15)', background:'#12182b', color:'#fff', fontSize:14, boxSizing:'border-box' as any }} />
+            </div>
+
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', color:'#8098b8', fontSize:12, fontWeight:700, marginBottom:6 }}>
+                Raison de la suppression (optionnel)
+              </label>
+              <textarea value={raison} onChange={e => setRaison(e.target.value)}
+                placeholder="Pourquoi souhaitez-vous supprimer votre compte ?" rows={3}
+                style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.15)', background:'#12182b', color:'#fff', fontSize:13, boxSizing:'border-box' as any, resize:'vertical' }} />
+            </div>
+
+            <div style={{ background:'rgba(240,74,106,0.08)', border:'1px solid rgba(240,74,106,0.25)', borderRadius:12, padding:'14px 16px', marginBottom:18, fontSize:12, color:'#ff94a8', lineHeight:1.6 }}>
+              <strong>Données supprimées sous 30 jours :</strong>
+              <ul style={{ margin:'6px 0 0', paddingLeft:18 }}>
+                <li>Votre compte et vos données de profil (nom, email, photo)</li>
+                <li>Votre solde d'Oscart et historique de transactions</li>
+                <li>Vos favoris, kiffements, playlists et accès à la Zikothèque</li>
+                <li>Vos interactions et signatures d'artistes</li>
+              </ul>
+            </div>
+
+            <label style={{ display:'flex', alignItems:'flex-start', gap:10, fontSize:12, color:'#c5d1eb', marginBottom:20, cursor:'pointer', lineHeight:1.5 }}>
+              <input type="checkbox" required checked={confirme} onChange={e => setConfirme(e.target.checked)} style={{ marginTop:2 }} />
+              <span>Je confirme la demande de suppression définitive de mon compte et de toutes les données associées.</span>
+            </label>
+
+            <button type="submit" disabled={loading || !confirme}
+              style={{ width:'100%', padding:14, borderRadius:12, border:'none', background: confirme ? '#f04a6a' : 'rgba(240,74,106,0.3)', color:'#fff', fontWeight:800, fontSize:14, cursor: confirme ? 'pointer' : 'not-allowed' }}>
+              {loading ? 'Traitement en cours...' : 'Envoyer la demande de suppression'}
+            </button>
+          </form>
+        )}
+
+        <div style={{ marginTop:28, padding:'16px', borderTop:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#8098b8', lineHeight:1.7 }}>
+          <p style={{ margin:0 }}>
+            Pour toute question ou demande immédiate, vous pouvez également contacter notre équipe par email à <a href="mailto:bdonaldservices@gmail.com" style={{ color:'#4da6ff' }}>bdonaldservices@gmail.com</a>.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -7248,6 +7479,8 @@ user ? <ZikothequePage user={user} /> : <LandingPage />
         <Route path="/rejoindre" element={<RejoindrePage />} />
         <Route path="/about" element={<AProposPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/suppression-compte" element={<SuppressionComptePage />} />
+        <Route path="/delete-account" element={<SuppressionComptePage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/*" element={
           authLoading ? null : user ? <ZikothequePage user={user} /> : <LandingPage />
