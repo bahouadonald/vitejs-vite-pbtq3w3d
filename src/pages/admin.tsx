@@ -2439,6 +2439,7 @@ export function AdminPage() {
   const [pochetteTemplate, setPochetteTemplate] = useState<File | null>(null);
   const [pochettePreviewUrl, setPochettePreviewUrl] = useState('');
   const [pochettePos, setPochettePos] = useState({ xPct: 3, yPct: 72, sizePct: 22 });
+  const [pochetteSortie, setPochetteSortie] = useState<'zip' | 'pdf6'>('zip');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [annonceurs, setAnnonceurs] = useState<any[]>([]);
   const [pubs, setPubs] = useState<any[]>([]);
@@ -2738,9 +2739,9 @@ export function AdminPage() {
       // imprimer — plus besoin de découper/coller les QR à la main.
       const qrcodesPourPochettes = qrIds.map(qrId => ({ qrId, label: bulkQr.label }));
       await generatePochettes(qrcodesPourPochettes, pochetteTemplate,
-        (p) => setBulkProgress(55 + Math.round(p * 0.45)), pochettePos);
+        (p) => setBulkProgress(55 + Math.round(p * 0.45)), pochettePos, pochetteSortie);
       setBulkProgress(100);
-      setMsg('' + count + ' pochettes generees' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + ' ! ZIP telecharge.');
+      setMsg('' + count + ' pochettes generees' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + (pochetteSortie === 'pdf6' ? ' ! PDF telecharge.' : ' ! ZIP telecharge.'));
       await new Promise(r => setTimeout(r, 1500));
       setBulkLoading(false); setShowBulk(false); setBulkQr(null);
       return;
@@ -2927,6 +2928,19 @@ export function AdminPage() {
                     <input type="range" min={8} max={40} value={pochettePos.sizePct}
                       onChange={e => setPochettePos(p => ({ ...p, sizePct: parseInt(e.target.value) }))}
                       style={{ width:'100%' }} />
+
+                    <label style={{ ...S.lbl, marginTop:10 }}>Format de sortie</label>
+                    <div style={{ display:'flex', gap:8 }}>
+                      {[['zip','ZIP · 1 image/pochette'],['pdf6','PDF · 6/page A4']].map(([k,l]) => (
+                        <button key={k} onClick={() => setPochetteSortie(k as any)}
+                          style={{ flex:1, padding:'9px', borderRadius:10, border:`2px solid ${pochetteSortie===k?'#1a6bff':'#dce6f7'}`, background:pochetteSortie===k?'#eaf1ff':'#fff', color:pochetteSortie===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                    {pochetteSortie === 'pdf6' && (
+                      <p style={{ color:'#8098b8', fontSize:11, marginTop:6 }}>Le verso reste à gérer séparément de ton côté (pages uniformes).</p>
+                    )}
                   </>
                 )}
               </div>
@@ -2955,7 +2969,7 @@ export function AdminPage() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); setPochetteTemplate(null); setPochettePreviewUrl(''); setBulkMode('feuille'); }} disabled={bulkLoading}>Annuler</button>
+              <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); setPochetteTemplate(null); setPochettePreviewUrl(''); setBulkMode('feuille'); setPochetteSortie('zip'); }} disabled={bulkLoading}>Annuler</button>
               <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading || (bulkMode === 'pochette' && !pochetteTemplate)}>
                 {bulkLoading ? 'Generation...' : bulkMode === 'pochette' ? 'Generer ' + bulkCount + ' pochettes' : 'Generer ' + bulkCount + ' QR codes'}
               </button>

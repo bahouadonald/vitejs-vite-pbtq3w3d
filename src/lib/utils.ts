@@ -377,7 +377,8 @@ export const TYPES_CONTENU = [
 // ─────────────────────────────────────────────
 export async function generatePochettes(
   qrcodes: any[], templateFile: File, onProgress: (p: number) => void,
-  position?: { xPct: number, yPct: number, sizePct: number }
+  position?: { xPct: number, yPct: number, sizePct: number },
+  outputMode: 'zip' | 'pdf6' = 'zip',
 ): Promise<void> {
   const QRCode = (await import('qrcode')).default;
   const templateUrl = URL.createObjectURL(templateFile);
@@ -391,18 +392,12 @@ export async function generatePochettes(
   const QR_X = Math.round(SIZE * ((position?.xPct ?? 3) / 100));
   const QR_Y = Math.round(SIZE * ((position?.yPct ?? 72) / 100));
 
-  const JSZip = (await import('jszip')).default;
-  const zip = new JSZip();
-  const folder = zip.folder('pochettes') as any;
-
-  for (let i = 0; i < qrcodes.length; i++) {
-    const q = qrcodes[i];
+  // Compose UNE pochette (template + QR + texte) et renvoie son canvas.
+  const composerUnePochette = async (q: any): Promise<HTMLCanvasElement> => {
     const canvas = document.createElement('canvas');
     canvas.width = SIZE; canvas.height = SIZE;
     const ctx = canvas.getContext('2d')!;
-    // Dessiner la pochette template
     ctx.drawImage(templateImg, 0, 0, SIZE, SIZE);
-    // Générer QR code
     const qrDataUrl = await QRCode.toDataURL(BASE_URL + '/fan/' + q.qrId, {
       width: QR_SIZE, margin: 1, errorCorrectionLevel: 'H',
       color: { dark: '#000000', light: '#ffffff' }
@@ -410,13 +405,9 @@ export async function generatePochettes(
     const qrImg = await new Promise<HTMLImageElement>((res, rej) => {
       const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = qrDataUrl;
     });
-    // Fond blanc sous le QR
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(QR_X - 4, QR_Y - 4, QR_SIZE + 8, QR_SIZE + 8);
-    // Dessiner le QR code
     ctx.drawImage(qrImg, QR_X, QR_Y, QR_SIZE, QR_SIZE);
-    // Texte "Scannez et Téléchargez"
-    ctx.fillStyle = '#000000';
     ctx.font = `bold ${Math.round(SIZE * 0.022)}px Arial`;
     const textY = QR_Y + QR_SIZE + Math.round(SIZE * 0.035);
     ctx.fillStyle = '#000000';
@@ -424,7 +415,42 @@ export async function generatePochettes(
     const scannezWidth = ctx.measureText('Scannez et ').width;
     ctx.fillStyle = '#1a6bff';
     ctx.fillText('Téléchargez', QR_X + scannezWidth, textY);
-    // Exporter en PNG
+    return canvas;
+  };
+
+  if (outputMode === 'pdf6') {
+    // 6 pochettes par page A4 (2 colonnes × 3 lignes), prêtes à découper.
+    // Le verso reste géré séparément par l'artiste (pages uniformes).
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297, cols = 2, rows = 3, margin = 8;
+    const cellW = (pageW - margin * (cols + 1)) / cols;
+    const cellH = (pageH - margin * (rows + 1)) / rows;
+    const cote = Math.min(cellW, cellH); // carré, prend le plus petit des deux
+    const perPage = cols * rows;
+
+    for (let i = 0; i < qrcodes.length; i++) {
+      if (i > 0 && i % perPage === 0) pdf.addPage();
+      const pos = i % perPage;
+      const col = pos % cols, row = Math.floor(pos / cols);
+      const x = margin + col * (cellW + margin) + (cellW - cote) / 2;
+      const y = margin + row * (cellH + margin) + (cellH - cote) / 2;
+      const canvas = await composerUnePochette(qrcodes[i]);
+      pdf.addImage(canvas.toDataURL('image/png', 0.92), 'PNG', x, y, cote, cote);
+      onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
+    }
+    await new Promise(r => setTimeout(r, 60)); // laisse le 100% s'afficher avant le gel du PDF
+    pdf.save('pochettes_' + (qrcodes[0]?.label || '').replace(/[^a-zA-Z0-9_-]/g, '_') + '_A4_6parpage.pdf');
+    URL.revokeObjectURL(templateUrl);
+    return;
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  const folder = zip.folder('pochettes') as any;
+  for (let i = 0; i < qrcodes.length; i++) {
+    const q = qrcodes[i];
+    const canvas = await composerUnePochette(q);
     const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png', 0.95));
     folder.file((q.label || 'pochette').replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + q.qrId + '.png', blob);
     onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
