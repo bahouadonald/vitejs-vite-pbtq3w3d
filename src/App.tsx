@@ -6604,69 +6604,72 @@ function ArtisteBioPage() {
     })();
   }, [slug]);
 
+  const BLEU = '#1a6bff';
   if (statut === 'chargement') return (
-    <div style={{ minHeight:'100vh', background:C.bgDeep, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <p style={{ color:C.textSoft }}>Chargement...</p>
+    <div style={{ minHeight:'100vh', background:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <p style={{ color:'#8098b8' }}>Chargement...</p>
     </div>
   );
   if (statut === 'introuvable') return (
-    <div style={{ minHeight:'100vh', background:C.bgDeep, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <p style={{ color:C.text, fontWeight:700, marginBottom:8 }}>Artiste introuvable</p>
-      <Link to="/decouvrir" style={{ color:C.blueLite, fontSize:13 }}>← Retour à Découvrir</Link>
+    <div style={{ minHeight:'100vh', background:'#fff', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <p style={{ color:'#1a2340', fontWeight:700, marginBottom:8 }}>Artiste introuvable</p>
+      <Link to="/decouvrir" style={{ color:BLEU, fontSize:13 }}>← Retour à Découvrir</Link>
     </div>
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:60 }}>
-      <div style={{ padding:'14px 16px' }}>
+    <div style={{ minHeight:'100vh', background:'#fff', color:'#1a2340', fontFamily:"'DM Sans',sans-serif", paddingBottom:60 }}>
+      {/* Bande bleue d'en-tête */}
+      <div style={{ background:`linear-gradient(135deg,${BLEU},#0050d0)`, padding:'14px 16px' }}>
         <Logo size="sm" />
       </div>
 
-      <div style={{ maxWidth:640, margin:'0 auto', padding:'0 20px' }}>
-        {/* En-tête façon Wikipédia : pochette + identité */}
-        <div style={{ display:'flex', gap:18, alignItems:'flex-start', marginBottom:24, flexWrap:'wrap' }}>
-          {(artiste.bioPhotoUrl || artiste.coverUrl) ? (
-            <img src={optimImg(artiste.bioPhotoUrl || artiste.coverUrl,500)} alt={artiste.artistName || artiste.nom}
-              style={{ width:180, height:180, objectFit:'cover', borderRadius:16, border:'1px solid '+C.border, flexShrink:0 }} />
-          ) : (
-            <div style={{ width:180, height:180, borderRadius:16, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-              <img src={LOGO_B64} alt="" style={{ width:70, opacity:0.4 }} />
-            </div>
-          )}
-          <div style={{ flex:1, minWidth:180 }}>
-            <h1 style={{ fontFamily:'serif', fontSize:24, fontWeight:800, margin:'0 0 4px' }}>{artiste.bioFormulaire?.nom || artiste.artistName || artiste.nom}</h1>
-            {artiste.bioFormulaire?.fonction && <p style={{ color:C.gold, fontSize:13, fontWeight:600, margin:'0 0 8px' }}>{artiste.bioFormulaire.fonction}</p>}
-            <p style={{ color:C.textSoft, fontSize:12, margin:0 }}>
+      <div style={{ maxWidth:720, margin:'0 auto', padding:'28px 20px 0' }}>
+        {/* En-tête : texte à gauche, photo à droite (empilés sur mobile) */}
+        <div style={{ display:'flex', flexWrap:'wrap-reverse', gap:24, alignItems:'center', marginBottom:28 }}>
+          <div style={{ flex:'1 1 260px', minWidth:220 }}>
+            <div style={{ width:48, height:4, borderRadius:99, background:BLEU, marginBottom:14 }} />
+            <h1 style={{ fontFamily:'serif', fontSize:30, fontWeight:800, margin:'0 0 6px', color:'#1a2340' }}>{artiste.bioFormulaire?.nom || artiste.artistName || artiste.nom}</h1>
+            {artiste.bioFormulaire?.fonction && <p style={{ color:BLEU, fontSize:14, fontWeight:700, margin:'0 0 8px' }}>{artiste.bioFormulaire.fonction}</p>}
+            <p style={{ color:'#5a7090', fontSize:13, margin:0 }}>
               {[artiste.bioFormulaire?.nationalite, artiste.bioFormulaire?.residence].filter(Boolean).join(' · ')}
             </p>
           </div>
+          {(artiste.bioPhotoUrl || artiste.coverUrl) ? (
+            <img src={optimImg(artiste.bioPhotoUrl || artiste.coverUrl,700)} alt={artiste.artistName || artiste.nom}
+              style={{ flex:'0 0 auto', width:260, height:260, objectFit:'cover', borderRadius:20, border:'1px solid #dce6f7', boxShadow:'0 8px 28px rgba(26,107,255,0.15)' }} />
+          ) : (
+            <div style={{ flex:'0 0 auto', width:260, height:260, borderRadius:20, background:'linear-gradient(135deg,#eaf1ff,#dce6f7)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <img src={LOGO_B64} alt="" style={{ width:90, opacity:0.4 }} />
+            </div>
+          )}
         </div>
 
         {/* Bio */}
         {artiste.bioTexte ? (
-          <div style={{ marginBottom:32 }}>
+          <div style={{ marginBottom:36, paddingLeft:18, borderLeft:`3px solid ${BLEU}` }}>
             {artiste.bioTexte.split('\n').filter((p:string) => p.trim()).map((p:string, i:number) => (
-              <p key={i} style={{ color:C.text, fontSize:14, lineHeight:1.8, marginBottom:14, fontStyle: p.trim().startsWith('«') || p.trim().startsWith('"') ? 'italic' : 'normal' }}>{p}</p>
+              <p key={i} style={{ color:'#2a3550', fontSize:15, lineHeight:1.85, marginBottom:14, fontStyle: p.trim().startsWith('«') || p.trim().startsWith('"') ? 'italic' : 'normal' }}>{p}</p>
             ))}
           </div>
         ) : (
-          <p style={{ color:C.textSoft, fontSize:13, marginBottom:32, fontStyle:'italic' }}>Cet artiste n'a pas encore publié sa bio.</p>
+          <p style={{ color:'#8098b8', fontSize:13, marginBottom:32, fontStyle:'italic' }}>Cet artiste n'a pas encore publié sa bio.</p>
         )}
 
         {/* Titres publiés */}
         {titres.length > 0 && (
           <div>
-            <p style={{ color:C.gold, fontSize:11, fontWeight:800, letterSpacing:1.5, textTransform:'uppercase', marginBottom:14 }}>Titres publiés ({titres.length})</p>
+            <p style={{ color:BLEU, fontSize:11, fontWeight:800, letterSpacing:1.5, textTransform:'uppercase', marginBottom:14 }}>Titres publiés ({titres.length})</p>
             <div style={{ display:'grid', gap:10 }}>
               {titres.map((t) => (
                 <Link key={t.id} to={`/ecoute/${t.publicLinkId}`}
-                  style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, background:C.card, border:'1px solid '+C.border, textDecoration:'none' }}>
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, background:'#f5f8ff', border:'1px solid #dce6f7', textDecoration:'none' }}>
                   {t.coverUrl ? (
                     <img src={optimImg(t.coverUrl,120)} alt="" style={{ width:44, height:44, borderRadius:8, objectFit:'cover', flexShrink:0 }} />
                   ) : (
-                    <div style={{ width:44, height:44, borderRadius:8, background:'linear-gradient(135deg,#0d1535,#1a3a6e)', flexShrink:0 }} />
+                    <div style={{ width:44, height:44, borderRadius:8, background:'linear-gradient(135deg,#eaf1ff,#dce6f7)', flexShrink:0 }} />
                   )}
-                  <p style={{ color:C.text, fontSize:13, fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</p>
+                  <p style={{ color:'#1a2340', fontSize:13, fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</p>
                 </Link>
               ))}
             </div>
