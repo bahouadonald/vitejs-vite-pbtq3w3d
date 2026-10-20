@@ -32,6 +32,7 @@ twa/*.aab
 twa/*.idsig
 twa/doniel-zik.keystore
 twa/.keystore-password.txt
+twa/*.pem
 *.keystore
 *.keystore.id
 
