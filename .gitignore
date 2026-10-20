@@ -12,6 +12,29 @@ dist
 dist-ssr
 *.local
 
+# TWA — secrets, projet Android généré et artefacts de build ne sont pas versionnés
+# (seuls twa/twa-manifest.json et twa/README.md sont suivis, le reste se régénère
+#  avec `bubblewrap update` depuis le dossier twa/)
+twa/app/
+twa/build/
+twa/.gradle/
+twa/gradle/
+twa/gradlew
+twa/gradlew.bat
+twa/gradle.properties
+twa/settings.gradle
+twa/build.gradle
+twa/local.properties
+twa/store_icon.png
+twa/manifest-checksum.txt
+twa/*.apk
+twa/*.aab
+twa/*.idsig
+twa/doniel-zik.keystore
+twa/.keystore-password.txt
+*.keystore
+*.keystore.id
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

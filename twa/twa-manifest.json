@@ -1,0 +1,46 @@
+{
+  "packageId": "art.doniel.twa",
+  "host": "doniel.art",
+  "name": "Doniel Zik",
+  "launcherName": "Doniel Zik",
+  "display": "standalone",
+  "displayOverride": ["standalone", "window-controls-overlay", "tabbed", "minimal-ui"],
+  "themeColor": "#0E2A52",
+  "themeColorDark": "#0E2A52",
+  "navigationColor": "#0E2A52",
+  "navigationColorDark": "#0E2A52",
+  "navigationDividerColor": "#0E2A52",
+  "navigationDividerColorDark": "#0E2A52",
+  "backgroundColor": "#0E2A52",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://doniel.art/icons/icon-512x512.png",
+  "maskableIconUrl": "https://doniel.art/icons/icon-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "doniel-zik.keystore",
+    "alias": "doniel"
+  },
+  "appVersionCode": 6,
+  "appVersion": "1.0.6",
+  "enableSiteSettingsShortcut": true,
+  "fallbackType": "customtabs",
+  "orientation": "portrait",
+  "minSdkVersion": 24,
+  "webManifestUrl": "https://doniel.art/manifest.json",
+  "launchHandlerClientMode": "navigate-existing",
+  "shortcuts": [
+    {
+      "name": "Découvrir",
+      "shortName": "Découvrir",
+      "url": "/decouvrir",
+      "chosenIconUrl": "https://doniel.art/icons/icon-96x96.png"
+    },
+    {
+      "name": "Ma Zikothèque",
+      "shortName": "Zikothèque",
+      "url": "/ziko",
+      "chosenIconUrl": "https://doniel.art/icons/icon-96x96.png"
+    }
+  ]
+}
