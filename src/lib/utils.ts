@@ -408,13 +408,8 @@ export async function generatePochettes(
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(QR_X - 4, QR_Y - 4, QR_SIZE + 8, QR_SIZE + 8);
     ctx.drawImage(qrImg, QR_X, QR_Y, QR_SIZE, QR_SIZE);
-    ctx.font = `bold ${Math.round(SIZE * 0.022)}px Arial`;
-    const textY = QR_Y + QR_SIZE + Math.round(SIZE * 0.035);
-    ctx.fillStyle = '#000000';
-    ctx.fillText('Scannez et ', QR_X, textY);
-    const scannezWidth = ctx.measureText('Scannez et ').width;
-    ctx.fillStyle = '#1a6bff';
-    ctx.fillText('Téléchargez', QR_X + scannezWidth, textY);
+    // Aucun texte ajouté : le "Scannez et téléchargez" est déjà dans le
+    // design de la pochette fourni par l'artiste, seul le QR est posé dessus.
     return canvas;
   };
 
