@@ -2956,7 +2956,7 @@ export function AdminPage() {
                     {pochetteSortie === 'pdf6' && (
                       <p style={{ color:'#8098b8', fontSize:11, marginTop:6 }}>
                         {pochetteVerso
-                          ? 'Un seul PDF recto-verso : chaque page recto est suivie de son verso, même gabarit. Imprimer en recto-verso, retournement bord long.'
+                          ? 'Deux PDF : RECTO (toutes les pages avec QR) + VERSO (une seule page A4, même gabarit), à imprimer au dos de chaque page recto.'
                           : 'Sans verso : seules les pages recto sont générées.'}
                       </p>
                     )}

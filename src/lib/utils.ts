@@ -430,7 +430,8 @@ export async function generatePochettes(
 
   if (outputMode === 'pdf6') {
     // 6 pochettes par page A4 (2 colonnes × 3 lignes), prêtes à découper.
-    // Si un verso est fourni, chaque page recto est suivie de sa page verso.
+    // Le verso étant identique partout, il est généré à part : UNE seule
+    // page A4 (6 versos), même grille et mêmes marges que les pages recto.
     const { jsPDF } = await import('jspdf');
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = 210, pageH = 297, cols = 2, rows = 3, margin = 8;
@@ -443,21 +444,9 @@ export async function generatePochettes(
       x: margin + col * (cellW + margin) + (cellW - cote) / 2,
       y: margin + row * (cellH + margin) + (cellH - cote) / 2,
     });
-    // Page verso : même grille que la page recto, colonnes inversées
-    // (impression recto-verso, retournement bord long) pour que chaque verso
-    // tombe exactement derrière son recto.
-    const ajouterPageVerso = (nbSurPage: number) => {
-      if (!versoDataUrl || nbSurPage <= 0) return;
-      pdf.addPage();
-      for (let k = 0; k < nbSurPage; k++) {
-        const col = cols - 1 - (k % cols), row = Math.floor(k / cols);
-        const { x, y } = caseXY(col, row);
-        pdf.addImage(versoDataUrl, 'PNG', x, y, cote, cote, 'verso');
-      }
-    };
 
     for (let i = 0; i < qrcodes.length; i++) {
-      if (i > 0 && i % perPage === 0) { ajouterPageVerso(perPage); pdf.addPage(); }
+      if (i > 0 && i % perPage === 0) pdf.addPage();
       const pos = i % perPage;
       const col = pos % cols, row = Math.floor(pos / cols);
       const { x, y } = caseXY(col, row);
@@ -465,10 +454,18 @@ export async function generatePochettes(
       pdf.addImage(canvas.toDataURL('image/png', 0.92), 'PNG', x, y, cote, cote);
       onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
     }
-    // Verso de la dernière page (seulement le nombre de pochettes présentes)
-    ajouterPageVerso(((qrcodes.length - 1) % perPage) + 1);
     await new Promise(r => setTimeout(r, 60)); // laisse le 100% s'afficher avant le gel du PDF
-    pdf.save('pochettes_' + (qrcodes[0]?.label || '').replace(/[^a-zA-Z0-9_-]/g, '_') + (versoDataUrl ? '_A4_6parpage_recto-verso.pdf' : '_A4_6parpage.pdf'));
+    const nomBase = 'pochettes_' + (qrcodes[0]?.label || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    pdf.save(nomBase + '_A4_6parpage_RECTO.pdf');
+    if (versoDataUrl) {
+      const pdfVerso = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      for (let k = 0; k < perPage; k++) {
+        const { x, y } = caseXY(k % cols, Math.floor(k / cols));
+        pdfVerso.addImage(versoDataUrl, 'PNG', x, y, cote, cote, 'verso');
+      }
+      await new Promise(r => setTimeout(r, 800)); // laisse le 1er téléchargement partir
+      pdfVerso.save(nomBase + '_A4_6parpage_VERSO.pdf');
+    }
     URL.revokeObjectURL(templateUrl);
     if (versoUrl) URL.revokeObjectURL(versoUrl);
     return;
