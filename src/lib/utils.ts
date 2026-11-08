@@ -379,6 +379,7 @@ export async function generatePochettes(
   qrcodes: any[], templateFile: File, onProgress: (p: number) => void,
   position?: { xPct: number, yPct: number, sizePct: number },
   outputMode: 'zip' | 'pdf6' = 'zip',
+  versoFile?: File | null,
 ): Promise<void> {
   const QRCode = (await import('qrcode')).default;
   const templateUrl = URL.createObjectURL(templateFile);
@@ -386,6 +387,20 @@ export async function generatePochettes(
     const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = templateUrl;
   });
   const SIZE = 1000; // canvas carré 1000x1000px
+  // Verso (optionnel) : une seule image, répétée sur chaque pochette avec
+  // exactement le même gabarit que le recto.
+  let versoUrl = '';
+  let versoDataUrl = '';
+  if (versoFile) {
+    versoUrl = URL.createObjectURL(versoFile);
+    const versoImg = await new Promise<HTMLImageElement>((res, rej) => {
+      const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = versoUrl;
+    });
+    const vc = document.createElement('canvas');
+    vc.width = SIZE; vc.height = SIZE;
+    vc.getContext('2d')!.drawImage(versoImg, 0, 0, SIZE, SIZE);
+    versoDataUrl = vc.toDataURL('image/png', 0.92);
+  }
   // Position choisie par l'admin (coin haut-gauche du QR + sa taille, en % de
   // l'image) — avant, c'était toujours figé en bas à gauche, 22% de large.
   const QR_SIZE = Math.round(SIZE * ((position?.sizePct ?? 22) / 100));
@@ -415,7 +430,7 @@ export async function generatePochettes(
 
   if (outputMode === 'pdf6') {
     // 6 pochettes par page A4 (2 colonnes × 3 lignes), prêtes à découper.
-    // Le verso reste géré séparément par l'artiste (pages uniformes).
+    // Si un verso est fourni, chaque page recto est suivie de sa page verso.
     const { jsPDF } = await import('jspdf');
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = 210, pageH = 297, cols = 2, rows = 3, margin = 8;
@@ -424,19 +439,38 @@ export async function generatePochettes(
     const cote = Math.min(cellW, cellH); // carré, prend le plus petit des deux
     const perPage = cols * rows;
 
+    const caseXY = (col: number, row: number) => ({
+      x: margin + col * (cellW + margin) + (cellW - cote) / 2,
+      y: margin + row * (cellH + margin) + (cellH - cote) / 2,
+    });
+    // Page verso : même grille que la page recto, colonnes inversées
+    // (impression recto-verso, retournement bord long) pour que chaque verso
+    // tombe exactement derrière son recto.
+    const ajouterPageVerso = (nbSurPage: number) => {
+      if (!versoDataUrl || nbSurPage <= 0) return;
+      pdf.addPage();
+      for (let k = 0; k < nbSurPage; k++) {
+        const col = cols - 1 - (k % cols), row = Math.floor(k / cols);
+        const { x, y } = caseXY(col, row);
+        pdf.addImage(versoDataUrl, 'PNG', x, y, cote, cote, 'verso');
+      }
+    };
+
     for (let i = 0; i < qrcodes.length; i++) {
-      if (i > 0 && i % perPage === 0) pdf.addPage();
+      if (i > 0 && i % perPage === 0) { ajouterPageVerso(perPage); pdf.addPage(); }
       const pos = i % perPage;
       const col = pos % cols, row = Math.floor(pos / cols);
-      const x = margin + col * (cellW + margin) + (cellW - cote) / 2;
-      const y = margin + row * (cellH + margin) + (cellH - cote) / 2;
+      const { x, y } = caseXY(col, row);
       const canvas = await composerUnePochette(qrcodes[i]);
       pdf.addImage(canvas.toDataURL('image/png', 0.92), 'PNG', x, y, cote, cote);
       onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
     }
+    // Verso de la dernière page (seulement le nombre de pochettes présentes)
+    ajouterPageVerso(((qrcodes.length - 1) % perPage) + 1);
     await new Promise(r => setTimeout(r, 60)); // laisse le 100% s'afficher avant le gel du PDF
-    pdf.save('pochettes_' + (qrcodes[0]?.label || '').replace(/[^a-zA-Z0-9_-]/g, '_') + '_A4_6parpage.pdf');
+    pdf.save('pochettes_' + (qrcodes[0]?.label || '').replace(/[^a-zA-Z0-9_-]/g, '_') + (versoDataUrl ? '_A4_6parpage_recto-verso.pdf' : '_A4_6parpage.pdf'));
     URL.revokeObjectURL(templateUrl);
+    if (versoUrl) URL.revokeObjectURL(versoUrl);
     return;
   }
 
@@ -450,11 +484,16 @@ export async function generatePochettes(
     folder.file((q.label || 'pochette').replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + q.qrId + '.png', blob);
     onProgress(Math.round(((i + 1) / qrcodes.length) * 100));
   }
+  if (versoDataUrl) {
+    // Le verso est identique pour toutes les pochettes : un seul fichier suffit.
+    zip.file('VERSO_' + (qrcodes[0]?.label || 'pochette').replace(/[^a-zA-Z0-9_-]/g, '_') + '.png', versoDataUrl.split(',')[1], { base64: true });
+  }
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(zipBlob);
   a.download = 'pochettes_' + qrcodes[0]?.label?.replace(/[^a-zA-Z0-9_-]/g, '_') + '.zip';
   a.click();
   URL.revokeObjectURL(templateUrl);
+  if (versoUrl) URL.revokeObjectURL(versoUrl);
 }
 
