@@ -954,14 +954,6 @@ export function LikeButton({ qrId, compact, artistEmail, source = 'qr' }: { qrId
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-// Lecture partielle : URL d'un VRAI extrait généré par Cloudinary (coupé à
-// `secondes`, avec fondu de sortie de 3 s). Le fichier complet n'est jamais
-// envoyé au lecteur. Hors Cloudinary → on garde l'URL et on coupe côté lecteur.
-export const urlExtrait = (url: string, secondes: number) => {
-  if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url;
-  return url.replace('/upload/', `/upload/eo_${secondes}/e_fade:-3000/`);
-};
-
 export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, autoStartIdx, autoStartCle, onFinAlbum, albumTitre, albumArtiste, albumCover, extraitSecondes, onAllerTelecharger }: { files: any[], extraitSecondes?: number, onAllerTelecharger?: () => void, onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, autoStartIdx?: number, autoStartCle?: number, onFinAlbum?: () => void, albumTitre?: string, albumArtiste?: string, albumCover?: string }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -975,11 +967,13 @@ export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChan
   const derniereCleAuto = useRef<number>(0);
   const [finExtrait, setFinExtrait] = useState(false);
   const extraitActif = !!extraitSecondes && extraitSecondes > 0;
-  const urlCur = files[idx]?.url ? (extraitActif ? urlExtrait(files[idx].url, extraitSecondes!) : files[idx].url) : files[idx]?.url;
-  const cur = files[idx] ? { ...files[idx], url: urlCur } : files[idx];
-  useEffect(() => { setFinExtrait(false); }, [idx]);
+  // Version simple : le lecteur joue le fichier normal et s'arrête lui-même
+  // à la limite (fondu de volume sur les 3 dernières secondes).
+  const cur = files[idx];
+  useEffect(() => { setFinExtrait(false); if (ref.current) ref.current.volume = 1; }, [idx]);
   const terminerExtrait = () => {
     if (ref.current && !ref.current.paused) ref.current.pause();
+    if (ref.current) ref.current.volume = 1;
     setPlaying(false); stopLevelLoop();
     if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), Math.min(ref.current?.currentTime || 0, extraitSecondes || 0));
     setFinExtrait(true);
@@ -1196,12 +1190,19 @@ export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChan
 
       <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
         onTimeUpdate={() => { if (ref.current) {
-          // Filet de sécurité (fichier hors Cloudinary) : arrêt net à la limite
-          if (extraitActif && !finExtrait && ref.current.currentTime >= (extraitSecondes as number)) { terminerExtrait(); return; }
+          if (extraitActif && !finExtrait) {
+            const t = ref.current.currentTime, lim = extraitSecondes as number;
+            if (t >= lim) { terminerExtrait(); return; }
+            ref.current.volume = t > lim - 3 ? Math.max(0, (lim - t) / 3) : 1;
+          }
           setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
         onCanPlay={() => { if (playing && ref.current && ref.current.paused) { ref.current.play().catch(()=>{}); } }}
-        onPlay={() => { setPlaying(true); }}
+        onPlay={() => {
+          // Relancer après la fin de l'extrait → on repart du début de l'extrait
+          if (extraitActif && ref.current && ref.current.currentTime >= (extraitSecondes as number)) { ref.current.currentTime = 0; ref.current.volume = 1; setFinExtrait(false); }
+          setPlaying(true);
+        }}
         onEnded={() => {
           if (extraitActif) { if (!finExtrait) terminerExtrait(); return; }
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
