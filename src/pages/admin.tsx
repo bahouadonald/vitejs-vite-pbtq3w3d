@@ -1621,6 +1621,26 @@ export function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[
               </div>
             </div>
 
+            {/* LECTURE PARTIELLE — vérifiée à chaque scan (s'applique aussi aux pochettes déjà imprimées) */}
+            <label style={{ display:'flex', alignItems:'center', gap:10, marginTop:12, padding:'10px 12px', borderRadius:10, cursor:'pointer',
+              background: a.lecturePartielle ? '#fff8e6' : '#f5f8ff', border:'1px solid ' + (a.lecturePartielle ? '#f0b84a' : '#dbe6f7') }}>
+              <input type="checkbox" checked={!!a.lecturePartielle}
+                onChange={async e => {
+                  const val = e.target.checked;
+                  try {
+                    await updateDoc(doc(db,'artists',a.id), { lecturePartielle: val });
+                    setMsg(`${a.name} : ${val ? 'lecture partielle activée (extrait 1 min)' : 'lecture complète rétablie'}.`);
+                  } catch { setMsg('Échec de la mise à jour, réessaie.'); }
+                }}
+                style={{ width:18, height:18, accentColor:'#1a6bff', cursor:'pointer', flexShrink:0 }} />
+              <span>
+                <span style={{ fontWeight:800, fontSize:13, color:'#1a2a44' }}>Lecture partielle</span>
+                <span style={{ display:'block', color:'#8098b8', fontSize:11 }}>
+                  {a.lecturePartielle ? 'Après le scan : extrait d\'1 minute, puis invitation à télécharger.' : 'Après le scan : lecture complète.'}
+                </span>
+              </span>
+            </label>
+
             {/* Stats rapides */}
             {artistQRs.length > 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:12 }}>

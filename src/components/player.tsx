@@ -954,7 +954,15 @@ export function LikeButton({ qrId, compact, artistEmail, source = 'qr' }: { qrId
 // ─────────────────────────────────────────────
 // AUDIO PLAYER — bannière pub pendant lecture + timer 7s + VideoPlayer avec pub YouTube
 // ─────────────────────────────────────────────
-export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, autoStartIdx, autoStartCle, onFinAlbum, albumTitre, albumArtiste, albumCover }: { files: any[], onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, autoStartIdx?: number, autoStartCle?: number, onFinAlbum?: () => void, albumTitre?: string, albumArtiste?: string, albumCover?: string }) {
+// Lecture partielle : URL d'un VRAI extrait généré par Cloudinary (coupé à
+// `secondes`, avec fondu de sortie de 3 s). Le fichier complet n'est jamais
+// envoyé au lecteur. Hors Cloudinary → on garde l'URL et on coupe côté lecteur.
+export const urlExtrait = (url: string, secondes: number) => {
+  if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url;
+  return url.replace('/upload/', `/upload/eo_${secondes}/e_fade:-3000/`);
+};
+
+export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChange, autoStartIdx, autoStartCle, onFinAlbum, albumTitre, albumArtiste, albumCover, extraitSecondes, onAllerTelecharger }: { files: any[], extraitSecondes?: number, onAllerTelecharger?: () => void, onStream?: (track: string, duration: number) => void, onPlay?: () => void, onDownload?: () => void, onPlayingChange?: (playing: boolean) => void, autoStartIdx?: number, autoStartCle?: number, onFinAlbum?: () => void, albumTitre?: string, albumArtiste?: string, albumCover?: string }) {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { onPlayingChange?.(playing); }, [playing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -965,7 +973,17 @@ export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChan
   const streamStart = useRef<number>(0);
   const stopTimer = useRef<any>(null);
   const derniereCleAuto = useRef<number>(0);
-  const cur = files[idx];
+  const [finExtrait, setFinExtrait] = useState(false);
+  const extraitActif = !!extraitSecondes && extraitSecondes > 0;
+  const urlCur = files[idx]?.url ? (extraitActif ? urlExtrait(files[idx].url, extraitSecondes!) : files[idx].url) : files[idx]?.url;
+  const cur = files[idx] ? { ...files[idx], url: urlCur } : files[idx];
+  useEffect(() => { setFinExtrait(false); }, [idx]);
+  const terminerExtrait = () => {
+    if (ref.current && !ref.current.paused) ref.current.pause();
+    setPlaying(false); stopLevelLoop();
+    if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), Math.min(ref.current?.currentTime || 0, extraitSecondes || 0));
+    setFinExtrait(true);
+  };
 
   // ── Analyseur audio (avec protection : si échec, le son continue) ──
   const audioCtxRef = useRef<any>(null);
@@ -1177,11 +1195,15 @@ export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChan
     <div style={{ background: 'rgba(20,28,48,0.92)', borderRadius: 16, padding: '12px 14px', border: '1px solid '+C.border, boxShadow: '0 6px 24px rgba(0,0,0,0.4)' }}>
 
       <audio ref={ref} src={cur?.url} crossOrigin="anonymous"
-        onTimeUpdate={() => { if (ref.current) { setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
+        onTimeUpdate={() => { if (ref.current) {
+          // Filet de sécurité (fichier hors Cloudinary) : arrêt net à la limite
+          if (extraitActif && !finExtrait && ref.current.currentTime >= (extraitSecondes as number)) { terminerExtrait(); return; }
+          setCt(ref.current.currentTime); setProgress((ref.current.currentTime / ref.current.duration) * 100 || 0); } }}
         onLoadedMetadata={() => { if (ref.current) setDur(ref.current.duration); }}
         onCanPlay={() => { if (playing && ref.current && ref.current.paused) { ref.current.play().catch(()=>{}); } }}
         onPlay={() => { setPlaying(true); }}
         onEnded={() => {
+          if (extraitActif) { if (!finExtrait) terminerExtrait(); return; }
           if (onStream) onStream(cur?.name || 'Piste ' + (idx + 1), ref.current?.duration || 0);
           if (idx < files.length - 1) {
             setIdx(i => i + 1);
@@ -1230,6 +1252,28 @@ export function AudioPlayer({ files, onStream, onPlay, onDownload, onPlayingChan
           </button>
         )}
       </div>
+
+      {/* LECTURE PARTIELLE : badge + message de fin d'extrait */}
+      {extraitActif && !finExtrait && (
+        <p style={{ color: C.textSoft, fontSize: 10, margin: '8px 0 0', textAlign: 'right' }}>Extrait de {Math.round((extraitSecondes as number) / 60) || 1} min · Télécharge pour l'écouter en entier</p>
+      )}
+      {extraitActif && finExtrait && (
+        <div style={{ marginTop: 12, padding: '14px 14px 12px', borderRadius: 14, textAlign: 'center', background: 'linear-gradient(160deg, rgba(10,132,255,0.22), rgba(0,80,208,0.10))', border: '1px solid rgba(10,132,255,0.45)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 6px 20px rgba(10,132,255,0.25)' }}>
+          <p style={{ color: C.text, fontWeight: 800, fontSize: 15, margin: '0 0 4px' }}>Télécharge pour écouter la suite</p>
+          <p style={{ color: C.textSoft, fontSize: 11, margin: '0 0 12px' }}>L'extrait d'une minute est terminé.</p>
+          <button onClick={() => { if (onAllerTelecharger) onAllerTelecharger(); else if (onDownload) onDownload(); }}
+            style={{ background: 'linear-gradient(180deg, #3a9bff, '+C.blue+' 45%, #0050d0)', border: 'none', borderRadius: 12, padding: '11px 22px', cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 14px rgba(10,132,255,0.5)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
+            Télécharger
+          </button>
+          {idx < files.length - 1 && (
+            <button onClick={() => { setIdx(i => i + 1); setPlaying(true); }}
+              style={{ display: 'block', margin: '10px auto 0', background: 'none', border: 'none', color: C.blueLite, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              Écouter l'extrait suivant ⏭
+            </button>
+          )}
+        </div>
+      )}
 
       {/* BARRE DE PROGRESSION fine */}
       <div

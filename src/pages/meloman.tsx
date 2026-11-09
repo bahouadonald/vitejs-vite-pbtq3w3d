@@ -67,6 +67,10 @@ export function FanPage() {
   // ce qui vient d'être fait dans cette visite (mise à jour immédiate).
   const [titresTelDejaFaits, setTitresTelDejaFaits] = useState<string[]>([]);
   const [artisteSlug, setArtisteSlug] = useState('');
+  // Lecture partielle (réglée par l'admin dans le dossier de l'artiste) :
+  // null = pas encore connu (on attend avant d'afficher le lecteur),
+  // true = extrait d'1 minute seulement, false = lecture complète.
+  const [lecturePartielle, setLecturePartielle] = useState<boolean | null>(null);
   const [zikoState, setZikoState] = useState<'idle' | 'modal' | 'adding' | 'done'>('idle');
   const [showPubAfterDL, setShowPubAfterDL] = useState(false);
   const [showZikoTuto, setShowZikoTuto] = useState(false);
@@ -103,10 +107,23 @@ export function FanPage() {
       setQrData(data);
       setTitresTelDejaFaits(data.titresTelecharges || []);
       // Chercher la page bio publique de l'artiste (si elle existe) pour le bouton "Voir la bio"
-      if (data.artistEmail) {
-        getDocs(query(collection(db,'artists'), where('email','==',data.artistEmail.toLowerCase())))
-          .then(s => { if (!s.empty && s.docs[0].data().slug) setArtisteSlug(s.docs[0].data().slug); })
-          .catch(() => {});
+      // + lire le réglage « Lecture partielle » de l'artiste (vérifié à chaque
+      // scan : s'applique donc aussi aux pochettes déjà imprimées).
+      const rechercheArtiste = data.artistEmail
+        ? getDocs(query(collection(db,'artists'), where('email','==',data.artistEmail.toLowerCase())))
+        : data.artist
+          ? getDocs(query(collection(db,'artists'), where('name','==',data.artist)))
+          : null;
+      if (rechercheArtiste) {
+        rechercheArtiste
+          .then(s => {
+            const a = s.empty ? null : s.docs[0].data();
+            if (a?.slug && data.artistEmail) setArtisteSlug(a.slug);
+            setLecturePartielle(a?.lecturePartielle === true);
+          })
+          .catch(() => setLecturePartielle(false));
+      } else {
+        setLecturePartielle(false);
       }
       // Afficher la page TOUT DE SUITE (ne pas attendre l'écriture des stats)
       setStep('ready');
@@ -395,7 +412,7 @@ export function FanPage() {
 
               // DL épuisés ou lien public → AchatWidget (payant)
               return (
-                <>
+                <div id="zone-achat" style={{ borderRadius:12 }}>
                   {dlsEpuises && (
                     <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, background:'rgba(255,200,0,0.08)', border:'1px solid rgba(255,200,0,0.2)', marginBottom:12 }}>
                       <span style={{ fontSize:16 }}>ℹ</span>
@@ -412,15 +429,23 @@ export function FanPage() {
                     files={qrData.files || []}
                     source="qr"
                   />
-                </>
+                </div>
               );
             })()}
 
             {/* ── LECTEUR AUDIO ── */}
-            {qrData.files?.some((f:any) => estFichierAudio(f)) && (
+            {lecturePartielle !== null && qrData.files?.some((f:any) => estFichierAudio(f)) && (
               <div style={{ marginBottom:20 }}>
                 <AudioPlayer
                   files={qrData.files.filter((f:any) => estFichierAudio(f))}
+                  extraitSecondes={lecturePartielle ? 60 : undefined}
+                  onAllerTelecharger={() => {
+                    const zone = document.getElementById('zone-telechargement') || document.getElementById('zone-achat');
+                    if (zone) {
+                      zone.scrollIntoView({ behavior:'smooth', block:'center' });
+                      zone.animate?.([{ boxShadow:'0 0 0 0 rgba(10,132,255,0)' }, { boxShadow:'0 0 0 6px rgba(10,132,255,0.55)' }, { boxShadow:'0 0 0 0 rgba(10,132,255,0)' }], { duration:1200, iterations:2 });
+                    }
+                  }}
                   onStream={recordStream}
                   onPlay={() => { if (!localStorage.getItem('dz_tuto_seen_v4')) setTimeout(() => setShowTutoCascade(true), 800); }}
                 />
@@ -446,7 +471,7 @@ export function FanPage() {
                 bascule en payant (lui seul), sans recharger la page ni
                 toucher aux autres titres de la liste. ── */}
             {qrData.files?.length > 0 && !(qrData.totalScans > 0 && (qrData.usedScans || 0) >= (qrData.totalScans || 0)) && (
-              <div style={{ marginBottom:20 }}>
+              <div id="zone-telechargement" style={{ marginBottom:20, borderRadius:12 }}>
                 <p style={{ color:'#4a5878', fontSize:10, fontWeight:700, letterSpacing:2, marginBottom:10, textTransform:'uppercase' }}>
                   {qrData.files.length > 1 ? `${qrData.files.length} titres` : 'Titre'}
                 </p>
