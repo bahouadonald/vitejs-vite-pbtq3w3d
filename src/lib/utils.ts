@@ -434,15 +434,21 @@ export async function generatePochettes(
     // page A4 (6 versos), même grille et mêmes marges que les pages recto.
     const { jsPDF } = await import('jspdf');
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = 210, pageH = 297, cols = 2, rows = 3, margin = 8;
-    const cellW = (pageW - margin * (cols + 1)) / cols;
-    const cellH = (pageH - margin * (rows + 1)) / rows;
-    const cote = Math.min(cellW, cellH); // carré, prend le plus petit des deux
+    // La feuille est découpée en 6 parts ÉGALES (105 × 99 mm) et chaque
+    // pochette est posée pile au centre de sa part : une fois découpée, chaque
+    // pochette a le même bord blanc à gauche et à droite, et en haut et en bas.
+    // Ainsi le recto et le verso tombent en face après retournement de la
+    // feuille (avant, la marge extérieure était plus large que la marge du
+    // milieu, ce qui décalait le verso). Taille des pochettes inchangée.
+    const pageW = 210, pageH = 297, cols = 2, rows = 3;
+    const cellW = pageW / cols;  // 105 mm
+    const cellH = pageH / rows;  // 99 mm
+    const cote = (pageH - 8 * (rows + 1)) / rows; // 88,33 mm, comme avant
     const perPage = cols * rows;
 
     const caseXY = (col: number, row: number) => ({
-      x: margin + col * (cellW + margin) + (cellW - cote) / 2,
-      y: margin + row * (cellH + margin) + (cellH - cote) / 2,
+      x: col * cellW + (cellW - cote) / 2,
+      y: row * cellH + (cellH - cote) / 2,
     });
 
     for (let i = 0; i < qrcodes.length; i++) {
