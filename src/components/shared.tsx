@@ -234,7 +234,7 @@ export function LoginModal({ onClose, message }: { onClose: () => void, message:
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
       onClick={onClose}>
-      <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480, animation:'tutoSlide .3s ease' }}
+      <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480, animation:'tutoSlide .3s ease' }}
         onClick={e => e.stopPropagation()}>
         <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
         <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', textAlign:'center', marginBottom:8 }}>{message}</p>

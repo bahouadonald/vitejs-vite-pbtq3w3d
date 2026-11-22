@@ -151,7 +151,7 @@ export function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, so
         {rechargeModal && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
             onClick={() => setRechargeModal(null)}>
-            <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+            <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
               onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
               <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
@@ -190,7 +190,7 @@ export function OscartPayButton({ prix, qrId, albumLabel, artistEmail, files, so
       {rechargeModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => setRechargeModal(null)}>
-          <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
             <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
@@ -379,7 +379,7 @@ export function AchatWidget({ qrId, albumLabel, artistEmail, prix, files, extern
       {(showDetail || externalOpen) && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => { setShowDetail(false); onExternalClose?.(); }}>
-          <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
             <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 12px' }}>Télécharger {albumLabel || ''}</p>

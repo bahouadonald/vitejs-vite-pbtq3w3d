@@ -152,7 +152,7 @@ export function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose
       ))}
       {confirmKiff && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9991, display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => setConfirmKiff(null)}>
-          <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }} onClick={e => e.stopPropagation()}>
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 18px' }} />
             <img src={confirmKiff.image} alt={confirmKiff.label} style={{ width:90, height:90, objectFit:'contain', margin:'0 auto 12px', display:'block', filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.5))' }} />
             <p style={{ color:'#fff', fontWeight:800, fontSize:17, margin:'0 0 4px' }}>Envoyer {confirmKiff.label} ?</p>
@@ -182,7 +182,7 @@ export function KiffementSection({ qrId, artistEmail, compact, autoOpen, onClose
       {rechargeModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => setRechargeModal(null)}>
-          <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
             <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>
@@ -1579,7 +1579,7 @@ export function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:999, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'0 0 0 0' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width:'100%', maxWidth:500, background:'#0f1322', borderRadius:'20px 20px 0 0', padding:'28px 20px 40px', border:'1px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', width:'100%', maxWidth:500, background:'#0f1322', borderRadius:'20px 20px 0 0', padding:'28px 20px 40px', border:'1px solid rgba(255,255,255,0.1)' }}>
 
         {/* Poignée */}
         <div style={{ width:40, height:4, background:'rgba(255,255,255,0.15)', borderRadius:99, margin:'0 auto 20px' }} />

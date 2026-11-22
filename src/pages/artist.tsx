@@ -26,6 +26,7 @@ import {
   ChangerMotDePasse, Logo, OSCART_TO_FCFA, OSCART_TO_EUR, OSCART_TO_USD, PALIERS_CONCOURS_DEFAUT, Lien,
 } from '../components/shared';
 import { SignaturesArtisteTab } from './admin';
+import { StudioVocalArtiste } from './studio-vocal';
 
 // ─────────────────────────────────────────────
 // ARTIST PAGE
@@ -38,7 +39,11 @@ export function ArtistPage() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>({ visits: 0, streams: 0, validStreams: 0, downloads: 0, qrcodes: [] });
-  const [dashTab, setDashTab] = useState<'stats'|'publier'|'mot'|'bio'|'pochettes'|'signatures'|'notifs'>('stats');
+  const [dashTab, setDashTab] = useState<'stats'|'studio'|'publier'|'mot'|'bio'|'pochettes'|'signatures'|'notifs'>(() => {
+    // Ouvre directement un onglet via ?tab=... (ex : retour de paiement Studio vocal)
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return t === 'studio' ? 'studio' : 'stats';
+  });
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
   const [artistNom, setArtistNom] = useState('');
@@ -360,7 +365,7 @@ export function ArtistPage() {
 
       {/* TABS — façon pilules, comme le reste de l'app */}
       <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
-        {[['stats','Stats'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
+        {[['stats','Stats'],['studio','Studio vocal'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
           <button key={id} onClick={() => setDashTab(id as any)}
             style={{ flexShrink:0, whiteSpace:'nowrap', padding:'8px 16px', borderRadius:99, border:'1px solid '+(dashTab===id ? 'transparent' : C.border),
               background: dashTab===id ? 'linear-gradient(135deg,'+C.blue+',#5d3fff)' : 'transparent',
@@ -400,7 +405,7 @@ export function ArtistPage() {
             {rechargeModalArtiste && (
               <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
                 onClick={() => setRechargeModalArtiste(null)}>
-                <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+                <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
                   onClick={e => e.stopPropagation()}>
                   <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
                   <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>Recharger {rechargeModalArtiste.oscart} Oscart</p>
@@ -652,6 +657,8 @@ export function ArtistPage() {
 
         {/* ────────── ONGLET VENTES ────────── */}
         {/* ── PUBLIER UN CONTENU ── */}
+        {dashTab === 'studio' && <StudioVocalArtiste user={user} artistName={stats.artistName || user?.displayName || ''} />}
+
         {dashTab === 'publier' && <PublierContenuTab user={user} soldeOscart={soldeOscartArtiste} artistName={stats.artistName || user?.displayName || ''} onRecharge={() => setRechargeModalArtiste(RECHARGES[1])} />}
 
         {/* ── MON MOT ── */}
@@ -2073,7 +2080,7 @@ export function RetraitModal({ montant, oscart, artistEmail }: { montant:number,
       </button>
       <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
         onClick={() => setOpen(false)}>
-        <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+        <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
           onClick={e => e.stopPropagation()}>
           <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
           {sent ? (

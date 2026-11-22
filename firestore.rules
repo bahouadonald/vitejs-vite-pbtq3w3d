@@ -16,7 +16,7 @@ service cloud.firestore {
       allow read: if true;
       allow update: if request.auth != null
                     || request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status', 'titresTelecharges']);
+                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status']);
       allow create, delete: if request.auth != null;
     }
 
@@ -247,10 +247,29 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null;
     }
 
-    match /demandes_suppression/{id} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null;
+    // ── STUDIO VOCAL ──────────────────────────────────────────────────────
+    // L'artiste crée son projet (statut « envoye ») et ne voit que les siens.
+    // Il peut seulement l'annuler tant que le studio n'a pas commencé.
+    // Le passage à « payé » et les crédits de pack sont écrits par le serveur
+    // (SDK Admin, qui passe outre ces règles) ou par un admin.
+    match /studio_projets/{id} {
+      allow read: if request.auth != null
+                  && (estAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.statut == 'envoye';
+      allow update: if estAdmin()
+                    || (request.auth != null
+                        && resource.data.uid == request.auth.uid
+                        && resource.data.statut == 'envoye'
+                        && request.resource.data.statut == 'annule'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut', 'annuleLe']));
+      allow delete: if estAdmin();
+    }
+
+    match /studio_credits/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || estAdmin());
+      allow write: if estAdmin();
     }
   }
 }
-

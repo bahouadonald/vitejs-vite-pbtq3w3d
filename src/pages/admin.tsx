@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
+import { StudioVocalAdmin } from './studio-vocal';
 import {
   C, S, ADMIN_EMAIL, estSuperAdmin, estAdmin, demanderResetPassword, envoyerNotification,
   notifierAdminEnregistrement, CLOUDINARY_CLOUD, CLOUDINARY_UPLOAD_PRESET, BASE_URL, optimImg,
@@ -599,7 +600,7 @@ export function SoumissionsTab({ canValidate, canDelete }: { canValidate?: boole
       {scansModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9990, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
           onClick={() => setScansModal(null)}>
-          <div style={{ background:'#fff', borderRadius:16, padding:24, maxWidth:380, width:'100%' }} onClick={e => e.stopPropagation()}>
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:16, padding:24, maxWidth:380, width:'100%' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:8 }}>Configurer le QR</h3>
             <p style={{ color:'#8098b8', fontSize:13, marginBottom:16 }}>
               "{scansModal.titre}" — définissez le nombre de scans autorisés pour le QR privé (duplication).
@@ -2420,7 +2421,9 @@ export function AdminPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState('qrcodes');
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('tab') === 'studiovocal' ? 'studiovocal' : 'qrcodes');
+  // Studio vocal : nombre de projets à traiter (pastille sur l'onglet)
+  const [studioATraiter, setStudioATraiter] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadMsg, setUploadMsg] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -2517,6 +2520,13 @@ export function AdminPage() {
     await signOut(auth);
     setUser(null); setView('login');
   };
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(collection(db, 'studio_projets'),
+      s => setStudioATraiter(s.docs.filter(d => ['envoye', 'en_production', 'paye'].includes(d.data().statut)).length),
+      () => {});
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -2891,7 +2901,7 @@ export function AdminPage() {
       {/* BULK MODAL */}
       {showBulk && bulkQr && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>Generation en masse</h3>
             <p style={{ color: '#1a6bff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4, fontSize: 15 }}>{bulkQr.label}</p>
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
@@ -3084,7 +3094,7 @@ export function AdminPage() {
       {/* QR MODAL */}
       {qrModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background: '#ffffff', border: '1px solid #dce6f7', borderRadius: 20, padding: 32, width: '100%', maxWidth: 420, textAlign: 'center' }}>
             <p style={{ color: '#5a7090', fontSize: 12, marginBottom: 2 }}>{qrModal.artist}</p>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 4 }}>{qrModal.label}</h3>
             <p style={{ fontFamily: 'monospace', color: '#1a6bff', fontWeight: 800, fontSize: 20, marginBottom: 20, letterSpacing: 4 }}>{qrModal.qrId}</p>
@@ -3105,7 +3115,7 @@ export function AdminPage() {
       {/* CONFIRM DELETE */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#ffffff', border: '1px solid #f04a6a', borderRadius: 20, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center' }}>
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background: '#ffffff', border: '1px solid #f04a6a', borderRadius: 20, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center' }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 20, marginBottom: 12 }}>Supprimer ce QR code ?</h3>
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 24 }}>Cette action est irreversible.</p>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -3161,6 +3171,7 @@ export function AdminPage() {
         <button style={{...tabStyle(tab === 'audience'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('audience')}>
           Audience {audienceStats.melomanes > 0 ? `(${audienceStats.melomanes.toLocaleString()})` : ''}
         </button>
+        <button style={{...tabStyle(tab === 'studiovocal'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('studiovocal')}>Studio vocal{studioATraiter > 0 ? ' (' + studioATraiter + ')' : ''}</button>
         <button style={{...tabStyle(tab === 'production'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('production')}>Productions</button>
         <button style={{...tabStyle(tab === 'payments'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('payments')}>Paiements {pendingPay.length > 0 ? '(' + pendingPay.length + ')' : ''}</button>
         <button style={{...tabStyle(tab === 'annonceurs'), flexShrink:0, whiteSpace:'nowrap'}} onClick={() => setTab('annonceurs')}>
@@ -3324,6 +3335,7 @@ export function AdminPage() {
         {tab === 'responsables' && <ResponsablesTab canDelete={estSuperAdmin(user?.email)} />}
 
         {/* ────────── ONGLET PRODUCTIONS ────────── */}
+        {tab === 'studiovocal' && <StudioVocalAdmin />}
         {tab === 'production' && <ProductionTab />}
 
         {/* ────────── ONGLET AUDIENCE ────────── */}

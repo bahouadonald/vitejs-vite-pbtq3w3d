@@ -78,21 +78,7 @@ export function FanPage() {
   const [showTutoCascade, setShowTutoCascade] = useState(false);
   const [tutoSeen, setTutoSeen] = useState(false);
 
-  // Démarrer tuto après chargement des données
-  useEffect(() => {
-    if (localStorage.getItem('dz_tuto_seen_v4')) return;
-    let attempts = 0;
-    const tryStart = () => {
-      attempts++;
-      const el = document.getElementById('btn-play') || document.getElementById('btn-download') || document.getElementById('btn-like');
-      if (el) {
-        setTutoStep(1);
-      } else if (attempts < 30) {
-        setTimeout(tryStart, 300);
-      }
-    };
-    setTimeout(tryStart, 800);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tutos retirés (demande de Guy) : plus de pointeur ni de bulles au chargement.
   const onSafari = isSafari() && isIOS() && !isChromeiOS();
   const qrDocId = useRef<string>('');
 
@@ -355,7 +341,7 @@ export function FanPage() {
 
           {/* PUB après téléchargement gratuit */}
       {/* ── TUTO CASCADE — bulles après Play ── */}
-      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
+      {false && showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
       {false && showPubAfterDL && (
         <PubOverlay trigger="download" onDone={() => setShowPubAfterDL(false)} />
@@ -816,26 +802,16 @@ export function LandingPage() {
           Découvrir des contenus
         </Lien>
 
-        {/* TÉLÉCHARGER L'APP — détection automatique Android (APK) / iPhone (PWA) */}
-        {isAndroid() ? (
-          <a href="/doniel-zik.apk" download
-            style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', maxWidth:360, padding:16, borderRadius:14, border:'1px solid rgba(0,212,154,0.4)', background:'rgba(0,212,154,0.08)', color:'#4dff9a', fontWeight:700, fontSize:14, textDecoration:'none', marginBottom:20 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4dff9a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
-            Télécharger l'app Android (.apk)
-          </a>
-        ) : isIOS() ? (
+        {/* iPhone uniquement : ajouter Doniel Zik à l'écran d'accueil (PWA). Le téléchargement de l'APK est retiré. */}
+        {isIOS() && (
           <button onClick={() => setShowInstallIOS(true)}
             style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', maxWidth:360, padding:16, borderRadius:14, border:'1px solid rgba(0,212,154,0.4)', background:'rgba(0,212,154,0.08)', color:'#4dff9a', fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:20 }}>
-            📲 Installer l'app sur iPhone
+            📲 Ajouter Doniel Zik à l'écran d'accueil
           </button>
-        ) : (
-          <p style={{ color:'rgba(255,255,255,0.3)', fontSize:12, marginBottom:20, textAlign:'center' }}>
-            Ouvre ce lien depuis ton téléphone (Android ou iPhone) pour installer l'app
-          </p>
         )}
         {showInstallIOS && (
           <div onClick={() => setShowInstallIOS(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9999, display:'flex', alignItems:'flex-end' }}>
-            <div onClick={e => e.stopPropagation()} style={{ background:'#12213f', width:'100%', borderRadius:'20px 20px 0 0', padding:24 }}>
+            <div onClick={e => e.stopPropagation()} style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#12213f', width:'100%', borderRadius:'20px 20px 0 0', padding:24 }}>
               <p style={{ fontWeight:800, fontSize:15, color:'#fff', marginBottom:12 }}>Installer sur iPhone</p>
               <p style={{ color:'rgba(255,255,255,0.7)', fontSize:14, lineHeight:1.8, marginBottom:16 }}>
                 1. Appuie sur le bouton <strong>Partager ⬆</strong> (en bas de Safari)<br/>

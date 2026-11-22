@@ -607,7 +607,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
         {showDetail && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9992, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
             onClick={() => setShowDetail(false)}>
-            <div style={{ background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
+            <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:C.card, borderRadius:'20px 20px 0 0', padding:'24px 24px 36px', width:'100%', maxWidth:480, textAlign:'center' }}
               onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.15)', margin:'0 auto 18px' }} />
               <p style={{ color:C.text, fontWeight:800, fontSize:17, margin:'0 0 12px' }}>Réserver {s.titre}</p>
@@ -627,7 +627,7 @@ function CarteSortie({ s, cible }: { s: any, cible?: boolean }) {
               {rechargeModalRes && (
                 <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
                   onClick={() => setRechargeModalRes(null)}>
-                  <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+                  <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
                     onClick={e => e.stopPropagation()}>
                     <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
                     <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:16 }}>
@@ -963,7 +963,7 @@ function MesChallengesPage() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:10001, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => setPartageCh(null)}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'22px 20px 34px', width:'100%', maxWidth:480 }}>
+            style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'22px 20px 34px', width:'100%', maxWidth:480 }}>
             <p style={{ color:'#fff', fontWeight:800, fontSize:16, margin:'0 0 16px' }}>Partager ce challenge</p>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               <button onClick={() => { partagerChallenge(partageCh,'whatsapp'); setPartageCh(null); }}
@@ -3392,7 +3392,7 @@ function ProfilPage() {
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={() => setEditProfil(false)}>
             <div onClick={e => e.stopPropagation()}
-              style={{ background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
+              style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
               <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', margin:'0 0 16px' }}>Modifier mon profil</p>
 
               {/* Photo */}
@@ -3434,7 +3434,7 @@ function ProfilPage() {
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={() => setSpotModal(null)}>
             <div onClick={e => e.stopPropagation()}
-              style={{ background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
+              style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:18, padding:'22px 20px', width:'100%', maxWidth:400 }}>
               <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', margin:'0 0 4px' }}>Votre nom dans la musique</p>
               <p style={{ color:'#8098b8', fontSize:13, margin:'0 0 16px', lineHeight:1.5 }}>
                 {spotModal.artistName} va citer votre nom dans une prochaine musique. Indiquez le nom et le slogan à chanter.
@@ -3462,7 +3462,7 @@ function ProfilPage() {
         {rechargeModalProfil && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9990, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
             onClick={() => setRechargeModalProfil(null)}>
-            <div style={{ background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+            <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#1e2540', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
               onClick={e => e.stopPropagation()}>
               <div style={{ width:40, height:4, borderRadius:99, background:'rgba(255,255,255,0.1)', margin:'0 auto 20px' }} />
               <p style={{ fontWeight:800, fontSize:17, color:'#ffd700', textAlign:'center', marginBottom:6 }}>Recharger {rechargeModalProfil.oscart} Oscart</p>
@@ -3560,7 +3560,7 @@ function ProfilPage() {
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={() => !deletingAccount && setShowDeleteModal(false)}>
             <div onClick={e => e.stopPropagation()}
-              style={{ background:'#161c2e', border:'1px solid rgba(240,74,106,0.35)', borderRadius:20, padding:'24px 20px', width:'100%', maxWidth:440, color:'#dde4f5', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+              style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#161c2e', border:'1px solid rgba(240,74,106,0.35)', borderRadius:20, padding:'24px 20px', width:'100%', maxWidth:440, color:'#dde4f5', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
                 <span style={{ width:40, height:40, borderRadius:99, background:'rgba(240,74,106,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
                   ⚠️
@@ -6474,7 +6474,7 @@ function PWAInstallBanner() {
       {showInstructions && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:10000, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
           onClick={() => setShowInstructions(false)}>
-          <div style={{ background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
+          <div style={{ maxHeight:'90vh', overflowY:'auto', overscrollBehavior:'contain', background:'#fff', borderRadius:'20px 20px 0 0', padding:'24px 24px 40px', width:'100%', maxWidth:480 }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:99, background:'#dce6f7', margin:'0 auto 20px' }} />
             <p style={{ fontWeight:800, fontSize:17, color:'#1a2340', marginBottom:6 }}>Installer Doniel Zik</p>
@@ -6935,7 +6935,7 @@ function PublicStreamPage() {
       {/* PUB MAISON */}
 
       {/* ── TUTO CASCADE — bulles après Play ── */}
-      {showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
+      {false && showTutoCascade && <TutoCascade onDone={() => { setShowTutoCascade(false); localStorage.setItem('dz_tuto_seen_v4','1'); }} />}
 
       {/* ── POCHETTE — zoom + flash lumineux qui dansent avec la musique ── */}
       <div style={{ position: 'relative', width: '100%', animation: 'fadeUp .35s ease', padding: '20px 16px 0', display:'flex', justifyContent:'center' }}>
@@ -7448,7 +7448,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <PWAInstallBanner />
+      {/* Bandeau « Installer Doniel Zik » retiré (demande de Guy) — le PWA reste actif */}
+      {false && <PWAInstallBanner />}
       <Routes>
         <Route path="/" element={
 user ? <ZikothequePage user={user} /> : <LandingPage />

@@ -99,7 +99,7 @@ export async function envoyerNotification(data: { to: string | null | undefined,
     await addDoc(collection(db, 'notifications'), { ...data, createdAt: new Date().toISOString(), lu: false });
   } catch (e) { console.error('envoyerNotification (Firestore)', e); }
   // Best-effort, ne bloque jamais l'action principale si le push échoue
-  const urlCible = data.qrId
+  const urlCible = typeof data.lien === 'string' && data.lien.startsWith('/') ? data.lien : data.qrId
     ? (data.source === 'public' ? `/ecoute/${data.qrId}` : `/fan/${data.qrId}`)
     : (data.role === 'artiste' ? '/artiste' : '/notifications');
   fetch('/api/send-push', {

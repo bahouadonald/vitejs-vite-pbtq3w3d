@@ -12,6 +12,7 @@
 // Déploiement : place ce fichier dans "api/" à la racine du projet.
 
 import crypto from 'crypto';
+import { adminApp, FORMULES, ADMIN_EMAIL, notifier } from './_studio-admin.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -58,6 +59,10 @@ export default async function handler(req, res) {
     // 3bis. Paiement direct d'un téléchargement (pas de recharge Oscart)
     if (meta.type === 'telechargement_direct') {
       return await traiterTelechargementDirect(meta, reference0, res);
+    }
+    // 3quater. Studio vocal : paiement d'un titre ou d'un pack
+    if (meta.type === 'studio') {
+      return await traiterStudio(meta, reference0, res);
     }
     // 3ter. Paiement direct d'une réservation / pré-téléchargement (pas de recharge Oscart)
     if (meta.type === 'reservation_directe') {
@@ -348,5 +353,47 @@ async function traiterReservationDirecte(meta, reference, res) {
     return res.status(200).json({ ok: true, statut: 'reserve', kiffsGagnes });
   } catch (e) {
     return res.status(500).json({ error: e.message || 'Erreur serveur (réservation directe)' });
+  }
+}
+
+// Studio vocal : marque le projet payé ; pour un pack, ajoute les titres restants
+// (titres du pack - 1, celui-ci étant consommé par le projet en cours).
+async function traiterStudio(meta, reference, res) {
+  try {
+    const f = FORMULES[meta.formule];
+    if (!meta.projetId || !meta.uid || !f || !reference) {
+      return res.status(200).json({ ok: true, ignore: 'paramètres manquants' });
+    }
+    const db = adminApp().firestore();
+    const refTraite = db.collection('paiements_traites').doc(reference);
+    const refProjet = db.collection('studio_projets').doc(meta.projetId);
+    const refCredits = db.collection('studio_credits').doc(meta.uid);
+
+    const resultat = await db.runTransaction(async (t) => {
+      const [deja, p, c] = await Promise.all([t.get(refTraite), t.get(refProjet), t.get(refCredits)]);
+      if (deja.exists) return { ignore: 'déjà traité' };
+      const maintenant = new Date().toISOString();
+      t.set(refTraite, { reference, type: 'studio', uid: meta.uid, projetId: meta.projetId, formule: meta.formule, montant: f.fcfa, traiteLe: maintenant });
+      if (!p.exists) return { ignore: 'projet introuvable' };
+      const projet = p.data();
+      const creditsActuels = c.exists ? (c.data().credits || 0) : 0;
+      if (projet.statut === 'extrait_dispo') {
+        // Ce titre est payé ; le reste du pack devient des crédits
+        t.update(refProjet, { statut: 'paye', payeLe: maintenant, formule: meta.formule, montant: f.fcfa, referencePaiement: reference, majLe: maintenant });
+        if (f.titres > 1) t.set(refCredits, { uid: meta.uid, credits: creditsActuels + f.titres - 1, majLe: maintenant }, { merge: true });
+      } else {
+        // Projet déjà validé autrement (ex : double paiement) : rien n'est perdu, tout part en crédits
+        t.set(refCredits, { uid: meta.uid, credits: creditsActuels + f.titres, majLe: maintenant }, { merge: true });
+      }
+      return { titre: projet.titre || '', email: projet.email || '' };
+    });
+
+    if (resultat.titre !== undefined) {
+      await notifier(db, ADMIN_EMAIL, `Studio vocal — paiement reçu pour « ${resultat.titre} » (${f.label}, ${f.fcfa} FCFA). À finaliser (mixage + mastering).`, '/admin?tab=studiovocal');
+      await notifier(db, resultat.email, `Paiement reçu pour « ${resultat.titre} » ! Le studio fait le mixage et le mastering final.`, '/artiste?tab=studio', 'artiste');
+    }
+    return res.status(200).json({ ok: true, ...resultat });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'Erreur serveur' });
   }
 }
