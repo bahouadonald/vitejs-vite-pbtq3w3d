@@ -218,9 +218,9 @@ export function CarteProjetArtiste({ p, credits }: { p: any, credits: number }) 
     try {
       const u = auth.currentUser; if (!u) throw new Error('Reconnecte-toi.');
       const idToken = await u.getIdToken();
-      const r = await fetch('/api/studio-utiliser-credit', {
+      const r = await fetch('/api/studio-paiement', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projetId: p.id, idToken }),
+        body: JSON.stringify({ action: 'credit', projetId: p.id, idToken }),
       });
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || 'Erreur, réessaie.');

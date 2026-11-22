@@ -7,9 +7,15 @@
 //   GENIUSPAY_API_KEY, GENIUSPAY_API_SECRET, FIREBASE_SERVICE_ACCOUNT_BASE64
 
 import { adminApp, verifierUtilisateur, FORMULES } from './_studio-admin.js';
+import { utiliserCredit } from './_studio-credit.js';
 
+// Une seule fonction serveur pour le Studio vocal (le plan Vercel Hobby limite
+// le nombre de fonctions à 12) :
+//   { action: 'credit', projetId, idToken }           → valider avec un titre du pack
+//   { projetId, formule, idToken }                    → créer un paiement GeniusPay
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
+  if ((req.body || {}).action === 'credit') return utiliserCredit(req, res);
 
   try {
     const { projetId, formule, idToken } = req.body || {};

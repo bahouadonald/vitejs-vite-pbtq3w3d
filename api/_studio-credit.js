@@ -1,12 +1,10 @@
-// api/studio-utiliser-credit.js
+// api/_studio-credit.js (appelé par api/studio-paiement.js, action « credit »)
 // Valide un projet du Studio vocal avec un titre restant d'un pack déjà payé.
 // Tout se fait dans une transaction : impossible d'utiliser deux fois le même titre.
 
 import { adminApp, verifierUtilisateur, ADMIN_EMAIL, notifier } from './_studio-admin.js';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
-
+export async function utiliserCredit(req, res) {
   try {
     const { projetId, idToken } = req.body || {};
     if (!projetId) return res.status(400).json({ error: 'Projet manquant' });
