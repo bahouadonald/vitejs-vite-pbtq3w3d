@@ -14,7 +14,7 @@
 //   studio_priorite/{uid}  — Pack Priorité (écrit par le serveur)
 //   studio_config/signature — signature sonore choisie par l'admin
 // ─────────────────────────────────────────────
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { auth, db } from '../firebase';
 import {
@@ -46,7 +46,9 @@ export const libelleService = (s?: string) => (s && s in SERVICES_STUDIO) ? SERV
 // Pack d'ouverture : priorité (réponse sous 48 h) pendant 3 mois, payé une seule fois
 export const PACK_PRIORITE = { label: 'Pack Priorité', fcfa: 1500, mois: 3 };
 export const DELAI_PRIORITE = '48 h';
-export const DELAI_NORMAL = '7 à 10 jours';
+export const DELAI_NORMAL = '7 jours et plus';
+// « Réponse sous 48 h » / « Réponse en 7 jours et plus »
+export const delai = (prio: boolean) => prio ? `sous ${DELAI_PRIORITE}` : `en ${DELAI_NORMAL}`;
 
 export const STYLES_MUSIQUE = ['Gospel', 'Zouglou', 'Afrobeat', 'Coupé-décalé', 'Rumba', 'Rap', 'R&B', 'Reggae', 'Variété', 'Autre'];
 
@@ -204,7 +206,7 @@ export function CarteProjetArtiste({ p, onChanter }: { p: any, onChanter?: (p: a
 
       {(p.statut === 'envoye' || p.statut === 'en_production') && (
         <p style={{ margin: '6px 0 0', color: C.textSoft, fontSize: 13, lineHeight: 1.6 }}>
-          Le studio travaille sur ta musique. Réponse sous {p.prioritaire ? DELAI_PRIORITE : DELAI_NORMAL}, tu seras notifié.
+          Le studio travaille sur ta musique. Réponse {delai(!!p.prioritaire)}, tu seras notifié.
         </p>
       )}
       {p.statut === 'envoye' && <button style={{ ...boutonDiscret, marginTop: 10, fontSize: 12 }} onClick={annuler}>Annuler ce projet</button>}
@@ -319,7 +321,7 @@ export function StudioVocalAdmin() {
         <h2 style={{ fontFamily: 'serif', fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>Studio</h2>
         <p style={{ color: '#5a7090', fontSize: 13, margin: 0, lineHeight: 1.6 }}>
           Tu déposes toujours des fichiers PROPRES : la signature sonore est ajoutée automatiquement sur ce que l'artiste écoute avant de payer.
-          ⚡ Priorité sous 48 h, sinon sous 7 à 10 jours.
+          ⚡ FAST : sous 48 h. FREE : 7 jours et plus.
         </p>
       </div>
       <SignatureSonoreAdmin />
@@ -648,8 +650,13 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
   const recRef = useRef<MediaRecorder | null>(null);
   const fluxRef = useRef<MediaStream | null>(null);
   const morceauxRef = useRef<Blob[]>([]);
-  const beatAudioRef = useRef<HTMLAudioElement | null>(null);
   const lecteurRef = useRef<HTMLAudioElement | null>(null);
+  // Lecture par Web Audio : plus fiable sur Android (casques Bluetooth compris)
+  // et permet d'entendre tout ce qui est déjà enregistré pendant une nouvelle prise.
+  const audioRef = useRef<AudioContext | null>(null);
+  const tamponsRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const sourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const [preparation, setPreparation] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number>(0);
   const minuterieRef = useRef<any>(null);
@@ -707,7 +714,40 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
     ctxRef.current = null;
     setNiveau(0);
   };
-  useEffect(() => () => { libererMicro(); beatAudioRef.current?.pause(); lecteurRef.current?.pause(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const contexteLecture = (): AudioContext => {
+    if (!audioRef.current || audioRef.current.state === 'closed') {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      audioRef.current = new Ctx();
+    }
+    if (audioRef.current!.state === 'suspended') audioRef.current!.resume().catch(() => {});
+    return audioRef.current!;
+  };
+  const tampon = async (cle: string, url: string): Promise<AudioBuffer> => {
+    const deja = tamponsRef.current.get(cle); if (deja) return deja;
+    const ctx = contexteLecture();
+    const donnees = await (await fetch(url)).arrayBuffer();
+    const buf = await new Promise<AudioBuffer>((ok, ko) => { const r = ctx.decodeAudioData(donnees, ok, ko); if (r && (r as any).then) (r as any).then(ok, ko); });
+    tamponsRef.current.set(cle, buf);
+    return buf;
+  };
+  const couperLecture = () => {
+    sourcesRef.current.forEach(s => { try { s.onended = null; s.stop(); } catch { /* déjà arrêtée */ } });
+    sourcesRef.current = [];
+    lecteurRef.current?.pause();
+  };
+  // Joue plusieurs pistes ensemble, calées au même départ
+  const jouerEnsemble = (bufs: AudioBuffer[], quandFini?: () => void) => {
+    const ctx = contexteLecture();
+    const depart = ctx.currentTime + 0.08;
+    let plusLongue: AudioBufferSourceNode | null = null, duree = 0;
+    bufs.forEach(b => {
+      const src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.start(depart);
+      sourcesRef.current.push(src);
+      if (b.duration > duree) { duree = b.duration; plusLongue = src; }
+    });
+    if (plusLongue && quandFini) (plusLongue as AudioBufferSourceNode).onended = quandFini;
+  };
+  useEffect(() => () => { libererMicro(); couperLecture(); audioRef.current?.close().catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const demarrer = async () => {
     setErreur('');
@@ -716,11 +756,20 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
       document.getElementById('dz-style')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    if (beat && !ecouteursOk.current) {
-      if (!confirm('Branche des écouteurs FILAIRES avant de chanter sur l\'instru (le Bluetooth décale la voix). C\'est fait ?')) return;
+    const accompagnement = [...(beat ? [{ cle: 'beat:' + beat.url, url: beat.url }] : []), ...prises.map(p => ({ cle: p.id, url: p.url }))];
+    if (accompagnement.length && !ecouteursOk.current) {
+      if (!confirm('Mets tes écouteurs (filaires de préférence, Bluetooth possible) : tu vas entendre ce qui est déjà enregistré pendant que tu chantes. C\'est fait ?')) return;
       ecouteursOk.current = true;
     }
-    lecteurRef.current?.pause(); setLecture('');
+    couperLecture(); setLecture('');
+    // Prépare le retour casque avant d'ouvrir le micro
+    let bufsAccomp: AudioBuffer[] = [];
+    if (accompagnement.length) {
+      setPreparation(true);
+      try { bufsAccomp = await Promise.all(accompagnement.map(a => tampon(a.cle, a.url))); }
+      catch { bufsAccomp = []; }
+      setPreparation(false);
+    }
     if (!navigator.mediaDevices?.getUserMedia || !(window as any).MediaRecorder) {
       setErreur('Ce navigateur ne permet pas d\'enregistrer. Utilise Chrome ou Safari à jour.');
       return;
@@ -770,10 +819,8 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
         }
       };
       recRef.current = rec;
-      if (beat && beatAudioRef.current) {
-        beatAudioRef.current.currentTime = 0;
-        await beatAudioRef.current.play().catch(() => {});
-      }
+      // Le beat et les prises déjà faites jouent dans le casque pendant la nouvelle prise
+      if (bufsAccomp.length) jouerEnsemble(bufsAccomp);
       rec.start(1000);
       debutRef.current = Date.now();
       setSecondes(0);
@@ -792,18 +839,38 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
   };
 
   const arreter = () => {
-    beatAudioRef.current?.pause();
+    couperLecture();
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
     setEnregistre(false);
   };
 
-  const ecouter = (id: string, url: string) => {
+  const ecouter = async (id: string, url: string) => {
     if (enregistre) return;
-    const a = lecteurRef.current; if (!a) return;
-    if (lecture === id) { a.pause(); setLecture(''); return; }
-    a.src = url; a.currentTime = 0;
-    a.play().then(() => setLecture(id)).catch(() => {});
-    a.onended = () => setLecture('');
+    couperLecture();
+    if (lecture === id) { setLecture(''); return; }
+    contexteLecture(); // débloqué par le toucher (iPhone)
+    setLecture(id);
+    try {
+      const buf = await tampon(id === 'beat' || id === 'titre' ? id + ':' + url : id, url);
+      jouerEnsemble([buf], () => setLecture(l => l === id ? '' : l));
+    } catch {
+      // Secours : lecteur classique
+      const a = lecteurRef.current; if (!a) { setLecture(''); return; }
+      a.src = url; a.currentTime = 0; a.onended = () => setLecture('');
+      a.play().catch(() => setLecture(''));
+    }
+  };
+  // Tout écouter ensemble (beat + toutes les prises)
+  const toutEcouter = async () => {
+    if (enregistre) return;
+    couperLecture();
+    if (lecture === 'tout') { setLecture(''); return; }
+    contexteLecture(); setLecture('tout');
+    try {
+      const pistes = [...(beat ? [{ cle: 'beat:' + beat.url, url: beat.url }] : []), ...prises.map(p => ({ cle: p.id, url: p.url }))];
+      const bufs = await Promise.all(pistes.map(p => tampon(p.cle, p.url)));
+      jouerEnsemble(bufs, () => setLecture(l => l === 'tout' ? '' : l));
+    } catch { setLecture(''); }
   };
 
   const importerVoix = async (f: File) => {
@@ -879,7 +946,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
   };
 
   const supprimerPrise = (id: string) => {
-    if (lecture === id) { lecteurRef.current?.pause(); setLecture(''); }
+    if (lecture === id || lecture === 'tout') { couperLecture(); setLecture(''); }
     setPrises(ps => { const p = ps.find(x => x.id === id); if (p) URL.revokeObjectURL(p.url); return ps.filter(x => x.id !== id); });
   };
 
@@ -908,7 +975,6 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
     <div className="dz-console" style={{ color: C.text, paddingBottom: pleinePage ? 0 : 20 }}>
       <style>{cssConsole}</style>
       <audio ref={lecteurRef} style={{ display: 'none' }} />
-      {beat && <audio ref={beatAudioRef} src={beat.url} style={{ display: 'none' }} />}
 
       {/* Barre du haut */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, minHeight: 40 }}>
@@ -937,7 +1003,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
       {/* Chanter / Titre existant */}
       {!projetFinal && <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 14, marginBottom: 12, background: 'rgba(0,0,0,0.3)', boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)' }}>
         {([['chanter', 'Chanter'], ['existant', 'Titre existant']] as const).map(([k, l]) => (
-          <button key={k} disabled={enregistre} onClick={() => { setMode(k); setErreur(''); lecteurRef.current?.pause(); setLecture(''); }}
+          <button key={k} disabled={enregistre} onClick={() => { setMode(k); setErreur(''); couperLecture(); setLecture(''); }}
             style={{ flex: 1, padding: '10px 0', borderRadius: 11, border: 'none', cursor: 'pointer', fontWeight: 900, fontSize: 13,
               background: mode === k ? 'linear-gradient(180deg,#3d9bff,#0a6be0)' : 'transparent', color: mode === k ? '#fff' : C.textSoft,
               boxShadow: mode === k ? '0 3px 0 #0040a0, inset 0 1px 0 rgba(255,255,255,0.3)' : 'none' }}>{l}</button>
@@ -1012,7 +1078,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
                 <span style={{ color: C.gold, fontSize: 12 }}>{lecture === 'beat' ? '❚❚' : '▶'}</span>
                 <MiniOnde pics={beat.pics.length ? beat.pics : Array(40).fill(0.15)} couleur={C.gold} />
               </button>
-              <button onClick={() => { if (lecture === 'beat') { lecteurRef.current?.pause(); setLecture(''); } URL.revokeObjectURL(beat.url); setBeat(null); }} disabled={enregistre}
+              <button onClick={() => { if (lecture === 'beat' || lecture === 'tout') { couperLecture(); setLecture(''); } URL.revokeObjectURL(beat.url); setBeat(null); }} disabled={enregistre}
                 style={{ background: 'none', border: 'none', color: '#8aa0c4', fontSize: 18, cursor: 'pointer', padding: 4 }} aria-label="Retirer le beat">×</button>
             </>
           ) : (
@@ -1029,7 +1095,8 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
           const dernierChoeur = pi.id === (nbChoeurs === 1 ? 'choeur' : 'choeur' + nbChoeurs);
           const clips = prises.filter(p => p.type === pi.id);
           return (
-            <div key={pi.id} className="dz-piste" onClick={() => { if (!enregistre) setArme(pi.id); }}
+            <Fragment key={pi.id}>
+            <div className="dz-piste" onClick={() => { if (!enregistre) setArme(pi.id); }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: enregistre ? 'default' : 'pointer',
                 borderBottom: '1px solid rgba(120,170,255,0.12)',
                 background: estArmee ? `linear-gradient(90deg, ${pi.couleur}26, transparent 70%)` : 'transparent', transition: 'background .2s' }}>
@@ -1038,12 +1105,6 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
                   background: estArmee ? '#ff2d4d' : 'transparent', border: '2px solid ' + (estArmee ? '#ff2d4d' : pi.couleur),
                   boxShadow: estArmee ? '0 0 8px #ff2d4d' : 'none' }} />
                 {pi.id === 'choeur' && nbChoeurs > 1 ? 'Chœur 1' : pi.court}
-                {dernierChoeur && nbChoeurs < 4 && !enregistre && (
-                  <span role="button" aria-label="Ajouter une voix de chœur"
-                    onClick={e => { e.stopPropagation(); setNbChoeurs(n => n + 1); setArme('choeur' + (nbChoeurs + 1)); }}
-                    style={{ marginLeft: 2, flexShrink: 0, width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(179,136,255,0.25)', border: '1px solid #b388ff', color: '#fff', fontSize: 14, lineHeight: 1 }}>+</span>
-                )}
               </span>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 6, overflowX: 'auto', minHeight: 36, alignItems: 'center' }}>
                 {clips.map((c, i) => (
@@ -1065,9 +1126,25 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
                 )}
               </div>
             </div>
+            {dernierChoeur && nbChoeurs < 4 && !enregistre && (
+              <button onClick={() => { setNbChoeurs(n => n + 1); setArme('choeur' + (nbChoeurs + 1)); }}
+                style={{ display: 'block', width: 'calc(100% - 24px)', margin: '8px 12px', padding: '10px 0', borderRadius: 12, cursor: 'pointer',
+                  border: '1.5px dashed #b388ff', background: 'rgba(179,136,255,0.12)', color: '#e3d4ff', fontSize: 13, fontWeight: 900 }}>
+                + Ajouter une voix de chœur ({nbChoeurs + 1}/4)
+              </button>
+            )}
+            </Fragment>
           );
         })}
       </div>
+
+      {(prises.length + (beat ? 1 : 0)) >= 2 && !enregistre && (
+        <button onClick={toutEcouter}
+          style={{ ...boutonDiscret, width: '100%', marginBottom: 14, fontSize: 13, color: lecture === 'tout' ? '#00D49A' : C.text, borderColor: lecture === 'tout' ? '#00D49A' : C.border }}>
+          {lecture === 'tout' ? '❚❚ Arrêter l\'écoute' : '▶ Tout écouter ensemble'}
+        </button>
+      )}
+      {preparation && <p style={{ margin: '0 0 10px', textAlign: 'center', color: C.gold, fontSize: 12, fontWeight: 800 }}>Préparation du retour casque...</p>}
 
       {/* Transport : importer · enregistrer · écouteurs */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', marginBottom: 8 }}>
@@ -1097,7 +1174,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
         </span>
       </div>
       <p style={{ textAlign: 'center', margin: '0 0 16px', color: '#7f97bf', fontSize: 11, fontWeight: 700 }}>
-        {beat ? 'Écouteurs obligatoires avec un beat' : 'Importer · Enregistrer · Écouteurs'}
+        {beat || prises.length ? 'Écouteurs obligatoires : tu entends tes pistes en chantant' : 'Voix lead : pas besoin d\'écouteurs'}
       </p>
 
       </>}
@@ -1131,7 +1208,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
                 <p style={{ margin: '0 0 4px', color: C.text, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titreExistant.file.name}</p>
                 <MiniOnde pics={titreExistant.pics.length ? titreExistant.pics : Array(60).fill(0.15)} couleur="#5BB0FF" />
               </div>
-              <button onClick={() => { if (lecture === 'titre') { lecteurRef.current?.pause(); setLecture(''); } URL.revokeObjectURL(titreExistant.url); setTitreExistant(null); }}
+              <button onClick={() => { if (lecture === 'titre') { couperLecture(); setLecture(''); } URL.revokeObjectURL(titreExistant.url); setTitreExistant(null); }}
                 style={{ background: 'none', border: 'none', color: '#8aa0c4', fontSize: 20, cursor: 'pointer' }} aria-label="Retirer">×</button>
             </div>
           ) : (
@@ -1145,17 +1222,22 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
         </div>
       )}
 
-      {/* Délai */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', marginBottom: 14, borderRadius: 14,
-        background: prioritaire ? 'rgba(245,200,76,0.14)' : 'rgba(8,20,45,0.5)', border: '1px solid ' + (prioritaire ? 'rgba(245,200,76,0.45)' : C.border) }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: prioritaire ? C.gold : C.textSoft }}>
-          {prioritaire ? `⚡ Priorité : réponse sous ${DELAI_PRIORITE}` : `Réponse sous ${DELAI_NORMAL}`}
-        </span>
-        {!prioritaire && (
-          <button onClick={() => setTarifsOuverts(true)}
-            style={{ padding: '6px 12px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 900, color: '#3a2a00',
-              background: 'linear-gradient(180deg,#ffd76a,#e0a915)', boxShadow: '0 3px 0 #9a7200' }}>⚡ 48 h</button>
-        )}
+      {/* Délai : FREE (gratuit, 7 jours et plus) ou FAST (Pack Priorité, 48 h) */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {[
+          { cle: 'free', actif: !prioritaire, titre: 'FREE', ligne1: 'Gratuit', ligne2: DELAI_NORMAL, couleur: '#5BB0FF' },
+          { cle: 'fast', actif: prioritaire, titre: '⚡ FAST', ligne1: prioritaire ? 'Actif' : `${fcfa(PACK_PRIORITE.fcfa)} · ${PACK_PRIORITE.mois} mois`, ligne2: DELAI_PRIORITE, couleur: C.gold },
+        ].map(o => (
+          <button key={o.cle} onClick={() => { if (o.cle === 'fast' && !prioritaire) setTarifsOuverts(true); }}
+            style={{ flex: 1, padding: '10px 12px', borderRadius: 16, cursor: o.cle === 'fast' && !prioritaire ? 'pointer' : 'default', textAlign: 'left',
+              border: '1.5px solid ' + (o.actif ? o.couleur : C.border),
+              background: o.actif ? (o.cle === 'fast' ? 'linear-gradient(160deg,#6a5413,#2d2306)' : 'linear-gradient(160deg,#1d4a8f,#0d2a5a)') : 'rgba(8,20,45,0.45)',
+              boxShadow: o.actif ? `0 0 0 2px ${o.couleur}33, 0 8px 18px rgba(0,0,0,0.3)` : 'none', opacity: o.actif ? 1 : 0.8 }}>
+            <span style={{ display: 'block', color: o.couleur, fontWeight: 900, fontSize: 14, letterSpacing: 1 }}>{o.titre}</span>
+            <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 18, margin: '2px 0' }}>{o.ligne2}</span>
+            <span style={{ display: 'block', color: C.textSoft, fontSize: 11, fontWeight: 700 }}>{o.ligne1}</span>
+          </button>
+        ))}
       </div>
 
       {erreur && <p style={{ color: C.alert, fontSize: 13, margin: '0 0 12px', textAlign: 'center' }}>{erreur}</p>}
@@ -1183,7 +1265,7 @@ export function StudioConsole({ user, artistName, pleinePage }: { user: any, art
             if (mode === 'existant' && titreExistant) { URL.revokeObjectURL(titreExistant.url); setTitreExistant(null); }
             else setPrises([]);
             setEnvoiOuvert(false);
-            setInfo(`Projet envoyé. Réponse du studio sous ${prioritaire ? DELAI_PRIORITE : DELAI_NORMAL}, tu seras notifié.`);
+            setInfo(`Projet envoyé. Réponse du studio ${delai(prioritaire)}, tu seras notifié.`);
             setVue('projets');
           }} />
       )}
@@ -1402,7 +1484,7 @@ function FeuilleEnvoi({ user, artistName, beat, prises, service, fichier, style,
         {envoi || 'Envoyer'}
       </button>
       <p style={{ margin: '10px 0 0', color: C.textSoft, fontSize: 11, textAlign: 'center' }}>
-        Réponse sous {prioritaire ? DELAI_PRIORITE : DELAI_NORMAL}. Tu écoutes avant de payer.
+        Réponse {delai(prioritaire)}. Tu écoutes avant de payer.
       </p>
     </Feuille>
   );
@@ -1454,7 +1536,7 @@ export function ConditionsStudioPage() {
       'Avant paiement, tout ce que tu écoutes porte la signature sonore Doniel Zik. Après paiement, tu reçois les fichiers sans signature.',
     ]],
     ['6. Délais', [
-      'Avec le Pack Priorité : réponse du studio sous 48 h à chaque étape. Sans le pack : sous 7 à 10 jours.',
+      'FAST (Pack Priorité) : réponse du studio sous 48 h à chaque étape. FREE (sans le pack) : 7 jours et plus.',
       'Ces délais sont indicatifs et peuvent être dépassés en cas de force majeure (panne, coupure, événement imprévu).',
       'Le Pack Priorité est payé une seule fois et dure 3 mois à partir du paiement. Il n\'est pas remboursable.',
     ]],
