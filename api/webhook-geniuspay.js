@@ -361,36 +361,77 @@ async function traiterReservationDirecte(meta, reference, res) {
 async function traiterStudio(meta, reference, res) {
   try {
     const f = FORMULES[meta.formule];
-    if (!meta.projetId || !meta.uid || !f || !reference) {
+    if (!meta.uid || !f || !reference) {
       return res.status(200).json({ ok: true, ignore: 'paramètres manquants' });
     }
     const db = adminApp().firestore();
+
+    // Pack Priorité : 3 mois de priorité (prolongés si déjà actifs)
+    if (meta.formule === 'priorite') {
+      const refTraiteP = db.collection('paiements_traites').doc(reference);
+      const refPrio = db.collection('studio_priorite').doc(meta.uid);
+      const r = await db.runTransaction(async (t) => {
+        const [deja, pr] = await Promise.all([t.get(refTraiteP), t.get(refPrio)]);
+        if (deja.exists) return { ignore: 'déjà traité' };
+        const maintenant = Date.now();
+        const base = Math.max(maintenant, pr.exists ? (pr.data().jusquAuMs || 0) : 0);
+        const jusquAuMs = base + f.jours * 24 * 3600 * 1000;
+        t.set(refTraiteP, { reference, type: 'studio_priorite', uid: meta.uid, montant: f.fcfa, traiteLe: new Date().toISOString() });
+        t.set(refPrio, { uid: meta.uid, jusquAuMs, jusquAu: new Date(jusquAuMs).toISOString(), majLe: new Date().toISOString() }, { merge: true });
+        return { jusquAuMs };
+      });
+      if (r.jusquAuMs) {
+        const u = await adminApp().auth().getUser(meta.uid).catch(() => null);
+        const fin = new Date(r.jusquAuMs).toLocaleDateString('fr-FR');
+        if (u?.email) await notifier(db, u.email, `Pack Priorité activé jusqu'au ${fin} : tes projets sont traités sous 48 h.`, '/studio-vocal');
+        await notifier(db, ADMIN_EMAIL, `Studio — Pack Priorité acheté (${f.fcfa} FCFA) par ${u?.displayName || u?.email || meta.uid}.`, '/admin?tab=studiovocal');
+      }
+      return res.status(200).json({ ok: true, ...r });
+    }
+    if (!meta.projetId) return res.status(200).json({ ok: true, ignore: 'projet manquant' });
+
     const refTraite = db.collection('paiements_traites').doc(reference);
     const refProjet = db.collection('studio_projets').doc(meta.projetId);
-    const refCredits = db.collection('studio_credits').doc(meta.uid);
 
     const resultat = await db.runTransaction(async (t) => {
-      const [deja, p, c] = await Promise.all([t.get(refTraite), t.get(refProjet), t.get(refCredits)]);
+      const [deja, p] = await Promise.all([t.get(refTraite), t.get(refProjet)]);
       if (deja.exists) return { ignore: 'déjà traité' };
       const maintenant = new Date().toISOString();
       t.set(refTraite, { reference, type: 'studio', uid: meta.uid, projetId: meta.projetId, formule: meta.formule, montant: f.fcfa, traiteLe: maintenant });
       if (!p.exists) return { ignore: 'projet introuvable' };
       const projet = p.data();
-      const creditsActuels = c.exists ? (c.data().credits || 0) : 0;
-      if (projet.statut === 'extrait_dispo') {
-        // Ce titre est payé ; le reste du pack devient des crédits
-        t.update(refProjet, { statut: 'paye', payeLe: maintenant, formule: meta.formule, montant: f.fcfa, referencePaiement: reference, majLe: maintenant });
-        if (f.titres > 1) t.set(refCredits, { uid: meta.uid, credits: creditsActuels + f.titres - 1, majLe: maintenant }, { merge: true });
+      const paiement = { payeLe: maintenant, formule: meta.formule, montant: f.fcfa, referencePaiement: reference, majLe: maintenant };
+      let suite = '';
+      if (projet.service === 'production' && projet.statut === 'propositions_dispo') {
+        // L'instru choisie se débloque : l'artiste peut la télécharger et chanter dessus
+        t.update(refProjet, { ...paiement, statut: 'instru_debloquee' });
+        suite = 'instru';
+      } else if (projet.statut === 'extrait_dispo' && projet.service) {
+        // Beat, remastering, remixage : le titre fini est déjà prêt, il se débloque
+        t.update(refProjet, { ...paiement, statut: 'livre', livreLe: maintenant });
+        suite = 'livre';
+      } else if (projet.statut === 'extrait_dispo') {
+        // Ancien parcours
+        t.update(refProjet, { ...paiement, statut: 'paye' });
+        suite = 'ancien';
       } else {
-        // Projet déjà validé autrement (ex : double paiement) : rien n'est perdu, tout part en crédits
-        t.set(refCredits, { uid: meta.uid, credits: creditsActuels + f.titres, majLe: maintenant }, { merge: true });
+        // Paiement en double ou projet déjà avancé : on le note pour l'admin
+        t.update(refProjet, { paiementEnTrop: reference, majLe: maintenant });
+        suite = 'doublon';
       }
-      return { titre: projet.titre || '', email: projet.email || '' };
+      return { titre: projet.titre || '', email: projet.email || '', suite };
     });
 
     if (resultat.titre !== undefined) {
-      await notifier(db, ADMIN_EMAIL, `Studio vocal — paiement reçu pour « ${resultat.titre} » (${f.label}, ${f.fcfa} FCFA). À finaliser (mixage + mastering).`, '/admin?tab=studiovocal');
-      await notifier(db, resultat.email, `Paiement reçu pour « ${resultat.titre} » ! Le studio fait le mixage et le mastering final.`, '/artiste?tab=studio', 'artiste');
+      const ti = resultat.titre;
+      const msgArtiste = {
+        instru: `Paiement reçu pour « ${ti} » ! Ton instru est débloquée : télécharge-la et enregistre ta voix finale dans le Studio.`,
+        livre: `Paiement reçu pour « ${ti} » ! Ton titre est débloqué : télécharge-le dans le Studio.`,
+        ancien: `Paiement reçu pour « ${ti} » ! Le studio fait le mixage et le mastering final.`,
+        doublon: `Paiement reçu pour « ${ti} ». Le studio a été prévenu.`,
+      }[resultat.suite] || `Paiement reçu pour « ${ti} ».`;
+      await notifier(db, ADMIN_EMAIL, `Studio — paiement reçu pour « ${ti} » (${f.label}, ${f.fcfa} FCFA)${resultat.suite === 'doublon' ? ' — ATTENTION : paiement en double' : ''}.`, '/admin?tab=studiovocal');
+      await notifier(db, resultat.email, msgArtiste, '/studio-vocal?vue=projets');
     }
     return res.status(200).json({ ok: true, ...resultat });
   } catch (e) {

@@ -23,6 +23,7 @@ export async function utiliserCredit(req, res) {
       const projet = p.data();
       if (projet.uid !== utilisateur.uid) throw new Error('Ce projet ne t\'appartient pas');
       if (projet.statut !== 'extrait_dispo') throw new Error('Ce projet n\'attend pas de validation');
+      if (projet.service && projet.service !== 'production') throw new Error('Les titres du pack servent aux productions, pas à ce service');
       const credits = c.exists ? (c.data().credits || 0) : 0;
       if (credits < 1) throw new Error('Plus aucun titre dans ton pack');
       const maintenant = new Date().toISOString();

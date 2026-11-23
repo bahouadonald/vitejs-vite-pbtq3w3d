@@ -16,7 +16,7 @@ service cloud.firestore {
       allow read: if true;
       allow update: if request.auth != null
                     || request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status']);
+                         .hasOnly(['visits', 'streams', 'downloads', 'usedScans', 'status', 'titresTelecharges']);
       allow create, delete: if request.auth != null;
     }
 
@@ -257,19 +257,61 @@ service cloud.firestore {
                   && (estAdmin() || resource.data.uid == request.auth.uid);
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.statut == 'envoye';
+                    && request.resource.data.statut == 'envoye'
+                    // « prioritaire » seulement avec un Pack Priorité encore valide
+                    && (request.resource.data.get('prioritaire', false) == false
+                        || (exists(/databases/$(database)/documents/studio_priorite/$(request.auth.uid))
+                            && get(/databases/$(database)/documents/studio_priorite/$(request.auth.uid)).data.jusquAuMs > request.time.toMillis()));
       allow update: if estAdmin()
-                    || (request.auth != null
-                        && resource.data.uid == request.auth.uid
-                        && resource.data.statut == 'envoye'
-                        && request.resource.data.statut == 'annule'
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut', 'annuleLe']));
+                    || (request.auth != null && resource.data.uid == request.auth.uid && (
+                        // annuler avant le début du travail
+                        (resource.data.statut == 'envoye'
+                          && request.resource.data.statut == 'annule'
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut', 'annuleLe']))
+                        // choisir une des propositions (avant de payer)
+                        || (resource.data.statut == 'propositions_dispo'
+                          && request.resource.data.statut == 'propositions_dispo'
+                          && request.resource.data.choix is int
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['choix', 'majLe']))
+                        // envoyer sa prise de voix finale (après paiement)
+                        || (resource.data.statut == 'instru_debloquee'
+                          && request.resource.data.statut == 'voix_finale'
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut', 'pistesFinales', 'notesFinales', 'voixFinaleLe', 'majLe']))
+                      ));
       allow delete: if estAdmin();
+    }
+
+    // Fichiers PROPRES (sans signature sonore) : visibles par l'artiste
+    // seulement une fois payé. Avant, il n'écoute que les aperçus signés.
+    match /studio_livrables/{id} {
+      allow read: if estAdmin()
+                  || (request.auth != null
+                      && resource.data.uid == request.auth.uid
+                      && get(/databases/$(database)/documents/studio_projets/$(id)).data.statut
+                         in ['instru_debloquee', 'voix_finale', 'finalisation', 'livre']);
+      allow write: if estAdmin();
+    }
+
+    // Réglages du Studio (signature sonore)
+    match /studio_config/{id} {
+      allow read, write: if estAdmin();
     }
 
     match /studio_credits/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || estAdmin());
       allow write: if estAdmin();
     }
+
+    // Pack Priorité (écrit uniquement par le serveur après paiement)
+    match /studio_priorite/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || estAdmin());
+      allow write: if estAdmin();
+    }
+
+    match /demandes_suppression/{id} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
   }
 }
+

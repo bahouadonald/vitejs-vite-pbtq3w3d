@@ -6,32 +6,48 @@
 // Variables d'environnement Vercel (déjà utilisées par les autres paiements) :
 //   GENIUSPAY_API_KEY, GENIUSPAY_API_SECRET, FIREBASE_SERVICE_ACCOUNT_BASE64
 
-import { adminApp, verifierUtilisateur, FORMULES } from './_studio-admin.js';
+import { adminApp, verifierUtilisateur, FORMULES, SERVICES } from './_studio-admin.js';
 import { utiliserCredit } from './_studio-credit.js';
 
 // Une seule fonction serveur pour le Studio vocal (le plan Vercel Hobby limite
 // le nombre de fonctions à 12) :
 //   { action: 'credit', projetId, idToken }           → valider avec un titre du pack
 //   { projetId, formule, idToken }                    → créer un paiement GeniusPay
+//   { formule: 'priorite', idToken }                  → acheter le Pack Priorité (3 mois)
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
   if ((req.body || {}).action === 'credit') return utiliserCredit(req, res);
 
   try {
-    const { projetId, formule, idToken } = req.body || {};
-    const f = FORMULES[formule];
-    if (!projetId || !f) return res.status(400).json({ error: 'Paramètres invalides' });
+    const { projetId, idToken } = req.body || {};
+    let formule = (req.body || {}).formule;
 
     let utilisateur;
     try { utilisateur = await verifierUtilisateur(idToken); }
     catch { return res.status(401).json({ error: 'Session expirée, reconnecte-toi.' }); }
 
-    const db = adminApp().firestore();
-    const snap = await db.collection('studio_projets').doc(projetId).get();
-    if (!snap.exists) return res.status(404).json({ error: 'Projet introuvable' });
-    const projet = snap.data();
-    if (projet.uid !== utilisateur.uid) return res.status(403).json({ error: 'Ce projet ne t\'appartient pas' });
-    if (projet.statut !== 'extrait_dispo') return res.status(400).json({ error: 'Ce projet n\'attend pas de paiement' });
+    let projet = { titre: '', nomArtiste: '', email: '' };
+    if (formule !== 'priorite') {
+      if (!projetId) return res.status(400).json({ error: 'Paramètres invalides' });
+      const db = adminApp().firestore();
+      const snap = await db.collection('studio_projets').doc(projetId).get();
+      if (!snap.exists) return res.status(404).json({ error: 'Projet introuvable' });
+      projet = snap.data();
+      if (projet.uid !== utilisateur.uid) return res.status(403).json({ error: 'Ce projet ne t\'appartient pas' });
+      // Le prix est toujours celui du service du projet, quoi que demande le navigateur
+      if (SERVICES.includes(projet.service)) {
+        formule = projet.service;
+        const attendu = projet.service === 'production' ? 'propositions_dispo' : 'extrait_dispo';
+        if (projet.statut !== attendu) return res.status(400).json({ error: 'Ce projet n\'attend pas de paiement' });
+        if (projet.service === 'production' && typeof projet.choix !== 'number') return res.status(400).json({ error: 'Choisis d\'abord ta proposition' });
+      } else {
+        // Ancien projet
+        if (projet.statut !== 'extrait_dispo') return res.status(400).json({ error: 'Ce projet n\'attend pas de paiement' });
+        formule = 'titre';
+      }
+    }
+    const f = FORMULES[formule];
+    if (!f || (formule === 'priorite' && projetId)) return res.status(400).json({ error: 'Paramètres invalides' });
 
     const API_KEY = process.env.GENIUSPAY_API_KEY;
     const API_SECRET = process.env.GENIUSPAY_API_SECRET;
@@ -43,11 +59,11 @@ export default async function handler(req, res) {
       headers: { 'X-API-Key': API_KEY, 'X-API-Secret': API_SECRET, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: f.fcfa,
-        description: `Studio vocal - ${f.label} - ${projet.titre || ''} - Doniel Zik`,
+        description: `Studio - ${f.label}${projet.titre ? ' - ' + projet.titre : ''} - Doniel Zik`,
         customer: { name: projet.nomArtiste || utilisateur.name || 'Artiste Doniel Zik', email: utilisateur.email || projet.email || '' },
-        success_url: `${origine}/artiste?tab=studio&paiement=succes`,
-        error_url: `${origine}/artiste?tab=studio&paiement=echec`,
-        metadata: { type: 'studio', projetId, uid: utilisateur.uid, formule },
+        success_url: `${origine}/studio-vocal?paiement=succes`,
+        error_url: `${origine}/studio-vocal?paiement=echec`,
+        metadata: { type: 'studio', projetId: projetId || '', uid: utilisateur.uid, formule },
       }),
     });
     const data = await reponse.json();

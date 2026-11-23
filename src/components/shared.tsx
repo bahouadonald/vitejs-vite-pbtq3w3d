@@ -595,3 +595,69 @@ export function BadgeNotif() {
   );
 }
 
+
+// Bouton Profil (icône personne), placé en haut à droite des en-têtes
+export function BoutonProfil({ flottant }: { flottant?: boolean }) {
+  const actif = window.location.pathname === '/profil';
+  return (
+    <Link to="/profil" className="dz-nav-bas" aria-label="Profil"
+      style={{ ...(flottant ? { position: 'fixed' as const, top: 12, right: 12, zIndex: 1001 } : {}),
+        width: flottant ? 40 : 34, height: flottant ? 40 : 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: actif ? 'linear-gradient(180deg,#3d9bff,#0a6be0)' : 'linear-gradient(180deg,#24497f,#142f5a)', color: '#fff',
+        border: '1px solid rgba(150,185,235,0.3)', boxShadow: '0 3px 0 #0a1d3d, 0 6px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
+      <svg width={flottant ? 20 : 17} height={flottant ? 20 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+    </Link>
+  );
+}
+
+// ─────────────────────────────────────────────
+// BARRE DU BAS (site) — Accueil · Découvrir · Studio (micro central en relief)
+// · Challenge · Notifs. Le Profil est l'icône ronde en haut à droite.
+// Masquée dans l'application mobile (classe dz-nav-bas).
+// ─────────────────────────────────────────────
+export function NavBas({ profilFlottant }: { profilFlottant?: boolean } = {}) {
+  const chemin = window.location.pathname;
+  const ic = (d: any) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
+  const items = [
+    { label: 'Accueil', path: '/', svg: ic(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>) },
+    { label: 'Découvrir', path: '/decouvrir', svg: ic(<><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>) },
+    { label: 'Studio', path: '/studio-vocal', centre: true },
+    { label: 'Challenge', path: '/challenge', svg: ic(<><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></>) },
+    { label: 'Notifs', path: '/notifications', svg: ic(<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>) },
+  ];
+  return (
+    <>
+      {profilFlottant && <BoutonProfil flottant />}
+
+      <div className="dz-nav-bas" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+        background: 'linear-gradient(180deg, rgba(20,44,86,0.97), rgba(9,22,46,0.99))', backdropFilter: 'blur(20px)',
+        borderTop: '1px solid rgba(150,185,235,0.18)', boxShadow: '0 -8px 24px rgba(0,0,0,0.35)',
+        display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', padding: '8px 0 calc(10px + env(safe-area-inset-bottom))' }}>
+        {items.map(item => {
+          const actif = item.path === '/' ? chemin === '/' : chemin.startsWith(item.path);
+          if (item.centre) return (
+            <Link key={item.path} to={item.path} aria-label="Studio"
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none', marginTop: -28 }}>
+              <span style={{ width: 58, height: 58, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'radial-gradient(circle at 35% 30%, #ff8fa0, #ff2d4d 55%, #a50f29)', border: '3px solid #0c1f40',
+                boxShadow: '0 5px 0 #6d0818, 0 10px 22px rgba(255,45,77,0.35), inset 0 2px 0 rgba(255,255,255,0.35)' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z" /></svg>
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: actif ? '#fff' : '#a9bedc' }}>Studio</span>
+            </Link>
+          );
+          return (
+            <Link key={item.path} to={item.path}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none', minWidth: 56, color: actif ? '#5BB0FF' : '#7f97bf' }}>
+              <span style={{ position: 'relative', display: 'inline-flex', filter: actif ? 'drop-shadow(0 0 6px rgba(91,176,255,0.7))' : 'none' }}>
+                {item.svg}
+                {item.path === '/notifications' && <BadgeNotif />}
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700 }}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </>
+  );
+}

@@ -21,10 +21,21 @@ export function adminApp() {
 
 // Tarifs officiels (le client ne choisit jamais le montant)
 export const FORMULES = {
-  titre:  { label: '1 titre',            titres: 1,  fcfa: 12000 },
-  pack8:  { label: 'Pack 8 titres',      titres: 8,  fcfa: 60000 },
-  pack12: { label: 'Pack 8 à 12 titres', titres: 12, fcfa: 90000 },
+  // Studio complet : voix témoin → instru créée par l'équipe → prise finale
+  production: { label: 'Production complète',  titres: 1, fcfa: 12000 },
+  // L'artiste chante sur son propre beat
+  beat:       { label: 'Arrangement sur ton beat', titres: 1, fcfa: 6000 },
+  remaster:   { label: 'Remastering',          titres: 1, fcfa: 6000 },
+  remix:      { label: 'Remixage',             titres: 1, fcfa: 6000 },
+  // Anciens projets (avant le nouveau parcours)
+  titre:      { label: '1 titre',              titres: 1, fcfa: 12000 },
+  // Pack d'ouverture : priorité (48 h) pendant 3 mois, payé une fois
+  priorite:   { label: 'Pack Priorité (3 mois)', titres: 0, fcfa: 1500, jours: 90 },
 };
+// Services du nouveau parcours (le prix vient toujours du service du projet)
+export const SERVICES = ['production', 'beat', 'remaster', 'remix'];
+// Compatibilité avec l'ancien code
+export const SERVICES_TITRE_EXISTANT = ['beat', 'remaster', 'remix'];
 
 export const ADMIN_EMAIL = 'bdonaldservices@gmail.com';
 

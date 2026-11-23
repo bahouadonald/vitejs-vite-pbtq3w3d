@@ -21,7 +21,7 @@ import {
   BASE_URL, optimImg, notifierActiviteCommunaute, APP_NAME, LOGO_B64,
   isIOS, isAndroid, isSafari, isChromeiOS, isMobileDevice, S,
 } from '../lib/utils';
-import { formatTime, Logo, Lien, BadgeNotif, NomArtisteProfil } from '../components/shared';
+import { formatTime, Logo, Lien, BadgeNotif, NomArtisteProfil, NavBas, BoutonProfil } from '../components/shared';
 import {
   Travailleurs, ActionBar, AudioPlayer, TutoCascade, VideoPlayer, ZikoLoginModal,
 } from '../components/player';
@@ -832,7 +832,7 @@ export function LandingPage() {
       <div style={{ padding:'0 20px 40px', maxWidth:500, margin:'0 auto' }}>
         <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, letterSpacing:2, textAlign:'center', marginBottom:20, textTransform:'uppercase' }}>Nos services</p>
         {[
-          { titre:'Studio vocal', desc:'Enregistre ta voix depuis ton téléphone : on produit la musique complète autour de toi. Extrait sous 48 h, tu paies seulement si ça te plaît.', lien:'/studio-vocal', btn:'Enregistrer ma voix' },
+          { titre:'Studio vocal', desc:'Enregistre ta voix depuis ton téléphone : on produit la musique complète autour de toi. Tu écoutes un extrait et tu paies seulement si ça te plaît.', lien:'/studio-vocal', btn:'Enregistrer ma voix' },
           { titre:'Pour les Artistes', desc:'Monétisez votre musique, humour ou cinéma via QR code, liens publics et kiffements. Soyez payé à chaque écoute et téléchargement.', lien:'/artiste', btn:'Espace Artiste' },
         ].map((s,i) => (
           <div key={i} className="dz-service-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12, animationDelay:`${i * 0.12}s` }}>
@@ -1269,7 +1269,7 @@ export function ZikothequePage({ user }: { user: any }) {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <IconeScannerBouton onClick={() => setShowScanner(true)} />
-          <Lien href="/decouvrir" style={{ background: 'rgba(30,111,255,0.15)', border: '1px solid rgba(30,111,255,0.3)', borderRadius: 20, padding: '6px 12px', color: '#4da6ff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Découvrir</Lien>
+          <BoutonProfil />
           {user.email === ADMIN_EMAIL && (
             <Lien href="/admin" style={{ background: 'transparent', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'transparent', fontSize: 6, fontWeight: 700, textDecoration: 'none', opacity: 0.08, userSelect: 'none' }}>·</Lien>
           )}
@@ -1466,24 +1466,7 @@ export function ZikothequePage({ user }: { user: any }) {
       )}
 
       {/* BARRE NAVIGATION FIXE EN BAS — toujours visible */}
-      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
-        {[
-          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
-          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
-          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-        ].map((item) => (
-          <Link key={item.path} to={item.path}
-            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ position:'relative', display:'inline-flex' }}>
-              {item.svg}
-              {item.path === '/notifications' && <BadgeNotif />}
-            </span>
-            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      <NavBas />
     </div>
   );
 }

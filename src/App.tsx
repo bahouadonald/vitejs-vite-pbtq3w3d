@@ -32,8 +32,9 @@ import {
   RechargeDeviseSelector, SIGNATURES, SignatureShowcase, optimizeCloudinaryUrl, OSCART_TO_FCFA,
   OSCART_TO_EUR, OSCART_TO_USD, DEVISE_PAR_PAYS, INFO_DEVISE, PALIERS_CONCOURS_DEFAUT, formatOscart,
   useDeviseLocale, useNotifsNonLues, Lien, VignetteFiltreEnDirect, Logo, BadgeNotif, NomArtisteProfil,
+  NavBas, BoutonProfil,
 } from './components/shared';
-import { StudioVocalPresentation } from './pages/studio-vocal';
+import { StudioVocalPresentation, ConditionsStudioPage } from './pages/studio-vocal';
 import {
   compterTelechargementQrcode, compterTelechargementLienPublic, OscartPayButton, AchatWidget,
 } from './components/achat';
@@ -868,6 +869,7 @@ function MesChallengesPage() {
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14, margin:0 }}>Challenge</p>
           <IconeScannerBouton onClick={() => setShowScanner(true)} />
+          <BoutonProfil />
         </div>
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
@@ -985,24 +987,7 @@ function MesChallengesPage() {
       )}
 
       {/* NAV BAS */}
-      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
-        {[
-          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
-          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
-          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-        ].map((item) => (
-          <Link key={item.path} to={item.path}
-            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ position:'relative', display:'inline-flex' }}>
-              {item.svg}
-              {item.path === '/notifications' && <BadgeNotif />}
-            </span>
-            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      <NavBas />
     </div>
   );
 }
@@ -2580,6 +2565,7 @@ function DecouvrirPage() {
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <p style={{ color:'#4da6ff', fontWeight:700, fontSize:14, margin:0 }}>Découvrir</p>
           <IconeScannerBouton onClick={() => setShowScanner(true)} />
+          <BoutonProfil />
         </div>
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
@@ -2831,24 +2817,7 @@ function DecouvrirPage() {
       </div>
 
       {/* BARRE NAVIGATION */}
-      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
-        {[
-          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
-          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
-          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-        ].map((item) => (
-          <Link key={item.path} to={item.path}
-            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ position:'relative', display:'inline-flex' }}>
-              {item.svg}
-              {item.path === '/notifications' && <BadgeNotif />}
-            </span>
-            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      <NavBas />
     </div>
     </>
   );
@@ -2916,7 +2885,10 @@ function NotificationsPage() {
           <Logo size="sm" />
           <p style={{ marginLeft:16, fontWeight:700, fontSize:16, color:'#dde4f5' }}>Notifications</p>
         </div>
-        <IconeScannerBouton onClick={() => setShowScanner(true)} />
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <IconeScannerBouton onClick={() => setShowScanner(true)} />
+          <BoutonProfil />
+        </div>
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
@@ -3040,24 +3012,7 @@ function NotificationsPage() {
         ))}
       </div>
 
-      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
-        {[
-          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
-          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
-          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-        ].map((item) => (
-          <Link key={item.path} to={item.path}
-            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ position:'relative', display:'inline-flex' }}>
-              {item.svg}
-              {item.path === '/notifications' && <BadgeNotif />}
-            </span>
-            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      <NavBas />
     </div>
   );
 }
@@ -3228,7 +3183,10 @@ function ProfilPage() {
     <div style={{ minHeight:'100vh', background:`${GLOW_TOP}, ${C.bgDeep}`, color:C.text, fontFamily:"'DM Sans',sans-serif", paddingBottom:100 }}>
       <div style={{ background:'rgba(22,27,39,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 20px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <Logo size="sm" />
-        <IconeScannerBouton onClick={() => setShowScanner(true)} />
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <IconeScannerBouton onClick={() => setShowScanner(true)} />
+          <BoutonProfil />
+        </div>
       </div>
       {showScanner && <ScannerQR onClose={() => setShowScanner(false)} />}
 
@@ -3499,16 +3457,6 @@ function ProfilPage() {
           </div>
         </div>
 
-        {/* PROJET CRÉATIF — en attente (Pour bientôt) */}
-        <div style={{ background:'rgba(30,111,255,0.06)', border:'1px solid rgba(30,111,255,0.2)', borderRadius:16, padding:'18px 20px', marginBottom:16 }}>
-          <p style={{ fontWeight:800, fontSize:15, color:'#4da6ff', marginBottom:6 }}>Vous avez un projet créatif ?</p>
-          <p style={{ color:'#5a7090', fontSize:13, lineHeight:1.6, marginBottom:14 }}>
-            Vous êtes artiste, humoriste, réalisateur ou scénariste mais vous n'avez pas les moyens de produire ? Doniel Zik peut vous aider à produire et promouvoir votre contenu.
-          </p>
-          <div style={{ width:'100%', padding:12, borderRadius:10, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'#8098b8', fontWeight:700, fontSize:14, textAlign:'center' }}>
-            Pour bientôt
-          </div>
-        </div>
 
         {/* Accès direct au tableau de bord artiste, si ce compte est aussi un artiste validé */}
         {estArtiste && (
@@ -3613,24 +3561,7 @@ function ProfilPage() {
       </div>
 
       {/* BARRE NAVIGATION */}
-      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
-        {[
-          { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-          { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
-          { label:'Challenge', path:'/challenge', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
-          { label:'Notifs', path:'/notifications', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-          { label:'Profil', path:'/profil', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-        ].map((item) => (
-          <Link key={item.path} to={item.path}
-            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, textDecoration:'none', color: window.location.pathname === item.path ? '#4da6ff' : '#4a5878' }}>
-            <span style={{ position:'relative', display:'inline-flex' }}>
-              {item.svg}
-              {item.path === '/notifications' && <BadgeNotif />}
-            </span>
-            <span style={{ fontSize:10, fontWeight:600 }}>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      <NavBas />
     </div>
   );
 }
@@ -7502,6 +7433,7 @@ export default function App() {
 user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
         <Route path="/studio-vocal" element={<StudioVocalPresentation />} />
+        <Route path="/conditions-studio" element={<ConditionsStudioPage />} />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={
