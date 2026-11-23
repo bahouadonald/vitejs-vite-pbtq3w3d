@@ -14,6 +14,7 @@
 // module "crypto" intégré à Node, comme les autres fonctions serveur du projet.
 
 import crypto from 'crypto';
+import { adminApp } from './_studio-admin.js';
 
 async function obtenirJetonAcces() {
   const clientEmail = process.env.FCM_CLIENT_EMAIL;
@@ -58,7 +59,15 @@ export default async function handler(req, res) {
     const FCM_PROJECT = process.env.FCM_PROJECT_ID || PROJECT;
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
-    // Retrouver le/les jetons FCM enregistrés pour cet email
+    // Retrouver les jetons enregistrés pour cet email (site ET appli mobile).
+    // Lecture avec le compte de service (passe outre les règles Firestore) ;
+    // à défaut, ancienne lecture publique.
+    let tokens = [];
+    try {
+      const snap = await adminApp().firestore().collection('fcm_tokens').where('email', '==', String(email).toLowerCase()).limit(20).get();
+      tokens = snap.docs.map(d => d.data().token).filter(Boolean);
+    } catch (e) { console.error('lecture jetons (admin)', e); }
+    if (tokens.length === 0) {
     const reponseRecherche = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,15 +80,36 @@ export default async function handler(req, res) {
       }),
     });
     const resultats = await reponseRecherche.json();
-    const tokens = (Array.isArray(resultats) ? resultats.filter(r => r.document) : [])
+    tokens = (Array.isArray(resultats) ? resultats.filter(r => r.document) : [])
       .map(r => r.document.fields?.token?.stringValue)
       .filter(Boolean);
+    }
 
     if (tokens.length === 0) return res.status(200).json({ ok: true, envoyes: 0, raison: 'aucun jeton enregistré' });
 
-    const accessToken = await obtenirJetonAcces();
     let envoyes = 0;
-    for (const token of tokens) {
+
+    // Appli mobile Doniel Zik : jetons Expo, envoyés via le service Expo
+    const jetonsExpo = tokens.filter(t => String(t).startsWith('ExponentPushToken'));
+    if (jetonsExpo.length) {
+      try {
+        const r = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(jetonsExpo.map(to => ({
+            to, title: title || 'Doniel Zik', body: body || 'Vous avez une nouvelle notification',
+            data: { url: url || '/notifications' }, sound: 'default', channelId: 'default', priority: 'high',
+          }))),
+        });
+        if (r.ok) envoyes += jetonsExpo.length;
+      } catch (e) { console.error('envoi push expo', e); }
+    }
+
+    const jetonsWeb = tokens.filter(t => !String(t).startsWith('ExponentPushToken'));
+    if (jetonsWeb.length === 0) return res.status(200).json({ ok: true, envoyes, total: tokens.length });
+
+    const accessToken = await obtenirJetonAcces();
+    for (const token of jetonsWeb) {
       try {
         const reponseEnvoi = await fetch(`https://fcm.googleapis.com/v1/projects/${FCM_PROJECT}/messages:send`, {
           method: 'POST',

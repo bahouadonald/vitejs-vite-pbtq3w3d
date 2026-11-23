@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react';
 import { auth, db } from '../firebase';
 import {
   collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, arrayUnion, increment,
+  orderBy, limit,
 } from 'firebase/firestore';
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -20,7 +21,7 @@ import {
   BASE_URL, optimImg, notifierActiviteCommunaute, APP_NAME, LOGO_B64,
   isIOS, isAndroid, isSafari, isChromeiOS, isMobileDevice, S,
 } from '../lib/utils';
-import { formatTime, Logo, Lien, BadgeNotif } from '../components/shared';
+import { formatTime, Logo, Lien, BadgeNotif, NomArtisteProfil } from '../components/shared';
 import {
   Travailleurs, ActionBar, AudioPlayer, TutoCascade, VideoPlayer, ZikoLoginModal,
 } from '../components/player';
@@ -66,7 +67,6 @@ export function FanPage() {
   // ce qui est déjà enregistré côté serveur (qrData.titresTelecharges) et
   // ce qui vient d'être fait dans cette visite (mise à jour immédiate).
   const [titresTelDejaFaits, setTitresTelDejaFaits] = useState<string[]>([]);
-  const [artisteSlug, setArtisteSlug] = useState('');
   // Lecture partielle (réglée par l'admin dans le dossier de l'artiste) :
   // null = pas encore connu (on attend avant d'afficher le lecteur),
   // true = extrait d'1 minute seulement, false = lecture complète.
@@ -104,7 +104,6 @@ export function FanPage() {
         rechercheArtiste
           .then(s => {
             const a = s.empty ? null : s.docs[0].data();
-            if (a?.slug && data.artistEmail) setArtisteSlug(a.slug);
             setLecturePartielle(a?.lecturePartielle === true);
           })
           .catch(() => setLecturePartielle(false));
@@ -367,13 +366,7 @@ export function FanPage() {
           {/* TITRE + ARTISTE */}
           <div style={{ padding:'14px 18px 0', marginBottom:20 }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:26, fontWeight:900, color:'#fff', marginBottom:4, lineHeight:1.1 }}>{qrData.label}</h1>
-            <p style={{ color:'#6a88aa', fontSize:13, marginBottom: artisteSlug ? 10 : 0 }}>par <strong style={{ color:'#4da6ff' }}>{qrData.artist}</strong></p>
-            {artisteSlug && (
-              <Link to={`/artiste-bio/${artisteSlug}`}
-                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:99, border:'1px solid rgba(77,166,255,0.4)', color:'#4da6ff', fontSize:12, fontWeight:700, textDecoration:'none' }}>
-                👤 Voir la bio de l'artiste
-              </Link>
-            )}
+            <NomArtisteProfil artistEmail={qrData.artistEmail} artistName={qrData.artist} />
           </div>
 
           <div style={{ padding:'0 16px', maxWidth:500, margin:'0 auto' }}>
@@ -403,7 +396,7 @@ export function FanPage() {
                     <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, background:'rgba(255,200,0,0.08)', border:'1px solid rgba(255,200,0,0.2)', marginBottom:12 }}>
                       <span style={{ fontSize:16 }}>ℹ</span>
                       <p style={{ color:'#ffd700', fontSize:12, fontWeight:600, margin:0 }}>
-                        Les téléchargements gratuits de cette pochette sont épuisés. Le téléchargement est maintenant disponible via paiement.
+                        Les téléchargements gratuits de ce support QR sont épuisés. Le téléchargement est maintenant disponible via paiement.
                       </p>
                     </div>
                   )}
@@ -784,7 +777,12 @@ export function LandingPage() {
         <div style={{ animation:'float 3s ease infinite', marginBottom:24 }}>
           <Logo size="lg" />
         </div>
-        <p style={{ color:'rgba(255,255,255,0.5)', fontSize:12, letterSpacing:3, fontWeight:600, marginBottom:32, textTransform:'uppercase' }}>La Musique. Un Scan. Un Monde.</p>
+        <h1 style={{ fontSize:28, fontWeight:900, lineHeight:1.2, margin:'4px 0 10px', maxWidth:360, letterSpacing:0, color:'#fff' }}>
+          Écoute, scanne et soutiens <span style={{ color:'#4da6ff' }}>tes artistes</span>
+        </h1>
+        <p style={{ color:'rgba(255,255,255,0.6)', fontSize:14, lineHeight:1.6, marginBottom:26, maxWidth:340 }}>
+          Gospel, zouglou, coupé-décalé, afro… Les dernières sorties de tes artistes, en un toucher.
+        </p>
 
         <a href="/ziko" className="dz-hero-btn" style={{ display:'block', width:'100%', maxWidth:360, padding:18, borderRadius:14, background:'linear-gradient(135deg,#1a6bff,#0050d0)', color:'#fff', fontWeight:800, fontSize:17, textDecoration:'none', marginBottom:12, boxShadow:'0 8px 32px rgba(30,111,255,0.4)' }}>
           Accéder à ma Zikothèque
@@ -827,13 +825,15 @@ export function LandingPage() {
         )}
       </div>
 
+      {/* NOUVEAUTÉS : les dernières sorties, à écouter tout de suite */}
+      <NouveautesAccueil />
+
       {/* SERVICES */}
       <div style={{ padding:'0 20px 40px', maxWidth:500, margin:'0 auto' }}>
         <p style={{ color:'rgba(255,255,255,0.3)', fontSize:11, letterSpacing:2, textAlign:'center', marginBottom:20, textTransform:'uppercase' }}>Nos services</p>
         {[
+          { titre:'Studio vocal', desc:'Enregistre ta voix depuis ton téléphone : on produit la musique complète autour de toi. Extrait sous 48 h, tu paies seulement si ça te plaît.', lien:'/studio-vocal', btn:'Enregistrer ma voix' },
           { titre:'Pour les Artistes', desc:'Monétisez votre musique, humour ou cinéma via QR code, liens publics et kiffements. Soyez payé à chaque écoute et téléchargement.', lien:'/artiste', btn:'Espace Artiste' },
-          { titre:'Pour les Annonceurs', desc:'Diffusez votre publicité auprès de milliers de mélomanes ivoiriens actifs. À partir de 1 000 FCFA.', lien:'/annonceurs', btn:'Espace Annonceur' },
-          { titre:'Production musicale', desc:'Faites produire votre single par Doniel Zik : studio, pochettes QR, clip et promotion télé. Enregistrez-vous et signez votre contrat en ligne.', lien:'/production', btn:'Produire ma musique' },
         ].map((s,i) => (
           <div key={i} className="dz-service-card" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'16px 18px', marginBottom:12, animationDelay:`${i * 0.12}s` }}>
             <p style={{ fontWeight:700, fontSize:14, color:'#dde4f5', marginBottom:6 }}>{s.titre}</p>
@@ -848,6 +848,49 @@ export function LandingPage() {
       {/* FOOTER */}
       <div style={{ textAlign:'center', padding:'20px 0 40px' }}>
         <Lien href="/admin" style={{ color:'rgba(255,255,255,0.08)', fontSize:10, textDecoration:'none' }}>·</Lien>
+      </div>
+    </div>
+  );
+}
+
+// Bandeau « Nouveautés » de l'accueil : les dernières sorties publiques,
+// pochettes en relief, un toucher pour écouter.
+function NouveautesAccueil() {
+  const [sorties, setSorties] = useState<any[]>([]);
+  useEffect(() => {
+    getDocs(query(collection(db, 'decouvrir'), orderBy('publishedAt', 'desc'), limit(20)))
+      .then(s => {
+        const vus = new Set<string>();
+        const liste: any[] = [];
+        s.docs.forEach(d => {
+          const c: any = { id: d.id, ...d.data() };
+          if (c.masque === true || !c.publicLinkId || !c.coverUrl || vus.has(c.publicLinkId)) return;
+          vus.add(c.publicLinkId); liste.push(c);
+        });
+        setSorties(liste.slice(0, 10));
+      })
+      .catch(() => {});
+  }, []);
+  if (sorties.length === 0) return null;
+  return (
+    <div style={{ padding:'0 0 34px', maxWidth:560, margin:'0 auto' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', padding:'0 20px', marginBottom:12 }}>
+        <p style={{ fontWeight:900, fontSize:18, color:'#fff', margin:0 }}>Nouveautés</p>
+        <Link to="/decouvrir" style={{ color:'#4da6ff', fontSize:13, fontWeight:700, textDecoration:'none' }}>Tout voir →</Link>
+      </div>
+      <div style={{ display:'flex', gap:14, overflowX:'auto', padding:'4px 20px 14px', scrollSnapType:'x mandatory', WebkitOverflowScrolling:'touch' }}>
+        {sorties.map(c => (
+          <Link key={c.id} to={`/ecoute/${c.publicLinkId}`} style={{ flex:'0 0 140px', scrollSnapAlign:'start', textDecoration:'none', textAlign:'left' }}>
+            <div style={{ position:'relative', width:140, height:140, borderRadius:16, overflow:'hidden', boxShadow:'0 10px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)', background:'#12213f' }}>
+              <img src={optimImg(c.coverUrl, 300)} alt={c.label} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+              <span style={{ position:'absolute', right:8, bottom:8, width:34, height:34, borderRadius:'50%', background:'linear-gradient(180deg,#3d8bff,#0050d0)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 12px rgba(26,107,255,0.6)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+              </span>
+            </div>
+            <p style={{ color:'#fff', fontWeight:800, fontSize:13, margin:'8px 0 2px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.label}</p>
+            <p style={{ color:'#4da6ff', fontSize:12, margin:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.artist}</p>
+          </Link>
+        ))}
       </div>
     </div>
   );
@@ -1245,7 +1288,7 @@ export function ZikothequePage({ user }: { user: any }) {
           <div style={{ textAlign: 'center', padding: '80px 20px', animation: 'fadeUp .4s ease' }}>
             <h3 style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 800, marginBottom: 12, color: '#dde4f5' }}>Votre Zikothèque est vide</h3>
             <p style={{ color: '#4a5878', fontSize: 14, lineHeight: 1.8, marginBottom: 28 }}>
-              Scannez une pochette musicale ou recevez un lien<br />pour ajouter vos premiers albums.
+              Scannez un support musical QR ou recevez un lien<br />pour ajouter vos premiers albums.
             </p>
             <Lien href="/" style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 12, background: 'linear-gradient(135deg, #1e6fff, #0050d0)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
               Découvrir de la musique
@@ -1423,7 +1466,7 @@ export function ZikothequePage({ user }: { user: any }) {
       )}
 
       {/* BARRE NAVIGATION FIXE EN BAS — toujours visible */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },

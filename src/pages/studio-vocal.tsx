@@ -12,6 +12,7 @@
 //   studio_credits/{uid}  — titres restants d'un pack (écrit côté serveur)
 // ─────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { auth, db } from '../firebase';
 import {
@@ -451,7 +452,7 @@ function NouveauProjet({ user, artistName, onFini, onAnnuler }: { user: any, art
         beatUrl, pistes, statut: 'envoye', createdAt: maintenant, majLe: maintenant,
       });
       // Alerte l'admin (notification + push + email)
-      const texte = `Studio vocal — ${artistName || user.email} a envoyé « ${titre.trim()} » (${pistes.length} piste${pistes.length > 1 ? 's' : ''}${beatUrl ? ', avec beat' : ', a cappella'}).`;
+      const texte = `Studio vocal — ${artistName || 'Un artiste'} a envoyé « ${titre.trim()} » (${pistes.length} piste${pistes.length > 1 ? 's' : ''}${beatUrl ? ', avec beat' : ', a cappella'}).`;
       envoyerNotification({ to: ADMIN_EMAIL, type: 'studio_admin', text: texte, lien: '/admin?tab=studiovocal' });
       envoyerEmailNotif(ADMIN_EMAIL, 'Studio vocal : nouveau projet', texte + '\n\nOuvre l\'admin Doniel Zik → onglet Studio vocal.');
       prises.forEach(p => URL.revokeObjectURL(p.url));
@@ -731,6 +732,63 @@ export function CarteProjetAdmin({ p }: { p: any }) {
       </div>
       {envoi && <p style={{ margin: '8px 0 0', color: '#1a6bff', fontSize: 13 }}>{envoi}</p>}
       {erreur && <p style={{ margin: '8px 0 0', color: '#e04060', fontSize: 13 }}>{erreur}</p>}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════
+// PAGE PUBLIQUE /studio-vocal — ouverte à tous, sans compte.
+// Présente l'offre ; le compte n'est demandé qu'en cliquant « Commencer ».
+// ═════════════════════════════════════════════
+export function StudioVocalPresentation() {
+  const etapes = [
+    { n: '1', t: 'Tu chantes', d: 'Sur ton téléphone, a cappella ou sur ton beat : voix lead, chœurs, doublages, cris.' },
+    { n: '2', t: 'On produit', d: 'Notre équipe construit la musique autour de ta vraie voix.' },
+    { n: '3', t: 'Tu écoutes l\'extrait', d: 'Sous 48 h. Tu paies seulement si ça te plaît.' },
+    { n: '4', t: 'Tu reçois ton titre', d: 'Mixé, masterisé, prêt à la duplication et à la publication.' },
+  ];
+  const commencer = auth.currentUser ? '/artiste?tab=studio' : '/artiste?tab=studio&inscription=1';
+  return (
+    <div style={{ minHeight: '100vh', background: `radial-gradient(circle at 20% 0%, #2a5db0 0%, ${C.bgDeep} 55%)`, color: C.text, fontFamily: "'DM Sans',sans-serif", padding: '28px 18px 60px', textAlign: 'left' }}>
+      <div style={{ maxWidth: 520, margin: '0 auto' }}>
+        <Link to="/" style={{ color: C.textSoft, fontSize: 13, textDecoration: 'none' }}>← Doniel Zik</Link>
+        <p style={{ margin: '22px 0 6px', color: '#cfe2ff', fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>Studio vocal</p>
+        <h1 style={{ margin: '0 0 10px', fontSize: 30, fontWeight: 900, lineHeight: 1.15, letterSpacing: 0 }}>Une musique avec ta propre voix</h1>
+        <p style={{ margin: '0 0 22px', color: '#dbe8ff', fontSize: 14, lineHeight: 1.7 }}>
+          Enregistre ta voix depuis ton téléphone. Nous produisons la musique complète autour de toi : arrangement, mixage et mastering.
+        </p>
+        <Link to={commencer} style={{ ...bouton3D('#00D49A', '#009a70'), display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 26 }}>
+          Commencer maintenant
+        </Link>
+
+        {etapes.map(e => (
+          <div key={e.n} style={{ ...carte3D, display: 'flex', gap: 14, alignItems: 'flex-start', padding: 16, marginBottom: 12 }}>
+            <span style={{ flexShrink: 0, width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900,
+              background: 'linear-gradient(180deg,#3d9bff,#0a6be0)', boxShadow: '0 4px 0 #0050b0, inset 0 1px 0 rgba(255,255,255,0.35)' }}>{e.n}</span>
+            <div>
+              <p style={{ margin: '0 0 3px', fontWeight: 800, fontSize: 15 }}>{e.t}</p>
+              <p style={{ margin: 0, color: C.textSoft, fontSize: 13, lineHeight: 1.6 }}>{e.d}</p>
+            </div>
+          </div>
+        ))}
+
+        <div style={{ ...carte3D, marginTop: 20 }}>
+          <p style={{ margin: '0 0 10px', fontWeight: 800, fontSize: 15 }}>Tarifs</p>
+          {(Object.keys(STUDIO_FORMULES) as FormuleStudio[]).map(k => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid ' + C.border }}>
+              <span style={{ color: C.textSoft, fontSize: 14 }}>{STUDIO_FORMULES[k].label}</span>
+              <span style={{ color: C.gold, fontWeight: 900, fontSize: 14 }}>{fcfa(STUDIO_FORMULES[k].fcfa)}</span>
+            </div>
+          ))}
+          <p style={{ margin: '10px 0 0', color: C.textSoft, fontSize: 12, lineHeight: 1.6 }}>
+            Ta voix reste la tienne. La musique est produite par notre équipe avec des outils d'intelligence artificielle.
+          </p>
+        </div>
+
+        <Link to={commencer} style={{ ...bouton3D('#00D49A', '#009a70'), display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 8 }}>
+          Enregistrer ma voix
+        </Link>
+      </div>
     </div>
   );
 }

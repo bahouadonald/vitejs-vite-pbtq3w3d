@@ -112,16 +112,18 @@ export async function envoyerNotification(data: { to: string | null | undefined,
 }
 
 // Notifie l'admin (notif in-app + email) à chaque nouvel enregistrement (artiste/commercial/mélomane...)
-export async function notifierAdminEnregistrement(quoi: string, details: string): Promise<void> {
+// La notification in-app n'affiche que le NOM (jamais l'e-mail) ; les
+// coordonnées (contact) ne partent que dans l'e-mail envoyé à l'admin.
+export async function notifierAdminEnregistrement(quoi: string, details: string, contact?: string): Promise<void> {
   const ADMIN = 'bdonaldservices@gmail.com';
   try {
     await envoyerNotification({
       to: ADMIN, type: 'enregistrement_admin',
-      text: `Nouvel enregistrement — ${quoi} : ${details}`,
+      text: `${quoi} : ${details}`,
       createdAt: new Date().toISOString(),    });
   } catch(e) { console.error('notif admin enreg', e); }
   // Email à l'admin (reçu même app fermée)
-  envoyerEmailNotif(ADMIN, `Nouvel enregistrement : ${quoi}`, `Un nouvel enregistrement vient d'avoir lieu sur Doniel Zik.\n\nType : ${quoi}\n${details}`);
+  envoyerEmailNotif(ADMIN, `Nouvel enregistrement : ${quoi}`, `Un nouvel enregistrement vient d'avoir lieu sur Doniel Zik.\n\nType : ${quoi}\n${details}${contact ? '\nContact : ' + contact : ''}`);
 }
 
 export const STRIPE_PUBLIC_KEY = 'pk_live_51TfH1EFzcsJPGqjTTx6jF9sO7sJ1669XFhovvMqTNDfM1XtjH7tuFfMFL3rhbJDKthKzdN9RrTslVF1Nyg3RS85X00Xh39KT1r';
@@ -171,7 +173,7 @@ export async function lancerPaiementGeniusPay(oscart: number, fcfa: number): Pro
 
 // Notifie les autres mélomanes qui ont déjà interagi (commenté/kiffé...) avec un même qrId,
 // pour ramener les actifs ("X a fait l'action, toi aussi"). Best-effort, ne bloque jamais.
-export async function notifierActiviteCommunaute(qrId: string, exclureUid: string, message: string): Promise<void> {
+export async function notifierActiviteCommunaute(qrId: string, exclureUid: string, message: string, source: 'qr' | 'public' = 'qr'): Promise<void> {
   if (!qrId) return;
   try {
     // On cible les mélomanes qui ont laissé un commentaire sur ce contenu (preuve d'intérêt)
@@ -184,7 +186,7 @@ export async function notifierActiviteCommunaute(qrId: string, exclureUid: strin
         dejaNotifies.add(emailCible);
         await envoyerNotification({
           to: emailCible, type: 'activite',
-          text: message, qrId, createdAt: new Date().toISOString(),        });
+          text: message, qrId, source, createdAt: new Date().toISOString(),        });
       }
     }
   } catch(e) { console.error('notif activite communaute', e); }
@@ -233,7 +235,7 @@ Rejoins Doniel Zik : on duplique, on monétise et on fait la promotion de tes œ
 Rémunération streaming : vues, écoutes, partages
 Rémunération via téléchargement : payé à chaque téléchargement
 Cadeaux reçus de tes fans
-Pochettes QR : tes fans achètent ta pochette, scannent, puis écoutent et téléchargent
+Supports QR : tes fans achètent ton support QR, scannent, puis écoutent et téléchargent
 Programme tes sorties officielles : tu lances ta sortie, tes fans réservent en payant à l'avance — tu atteins ton objectif de téléchargements avant même la sortie
 
 La musique. Un scan. Un monde.

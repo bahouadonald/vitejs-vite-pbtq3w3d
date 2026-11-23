@@ -31,8 +31,9 @@ import {
   BoutonResetAdmin, ChangerMotDePasse, cleanName, formatTime, Spectrogram, LoginModal,
   RechargeDeviseSelector, SIGNATURES, SignatureShowcase, optimizeCloudinaryUrl, OSCART_TO_FCFA,
   OSCART_TO_EUR, OSCART_TO_USD, DEVISE_PAR_PAYS, INFO_DEVISE, PALIERS_CONCOURS_DEFAUT, formatOscart,
-  useDeviseLocale, useNotifsNonLues, Lien, VignetteFiltreEnDirect, Logo, BadgeNotif,
+  useDeviseLocale, useNotifsNonLues, Lien, VignetteFiltreEnDirect, Logo, BadgeNotif, NomArtisteProfil,
 } from './components/shared';
+import { StudioVocalPresentation } from './pages/studio-vocal';
 import {
   compterTelechargementQrcode, compterTelechargementLienPublic, OscartPayButton, AchatWidget,
 } from './components/achat';
@@ -984,7 +985,7 @@ function MesChallengesPage() {
       )}
 
       {/* NAV BAS */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
@@ -2830,7 +2831,7 @@ function DecouvrirPage() {
       </div>
 
       {/* BARRE NAVIGATION */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
@@ -2975,6 +2976,8 @@ function NotificationsPage() {
               // route, ça retombait toujours sur la Zikothèque par défaut) et
               // distinction qr/public pour renvoyer vers la bonne page.
               if (n.qrId) { navigate(n.source === 'public' ? `/ecoute/${n.qrId}` : `/fan/${n.qrId}`); return; }
+              // Lien interne explicite (Studio vocal, admin...)
+              if (typeof n.lien === 'string' && n.lien.startsWith('/')) { navigate(n.lien); return; }
               if (n.type === 'educative' || n.type === 'generale' || n.type === 'activite') {
                 // Si la notif parle de kiffements → bannière d'invitation ; sinon Découvrir
                 if (n.text && n.text.toLowerCase().includes('kiffement')) {
@@ -3037,7 +3040,7 @@ function NotificationsPage() {
         ))}
       </div>
 
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
@@ -3610,7 +3613,7 @@ function ProfilPage() {
       </div>
 
       {/* BARRE NAVIGATION */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
+      <div className="dz-nav-bas" style={{ position:'fixed', bottom:0, left:0, right:0, background:'rgba(11,15,30,0.98)', backdropFilter:'blur(20px)', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'10px 0 14px', zIndex:99 }}>
         {[
           { label:'Accueil', path:'/', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
           { label:'Découvrir', path:'/decouvrir', svg:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
@@ -4124,8 +4127,8 @@ function EnregistrerArtisteTab({ commercialEmail, db }: { commercialEmail: strin
       // Notifier l'admin
       await envoyerNotification({
         to: 'bdonaldservices@gmail.com', type:'soumission',
-        text: `${commercialEmail} a enregistré "${titreContenu.trim()}" pour l'artiste ${nom.trim()}. À écouter et valider.`,
-        lien: fileUrl, createdAt: new Date().toISOString(),      });
+        text: `Un commercial a enregistré « ${titreContenu.trim()} » pour l'artiste ${nom.trim()}. À écouter et valider.`,
+        lien: '/admin', fichier: fileUrl, createdAt: new Date().toISOString(),      });
 
       setDone({ nom: nom.trim(), email: email.trim(), titre: titreContenu.trim(), tarif });
       setNom(''); setEmail(''); setWhatsapp(''); setTypeContenu(''); setTitreContenu(''); setCategorieContenu('autres'); setFileUrl('');
@@ -4489,7 +4492,7 @@ function CommercialPage() {
                           methode: inscMethode, cible: inscCible, objectif: inscObjectif,
                           status: 'en_attente', createdAt: new Date().toISOString(),
                         });
-                        notifierAdminEnregistrement('Nouveau commercial', `${inscNom} (${inscEmail.trim().toLowerCase()}) — ${inscCommune || ''}`);
+                        notifierAdminEnregistrement('Nouveau commercial', `${inscNom}${inscCommune ? ' — ' + inscCommune : ''}`, inscEmail.trim().toLowerCase());
                         setMsg('Inscription envoyée ! Votre compte sera validé par votre responsable.');
                         await signOut(auth);
                         setTimeout(() => { setMode('login'); setInscStep(1); setInscNom(''); setInscEmail(''); setInscTel(''); setInscPass(''); setMsg(''); }, 2500);
@@ -4690,7 +4693,7 @@ function CommercialPage() {
                 { label:'Encouragement', txt: `Bonjour ${prenom} ! Sur Doniel Zik, plus tu partages ton lien à tes fans, plus tu gagnes. Partage ton contenu sur WhatsApp, Facebook, TikTok dès aujourd'hui et fais décoller ton audience !` },
                 { label:'Cadeaux', txt: `${prenom}, savais-tu que tes fans peuvent t'envoyer des cadeaux (kiffements) directement sur Doniel Zik ? Invite ta communauté à te soutenir : chaque cadeau te rapporte. Demande-leur de t'envoyer des kiffements !` },
                 { label:'Téléchargements', txt: `${prenom}, chaque téléchargement de ton contenu te rapporte de l'argent. Partage ton lien partout et encourage tes fans à télécharger ta musique sur Doniel Zik !` },
-                { label:'Pochettes', txt: `${prenom}, duplique ta pochette chez nous à seulement 250 F et revends-la à 1 000 F ! Plus besoin de lecteur : tes fans scannent et téléchargent ta musique directement. Commande tes pochettes maintenant !` },
+                { label:'Supports QR', txt: `${prenom}, duplique ta musique sur un support QR chez nous à seulement 250 F et revends-le à 1 000 F ! Plus besoin de lecteur : tes fans scannent et téléchargent ta musique directement. Commande tes supports QR maintenant !` },
                 { label:'Écoutes / Vues', txt: `${prenom}, plus ton contenu est écouté et visionné, plus tu gagnes en visibilité et en revenus. Partage ton lien Doniel Zik à un maximum de personnes pour booster tes vues !` },
               ];
               return (
@@ -4806,7 +4809,7 @@ function RejoindrePage() {
   const [err, setErr] = useState('');
 
   const QUESTIONS = [
-    'Je suis prêt(e) à distribuer mes pochettes reçues.',
+    'Je suis prêt(e) à distribuer mes supports QR reçus.',
     'Je suis prêt(e) à partager mes liens pour faire écouter et télécharger au maximum de mélomanes.',
     'Je suis prêt(e) à inciter ma communauté à menvoyer un maximum de cadeaux.',
     'Je vais challenger pour atteindre les millions de Kiffs et obtenir des récompenses (cash, voiture).',
@@ -4906,7 +4909,7 @@ function RejoindrePage() {
           <p style={{ color:C.text, fontSize:15, fontWeight:700, marginBottom:12 }}>Tu bénéficies de :</p>
           {[
             ['', 'Un single produit fini', '(si besoin)'],
-            ['', '100 pochettes musicales', 'prêtes à être distribuées'],
+            ['', '100 supports musicaux QR', 'prêts à être distribués'],
           ].map(([ic, t, s], i) => (
             <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:10 }}>
               <span style={{ fontSize:22 }}>{ic}</span>
@@ -5021,7 +5024,7 @@ function AProposPage() {
     },
     {
       t: "Le lien public et le QR code",
-      c: "Chaque artiste dispose d'un lien public et d'un QR code personnel, qu'il peut partager partout : sur ses réseaux sociaux, lors de ses concerts, à ses événements. Toute personne qui ouvre ce lien ou scanne ce code accède instantanément au contenu de l'artiste, peut l'écouter, le regarder et le télécharger, où qu'elle se trouve. L'artiste peut également commander des pochettes physiques intelligentes portant son QR code, à revendre à ses fans : chaque pochette devient à la fois un objet promotionnel et une source de revenus."
+      c: "Chaque artiste dispose d'un lien public et d'un QR code personnel, qu'il peut partager partout : sur ses réseaux sociaux, lors de ses concerts, à ses événements. Toute personne qui ouvre ce lien ou scanne ce code accède instantanément au contenu de l'artiste, peut l'écouter, le regarder et le télécharger, où qu'elle se trouve. L'artiste peut également commander des supports musicaux QR portant son QR code, à revendre à ses fans : chaque support QR devient à la fois un objet promotionnel et une source de revenus."
     },
     {
       t: "Une communauté de mélomanes",
@@ -5531,7 +5534,7 @@ function ProductionPage() {
 
   const ETAPES_OFFRE = [
     { icone: '', titre: 'Single studio', desc: 'Votre titre enregistré et mixé en studio professionnel.' },
-    { icone: '', titre: '100 pochettes QR', desc: '100 pochettes physiques avec QR code pour partager votre musique partout.' },
+    { icone: '', titre: '100 supports QR', desc: '100 supports musicaux QR pour partager votre musique partout.' },
     { icone: '', titre: 'Publication', desc: 'Votre single publié sur la plateforme Doniel Zik.' },
     { icone: '', titre: 'Clip vidéo', desc: 'Un clip pour donner vie à votre chanson.' },
     { icone: '', titre: 'Promotion télé', desc: 'Une action de promotion à la télévision.' },
@@ -5577,7 +5580,7 @@ function ProductionPage() {
                 { n:'1', t:'Vous vous enregistrez', d:'Remplissez le formulaire avec vos informations et votre projet.' },
                 { n:'2', t:'Vous signez le contrat en ligne', d:'Lisez et signez votre contrat de production directement sur votre téléphone.' },
                 { n:'3', t:'Notre équipe vous recontacte', d:'Nous convenons ensemble des détails et du règlement, en dehors de la plateforme.' },
-                { n:'4', t:'On produit votre single', d:'Studio, pochettes, clip, publication et promotion télé.' },
+                { n:'4', t:'On produit votre single', d:'Studio, supports QR, clip, publication et promotion télé.' },
                 { n:'5', t:'Votre musique prend vie', d:'Les mélomanes écoutent, réalisent des challenges sur votre titre et le partagent sur les réseaux sociaux.' },
               ].map((s, i) => (
                 <div key={i} style={{ display:'flex', gap:12, marginBottom:14 }}>
@@ -6257,9 +6260,9 @@ function HomePage() {
   }, []);
 
   const etapes = [
-    { num: '01', icon: '', title: "L'artiste crée son QR", desc: "Il s'inscrit sur Doniel Zik, uploade sa musique et reçoit un QR code unique lié à sa pochette." },
-    { num: '02', icon: '', title: 'Il imprime sur sa pochette', desc: 'Le QR code est imprimé sur la pochette physique que l\'artiste vend directement à ses fans.' },
-    { num: '03', icon: '', title: 'Le fan scanne', desc: 'Le fan scanne la pochette avec son téléphone. La musique s\'ouvre instantanément, sans appli.' },
+    { num: '01', icon: '', title: "L'artiste crée son QR", desc: "Il s'inscrit sur Doniel Zik, uploade sa musique et reçoit un QR code unique lié à sa musique." },
+    { num: '02', icon: '', title: 'Son support QR est imprimé', desc: 'Le QR code est imprimé sur un support musical QR que l\'artiste vend directement à ses fans.' },
+    { num: '03', icon: '', title: 'Le fan scanne', desc: 'Le fan scanne le support QR avec son téléphone. La musique s\'ouvre instantanément, sans appli.' },
     { num: '04', icon: '', title: 'Il écoute et télécharge', desc: 'Streaming gratuit illimité. Téléchargement des fichiers originaux en qualité maximale.' },
   ];
 
@@ -6320,7 +6323,7 @@ function HomePage() {
         </h1>
 
         <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 17, lineHeight: 1.9, marginBottom: 40, maxWidth: 560, margin: '0 auto 40px', animation: 'fadeUp .6s ease .2s both', fontFamily: "'DM Sans', sans-serif" }}>
-          Doniel Zik connecte les artistes africains à leurs fans via des QR codes sur pochettes physiques. Distribution simple. Revenus réels. Droits conservés à 100%.
+          Doniel Zik connecte les artistes africains à leurs fans via des supports musicaux QR. Distribution simple. Revenus réels. Droits conservés à 100%.
         </p>
 
         {/* ONDES SONORES ANIMÉES */}
@@ -6389,8 +6392,8 @@ function HomePage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             {[
-              { icon: '', title: 'Artiste', color: '#1a6bff', grad: 'rgba(26,107,255,0.12)', items: ['QR code sur ta pochette', 'Streaming & téléchargement', 'Revenus par écoute', 'Droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
-              { icon: '', title: 'Mélomane', color: '#64c8ff', grad: 'rgba(100,200,255,0.12)', items: ['Scanner la pochette', 'Écouter gratuitement', 'Télécharger la musique', 'Accéder à ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
+              { icon: '', title: 'Artiste', color: '#1a6bff', grad: 'rgba(26,107,255,0.12)', items: ['Ton support musical QR', 'Streaming & téléchargement', 'Revenus par écoute', 'Droits conservés à 100%'], cta: 'Créer mon QR', href: '/artiste' },
+              { icon: '', title: 'Mélomane', color: '#64c8ff', grad: 'rgba(100,200,255,0.12)', items: ['Scanner le support QR', 'Écouter gratuitement', 'Télécharger la musique', 'Accéder à ta Zikothèque'], cta: 'Ma Zikothèque', href: '/ziko' },
               { icon: '', title: 'Annonceur', color: '#ffd700', grad: 'rgba(255,215,0,0.12)', items: ['Pub avant chaque écoute', 'Audience locale engagée', 'Stats de campagne', 'Budget flexible'], cta: 'Annoncer', href: '/annonceurs' },
             ].map((p, i) => (
               <div key={i} className="card-hover" style={{ background: p.grad, border: `1px solid ${p.color}33`, borderRadius: 20, padding: 22, display: 'flex', flexDirection: 'column', transition: 'all .3s' }}>
@@ -6591,9 +6594,15 @@ function ArtisteBioPage() {
   useEffect(() => {
     (async () => {
       try {
+        // Profil retrouvé par son slug, ou à défaut par l'identifiant de la fiche
+        // (les artistes sans bio n'ont pas encore de slug).
         const snap = await getDocs(query(collection(db,'artists'), where('slug','==',slug)));
-        if (snap.empty) { setStatut('introuvable'); return; }
-        const data = snap.docs[0].data();
+        let data: any = snap.empty ? null : snap.docs[0].data();
+        if (!data && slug) {
+          const parId = await getDoc(doc(db,'artists',slug)).catch(() => null);
+          if (parId && parId.exists()) data = parId.data();
+        }
+        if (!data) { setStatut('introuvable'); return; }
         setArtiste(data);
         if (data.email) {
           const decSnap = await getDocs(query(collection(db,'decouvrir'), where('artistEmail','==',data.email)));
@@ -6644,6 +6653,14 @@ function ArtisteBioPage() {
             </div>
           )}
         </div>
+
+        {/* Bouton « Modifier ma bio » — visible uniquement par l'artiste lui-même */}
+        {auth.currentUser?.email && artiste.email && auth.currentUser.email.toLowerCase() === String(artiste.email).toLowerCase() && (
+          <Link to="/artiste?tab=bio"
+            style={{ display:'inline-block', marginBottom:22, padding:'10px 18px', borderRadius:12, background:`linear-gradient(180deg,#3d8bff,${BLEU})`, color:'#fff', fontWeight:800, fontSize:13, textDecoration:'none', boxShadow:'0 4px 0 #0040b0, 0 8px 18px rgba(26,107,255,0.25)' }}>
+            Modifier ma bio
+          </Link>
+        )}
 
         {/* Bio */}
         {artiste.bioTexte ? (
@@ -6959,7 +6976,7 @@ function PublicStreamPage() {
       {/* ── TITRE + ARTISTE ── */}
       <div style={{ padding: '20px 18px 0', marginBottom: 22 }}>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 26, fontWeight: 900, color: '#fff', marginBottom: 4, lineHeight: 1.1 }}>{data.label}</h1>
-        <p style={{ color: '#6a88aa', fontSize: 13 }}>par <strong style={{ color: '#4da6ff' }}>{data.artist}</strong></p>
+        <NomArtisteProfil artistEmail={data.artistEmail} artistName={data.artist} />
       </div>
 
       <div style={{ padding: '0 16px', maxWidth: 500, margin: '0 auto' }}>
@@ -7370,8 +7387,10 @@ export default function App() {
 
   // Notifications TUTO pour l'ARTISTE (B2) : si l'utilisateur est un artiste, on lui envoie
   // de temps en temps (1 tous les 3 jours) un conseil pour faire grandir sa communauté.
+  // DÉSACTIVÉ (demande de Guy) : les astuces sont pour les mélomanes ; l'artiste a son tableau de bord.
   useEffect(() => {
-    if (!user || !user.email) return;
+    const ASTUCES_ARTISTE_ACTIVES = false as boolean;
+    if (!ASTUCES_ARTISTE_ACTIVES || !user || !user.email) return;
     const MESSAGES_TUTO_ARTISTE = [
       "Conseil : publiez régulièrement votre contenu sur Doniel Zik pour gagner en visibilité et toucher plus de fans !",
       "Astuce : programmez une sortie officielle et invitez votre communauté à la réserver à l'avance. L'attente crée l'engouement !",
@@ -7454,6 +7473,7 @@ export default function App() {
         <Route path="/" element={
 user ? <ZikothequePage user={user} /> : <LandingPage />
         } />
+        <Route path="/studio-vocal" element={<StudioVocalPresentation />} />
         <Route path="/fan/:qrId" element={<FanPage />} />
         <Route path="/ecoute/:publicLinkId" element={<PublicStreamPage />} />
         <Route path="/ziko" element={

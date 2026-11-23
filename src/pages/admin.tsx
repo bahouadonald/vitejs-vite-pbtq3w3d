@@ -1126,7 +1126,7 @@ export function ProductionTab() {
         // Notifier l'artiste
         if (cmd) await envoyerNotification({
           to: cmd.artistEmail, type:'pochette_livree',
-          text: `Votre pochette est prête ! Téléchargez-la en PNG depuis l'onglet Pochettes.`,
+          text: `Votre support QR est prêt ! L'équipe Doniel Zik vous contacte pour la livraison.`,
           createdAt: new Date().toISOString(),        });
       }
     } catch {}
@@ -1181,7 +1181,7 @@ export function ProductionTab() {
       {/* COMMANDES DE POCHETTES */}
       {commandes.length > 0 && (
         <div style={{ marginBottom:28 }}>
-          <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:16 }}>Commandes de pochettes</h2>
+          <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:16 }}>Commandes de supports QR</h2>
           {commandes.map(c => (
             <div key={c.id} style={{ ...S.card, marginBottom:12 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
@@ -1189,7 +1189,7 @@ export function ProductionTab() {
                   <p style={{ fontWeight:800, fontSize:14, margin:'0 0 2px' }}>{c.contenuTitre}</p>
                   <p style={{ color:'#1a6bff', fontSize:12, margin:'0 0 4px' }}>{c.artistName} · {c.artistEmail}</p>
                   <p style={{ color:'#5a7090', fontSize:12, margin:0 }}>
-                    {c.nbPochettes} pochettes · {c.nbScans} scan(s)/pièce · QR {c.qrPosition}
+                    {c.nbPochettes} supports QR · {c.nbScans} scan(s)/pièce · QR {c.qrPosition}
                   </p>
                   {c.creaParNous && <p style={{ color:'#b07a00', fontSize:12, margin:'4px 0 0', fontWeight:700 }}>Conception demandée (+{(c.coutCrea||5000).toLocaleString()} F)</p>}
                   {c.infos && <p style={{ color:'#8098b8', fontSize:11, margin:'4px 0 0', lineHeight:1.5 }}>Infos : {c.infos}</p>}
@@ -1505,7 +1505,7 @@ export function ArtistesTab({ db, qrcodes, canDelete }: { db: any, qrcodes: any[
         email: email.trim().toLowerCase(),
         createdAt: new Date().toISOString(),
       });
-      notifierAdminEnregistrement('Nouvel artiste', `${nom.trim()} (${email.trim().toLowerCase()})`);
+      notifierAdminEnregistrement('Nouvel artiste', nom.trim(), email.trim().toLowerCase());
       setMsg('Artiste enregistré ! Il peut maintenant créer son compte sur /artiste');
       setNom(''); setEmail('');
     } catch(e:any) { setMsg('Erreur: ' + e.message); }
@@ -2659,7 +2659,7 @@ export function AdminPage() {
             commercialEmail: newCommercialEmail || '',
             createdAt: new Date().toISOString(),
           });
-          notifierAdminEnregistrement('Nouvel artiste', `${newArtist} (${newArtistEmail})`);
+          notifierAdminEnregistrement('Nouvel artiste', newArtist, newArtistEmail);
         }
       }
       setNewLabel(''); setNewArtist(''); setNewPrice(''); setNewScans('');
@@ -2773,7 +2773,7 @@ export function AdminPage() {
       await generatePochettes(qrcodesPourPochettes, pochetteTemplate,
         (p) => setBulkProgress(55 + Math.round(p * 0.45)), pochettePos, pochetteSortie, pochetteVerso);
       setBulkProgress(100);
-      setMsg('' + count + ' pochettes generees' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + (pochetteSortie === 'pdf6' ? ' ! PDF telecharge.' : ' ! ZIP telecharge.'));
+      setMsg('' + count + ' supports QR générés' + (echecs > 0 ? ` (${echecs} en échec, à régénérer)` : '') + (pochetteSortie === 'pdf6' ? ' ! PDF telecharge.' : ' ! ZIP telecharge.'));
       await new Promise(r => setTimeout(r, 1500));
       setBulkLoading(false); setShowBulk(false); setBulkQr(null);
       return;
@@ -2906,15 +2906,15 @@ export function AdminPage() {
             <p style={{ color: '#1a6bff', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4, fontSize: 15 }}>{bulkQr.label}</p>
             <p style={{ color: '#5a7090', fontSize: 13, marginBottom: 20 }}>par {bulkQr.artist}</p>
             <div style={{ background: '#f5f8ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-              <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 pochette unique</p>
+              <p style={{ color: '#8098b8', fontSize: 11, marginBottom: 4 }}>Chaque QR code = 1 support QR unique</p>
               <p style={{ color: '#8098b8', fontSize: 11 }}>
-                {bulkMode === 'feuille' ? '30 QR/page en A4, 56 QR/page en A3 → PDF imprimable' : 'Le QR est collé directement sur ton design → une image prête à imprimer par pochette, dans un ZIP'}
+                {bulkMode === 'feuille' ? '30 QR/page en A4, 56 QR/page en A3 → PDF imprimable' : 'Le QR est collé directement sur ton design → une image prête à imprimer par support QR, dans un ZIP'}
               </p>
             </div>
 
             <label style={S.lbl}>Mode de génération</label>
             <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-              {[['feuille','Feuille de QR (PDF)'],['pochette','QR sur la pochette (ZIP)']].map(([k,l]) => (
+              {[['feuille','Feuille de QR (PDF)'],['pochette','QR sur le support (ZIP)']].map(([k,l]) => (
                 <button key={k} onClick={() => setBulkMode(k as any)}
                   style={{ flex:1, padding:'10px', borderRadius:10, border:`2px solid ${bulkMode===k?'#1a6bff':'#dce6f7'}`, background:bulkMode===k?'#eaf1ff':'#fff', color:bulkMode===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
                   {l}
@@ -2936,7 +2936,7 @@ export function AdminPage() {
               </>
             ) : (
               <div style={{ marginBottom:14 }}>
-                <label style={S.lbl}>Design de la pochette (une seule image)</label>
+                <label style={S.lbl}>Design du support QR (une seule image)</label>
                 <input type="file" accept="image/*" onChange={e => {
                   const f = e.target.files?.[0]; if (!f) return;
                   setPochetteTemplate(f);
@@ -2963,14 +2963,14 @@ export function AdminPage() {
 
                     <label style={{ ...S.lbl, marginTop:10 }}>Format de sortie</label>
                     <div style={{ display:'flex', gap:8 }}>
-                      {[['zip','ZIP · 1 image/pochette'],['pdf6','PDF · 6/page A4']].map(([k,l]) => (
+                      {[['zip','ZIP · 1 image/support'],['pdf6','PDF · 6/page A4']].map(([k,l]) => (
                         <button key={k} onClick={() => setPochetteSortie(k as any)}
                           style={{ flex:1, padding:'9px', borderRadius:10, border:`2px solid ${pochetteSortie===k?'#1a6bff':'#dce6f7'}`, background:pochetteSortie===k?'#eaf1ff':'#fff', color:pochetteSortie===k?'#1a6bff':'#8098b8', fontWeight:700, fontSize:12, cursor:'pointer' }}>
                           {l}
                         </button>
                       ))}
                     </div>
-                    <label style={{ ...S.lbl, marginTop:12 }}>Verso de la pochette (une seule image, optionnel)</label>
+                    <label style={{ ...S.lbl, marginTop:12 }}>Verso du support QR (une seule image, optionnel)</label>
                     <input type="file" accept="image/*" onChange={e => {
                       const f = e.target.files?.[0] || null;
                       setPochetteVerso(f);
@@ -3011,7 +3011,7 @@ export function AdminPage() {
             {bulkLoading && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5a7090', marginBottom: 6 }}>
-                  <span>{bulkProgress < 55 ? 'Creation des QR codes...' : (bulkMode === 'pochette' ? 'Collage sur les pochettes...' : 'Generation du PDF...')}</span>
+                  <span>{bulkProgress < 55 ? 'Creation des QR codes...' : (bulkMode === 'pochette' ? 'Collage sur les supports QR...' : 'Generation du PDF...')}</span>
                   <span style={{ color: '#1a6bff', fontWeight: 700 }}>{bulkProgress}%</span>
                 </div>
                 <div style={{ height: 8, background: '#dce6f7', borderRadius: 99 }}>
@@ -3023,7 +3023,7 @@ export function AdminPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.btn2, flex: 1 }} onClick={() => { setShowBulk(false); setBulkQr(null); setPochetteTemplate(null); setPochettePreviewUrl(''); setPochetteVerso(null); setPochetteVersoUrl(''); setBulkMode('feuille'); setPochetteSortie('zip'); }} disabled={bulkLoading}>Annuler</button>
               <button style={{ ...S.btn, flex: 2 }} onClick={generateBulkQRs} disabled={bulkLoading || (bulkMode === 'pochette' && !pochetteTemplate)}>
-                {bulkLoading ? 'Generation...' : bulkMode === 'pochette' ? 'Generer ' + bulkCount + ' pochettes' : 'Generer ' + bulkCount + ' QR codes'}
+                {bulkLoading ? 'Generation...' : bulkMode === 'pochette' ? 'Generer ' + bulkCount + ' supports QR' : 'Generer ' + bulkCount + ' QR codes'}
               </button>
             </div>
           </div>

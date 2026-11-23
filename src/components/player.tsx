@@ -346,7 +346,7 @@ export function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose, 
       }
       // Notif activité (message 6) : prévenir les autres mélomanes actifs sur ce contenu
       await notifierActiviteCommunaute(qrId, user.uid,
-        `${user.displayName || 'Quelqu\'un'} vient de commenter ce contenu. Rejoins la discussion !`);
+        `${user.displayName || 'Quelqu\'un'} vient de commenter ce contenu. Rejoins la discussion !`, source);
       setText(''); setMsg('');
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -371,7 +371,7 @@ export function CommentSection({ qrId, artistEmail, compact, autoOpen, onClose, 
       });
       // Notif activité (message 7) : une réponse a été postée
       await notifierActiviteCommunaute(qrId, user.uid,
-        `${user.displayName || 'Quelqu\'un'} a répondu à un commentaire sur ce contenu. Va voir la discussion !`);
+        `${user.displayName || 'Quelqu\'un'} a répondu à un commentaire sur ce contenu. Va voir la discussion !`, source);
       setReplyText(''); setReplyTo(null);
     } catch(e) { console.error(e); }
   };
@@ -806,14 +806,8 @@ export function ActionBar({ qrId, artistEmail, buzz, tutoStep, onTutoNext, sourc
       else if (r === 'ok') {
         // Notif activité (message 4) : quelqu'un a kiffé ce contenu
         notifierActiviteCommunaute(qrId, user.uid,
-          `${user.displayName || 'Quelqu\'un'} a kiffé ce contenu. Toi aussi, montre ton soutien : kiffe-le !`);
-        // Notif à l'ARTISTE (B1), modérée car le kiff arrive souvent
-        if (artistEmail && Math.random() < 0.25) {
-          await envoyerNotification({
-            to: artistEmail, role:'artiste', type:'kiff',
-            text: `${user.displayName || 'Un fan'} a kiffé votre contenu ! Continuez comme ça.`,
-            createdAt: new Date().toISOString(),          });
-        }
+          `${user.displayName || 'Quelqu\'un'} a kiffé ce contenu. Toi aussi, montre ton soutien : kiffe-le !`, source);
+        // (La notif à l'artiste est déjà envoyée par donnerKiff, avec le lien du contenu.)
       }
     } catch(e) { console.error(e); }
   };
@@ -1571,7 +1565,7 @@ export function ZikoLoginModal({ onSuccess, onClose }: { onSuccess: (uid: string
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
-      notifierAdminEnregistrement('Nouveau mélomane', `${displayName || ''} (${email})`);
+      notifierAdminEnregistrement('Nouveau mélomane', `${displayName || 'Sans nom'}`, email);
       onSuccess(result.user.uid);
     } catch (e: any) { setMsg('Erreur: ' + e.message); setLoading(false); }
   };

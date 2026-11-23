@@ -20,7 +20,7 @@ import {
   C, S, ADMIN_EMAIL, demanderResetPassword, envoyerNotification, CLOUDINARY_CLOUD,
   CLOUDINARY_UPLOAD_PRESET, BASE_URL, optimImg, logTx, lancerPaiementGeniusPay, LOGO_B64,
   badgeStyle, KIFFEMENTS, CATEGORIES_AUDIO, CATEGORIES_VIDEO, PRIX_PUBLICATION, COIN_OSCART_SYMBOLE,
-  activerNotificationsPush, RECHARGES,
+  activerNotificationsPush, RECHARGES, notifierAdminEnregistrement,
 } from '../lib/utils';
 import {
   ChangerMotDePasse, Logo, OSCART_TO_FCFA, OSCART_TO_EUR, OSCART_TO_USD, PALIERS_CONCOURS_DEFAUT, Lien,
@@ -32,7 +32,8 @@ import { StudioVocalArtiste } from './studio-vocal';
 // ARTIST PAGE
 // ─────────────────────────────────────────────
 export function ArtistPage() {
-  const [view, setView] = useState<'login' | 'register' | 'dashboard'>('login');
+  const [view, setView] = useState<'login' | 'register' | 'dashboard'>(() =>
+    new URLSearchParams(window.location.search).get('inscription') === '1' ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [user, setUser] = useState<any>(null);
@@ -42,11 +43,16 @@ export function ArtistPage() {
   const [dashTab, setDashTab] = useState<'stats'|'studio'|'publier'|'mot'|'bio'|'pochettes'|'signatures'|'notifs'>(() => {
     // Ouvre directement un onglet via ?tab=... (ex : retour de paiement Studio vocal)
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'studio' ? 'studio' : 'stats';
+    return t === 'studio' ? 'studio' : t === 'bio' ? 'bio' : 'stats';
   });
   const [soldeOscartArtiste, setSoldeOscartArtiste] = useState(0);
   const [rechargeModalArtiste, setRechargeModalArtiste] = useState<{fcfa:number,oscart:number}|null>(null);
   const [artistNom, setArtistNom] = useState('');
+  // Compte connecté (mélomane, Google...) qui n'a pas encore de fiche artiste
+  const [compteNonArtiste, setCompteNonArtiste] = useState<any>(null);
+  // Pendant une inscription, la fiche artiste n'existe pas encore quand Firebase
+  // signale la connexion : on ne doit pas afficher « devenir artiste » à ce moment-là.
+  const inscriptionEnCours = useRef(false);
   const refParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
 
   // Charger solde Oscart artiste
@@ -116,10 +122,15 @@ export function ArtistPage() {
           // Ce compte n'est pas artiste : on affiche simplement l'écran de connexion
           // artiste SANS déconnecter la session en cours (ex. un mélomane qui arrive
           // ici par erreur ne doit pas perdre l'accès à son compte mélomane).
+          // Inscription libre : on lui propose de devenir artiste avec ce même compte.
+          if (inscriptionEnCours.current) return;
           setUser(null); setView('login');
-          setMsg("Ce compte n'est pas un compte artiste. Connectez-vous avec votre compte artiste.");
+          setCompteNonArtiste(u);
         }
-      } else { setUser(null); setView('login'); }
+      } else {
+        setUser(null); setCompteNonArtiste(null);
+        setView(new URLSearchParams(window.location.search).get('inscription') === '1' ? 'register' : 'login');
+      }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -267,11 +278,8 @@ export function ArtistPage() {
     try {
       // L'email est-il déjà enregistré comme artiste ?
       const artistSnap = await getDocs(query(collection(db, 'artists'), where('email','==', email)));
-      // Pas enregistré ET pas de lien commercial -> bloquer
-      if (artistSnap.empty && !refParam) {
-        setMsg('Cet email n\'est pas enregistré. Inscrivez-vous via le lien de votre commercial Doniel Zik.');
-        setLoading(false); return;
-      }
+      // Inscription libre : tout artiste peut créer son compte. Le contrôle se
+      // fait à la publication (chaque contenu est validé par l'admin).
       if (artistSnap.empty && !artistNom.trim()) {
         setMsg('Indiquez votre nom d\'artiste.');
         setLoading(false); return;
@@ -286,14 +294,20 @@ export function ArtistPage() {
         } catch {}
       }
       // Créer le compte Firebase Auth
+      inscriptionEnCours.current = true;
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       if (artistSnap.empty) {
-        // Auto-inscription via lien commercial : créer la fiche artiste (1er contenu offert)
+        // Auto-inscription : créer la fiche artiste
+        // (1er contenu offert seulement via le lien d'un commercial)
         await addDoc(collection(db, 'artists'), {
           email, uid: cred.user.uid, name: artistNom.trim(), artistName: artistNom.trim(),
-          commercialEmail, premierContenuGratuit: true, status: 'actif',
+          commercialEmail, premierContenuGratuit: !!refParam, status: 'actif',
           createdAt: new Date().toISOString(),
         });
+        notifierAdminEnregistrement('Nouvel artiste', artistNom.trim(), email);
+        // Ouvre directement le tableau de bord (sans attendre un rechargement)
+        setUser(cred.user); setView('dashboard');
+        loadStats(email); loadArtistOptions(cred.user.uid);
       } else {
         // Déjà enregistré par l'admin : juste lier l'uid
         await updateDoc(doc(db, 'artists', artistSnap.docs[0].id), { uid: cred.user.uid });
@@ -305,6 +319,7 @@ export function ArtistPage() {
         setView('login');
       } else { setMsg('Erreur: ' + e.message); }
     }
+    inscriptionEnCours.current = false;
     setLoading(false);
   };
 
@@ -350,22 +365,22 @@ export function ArtistPage() {
               {unreadVentes} nouveau{unreadVentes>1?'x':''}
             </span>
           )}
+          <a href="/profil" aria-label="Basculer côté mélomane" title="Basculer côté mélomane"
+            style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:99, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:12, fontWeight:700, textDecoration:'none', marginRight:8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            Mélomane
+          </a>
           <button style={{ padding:'8px 12px', borderRadius:99, border:'1px solid '+C.border, background:'rgba(255,255,255,0.04)', color:C.textSoft, cursor:'pointer', fontSize:12, fontWeight:600 }} onClick={async () => await signOut(auth)}>Déco</button>
         </div>
       </div>
 
-      {/* BOUTON FLOTTANT — basculer vers le compte mélomane, visible sur tous les onglets */}
-      <a href="/profil" aria-label="Basculer côté mélomane"
-        style={{ position:'fixed', bottom:24, right:20, zIndex:60, display:'flex', alignItems:'center', gap:8, padding:'12px 18px', borderRadius:99, border:'none', background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontWeight:700, fontSize:13, textDecoration:'none', boxShadow:'0 6px 24px rgba(10,132,255,0.5)' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 2l4 4-4 4"/><path d="M3 12v-2a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 12v2a4 4 0 0 1-4 4H3"/>
-        </svg>
-        Basculer côté mélomane
-      </a>
+      {/* Basculer côté mélomane : bouton déplacé dans l'en-tête (il cachait le contenu) */}
 
       {/* TABS — façon pilules, comme le reste de l'app */}
       <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
-        {[['stats','Stats'],['studio','Studio vocal'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['pochettes','Pochettes'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
+        {[['stats','Stats'],['studio','Studio vocal'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
           <button key={id} onClick={() => setDashTab(id as any)}
             style={{ flexShrink:0, whiteSpace:'nowrap', padding:'8px 16px', borderRadius:99, border:'1px solid '+(dashTab===id ? 'transparent' : C.border),
               background: dashTab===id ? 'linear-gradient(135deg,'+C.blue+',#5d3fff)' : 'transparent',
@@ -431,7 +446,7 @@ export function ArtistPage() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               {[
-                { label:'Pochettes créées', value:stats.pochettes||0 },
+                { label:'Supports QR créés', value:stats.pochettes||0 },
                 { label:'Scans effectués', value:stats.scansTotal||0 },
               ].map((s,i) => (
                 <div key={i} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, textAlign:'center', padding:'20px 12px' }}>
@@ -477,7 +492,7 @@ export function ArtistPage() {
                 Portefeuille unique — gains, achats et crédits · retrait à partir de 15 000 F CFA
               </p>
               {(soldeOscartArtiste * OSCART_TO_FCFA) >= 15000 && (
-                <RetraitModal montant={soldeOscartArtiste * OSCART_TO_FCFA} oscart={soldeOscartArtiste} artistEmail={user?.email||''} />
+                <RetraitModal montant={soldeOscartArtiste * OSCART_TO_FCFA} oscart={soldeOscartArtiste} artistEmail={user?.email||''} artistName={stats.artistName || user?.displayName || ''} />
               )}
               {(soldeOscartArtiste * OSCART_TO_FCFA) < 15000 && soldeOscartArtiste > 0 && (
                 <p style={{ color:'#4a5878', fontSize:11, marginTop:4 }}>
@@ -604,7 +619,7 @@ export function ArtistPage() {
             )}
 
             {/* POCHETTES */}
-            <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12, color:C.text }}>Mes pochettes ({stats.qrcodes.length})</h3>
+            <h3 style={{ fontFamily:'serif', fontSize:16, fontWeight:700, marginBottom:12, color:C.text }}>Mes supports QR ({stats.qrcodes.length})</h3>
             {stats.qrcodes.map((q:any) => (
               <div key={q.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
@@ -666,7 +681,8 @@ export function ArtistPage() {
         {dashTab === 'bio' && <BioArtisteTab user={user} artistName={stats.artistName || user?.displayName || ''} coverUrl={stats.qrcodes?.[0]?.coverUrl || ''} />}
 
         {/* ── POCHETTES PHYSIQUES ── */}
-        {dashTab === 'pochettes' && (
+        {/* Onglet Pochettes retiré : les supports QR sont conçus et dupliqués par l'admin */}
+        {false && dashTab === 'pochettes' && (
           <div style={{ animation:'fadeUp .3s ease' }}>
             <CommandePochettes user={user} artistName={stats.artistName || user?.displayName || ''}
               contenusValides={(stats.qrcodes || [])} />
@@ -754,11 +770,48 @@ export function ArtistPage() {
         </div>
 
         <div style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:24 }}>
-          {view === 'login' ? (
+          {view === 'login' && compteNonArtiste ? (
+            <>
+              {/* Déjà connecté (mélomane, Google...) mais sans fiche artiste : on la crée en 1 clic */}
+              <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center', color:C.text }}>Devenir artiste</h2>
+              <p style={{ color:C.textSoft, fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
+                Vous êtes connecté avec {compteNonArtiste.email}. Indiquez votre nom d'artiste pour ouvrir votre espace artiste avec ce même compte.
+              </p>
+              <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Nom d'artiste *</label>
+              <input className="art-inp" value={artistNom} onChange={e => setArtistNom(e.target.value)} placeholder="Votre nom de scène" />
+              {msg && <p style={{ color: msg.startsWith('Erreur') ? C.alert : C.blueLite, fontSize:12, marginBottom:10 }}>{msg}</p>}
+              <button style={{ width:'100%', padding:14, borderRadius:10, border:'none', cursor:'pointer', fontWeight:700, fontSize:14, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff' }}
+                disabled={loading}
+                onClick={async () => {
+                  if (!artistNom.trim()) { setMsg('Indiquez votre nom d\'artiste.'); return; }
+                  setLoading(true); setMsg('');
+                  try {
+                    const u = compteNonArtiste;
+                    const mail = (u.email || '').toLowerCase();
+                    await addDoc(collection(db, 'artists'), {
+                      email: mail, uid: u.uid, name: artistNom.trim(), artistName: artistNom.trim(),
+                      commercialEmail: '', premierContenuGratuit: false, status: 'actif',
+                      createdAt: new Date().toISOString(),
+                    });
+                    notifierAdminEnregistrement('Nouvel artiste', artistNom.trim(), mail);
+                    setCompteNonArtiste(null);
+                    setUser(u); setView('dashboard');
+                    loadStats(mail); loadArtistOptions(u.uid);
+                  } catch (e: any) { setMsg('Erreur : ' + (e?.message || 'réessayez.')); }
+                  setLoading(false);
+                }}>
+                {loading ? 'Création...' : 'Ouvrir mon espace artiste'}
+              </button>
+              <button style={{ width:'100%', marginTop:10, padding:12, borderRadius:10, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontWeight:700, fontSize:12, cursor:'pointer' }}
+                onClick={async () => { await signOut(auth); setCompteNonArtiste(null); setMsg(''); }}>
+                Utiliser un autre compte
+              </button>
+            </>
+          ) : view === 'login' ? (
             <>
               <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center', color:C.text }}>Connexion</h2>
               <p style={{ color:C.textSoft, fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
-                Connectez-vous avec l'email enregistré par Doniel Zik
+                Connectez-vous à votre compte artiste
               </p>
 
               {/* Google */}
@@ -812,7 +865,7 @@ export function ArtistPage() {
 
               <div style={{ borderTop:'1px solid '+C.border, marginTop:14, paddingTop:14 }}>
                 <p style={{ color:C.textSoft, fontSize:11, textAlign:'center', marginBottom:10, lineHeight:1.6 }}>
-                  Première connexion ? Créez votre compte avec l'email que vous avez fourni à Doniel Zik.
+                  Pas encore de compte ? Créez-le en 30 secondes.
                 </p>
                 <button style={{ width:'100%', textAlign:'center', padding:12, borderRadius:10, border:'1px solid '+C.border, background:'transparent', color:C.blueLite, fontWeight:700, fontSize:13, cursor:'pointer' }}
                   onClick={() => { setView('register'); setMsg(''); }}>
@@ -824,15 +877,13 @@ export function ArtistPage() {
             <>
               <h2 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:4, textAlign:'center', color:C.text }}>Créer mon compte artiste</h2>
               <p style={{ color:C.textSoft, fontSize:12, textAlign:'center', marginBottom:20, lineHeight:1.6 }}>
-                {refParam ? "Bienvenue sur Doniel Zik ! Créez votre compte — votre 1er contenu est OFFERT." : "Utilisez l'email que vous avez communiqué à Doniel Zik lors de votre enregistrement."}
+                {refParam ? "Bienvenue sur Doniel Zik ! Créez votre compte — votre 1er contenu est OFFERT." : "Bienvenue sur Doniel Zik ! Créez votre compte artiste."}
               </p>
 
-              {refParam && (<>
-                <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Nom d'artiste *</label>
-                <input className="art-inp" value={artistNom} onChange={e => setArtistNom(e.target.value)} placeholder="Votre nom de scène" />
-              </>)}
+              <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Nom d'artiste *</label>
+              <input className="art-inp" value={artistNom} onChange={e => setArtistNom(e.target.value)} placeholder="Votre nom de scène" />
 
-              <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>{refParam ? 'Votre email *' : 'Email (celui enregistré chez nous) *'}</label>
+              <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Votre email *</label>
               <input className="art-inp" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" />
               <label style={{ display:'block', color:C.textSoft, fontSize:12, marginBottom:6 }}>Choisissez un mot de passe *</label>
               <input className="art-inp" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="8 caractères minimum" />
@@ -850,7 +901,7 @@ export function ArtistPage() {
 
               <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'12px 14px', marginTop:14 }}>
                 <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.7, margin:0 }}>
-                  Seuls les artistes dont l'email a été enregistré par Doniel Zik peuvent accéder au dashboard. Si votre email n'est pas reconnu, contactez-nous.
+                  Votre compte est créé tout de suite. Chaque contenu que vous publiez est vérifié par l'équipe Doniel Zik avant d'apparaître en public.
                 </p>
               </div>
             </>
@@ -1084,7 +1135,13 @@ export function NotificationsTab({ userEmail }: { userEmail: string }) {
         <div>
           <p style={{ color:C.textSoft, fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Activité</p>
           {notifs.map(n => (
-            <div key={n.id} style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1 }}>
+            <div key={n.id} onClick={() => {
+                // Ouvre le contenu concerné (kiff, commentaire...) ou la page indiquée
+                const cible = n.qrId ? (n.source === 'public' ? `/ecoute/${n.qrId}` : `/fan/${n.qrId}`)
+                  : (typeof n.lien === 'string' && n.lien.startsWith('/') ? n.lien : '');
+                if (cible) window.location.href = cible;
+              }}
+              style={{ background:C.card, border:'1px solid '+C.border, borderRadius:16, padding:20, marginBottom:10, borderLeft:`3px solid ${n.lu?'transparent':C.blue}`, opacity: n.lu ? 0.7 : 1, cursor: (n.qrId || n.lien) ? 'pointer' : 'default' }}>
               <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
                 <span style={{ fontSize:24, flexShrink:0 }}>{getIcon(n.type)}</span>
                 <div style={{ flex:1 }}>
@@ -2034,7 +2091,7 @@ export function BioArtisteTab({ user, artistName, coverUrl }: any) {
 // ─────────────────────────────────────────────
 // RETRAIT MODAL — méthodes de paiement
 // ─────────────────────────────────────────────
-export function RetraitModal({ montant, oscart, artistEmail }: { montant:number, oscart:number, artistEmail:string }) {
+export function RetraitModal({ montant, oscart, artistEmail, artistName }: { montant:number, oscart:number, artistEmail:string, artistName?:string }) {
   const [open, setOpen] = useState(false);
   const [methode, setMethode] = useState('');
   const [numero, setNumero] = useState('');
@@ -2062,7 +2119,7 @@ export function RetraitModal({ montant, oscart, artistEmail }: { montant:number,
     // la base de données à la main.
     await envoyerNotification({
       to: ADMIN_EMAIL, role: 'admin', type: 'demande_retrait',
-      text: `Nouvelle demande de retrait — ${artistEmail} : ${montant.toLocaleString()} F CFA via ${methode}`,
+      text: `Nouvelle demande de retrait — ${artistName || 'un artiste'} : ${montant.toLocaleString()} F CFA via ${methode}`,
     });
     setSent(true);
   };

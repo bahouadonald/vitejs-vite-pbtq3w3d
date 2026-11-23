@@ -18,7 +18,13 @@
     <meta property="og:url" content="https://doniel.art" />
     <title>Doniel Zik — Créer. Diffuser. Monétiser.</title>
 
+    <script>
+      // Ouvert depuis l'appli mobile Doniel Zik : l'appli a déjà sa propre
+      // barre de navigation, on masque donc celle du site (classe dz-app).
+      if (/DonielZikApp/.test(navigator.userAgent)) document.documentElement.classList.add('dz-app');
+    </script>
     <style>
+      .dz-app .dz-nav-bas, .dz-app .dz-masque-app { display: none !important; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { background: #0E2A52 !important; }
       #root { background: #0E2A52; min-height: 100vh; opacity: 1; }

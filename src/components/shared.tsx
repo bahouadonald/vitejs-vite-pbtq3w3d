@@ -3,17 +3,51 @@
 // et éléments associés (modales, textes juridiques, hooks de devise...).
 // ─────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { auth, db } from '../firebase';
 import {
-  collection, onSnapshot, query, where, limit,
+  collection, onSnapshot, query, where, limit, getDocs,
 } from 'firebase/firestore';
 import {
   GoogleAuthProvider, signInWithPopup, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
   onAuthStateChanged,
 } from 'firebase/auth';
 import { C, S, LOGO_B64, demanderResetPassword } from '../lib/utils';
+
+// ─────────────────────────────────────────────
+// NOM DE L'ARTISTE CLIQUABLE → son profil public (/artiste-bio/...)
+// Retrouve la fiche artiste par e-mail (sinon par nom) et utilise son slug
+// s'il en a un, sinon l'identifiant de sa fiche : le profil marche toujours.
+// ─────────────────────────────────────────────
+export function NomArtisteProfil({ artistEmail, artistName, style }: { artistEmail?: string, artistName?: string, style?: CSSProperties }) {
+  const [cible, setCible] = useState('');
+  useEffect(() => {
+    let actif = true;
+    const q = artistEmail
+      ? query(collection(db, 'artists'), where('email', '==', artistEmail.toLowerCase()), limit(1))
+      : artistName ? query(collection(db, 'artists'), where('name', '==', artistName), limit(1)) : null;
+    if (!q) return;
+    getDocs(q).then(s => {
+      if (!actif || s.empty) return;
+      const d = s.docs[0];
+      setCible(d.data().slug || d.id);
+    }).catch(() => {});
+    return () => { actif = false; };
+  }, [artistEmail, artistName]);
+  const nom = <strong style={{ color: '#4da6ff' }}>{artistName}</strong>;
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, ...style }}>
+      <span style={{ color: '#6a88aa', fontSize: 13 }}>par {cible ? <Link to={`/artiste-bio/${cible}`} style={{ textDecoration: 'none' }}>{nom}</Link> : nom}</span>
+      {cible && (
+        <Link to={`/artiste-bio/${cible}`}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 99, border: '1px solid rgba(77,166,255,0.4)', color: '#4da6ff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+          Voir le profil
+        </Link>
+      )}
+    </span>
+  );
+}
 
 // Lien WhatsApp cliquable réutilisable
 export function WhatsAppLink({ numero, size = 11 }: { numero: string, size?: number }) {
@@ -46,13 +80,13 @@ export const CONTRAT_COMMERCIAL = [
 // Contrat de production musicale (single) — 10 articles
 export const CONTRAT_PRODUCTION = [
   { t: "Article 1 — Objet", c: "Le présent contrat définit les conditions dans lesquelles la Société Doniel Zik (BDE SARL) réalise la production d'un single musical au profit de l'Artiste, comprenant l'enregistrement studio, la création de pochettes, la publication et la promotion." },
-  { t: "Article 2 — Contenu de la prestation", c: "La production comprend : l'enregistrement d'un single en studio, la fourniture de 100 pochettes physiques avec QR code, la publication du titre sur la plateforme Doniel Zik, la réalisation d'un clip et une action de promotion télévisée." },
+  { t: "Article 2 — Contenu de la prestation", c: "La production comprend : l'enregistrement d'un single en studio, la fourniture de 100 supports musicaux QR, la publication du titre sur la plateforme Doniel Zik, la réalisation d'un clip et une action de promotion télévisée." },
   { t: "Article 3 — Engagement de l'Artiste", c: "L'Artiste s'engage à être présent aux séances d'enregistrement et de tournage convenues, à fournir les éléments nécessaires (paroles, mélodies, éléments visuels) et à collaborer de bonne foi à la bonne réalisation de la production." },
   { t: "Article 4 — Modalités financières", c: "Le montant et les modalités de paiement de la production sont convenus séparément entre l'Artiste et la Société, en dehors de la plateforme. La présente inscription en ligne vaut engagement et sert au suivi du dossier ; elle ne constitue pas un paiement." },
   { t: "Article 5 — Droits sur l'œuvre", c: "L'Artiste conserve la propriété de son œuvre. Il autorise la Société à publier, diffuser et promouvoir le single produit sur la plateforme Doniel Zik et ses canaux de promotion, dans le cadre de la présente production." },
   { t: "Article 6 — Activités de valorisation", c: "L'Artiste est informé que la plateforme propose des activités de valorisation de sa musique, notamment les challenges réalisés par les mélomanes et le partage sur les réseaux sociaux, qui contribuent à la diffusion et à la rémunération de son œuvre." },
   { t: "Article 7 — Rémunération de l'Artiste", c: "L'Artiste perçoit une rémunération lorsque sa musique est utilisée sur la plateforme, y compris lorsqu'un mélomane réalise un challenge sur son titre et que ce challenge reçoit des cadeaux (kiffements), selon les conditions de répartition en vigueur." },
-  { t: "Article 8 — Délais", c: "Les délais de réalisation de chaque étape (enregistrement, pochettes, clip, publication, promotion) sont communiqués à l'Artiste et peuvent varier selon les disponibilités techniques et la collaboration de l'Artiste." },
+  { t: "Article 8 — Délais", c: "Les délais de réalisation de chaque étape (enregistrement, supports QR, clip, publication, promotion) sont communiqués à l'Artiste et peuvent varier selon les disponibilités techniques et la collaboration de l'Artiste." },
   { t: "Article 9 — Obligations de la Société", c: "La Société s'engage à réaliser la production avec sérieux et professionnalisme, à tenir l'Artiste informé de l'avancement, et à respecter l'intégrité artistique de l'œuvre." },
   { t: "Article 10 — Durée et droit applicable", c: "Le présent contrat prend effet à sa signature et court jusqu'à la livraison complète de la production. Il est régi par le droit en vigueur en Côte d'Ivoire. Tout litige sera réglé à l'amiable en priorité." },
 ];
