@@ -53,8 +53,9 @@ export default async function handler(req, res) {
         const f = doc.fields || {};
         const slug = f.slug?.stringValue || '';
         const bioTexte = f.bioTexte?.stringValue || '';
-        if (slug && bioTexte) {
-          urls.push({ loc: `https://doniel.art/artiste-bio/${slug}`, freq: 'monthly', priority: '0.8' });
+        // Tous les profils artistes ayant une adresse (avec ou sans bio)
+        if (slug) {
+          urls.push({ loc: `https://doniel.art/artiste-bio/${slug}`, freq: bioTexte ? 'monthly' : 'weekly', priority: bioTexte ? '0.8' : '0.6' });
         }
       }
     }

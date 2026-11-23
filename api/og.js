@@ -23,6 +23,9 @@ export default async function handler(req, res) {
     let titre = 'Doniel Zik';
     let description = "L'écosystème des créateurs africains. Musique, cinéma, humour, publicité.";
     let image = 'https://doniel.art/icons/icon-512x512.png';
+    // Contenu lisible par Google (page profil artiste) : bio complète + titres
+    let corps = '';
+    let jsonLd = null;
     const urlFinale = `https://doniel.art/${chemin}/${id || ''}`;
 
     if (id && PROJECT && KEY) {
@@ -38,7 +41,12 @@ export default async function handler(req, res) {
         }),
       });
       const resultats = await reponse.json();
-      const docTrouve = (Array.isArray(resultats) ? resultats.find(r => r.document) : null)?.document;
+      let docTrouve = (Array.isArray(resultats) ? resultats.find(r => r.document) : null)?.document;
+      // Profil sans slug : l'adresse utilise l'identifiant de la fiche artiste
+      if (!docTrouve && estArtiste) {
+        const r2 = await fetch(`${baseUrl}/artists/${encodeURIComponent(id)}?key=${KEY}`);
+        if (r2.ok) docTrouve = await r2.json();
+      }
       if (docTrouve) {
         const f = docTrouve.fields || {};
         if (estArtiste) {
@@ -48,6 +56,28 @@ export default async function handler(req, res) {
           if (nom) titre = `${nom} | Doniel Zik`;
           if (bioTexte) description = bioTexte.split('\n').find(p => p.trim())?.slice(0, 200) || description;
           if (cover) image = cover;
+          // Titres publiés de l'artiste
+          const email = f.email?.stringValue || '';
+          let titres = [];
+          if (email) {
+            const r3 = await fetch(`${baseUrl}:runQuery?key=${KEY}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'decouvrir' }], where: { fieldFilter: { field: { fieldPath: 'artistEmail' }, op: 'EQUAL', value: { stringValue: email } } }, limit: 50 } }),
+            });
+            const lr = await r3.json();
+            titres = (Array.isArray(lr) ? lr.filter(x => x.document) : []).map(x => x.document.fields || {})
+              .filter(t => !t.masque?.booleanValue && t.publicLinkId?.stringValue)
+              .map(t => ({ label: t.label?.stringValue || '', id: t.publicLinkId.stringValue }));
+          }
+          const e2 = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          corps = `<h1>${e2(nom || 'Artiste')}</h1>`
+            + (bioTexte ? bioTexte.split('\n').filter(p => p.trim()).map(p => `<p>${e2(p)}</p>`).join('') : '')
+            + (titres.length ? `<h2>Titres de ${e2(nom)}</h2><ul>${titres.map(t => `<li><a href="https://doniel.art/ecoute/${e2(t.id)}">${e2(t.label)}</a></li>`).join('')}</ul>` : '');
+          jsonLd = {
+            '@context': 'https://schema.org', '@type': 'MusicGroup', name: nom || 'Artiste', url: urlFinale,
+            image, description,
+            track: titres.slice(0, 20).map(t => ({ '@type': 'MusicRecording', name: t.label, url: `https://doniel.art/ecoute/${t.id}` })),
+          };
         } else {
           const label = f.label?.stringValue || '';
           const artist = f.artist?.stringValue || '';
@@ -57,6 +87,11 @@ export default async function handler(req, res) {
             ? `Écoutez et téléchargez "${label}" de ${artist} sur Doniel Zik.`
             : `Écoutez et téléchargez "${label}" sur Doniel Zik.`;
           if (cover) image = cover;
+          if (label) {
+            corps = `<h1>${label.replace(/</g, '&lt;')}</h1>${artist ? `<p>${artist.replace(/</g, '&lt;')}</p>` : ''}`;
+            jsonLd = { '@context': 'https://schema.org', '@type': 'MusicRecording', name: label, url: urlFinale, image,
+              ...(artist ? { byArtist: { '@type': 'MusicGroup', name: artist } } : {}) };
+          }
         }
       }
     }
@@ -76,14 +111,17 @@ export default async function handler(req, res) {
 <meta property="og:description" content="${echapper(description)}" />
 <meta property="og:image" content="${echapper(image)}" />
 <meta property="og:url" content="${echapper(urlFinale)}" />
-<meta property="og:type" content="music.song" />
+<meta property="og:type" content="${estArtiste ? 'profile' : 'music.song'}" />
 <meta property="og:site_name" content="Doniel Zik" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${echapper(titre)}" />
 <meta name="twitter:description" content="${echapper(description)}" />
 <meta name="twitter:image" content="${echapper(image)}" />
+<link rel="canonical" href="${echapper(urlFinale)}" />
+${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 </head>
 <body>
+${corps}
 <p><a href="${echapper(urlFinale)}">${echapper(titre)}</a></p>
 </body>
 </html>`);

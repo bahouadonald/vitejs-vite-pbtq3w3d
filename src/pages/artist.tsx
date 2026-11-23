@@ -219,6 +219,18 @@ export function ArtistPage() {
     const artistSnap = await getDocs(query(collection(db, 'artists'), where('email', '==', email)));
     let artistName = '';
     if (!artistSnap.empty) artistName = artistSnap.docs[0].data().name || '';
+    // Chaque artiste reçoit une adresse de profil lisible (doniel.art/artiste-bio/nom-artiste),
+    // même sans bio : son profil est partageable et indexable par Google.
+    if (!artistSnap.empty && !artistSnap.docs[0].data().slug) {
+      const fiche = artistSnap.docs[0];
+      const base = String(fiche.data().artistName || artistName || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      if (base) {
+        getDocs(query(collection(db, 'artists'), where('slug', '==', base)))
+          .then(dej => updateDoc(doc(db, 'artists', fiche.id), { slug: dej.empty ? base : `${base}-${fiche.id.slice(0, 4).toLowerCase()}` }))
+          .catch(() => {});
+      }
+    }
 
     // Chercher QR codes par email artiste OU par nom artiste
     let qrList: any[] = [];
@@ -380,7 +392,7 @@ export function ArtistPage() {
 
       {/* TABS — façon pilules, comme le reste de l'app */}
       <div className="art-tabs" style={{ borderBottom:'1px solid '+C.border, padding:'10px 12px', display:'flex', gap:8, background:'rgba(14,26,52,0.5)', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
-        {[['stats','Stats'],['studio','Studio vocal'],['publier','Enregistrer'],['mot','Mon Mood'],['bio','Ma Bio'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
+        {[['stats','Stats'],['studio','Studio'],['publier','Publier'],['bio','Mon profil'],['mot','Mood'],['signatures','Signatures'],['notifs','Notifs']].map(([id,label]) => (
           <button key={id} onClick={() => setDashTab(id as any)}
             style={{ flexShrink:0, whiteSpace:'nowrap', padding:'8px 16px', borderRadius:99, border:'1px solid '+(dashTab===id ? 'transparent' : C.border),
               background: dashTab===id ? 'linear-gradient(135deg,'+C.blue+',#5d3fff)' : 'transparent',
@@ -1392,9 +1404,9 @@ export function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }:
 
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
-      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6, color:C.text }}>Enregistrer un contenu</h3>
+      <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6, color:C.text }}>Publier un contenu</h3>
       <p style={{ color:C.textSoft, fontSize:13, marginBottom:16, lineHeight:1.6 }}>
-        Enregistrez votre musique ou vidéo sur la plateforme. Vous devez figurer dans le contenu (featuring accepté). Après écoute et validation par notre équipe, votre QR public et votre lien seront générés — vous pourrez alors les partager et publier.
+        Pochette carrée + fichier audio ou vidéo. Publié après validation par l'équipe.
       </p>
 
       {/* SÉLECTEUR DE MODE */}
@@ -1412,7 +1424,7 @@ export function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }:
       {mode === 'sortie' && (
         <div style={{ background:'rgba(245,200,76,0.08)', border:'1px solid rgba(245,200,76,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
           <p style={{ color:C.gold, fontSize:12, margin:0, lineHeight:1.6 }}>
-            Programmez la sortie officielle de votre œuvre. Vous chargez votre <strong>fichier complet</strong>, puis vous choisissez un <strong>extrait teaser</strong> (15s à 1 min) que les fans découvrent en streaming. Ils réservent leur téléchargement en payant à l'avance. Le jour J, le fichier complet est débloqué automatiquement pour tous ceux qui ont réservé — et il reste protégé jusque-là.
+            Les fans écoutent un extrait et réservent avant le jour J.
           </p>
         </div>
       )}
@@ -1487,7 +1499,7 @@ export function PublierContenuTab({ user, soldeOscart, artistName, onRecharge }:
               <div style={{ background:'rgba(93,132,255,0.08)', border:'1px solid rgba(93,132,255,0.25)', borderRadius:14, padding:16, margin:'14px 0' }}>
                 <p style={{ color:C.blueLite, fontSize:13, fontWeight:800, margin:'0 0 4px' }}>Créer l'extrait teaser</p>
                 <p style={{ color:C.textSoft, fontSize:11, lineHeight:1.6, margin:'0 0 14px' }}>
-                  Choisissez le passage que le public écoutera <strong>avant la sortie</strong>. Le fichier complet reste protégé : il ne sera débloqué que le jour J pour ceux qui ont réservé.
+                  Le passage que les fans écoutent avant la sortie.
                 </p>
 
                 {/* Durée de l'extrait */}
@@ -1844,7 +1856,7 @@ export function MotArtisteTab({ user, artistName }: any) {
     <div style={{ animation:'fadeUp .3s ease' }}>
       <h3 style={{ fontFamily:'serif', fontSize:18, fontWeight:800, marginBottom:6, color:C.text }}>Mon Mood</h3>
       <p style={{ color:C.textSoft, fontSize:13, marginBottom:12, lineHeight:1.6 }}>
-        Votre Mood est votre espace d'expression professionnel, public et validé par notre équipe. Ce n'est pas un espace de buzz ou de divertissement personnel.
+        Un message public à tes fans, validé par l'équipe.
       </p>
 
       <div style={{ background:'rgba(0,212,154,0.08)', border:'1px solid rgba(0,212,154,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
@@ -1923,6 +1935,7 @@ export function BioArtisteTab({ user, artistName, coverUrl }: any) {
   const [charge, setCharge] = useState(true);
   const [bioPhotoUrl, setBioPhotoUrl] = useState('');
   const [uploadPhoto, setUploadPhoto] = useState(false);
+  const [slugEnregistre, setSlugEnregistre] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -1933,6 +1946,7 @@ export function BioArtisteTab({ user, artistName, coverUrl }: any) {
           if (d.bioFormulaire) setForm((f) => ({ ...f, ...d.bioFormulaire }));
           if (d.bioTexte) { setBioTexte(d.bioTexte); setDejaPublie(true); }
           if (d.bioPhotoUrl) setBioPhotoUrl(d.bioPhotoUrl);
+          setSlugEnregistre(d.slug || snap.docs[0].id);
         }
       } catch (e) { console.error(e); }
       setCharge(false);
@@ -1978,13 +1992,16 @@ export function BioArtisteTab({ user, artistName, coverUrl }: any) {
         .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
       const snap = await getDocs(query(collection(db,'artists'), where('email','==',user.email.toLowerCase())));
       if (!snap.empty) {
-        await updateDoc(doc(db,'artists',snap.docs[0].id), { bioFormulaire: form, bioTexte, bioMiseAJour: new Date().toISOString(), slug, coverUrl });
+        // L'adresse du profil ne change plus une fois créée (stable pour Google et les liens partagés)
+        const slugFinal = snap.docs[0].data().slug || slug;
+        await updateDoc(doc(db,'artists',snap.docs[0].id), { bioFormulaire: form, bioTexte, bioMiseAJour: new Date().toISOString(), slug: slugFinal, coverUrl });
+        setSlugEnregistre(slugFinal);
       }
       setSauvegarde('done'); setDejaPublie(true);
       setTimeout(() => setSauvegarde('idle'), 2500);
     } catch (e) { console.error(e); setSauvegarde('idle'); }
   };
-  const slugActuel = (form.nom || artistName || '').toLowerCase()
+  const slugActuel = slugEnregistre || (form.nom || artistName || '').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
   if (charge) return <div style={{ textAlign:'center', padding:40, color:C.textSoft }}>Chargement...</div>;
@@ -1994,10 +2011,17 @@ export function BioArtisteTab({ user, artistName, coverUrl }: any) {
 
   return (
     <div>
-      <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, marginBottom:6, color:C.text }}>Ma Bio</h2>
-      <p style={{ color:C.textSoft, fontSize:12, marginBottom:20, lineHeight:1.6 }}>
-        Remplis le formulaire, l'IA rédige ta bio professionnelle. Elle sera visible sur ta page publique (avec ta pochette), que n'importe qui pourra consulter — y compris sur Google.
-      </p>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+        <h2 style={{ fontFamily:'serif', fontSize:20, fontWeight:800, margin:0, color:C.text }}>Mon profil</h2>
+        {slugActuel && (
+          <div style={{ display:'flex', gap:8 }}>
+            <a href={`/artiste-bio/${slugActuel}`} style={{ padding:'8px 14px', borderRadius:99, background:'linear-gradient(135deg,'+C.blue+',#0050d0)', color:'#fff', fontSize:12, fontWeight:700, textDecoration:'none' }}>Voir mon profil</a>
+            <button onClick={() => { const u = `https://doniel.art/artiste-bio/${slugActuel}`; if ((navigator as any).share) (navigator as any).share({ title: form.nom || artistName, url: u }).catch(() => {}); else { navigator.clipboard?.writeText(u); alert('Lien copié'); } }}
+              style={{ padding:'8px 14px', borderRadius:99, border:'1px solid '+C.border, background:'transparent', color:C.textSoft, fontSize:12, fontWeight:700, cursor:'pointer' }}>Partager</button>
+          </div>
+        )}
+      </div>
+      <p style={{ color:C.textSoft, fontSize:12, marginBottom:20 }}>Ta page publique, visible par les fans et sur Google.</p>
 
       <div style={{ marginBottom:20, textAlign:'center' }}>
         {(bioPhotoUrl || coverUrl) ? (

@@ -6613,6 +6613,34 @@ function ArtisteBioPage() {
     })();
   }, [slug]);
 
+  // Référencement : titre, description et données structurées de la page profil
+  useEffect(() => {
+    if (!artiste) return;
+    const nom = artiste.bioFormulaire?.nom || artiste.artistName || artiste.name || 'Artiste';
+    const resume = (artiste.bioTexte || '').split('\n').find((p: string) => p.trim())?.slice(0, 160)
+      || `${nom} sur Doniel Zik : écoute et télécharge ses titres.`;
+    const ancienTitre = document.title;
+    document.title = `${nom} | Doniel Zik`;
+    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    const ancienneDesc = meta?.content || '';
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
+    meta.content = resume;
+    const ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    ld.id = 'dz-ld-artiste';
+    ld.text = JSON.stringify({
+      '@context': 'https://schema.org', '@type': 'MusicGroup', name: nom,
+      url: `https://doniel.art/artiste-bio/${slug}`,
+      image: artiste.bioPhotoUrl || artiste.coverUrl || undefined,
+      description: resume,
+      genre: artiste.bioFormulaire?.genre || undefined,
+      track: titres.slice(0, 20).map((t: any) => ({ '@type': 'MusicRecording', name: t.label, url: `https://doniel.art/ecoute/${t.publicLinkId}` })),
+    });
+    document.getElementById('dz-ld-artiste')?.remove();
+    document.head.appendChild(ld);
+    return () => { document.title = ancienTitre; if (meta) meta.content = ancienneDesc; ld.remove(); };
+  }, [artiste, titres, slug]);
+
   const BLEU = '#1a6bff';
   if (statut === 'chargement') return (
     <div style={{ minHeight:'100vh', background:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
